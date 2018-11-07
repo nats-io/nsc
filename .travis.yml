@@ -24,6 +24,7 @@ script:
 - go test -i $EXCLUDE_VENDOR
 
 after_success:
+- go clean
 
 deploy:
 - provider: script
