@@ -61,7 +61,7 @@ func TestGenerateAccountExpiration(t *testing.T) {
 	require.NoError(t, err)
 
 	exp2 := time.Unix(ac.Expires, 0)
-	require.WithinDuration(t, exp, exp2, time.Second)
+	require.WithinDuration(t, exp, exp2, time.Second*5)
 }
 
 func TestGenerateAccountDefaultExpiration(t *testing.T) {
