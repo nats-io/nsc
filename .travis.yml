@@ -4,6 +4,9 @@ go:
 #  - 1.10.x
   - 1.11.x
 
+git:
+  depth: false
+
 install:
   - go get github.com/nats-io/nkeys
   - go get github.com/nats-io/jwt

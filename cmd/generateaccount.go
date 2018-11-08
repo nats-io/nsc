@@ -182,15 +182,17 @@ func GenerateAccountJWT(expiry string) (string, error) {
 		acct.Exports.Add(v.Export)
 	}
 
-	kp, err := s.GetKey()
+	kp, err := GetSeed()
 	if err != nil {
-		return "", fmt.Errorf("error reading account key: %v\n", err)
+		return "", err
 	}
 
 	jwt, err := acct.Encode(kp)
 	if err != nil {
 		return "", fmt.Errorf("error encoding account jwt: %v\n", err)
 	}
+
+	kp.Wipe()
 
 	return jwt, nil
 }

@@ -28,7 +28,7 @@ func TestLoadActivation(t *testing.T) {
 	dir := MakeTempDir(t)
 	os.Setenv(store.DataHomeEnv, dir)
 
-	s := InitStore(t)
+	s, _ := InitStore(t)
 
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)

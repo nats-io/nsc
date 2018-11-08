@@ -17,7 +17,6 @@ package store
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -36,7 +35,7 @@ const DefaultDirName = ".ncs"
 const DataHomeEnv = "NSC_HOME"
 const DataProfileEnv = "NSC_PROFILE"
 const DefaultProfile = "default"
-const KeyName = "account_priv.key"
+const PublicKey = "public.key"
 const AccountActivation = "account_activation"
 const Activations = "activations"
 const Users = "users"
@@ -105,7 +104,7 @@ func ListProfiles(dir string) ([]string, error) {
 	profiles := make([]string, 0)
 	for _, i := range infos {
 		if i.IsDir() {
-			p := filepath.Join(dir, i.Name(), KeyName)
+			p := filepath.Join(dir, i.Name(), PublicKey)
 			if _, err = os.Stat(p); err == nil {
 				profiles = append(profiles, i.Name())
 			}
@@ -126,7 +125,7 @@ func LoadStore(storeHomeDir string, profile string) (*Store, error) {
 	profile = Profile(profile)
 
 	dir := filepath.Join(home, profile)
-	t := filepath.Join(dir, KeyName)
+	t := filepath.Join(dir, PublicKey)
 
 	if _, err := os.Stat(t); os.IsNotExist(err) {
 		return nil, err
@@ -137,12 +136,15 @@ func LoadStore(storeHomeDir string, profile string) (*Store, error) {
 
 // CreateStore creates a new Store in the specified directory or $NSC_HOME environment variable
 // or ~/.nsc. If profile is is not specified it will $NSC_PROFILE or "default" will be attempted.
-// CreateStore will create the necessary directories and store the private key from KeyPair.
-func CreateStore(storeHomeDir string, profile string, kp nkeys.KeyPair) (*Store, error) {
-	if kp == nil {
-		return nil, errors.New("keypair is required")
-	}
+// CreateStore will create the necessary directories and store the public key.
+func CreateStore(storeHomeDir string, profile string, pk string) (*Store, error) {
 	var err error
+
+	_, err = nkeys.FromPublicKey([]byte(pk))
+	if err != nil {
+		return nil, fmt.Errorf("invalid public key: %v", err)
+	}
+
 	storeHomeDir, err = Home(storeHomeDir)
 	if err != nil {
 		return nil, err
@@ -158,12 +160,11 @@ func CreateStore(storeHomeDir string, profile string, kp nkeys.KeyPair) (*Store,
 	}
 
 	s := NewStore(storeHomeDir, profile)
-	kd, err := kp.Seed()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.Write(KeyName, []byte(kd)); err != nil {
+	if err := s.Write(PublicKey, []byte(pk)); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -249,11 +250,11 @@ func (s *Store) GetPublicKey() (string, error) {
 
 // Returns the public key stored in the store
 func (s *Store) GetKey() (nkeys.KeyPair, error) {
-	d, err := s.Read(KeyName)
+	d, err := s.Read(PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	pk, err := nkeys.FromSeed(d)
+	pk, err := nkeys.FromPublicKey(d)
 	if err != nil {
 		return nil, err
 	}

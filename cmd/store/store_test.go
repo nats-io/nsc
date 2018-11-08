@@ -68,8 +68,8 @@ func InitStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal("error creating temp dir", fp, err)
 	}
-	_, pub, kp := CreateAccount(t)
-	s, err := CreateStore(fp, "", kp)
+	_, pub, _ := CreateAccount(t)
+	s, err := CreateStore(fp, "", pub)
 	require.NoError(t, err)
 
 	_, _, okp := CreateOperator(t)
@@ -139,14 +139,14 @@ func TestLoadStoreRequiresKeyfile(t *testing.T) {
 	s, err := LoadStore(d, "")
 	require.Nil(t, s)
 	require.True(t, os.IsNotExist(err))
-	require.True(t, strings.Contains(err.Error(), KeyName))
+	require.True(t, strings.Contains(err.Error(), PublicKey))
 }
 
 func TestDefaultStore(t *testing.T) {
 	dir := MakeTempDir(t)
-	_, pk, k := CreateAccount(t)
+	_, pk, _ := CreateAccount(t)
 
-	s, err := CreateStore(dir, "", k)
+	s, err := CreateStore(dir, "", pk)
 	require.NoError(t, err)
 
 	pk2, err := s.GetPublicKey()

@@ -26,11 +26,11 @@ import (
 func TestAddUser(t *testing.T) {
 	seed, pub, _ := CreateUser(t)
 	_, pub2, _ := CreateUser(t)
-	aseed, apub, kp := CreateAccount(t)
+	aseed, apub, _ := CreateAccount(t)
 
 	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
 	os.Setenv(store.DataProfileEnv, "test")
-	store.CreateStore("", "", kp)
+	store.CreateStore("", "", apub)
 
 	defer func() {
 		os.Setenv(store.DataHomeEnv, "")

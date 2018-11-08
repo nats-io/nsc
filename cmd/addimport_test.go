@@ -36,7 +36,7 @@ func TestAddImportFlags(t *testing.T) {
 		os.Setenv(store.DataProfileEnv, "")
 	}()
 
-	s := InitStore(t)
+	s, _ := InitStore(t)
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)
 

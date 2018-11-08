@@ -60,7 +60,7 @@ func TestAddExportFlags(t *testing.T) {
 func TestGenerateAccount_Exports(t *testing.T) {
 	dir := MakeTempDir(t)
 	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, kp := InitStore(t)
 
 	_, _, err := ExecuteCmd(createAddExportCmd(), "--name", "tstream", "--stream", "foo.bar.>", "--tag", "stream")
 	require.NoError(t, err)
@@ -71,7 +71,8 @@ func TestGenerateAccount_Exports(t *testing.T) {
 	require.NoError(t, exports.Load())
 	require.Len(t, exports, 2)
 
-	out, _, err := ExecuteCmd(createGenerateAccountCmd())
+	out, _, err := ExecuteCmd(hoistFlags(createGenerateAccountCmd()), "-K", SeedKey(t, kp))
+	t.Log(out)
 	out = ExtractToken(out)
 
 	ac, err := jwt.DecodeAccountClaims(out)

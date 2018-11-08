@@ -151,13 +151,14 @@ func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
 	return seed, string(pub), kp
 }
 
-func InitStore(t *testing.T) *store.Store {
+func InitStore(t *testing.T) (*store.Store, nkeys.KeyPair) {
 	// reset the store - across test the first
 	// command will initialize - each test should
 	// get it's own store.
 	ngsStore = nil
+
 	_, pub, kp := CreateAccount(t)
-	s, err := store.CreateStore("", "", kp)
+	s, err := store.CreateStore("", "", pub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +171,19 @@ func InitStore(t *testing.T) *store.Store {
 		t.Fatal(err)
 	}
 	s.SetAccountActivation(token)
-	return s
+	return s, kp
+}
+
+func SeedKey(t *testing.T, kp nkeys.KeyPair) string {
+	d, err := kp.Seed()
+	require.NoError(t, err)
+	return string(d)
+}
+
+func PublicKey(t *testing.T, kp nkeys.KeyPair) string {
+	d, err := kp.PublicKey()
+	require.NoError(t, err)
+	return string(d)
 }
 
 func (p *AddUserParams) AsArgs() []string {

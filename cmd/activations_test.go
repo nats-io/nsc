@@ -29,14 +29,13 @@ func TestActivationUtil(t *testing.T) {
 	dir := MakeTempDir(t)
 
 	os.Setenv(store.DataHomeEnv, dir)
-	s := InitStore(t)
+	_, kp := InitStore(t)
 
-	pk, err := s.GetPublicKey()
-	require.NoError(t, err)
+	_, pub, _ := CreateAccount(t)
 
 	export := CreateExport(true, "foo")
 	export.Add(CreateExport(false, "bar")...)
-	token := CreateActivation(t, pk, nil, export...)
+	token := CreateActivation(t, pub, kp, export...)
 
 	claim, err := jwt.DecodeActivationClaims(token)
 	require.NoError(t, err)
@@ -55,7 +54,7 @@ func TestActivationUtil(t *testing.T) {
 	a, err := ParseActivations(tokens)
 	require.NoError(t, err)
 	require.Len(t, a, 1)
-	require.Equal(t, pk, a[0].Subject)
+	require.Equal(t, pub, a[0].Subject)
 
 	labels := ActivationLabels(a)
 	require.NoError(t, err)

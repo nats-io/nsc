@@ -110,7 +110,7 @@ func TestGenerateAccountNoExpiration(t *testing.T) {
 func TestGenerateAccountNoActivation(t *testing.T) {
 	dir := MakeTempDir(t)
 	os.Setenv(store.DataHomeEnv, dir)
-	s := InitStore(t)
+	s, _ := InitStore(t)
 	os.Remove(filepath.Join(s.Dir, s.Profile, store.AccountActivation))
 
 	_, _, err := ExecuteCmd(createGenerateAccountCmd())
@@ -120,7 +120,7 @@ func TestGenerateAccountNoActivation(t *testing.T) {
 func TestGenerateAccountExpiredActivation(t *testing.T) {
 	dir := MakeTempDir(t)
 	os.Setenv(store.DataHomeEnv, dir)
-	s := InitStore(t)
+	s, _ := InitStore(t)
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)
 

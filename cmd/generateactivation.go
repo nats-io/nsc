@@ -176,7 +176,7 @@ func (p *GenerateActivationParams) Run() (string, error) {
 		ac.Limits.Src = strings.Join(p.src, ",")
 	}
 
-	kp, err := s.GetKey()
+	kp, err := GetSeed()
 	if err != nil {
 		return "", err
 	}
@@ -185,6 +185,8 @@ func (p *GenerateActivationParams) Run() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	kp.Wipe()
 
 	d := FormatJwt("activation", token)
 

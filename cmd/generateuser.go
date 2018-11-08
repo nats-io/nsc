@@ -136,11 +136,6 @@ func (p *GenerateUserParams) ExportJWT() error {
 		return err
 	}
 
-	pk, err := s.GetKey()
-	if err != nil {
-		return fmt.Errorf("error loading account key: %v\n", err)
-	}
-
 	if s.Has(store.AccountActivation) {
 		activation, err := s.GetAccountActivation()
 		if err != nil {
@@ -188,10 +183,17 @@ func (p *GenerateUserParams) ExportJWT() error {
 			claims.Limits.Src = u.Src
 		}
 
+		pk, err := GetSeed()
+		if err != nil {
+			return err
+		}
+
 		token, err := claims.Encode(pk)
 		if err != nil {
 			return fmt.Errorf("error generating user jwt: %v\n", err)
 		}
+
+		pk.Wipe()
 
 		if err := s.WriteToken(token); err != nil {
 			return err

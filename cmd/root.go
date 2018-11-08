@@ -17,22 +17,31 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+const SeedKeyEnv = "NSC_SEED_KEY"
+const TestEnv = "NSC_TEST"
+
 var Version = "DEVELOPMENT"
+
 var cfgFile string
 var profileName string
+var seedKeyPath string
 var ngsHome string
 var ngsStore *store.Store
-var show, _ = strconv.ParseBool(os.Getenv("NGS_TEST"))
+
+// show some other hidden commands if the env is set
+var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 func getStore() (*store.Store, error) {
 	var err error
@@ -45,6 +54,55 @@ func getStore() (*store.Store, error) {
 	return ngsStore, nil
 }
 
+func GetSeedPath() string {
+	if seedKeyPath == "" {
+		seedKeyPath = os.Getenv(SeedKeyEnv)
+	}
+	return seedKeyPath
+}
+
+func GetSeed() (nkeys.KeyPair, error) {
+	p := GetSeedPath()
+	if p == "" {
+		return nil, fmt.Errorf("private key or keypath must be provided (--private-key, -K or in $%s)", SeedKeyEnv)
+	}
+
+	kp, err := nkeys.FromSeed([]byte(p))
+	if err != nil {
+		d, err := ioutil.ReadFile(p)
+		if err != nil {
+			return nil, fmt.Errorf("error reading private key: %v", err)
+		}
+
+		kp, err := nkeys.FromSeed(d)
+		if err != nil {
+			return nil, fmt.Errorf("error reading private key: %v", err)
+		}
+
+		if err := ValidateMatchesPublicKey(kp); err != nil {
+			return nil, err
+		}
+	}
+
+	return kp, nil
+}
+
+func ValidateMatchesPublicKey(kp nkeys.KeyPair) error {
+	s, err := getStore()
+	pk, err := s.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	vv, err := kp.PublicKey()
+	if err != nil {
+		return fmt.Errorf("error extracting public key from private: %v", err)
+	}
+	if pk != string(vv) {
+		return fmt.Errorf("invalid context - the public key extracted from the private key %q doesn't match the public key associated with the profile %q", string(vv), pk)
+	}
+	return nil
+}
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
@@ -54,6 +112,13 @@ var rootCmd = &cobra.Command{
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
 	Version: Version,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		_, err := getStore()
+		if err != nil {
+			return err
+		}
+		return nil
+	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 		if ngsStore != nil {
 			return ngsStore.Close()
@@ -74,8 +139,16 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVarP(&ngsHome, "nsc-home", "H", "", "nsc home directory")
-	rootCmd.PersistentFlags().StringVarP(&profileName, "profile-name", "a", "", "profile name")
+	hoistFlags(rootCmd)
+}
+
+// hostFlags adds persistent flags that would be added by the cobra framework
+// but are not because the unit tests are testing the command directly
+func hoistFlags(cmd *cobra.Command) *cobra.Command {
+	cmd.PersistentFlags().StringVarP(&ngsHome, "nsc-home", "H", "", "nsc home directory")
+	cmd.PersistentFlags().StringVarP(&profileName, "profile-name", "a", "", "profile name")
+	cmd.PersistentFlags().StringVarP(&seedKeyPath, "private-key", "K", "", "private key")
+	return cmd
 }
 
 // initConfig reads in config file and ENV variables if set.

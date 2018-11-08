@@ -46,7 +46,12 @@ func createTestCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := store.CreateStore(ngsHome, profileName, kp)
+			pk, err := kp.PublicKey()
+			if err != nil {
+				return err
+			}
+
+			s, err := store.CreateStore(ngsHome, profileName, string(pk))
 			if err != nil {
 				return err
 			}
