@@ -29,13 +29,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createInitClusterCmd() *cobra.Command {
-	var params InitClusterParams
+// addCmd represents the add command
+func createInitAccountCmd() *cobra.Command {
+	var params InitAccountParams
 
 	var cmd = &cobra.Command{
-		Use:    "operator",
+		Use:    "account",
 		Hidden: !show,
-		Short:  "initializes the current directory for operator configurations",
+		Short:  "initializes the current directory for account configurations",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := params.Validate(cmd); err != nil {
 				return err
@@ -50,19 +51,19 @@ func createInitClusterCmd() *cobra.Command {
 			}
 
 			if params.generate {
-				d := FormatKeys("operator", params.publicKey, string(d))
+				d := FormatKeys("account", params.publicKey, string(d))
 				if err := Write("--", d); err != nil {
 					return err
 				}
 			} else {
-				cmd.Printf("Success! - operator created %q\n", params.publicKey)
+				cmd.Printf("Success! - account created %q\n", params.publicKey)
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate operator nkey")
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "name for the operator")
+	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate account nkey")
+	cmd.Flags().StringVarP(&params.name, "name", "", "", "name for the account")
 	cmd.MarkFlagRequired("name")
 	cmd.MarkFlagRequired("private-key")
 
@@ -70,18 +71,17 @@ func createInitClusterCmd() *cobra.Command {
 }
 
 func init() {
-	initCmd.AddCommand(createInitClusterCmd())
+	initCmd.AddCommand(createInitAccountCmd())
 }
 
-type InitClusterParams struct {
+type InitAccountParams struct {
 	generate  bool
 	name      string
 	kp        nkeys.KeyPair
 	publicKey string
-	dir       string
 }
 
-func (p *InitClusterParams) Validate(cmd *cobra.Command) error {
+func (p *InitAccountParams) Validate(cmd *cobra.Command) error {
 	var err error
 
 	p.name = strings.TrimSpace(p.name)
@@ -108,9 +108,9 @@ func (p *InitClusterParams) Validate(cmd *cobra.Command) error {
 	}
 
 	if p.generate {
-		p.kp, err = nkeys.CreateOperator()
+		p.kp, err = nkeys.CreateAccount()
 		if err != nil {
-			return fmt.Errorf("error creating operator key: %v", err)
+			return fmt.Errorf("error creating account key: %v", err)
 		}
 	}
 
@@ -124,15 +124,15 @@ func (p *InitClusterParams) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("error reading public key: %v", err)
 		}
 
-		if !nkeys.IsValidPublicOperatorKey(pk) {
-			return fmt.Errorf("%q is not a valid operator key", string(pk))
+		if !nkeys.IsValidPublicAccountKey(pk) {
+			return fmt.Errorf("%q is not a valid account key", string(pk))
 		}
 	}
 
 	return nil
 }
 
-func (p *InitClusterParams) Run(args []string) error {
+func (p *InitAccountParams) Run(args []string) error {
 	if err := p.CreateStore(); err != nil {
 		return err
 	}
@@ -146,11 +146,11 @@ func (p *InitClusterParams) Run(args []string) error {
 	return nil
 }
 
-func (p *InitClusterParams) CreateStore() error {
+func (p *InitAccountParams) CreateStore() error {
 	var err error
 	d, err := p.kp.PublicKey()
 	if err != nil {
-		return fmt.Errorf("error reading or creating operator public key: %v", err)
+		return fmt.Errorf("error reading or creating account public key: %v", err)
 	}
 	p.publicKey = string(d)
 
@@ -158,28 +158,32 @@ func (p *InitClusterParams) CreateStore() error {
 	if err != nil {
 		return fmt.Errorf("error getting cwd: %v", err)
 	}
-	_, err = store.CreateStore(dir, p.publicKey, "operator", p.name)
+	_, err = store.CreateStore(dir, p.publicKey, "account", p.name)
 	return err
 }
 
-func (p *InitClusterParams) CreateDirs() error {
+func (p *InitAccountParams) CreateDirs() error {
 	// make some directories
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
-	cp := filepath.Join(s.Dir, "clusters")
+	cp := filepath.Join(s.Dir, "users")
 	return os.MkdirAll(cp, 0700)
 }
 
-func (p *InitClusterParams) WriteJwt() error {
-	c := jwt.NewOperatorClaims(p.publicKey)
+func (p *InitAccountParams) WriteJwt() error {
+	s, err := getStore()
+	if err != nil {
+		return err
+	}
+	c := jwt.NewAccountClaims(p.publicKey)
 	c.Name = p.name
 	d, err := c.Encode(p.kp)
 	if err != nil {
 		return err
 	}
 
-	fn := filepath.Join(p.dir, fmt.Sprintf("%s.jwt", p.name))
+	fn := filepath.Join(s.Dir, fmt.Sprintf("%s.jwt", p.name))
 	return ioutil.WriteFile(fn, []byte(d), 0666)
 }

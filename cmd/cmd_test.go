@@ -163,7 +163,7 @@ func CreateTestStore(t *testing.T) (*store.Store, string, nkeys.KeyPair) {
 	ngsStore = nil
 
 	_, pub, kp := CreateAccount(t)
-	s, err := store.CreateStore(p, pub)
+	s, err := store.CreateStore(p, pub, "account", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

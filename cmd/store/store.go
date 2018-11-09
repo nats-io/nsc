@@ -30,9 +30,8 @@ import (
 )
 
 // the keyfile name
-const DefaultDirName = ".ncs"
+const NSCFile = ".nsc"
 const DefaultProfile = "default"
-const PublicKey = ".public.key"
 const AccountActivation = "account_activation"
 const Activations = "activations"
 const Users = "users"
@@ -43,9 +42,8 @@ const Tokens = "tokens"
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
-	Dir     string
-	Profile string
-	Index   *Index
+	Dir   string
+	Index *Index
 }
 
 // FindCurrentStoreDir tries to find a store director
@@ -64,7 +62,7 @@ func FindCurrentStoreDir() (string, error) {
 func FindStoreDir(dir string) (string, error) {
 	var err error
 
-	pkp := filepath.Join(dir, PublicKey)
+	pkp := filepath.Join(dir, NSCFile)
 
 	if _, err := os.Stat(pkp); os.IsNotExist(err) {
 		parent := filepath.Dir(dir)
@@ -81,7 +79,7 @@ func FindStoreDir(dir string) (string, error) {
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(dir string, pk string) (*Store, error) {
+func CreateStore(dir string, pk string, sType string, name string) (*Store, error) {
 	var err error
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -107,7 +105,18 @@ func CreateStore(dir string, pk string) (*Store, error) {
 	}
 	s.Index = NewIndex(s)
 
-	if err := s.Write(PublicKey, []byte(pk)); err != nil {
+	m := make(map[string]string)
+	m["public_key"] = pk
+	m["type"] = sType
+	m["name"] = name
+
+	d, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing .nsc file: %v", err)
+	}
+	// end fixme
+
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), d, 0600); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -115,7 +124,7 @@ func CreateStore(dir string, pk string) (*Store, error) {
 
 // LoadStore loads a store from the specified directory path.
 func LoadStore(dir string) (*Store, error) {
-	pkf := filepath.Join(dir, PublicKey)
+	pkf := filepath.Join(dir, NSCFile)
 	if _, err := os.Stat(pkf); os.IsNotExist(err) {
 		return nil, err
 	}
@@ -136,7 +145,7 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) FilePath(name string) string {
-	return filepath.Join(s.Dir, s.Profile, name)
+	return filepath.Join(s.Dir, name)
 }
 
 // Write writes the specified file name or subpath in the store
@@ -144,7 +153,7 @@ func (s *Store) Write(name string, data []byte) error {
 	s.Lock()
 	defer s.Unlock()
 
-	fp := filepath.Join(s.Dir, s.Profile, name)
+	fp := filepath.Join(s.Dir, name)
 	dp := filepath.Dir(fp)
 	if err := os.MkdirAll(dp, 0700); err != nil {
 		return err
@@ -162,7 +171,7 @@ func (s *Store) WriteEntry(name string, entry interface{}) error {
 
 // Has returns true if the specified asset exists
 func (s *Store) Has(name string) bool {
-	fp := filepath.Join(s.Dir, s.Profile, name)
+	fp := filepath.Join(s.Dir, name)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return false
 	}
@@ -173,7 +182,7 @@ func (s *Store) Has(name string) bool {
 func (s *Store) Read(name string) ([]byte, error) {
 	s.Lock()
 	defer s.Unlock()
-	fp := filepath.Join(s.Dir, s.Profile, name)
+	fp := filepath.Join(s.Dir, name)
 	return ioutil.ReadFile(fp)
 }
 
@@ -181,7 +190,7 @@ func (s *Store) Read(name string) ([]byte, error) {
 func (s *Store) Delete(name string) error {
 	s.Lock()
 	defer s.Unlock()
-	fp := filepath.Join(s.Dir, s.Profile, name)
+	fp := filepath.Join(s.Dir, name)
 	return os.Remove(fp)
 }
 
@@ -208,11 +217,18 @@ func (s *Store) GetPublicKey() (string, error) {
 
 // Returns the public key stored in the store
 func (s *Store) GetKey() (nkeys.KeyPair, error) {
-	d, err := s.Read(PublicKey)
+	d, err := s.Read(NSCFile)
 	if err != nil {
 		return nil, err
 	}
-	pk, err := nkeys.FromPublicKey(d)
+
+	m := make(map[string]string)
+	err = json.Unmarshal(d, &m)
+	if err != nil {
+		return nil, fmt.Errorf("error deserializing .nsc file: %v", err)
+	}
+
+	pk, err := nkeys.FromPublicKey([]byte(m["public_key"]))
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +252,7 @@ func (s *Store) List(subDir string, ext string) ([]string, error) {
 	defer s.Unlock()
 
 	names := make([]string, 0)
-	dir := filepath.Join(s.Dir, s.Profile, subDir)
+	dir := filepath.Join(s.Dir, subDir)
 
 	if !s.Has(subDir) {
 		return nil, nil

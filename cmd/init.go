@@ -15,105 +15,15 @@
 
 package cmd
 
-import (
-	"errors"
-	"fmt"
-	"strings"
+import "github.com/spf13/cobra"
 
-	"github.com/nats-io/nkeys"
-	"github.com/spf13/cobra"
-)
-
-func createInitCmd() *cobra.Command {
-	var params InitParams
-
-	var cmd = &cobra.Command{
-		Use:    "initialize",
-		Hidden: true,
-		Short:  "initializes an directory for an account or operator",
-		Args:   cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Validate(args); err != nil {
-				return err
-			}
-			if err := params.Run(args); err != nil {
-
-			}
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVarP(&params.generate, "generate-nkeys", "", "", "generate nkeys ['account', 'operator', 'cluster']")
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "name to assign the profile")
-	cmd.Flags().StringVarP(&params.publicKey, "public-key", "k", "", "public key identifying the user - can be a filepath or a public nkey")
-	cmd.MarkFlagRequired("name")
-
-	return cmd
+// addCmd represents the add command
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "initialize a directory as an account, cluster or operator",
 }
 
 func init() {
-	rootCmd.AddCommand(createInitCmd())
-}
-
-type InitParams struct {
-	generate  string
-	name      string
-	publicKey string
-	seed      []byte
-}
-
-func (p *InitParams) Validate(args []string) error {
-	var err error
-	p.generate = strings.ToLower(p.generate)
-
-	if p.generate != "" && p.publicKey != "" {
-		return errors.New("specify either --generate-nkeys or --public-key")
-	}
-
-	if p.generate != "" && p.generate != "account" && p.generate != "operator" {
-		return fmt.Errorf("illegal value to --generate-nkeys option %q, only 'account', 'operator'", p.generate)
-	}
-
-	if p.publicKey != "" {
-		p.publicKey, err = GetKey(p.publicKey)
-		if err != nil {
-			return err
-		}
-	}
-
-	if !OkToWrite(args[0]) {
-		return fmt.Errorf("the path %q exists already", args[0])
-	}
-
-	return nil
-}
-
-func (p *InitParams) Run(args []string) error {
-
-	var err error
-	var kp nkeys.KeyPair
-	if p.generate != "" {
-		switch p.generate {
-		case "account":
-			kp, err = nkeys.CreateAccount()
-		case "operator":
-			kp, err = nkeys.CreateOperator()
-		}
-
-		if err != nil {
-			return err
-		}
-
-		p.seed, err = kp.Seed()
-		if err != nil {
-			return err
-		}
-
-		d, err := kp.PublicKey()
-		if err != nil {
-			return err
-		}
-		p.publicKey = string(d)
-	}
-	return nil
+	rootCmd.AddCommand(initCmd)
+	initCmd.AddCommand(createInitClusterCmd())
 }

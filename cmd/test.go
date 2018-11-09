@@ -16,13 +16,10 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +51,7 @@ func createTestCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := store.CreateStore(dir, string(pk))
+			s, err := store.CreateStore(dir, string(pk), "account", "test")
 			if err != nil {
 				return err
 			}
@@ -77,41 +74,13 @@ func createTestCmd() *cobra.Command {
 				return err
 			}
 			s.SetAccountActivation(token)
-			cmd.Printf("initialized test store %q for profile %q\n", s.Dir, s.Profile)
+			cmd.Printf("initialized test store %q\n", s.Dir)
 			return nil
-		},
-	}
-
-	var resetCmd = &cobra.Command{
-		Use:    "reset",
-		Short:  "Deletes the current store directory",
-		Long:   `Deletes the current store directory`,
-		Hidden: !show,
-		Run: func(cmd *cobra.Command, args []string) {
-
-			// TODO(sasbury) this doesn't work, you can't delete your current folder usually
-			dir, err := store.FindCurrentStoreDir()
-			if err != nil {
-				return
-			}
-
-			ok, err := cli.PromptYN(fmt.Sprintf("delete %q", dir))
-			if err != nil {
-				return
-			}
-			if ok {
-				if err := os.RemoveAll(dir); err != nil {
-					fmt.Printf("error removing %q: %v", dir, err)
-					return
-				}
-			}
-			fmt.Printf("Success! - %q was deleted\n", dir)
 		},
 	}
 
 	rootCmd.AddCommand(testCmd)
 	testCmd.AddCommand(initCmd)
-	testCmd.AddCommand(resetCmd)
 	return testCmd
 }
 

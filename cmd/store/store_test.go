@@ -68,7 +68,7 @@ func InitStore(t *testing.T) *Store {
 		t.Fatal("error creating temp dir", fp, err)
 	}
 	_, pub, _ := CreateAccount(t)
-	s, err := CreateStore(fp, pub)
+	s, err := CreateStore(fp, pub, "account", "test")
 	require.NoError(t, err)
 
 	_, _, okp := CreateOperator(t)
@@ -113,14 +113,14 @@ func TestLoadStoreRequiresKeyfile(t *testing.T) {
 	s, err := LoadStore(d)
 	require.Nil(t, s)
 	require.True(t, os.IsNotExist(err))
-	require.True(t, strings.Contains(err.Error(), PublicKey))
+	require.True(t, strings.Contains(err.Error(), NSCFile))
 }
 
 func TestDefaultStore(t *testing.T) {
 	dir := MakeTempDir(t)
 	_, pk, _ := CreateAccount(t)
 
-	s, err := CreateStore(dir, pk)
+	s, err := CreateStore(dir, pk, "account", "test")
 	require.NoError(t, err)
 
 	pk2, err := s.GetPublicKey()
@@ -159,7 +159,7 @@ func TestStoreCrud(t *testing.T) {
 	err := s.Write("testfile", []byte("hello"))
 	require.NoError(t, err)
 
-	fi, err := os.Stat(filepath.Join(s.Dir, s.Profile, "testfile"))
+	fi, err := os.Stat(filepath.Join(s.Dir, "testfile"))
 	require.NoError(t, err)
 	require.NotNil(t, fi)
 
@@ -184,7 +184,7 @@ func TestStoreEntryCrud(t *testing.T) {
 	err := s.WriteEntry("a/b", e)
 	require.NoError(t, err)
 
-	fi, err := os.Stat(filepath.Join(s.Dir, s.Profile, "a/b"))
+	fi, err := os.Stat(filepath.Join(s.Dir, "a/b"))
 	require.NoError(t, err)
 	require.NotNil(t, fi)
 
@@ -215,11 +215,11 @@ func TestList(t *testing.T) {
 	err = s.WriteEntry("a/b.test", e)
 	require.NoError(t, err)
 
-	fi, err := os.Stat(filepath.Join(s.Dir, s.Profile, "a/b"))
+	fi, err := os.Stat(filepath.Join(s.Dir, "a/b"))
 	require.NoError(t, err)
 	require.NotNil(t, fi)
 
-	fi, err = os.Stat(filepath.Join(s.Dir, s.Profile, "a/b.test"))
+	fi, err = os.Stat(filepath.Join(s.Dir, "a/b.test"))
 	require.NoError(t, err)
 	require.NotNil(t, fi)
 

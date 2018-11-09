@@ -97,7 +97,7 @@ func TestGenerateAccountNoExpiration(t *testing.T) {
 
 func TestGenerateAccountNoActivation(t *testing.T) {
 	s, _, _ := CreateTestStore(t)
-	os.Remove(filepath.Join(s.Dir, s.Profile, store.AccountActivation))
+	os.Remove(filepath.Join(s.Dir, store.AccountActivation))
 
 	_, _, err := ExecuteCmd(createGenerateAccountCmd())
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ func TestGenerateAccountExpiredActivation(t *testing.T) {
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)
 
-	fn := filepath.Join(s.Dir, s.Profile, store.AccountActivation)
+	fn := filepath.Join(s.Dir, store.AccountActivation)
 	os.Remove(fn)
 	d := CreateExpiringActivation(t, pk, nil)
 	ioutil.WriteFile(fn, []byte(d), 0644)
