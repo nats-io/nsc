@@ -18,7 +18,6 @@ package store
 import (
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -69,7 +68,7 @@ func InitStore(t *testing.T) *Store {
 		t.Fatal("error creating temp dir", fp, err)
 	}
 	_, pub, _ := CreateAccount(t)
-	s, err := CreateStore(fp, "", pub)
+	s, err := CreateStore(fp, pub)
 	require.NoError(t, err)
 
 	_, _, okp := CreateOperator(t)
@@ -82,61 +81,36 @@ func InitStore(t *testing.T) *Store {
 	return s
 }
 
-func TestListStoresEmpty(t *testing.T) {
-	dir, err := ioutil.TempDir("", "store")
+func TestFindStore(t *testing.T) {
+	s := InitStore(t)
+	sub := filepath.Join(s.Dir, "foo")
+	err := os.Mkdir(sub, 0777)
+	require.NoError(t, err)
+	sub2 := filepath.Join(sub, "bar")
+	err = os.Mkdir(sub2, 0777)
 	require.NoError(t, err)
 
-	profiles, err := ListProfiles(dir)
-	require.NoError(t, err)
-	require.Zero(t, len(profiles))
+	sf, err := FindStoreDir(sub2)
+	require.Equal(t, sf, s.Dir)
 }
 
-func TestNgsHomeWithSpecifiedPath(t *testing.T) {
-	p, err := Home("/foo/bar")
-	require.NoError(t, err)
-	require.Equal(t, "/foo/bar", p)
-}
-
-func TestNgsHomeFromEnv(t *testing.T) {
-	os.Setenv(DataHomeEnv, "/bar/foo")
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-	p, err := Home("")
-	require.NoError(t, err)
-	require.Equal(t, "/bar/foo", p)
-}
-
-func TestDefaultNgsHome(t *testing.T) {
-	u, err := user.Current()
-	require.NoError(t, err)
-	expected := filepath.Join(u.HomeDir, DefaultDirName)
-
-	d, err := Home("")
-	require.NoError(t, err)
-
-	require.Equal(t, expected, d)
-}
-
-func TestListProfilesNilIfNotExist(t *testing.T) {
-	profiles, err := ListProfiles("/foo/bar")
-	require.NoError(t, err)
-	require.Nil(t, profiles)
-}
-
-func TestNgsHomeNotReadable(t *testing.T) {
+func TestDoNotFindStore(t *testing.T) {
 	d := MakeTempDir(t)
-	td := filepath.Join(d, "foo")
-	err := os.Mkdir(td, 0333)
+	sub := filepath.Join(d, "foo")
+	err := os.Mkdir(sub, 0777)
+	require.NoError(t, err)
+	sub2 := filepath.Join(sub, "bar")
+	err = os.Mkdir(sub2, 0777)
 	require.NoError(t, err)
 
-	_, err = ListProfiles(td)
-	require.True(t, os.IsPermission(err), "should have gotten permission error")
+	sf, err := FindStoreDir(sub2)
+	require.Error(t, err)
+	require.Equal(t, sf, "")
 }
 
 func TestLoadStoreRequiresKeyfile(t *testing.T) {
 	d := MakeTempDir(t)
-	s, err := LoadStore(d, "")
+	s, err := LoadStore(d)
 	require.Nil(t, s)
 	require.True(t, os.IsNotExist(err))
 	require.True(t, strings.Contains(err.Error(), PublicKey))
@@ -146,26 +120,20 @@ func TestDefaultStore(t *testing.T) {
 	dir := MakeTempDir(t)
 	_, pk, _ := CreateAccount(t)
 
-	s, err := CreateStore(dir, "", pk)
+	s, err := CreateStore(dir, pk)
 	require.NoError(t, err)
 
 	pk2, err := s.GetPublicKey()
 	require.NoError(t, err)
 
 	require.Equal(t, pk, pk2)
-	require.Equal(t, DefaultProfile, s.Profile)
 	require.Equal(t, dir, s.Dir)
-
-	profiles, err := ListProfiles(dir)
-	require.NoError(t, err)
-
-	require.ElementsMatch(t, []string{DefaultProfile}, profiles)
 }
 
 func TestLoadStore(t *testing.T) {
 	s := InitStore(t)
 	dir := s.Dir
-	s, err := LoadStore(dir, "")
+	s, err := LoadStore(dir)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -187,12 +155,6 @@ func TestLoadStore(t *testing.T) {
 }
 
 func TestStoreCrud(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(DataHomeEnv, dir)
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-
 	s := InitStore(t)
 	err := s.Write("testfile", []byte("hello"))
 	require.NoError(t, err)
@@ -211,12 +173,6 @@ func TestStoreCrud(t *testing.T) {
 }
 
 func TestStoreEntryCrud(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(DataHomeEnv, dir)
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-
 	s := InitStore(t)
 
 	type ts struct {
@@ -245,12 +201,6 @@ func TestStoreEntryCrud(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(DataHomeEnv, dir)
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-
 	s := InitStore(t)
 
 	type ts struct {
@@ -283,12 +233,6 @@ func TestList(t *testing.T) {
 }
 
 func TestListingNonExisting(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(DataHomeEnv, dir)
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-
 	s := InitStore(t)
 
 	type ts struct {
@@ -306,12 +250,6 @@ func TestListingNonExisting(t *testing.T) {
 }
 
 func TestListSkipsNested(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(DataHomeEnv, dir)
-	defer func() {
-		os.Setenv(DataHomeEnv, "")
-	}()
-
 	s := InitStore(t)
 
 	type ts struct {

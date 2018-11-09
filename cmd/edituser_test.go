@@ -16,18 +16,13 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEditUser(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	os.Setenv(store.DataProfileEnv, "test")
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	p := AddUserParams{}
 	_, p.publicKey, _ = CreateUser(t)
@@ -119,10 +114,7 @@ func TestUserEdits(t *testing.T) {
 	}
 
 	for _, v := range tests {
-		dir := MakeTempDir(t)
-		os.Setenv(store.DataHomeEnv, dir)
-		os.Setenv(store.DataProfileEnv, "test")
-		InitStore(t)
+		_, _, _ = CreateTestStore(t)
 
 		_, pk, _ := CreateUser(t)
 		AddUser(t, pk, v.createFlags...)

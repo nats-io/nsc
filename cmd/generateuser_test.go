@@ -17,22 +17,17 @@ package cmd
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateUser(t *testing.T) {
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-
-	_, kp := InitStore(t)
+	_, _, kp := CreateTestStore(t)
 	seed := SeedKey(t, kp)
 
 	up := CreateUserParams(t, "export")
@@ -51,10 +46,7 @@ func TestGenerateUser(t *testing.T) {
 }
 
 func TestGenerateUserJWT(t *testing.T) {
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-
-	_, kp := InitStore(t)
+	_, _, kp := CreateTestStore(t)
 
 	up := CreateUserParams(t, "testuser")
 	AddUserFromParams(t, up)
@@ -101,10 +93,7 @@ func TestGenerateUserJWT(t *testing.T) {
 }
 
 func TestGenerateUserCustomExpiry(t *testing.T) {
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-
-	s, kp := InitStore(t)
+	s, _, kp := CreateTestStore(t)
 	apk, err := s.GetPublicKey()
 
 	up := CreateUserParams(t, "testuser")
@@ -125,10 +114,7 @@ func TestGenerateUserCustomExpiry(t *testing.T) {
 }
 
 func TestGenerateUserNoExpiry(t *testing.T) {
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-
-	s, kp := InitStore(t)
+	s, _, kp := CreateTestStore(t)
 	apk, err := s.GetPublicKey()
 
 	up := CreateUserParams(t, "testuser")
@@ -148,11 +134,7 @@ func TestGenerateUserNoExpiry(t *testing.T) {
 }
 
 func TestGenerateUserJWTFile(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	os.Setenv(store.DataProfileEnv, "test")
-
-	s, kp := InitStore(t)
+	s, dir, kp := CreateTestStore(t)
 	apk, err := s.GetPublicKey()
 
 	up := CreateUserParams(t, "testuser")

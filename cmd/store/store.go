@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path"
 	"path/filepath"
 	"strings"
@@ -32,10 +31,8 @@ import (
 
 // the keyfile name
 const DefaultDirName = ".ncs"
-const DataHomeEnv = "NSC_HOME"
-const DataProfileEnv = "NSC_PROFILE"
 const DefaultProfile = "default"
-const PublicKey = "public.key"
+const PublicKey = ".public.key"
 const AccountActivation = "account_activation"
 const Activations = "activations"
 const Users = "users"
@@ -51,122 +48,83 @@ type Store struct {
 	Index   *Index
 }
 
-func NewStore(dir string, profile string) *Store {
-	var s Store
-	s.Dir = dir
-	s.Profile = profile
-	s.Index = NewIndex(&s)
-	return &s
-}
-
-func Home(storeHomeDir string) (string, error) {
-	if storeHomeDir == "" {
-		storeHomeDir = os.Getenv(DataHomeEnv)
-		if storeHomeDir == "" {
-			u, err := user.Current()
-			if err != nil {
-				return "", err
-			}
-			storeHomeDir = filepath.Join(u.HomeDir, DefaultDirName)
-		}
-	}
-	return storeHomeDir, nil
-}
-
-func Profile(profile string) string {
-	if profile == "" {
-		profile = os.Getenv(DataProfileEnv)
-		if profile == "" {
-			profile = DefaultProfile
-		}
-	}
-	return profile
-}
-
-// ListProfiles returns the names of profiles found in the specified directory
-// if no directory is specified, the function will try to obtain it from
-// $NSC_HOME environment variable. If $NSC_HOME is not defined, then the ~/.nsc
-// is used
-func ListProfiles(dir string) ([]string, error) {
-	dir, err := Home(dir)
+// FindCurrentStoreDir tries to find a store director
+// starting with the current working dif
+func FindCurrentStoreDir() (string, error) {
+	wd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	infos, err := ioutil.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	profiles := make([]string, 0)
-	for _, i := range infos {
-		if i.IsDir() {
-			p := filepath.Join(dir, i.Name(), PublicKey)
-			if _, err = os.Stat(p); err == nil {
-				profiles = append(profiles, i.Name())
-			}
-		}
-	}
-	return profiles, nil
+	return FindStoreDir(wd)
 }
 
-// LoadStore loads a store from the specified directory path and profile name.
-// If not specified, $NSC_HOME or ~/.nsc will be attempted. If a profile name
-// is not provided, $NSC_PROFILE or "default" will be attempted.
-func LoadStore(storeHomeDir string, profile string) (*Store, error) {
-	home, err := Home(storeHomeDir)
-	if err != nil {
-		return nil, err
-	}
-
-	profile = Profile(profile)
-
-	dir := filepath.Join(home, profile)
-	t := filepath.Join(dir, PublicKey)
-
-	if _, err := os.Stat(t); os.IsNotExist(err) {
-		return nil, err
-	}
-
-	return NewStore(home, profile), nil
-}
-
-// CreateStore creates a new Store in the specified directory or $NSC_HOME environment variable
-// or ~/.nsc. If profile is is not specified it will $NSC_PROFILE or "default" will be attempted.
-// CreateStore will create the necessary directories and store the public key.
-func CreateStore(storeHomeDir string, profile string, pk string) (*Store, error) {
+// FindStore starts at the directory provided and tries to
+// find a directory containing the public key. This function
+// checks dir and then works its way up the folder path.
+func FindStoreDir(dir string) (string, error) {
 	var err error
+
+	pkp := filepath.Join(dir, PublicKey)
+
+	if _, err := os.Stat(pkp); os.IsNotExist(err) {
+		parent := filepath.Dir(dir)
+
+		if parent == dir {
+			return "", fmt.Errorf("no store directory found")
+		}
+
+		return FindStoreDir(parent)
+	}
+
+	return dir, err
+}
+
+// CreateStore creates a new Store in the specified directory.
+// CreateStore will create the necessary directories and store the public key.
+func CreateStore(dir string, pk string) (*Store, error) {
+	var err error
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil, err
+	}
+
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(files) != 0 {
+		return nil, fmt.Errorf("%s is not empty, only an empty folder can be sused for a new store", dir)
+	}
 
 	_, err = nkeys.FromPublicKey([]byte(pk))
 	if err != nil {
 		return nil, fmt.Errorf("invalid public key: %v", err)
 	}
 
-	storeHomeDir, err = Home(storeHomeDir)
-	if err != nil {
-		return nil, err
+	s := &Store{
+		Dir: dir,
 	}
-
-	profile = Profile(profile)
-
-	dir := filepath.Join(storeHomeDir, profile)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0700); err != nil {
-			return nil, err
-		}
-	}
-
-	s := NewStore(storeHomeDir, profile)
-	if err != nil {
-		return nil, err
-	}
+	s.Index = NewIndex(s)
 
 	if err := s.Write(PublicKey, []byte(pk)); err != nil {
 		return nil, err
 	}
+	return s, nil
+}
+
+// LoadStore loads a store from the specified directory path.
+func LoadStore(dir string) (*Store, error) {
+	pkf := filepath.Join(dir, PublicKey)
+	if _, err := os.Stat(pkf); os.IsNotExist(err) {
+		return nil, err
+	}
+
+	s := &Store{
+		Dir: dir,
+	}
+	s.Index = NewIndex(s)
+
 	return s, nil
 }
 

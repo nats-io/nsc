@@ -18,8 +18,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/user"
-	"path/filepath"
 	"time"
 
 	"github.com/nats-io/jwt"
@@ -51,7 +49,12 @@ func createTestCmd() *cobra.Command {
 				return err
 			}
 
-			s, err := store.CreateStore(ngsHome, profileName, string(pk))
+			dir, err := store.FindCurrentStoreDir()
+			if err != nil {
+				return err
+			}
+
+			s, err := store.CreateStore(dir, string(pk))
 			if err != nil {
 				return err
 			}
@@ -81,31 +84,28 @@ func createTestCmd() *cobra.Command {
 
 	var resetCmd = &cobra.Command{
 		Use:    "reset",
-		Short:  "Deletes the $NSC_HOME directory",
-		Long:   `Deletes the $NSC_HOME directory`,
+		Short:  "Deletes the current store directory",
+		Long:   `Deletes the current store directory`,
 		Hidden: !show,
 		Run: func(cmd *cobra.Command, args []string) {
-			ngsHomeDir := os.Getenv(store.DataHomeEnv)
-			if ngsHomeDir == "" {
-				u, err := user.Current()
-				if err != nil {
-					fmt.Printf("error obtaining user home directory: %v", err)
-					return
-				}
-				ngsHomeDir = filepath.Join(u.HomeDir, store.DefaultDirName)
+
+			// TODO(sasbury) this doesn't work, you can't delete your current folder usually
+			dir, err := store.FindCurrentStoreDir()
+			if err != nil {
+				return
 			}
 
-			ok, err := cli.PromptYN(fmt.Sprintf("delete %q", ngsHomeDir))
+			ok, err := cli.PromptYN(fmt.Sprintf("delete %q", dir))
 			if err != nil {
 				return
 			}
 			if ok {
-				if err := os.RemoveAll(ngsHomeDir); err != nil {
-					fmt.Printf("error removing %q: %v", ngsHomeDir, err)
+				if err := os.RemoveAll(dir); err != nil {
+					fmt.Printf("error removing %q: %v", dir, err)
 					return
 				}
 			}
-			fmt.Printf("Success! - %q was deleted\n", ngsHomeDir)
+			fmt.Printf("Success! - %q was deleted\n", dir)
 		},
 	}
 

@@ -16,10 +16,8 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,14 +26,7 @@ func TestAddUser(t *testing.T) {
 	_, pub2, _ := CreateUser(t)
 	aseed, apub, _ := CreateAccount(t)
 
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-	store.CreateStore("", "", apub)
-
-	defer func() {
-		os.Setenv(store.DataHomeEnv, "")
-		os.Setenv(store.DataProfileEnv, "")
-	}()
+	_, _, _ = CreateTestStore(t)
 
 	tests := CmdTests{
 		{createAddUserCmd(), []string{"add", "user"}, nil, []string{"--public-key", "--generate-nkeys"}, true},
@@ -77,16 +68,7 @@ func TestAddUser(t *testing.T) {
 }
 
 func TestAddUserData(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	os.Setenv(store.DataProfileEnv, "test")
-
-	defer func() {
-		os.Setenv(store.DataHomeEnv, "")
-		os.Setenv(store.DataProfileEnv, "")
-	}()
-
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	up := CreateUserParams(t, "test")
 	_, _, err := ExecuteCmd(createAddUserCmd(), up.AsArgs()...)

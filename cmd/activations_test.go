@@ -16,20 +16,15 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestActivationUtil(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	_, kp := InitStore(t)
+	_, dir, kp := CreateTestStore(t)
 
 	_, pub, _ := CreateAccount(t)
 
@@ -73,9 +68,7 @@ func TestParseActivationsNilOnError(t *testing.T) {
 }
 
 func TestListActivationsNone(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 	a, err := ListActivations()
 	require.NoError(t, err)
 	require.Len(t, a, 0)

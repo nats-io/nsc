@@ -28,10 +28,7 @@ import (
 )
 
 func TestGenerateAccount(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	tests := CmdTests{
 		{createGenerateAccountCmd(), []string{"export", "account"}, []string{"BEGIN ACCOUNT JWT", "END ACCOUNT JWT"}, nil, false},
@@ -41,10 +38,7 @@ func TestGenerateAccount(t *testing.T) {
 }
 
 func TestGenerateAccountExpiration(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, dir, _ := CreateTestStore(t)
 
 	fn := filepath.Join(dir, "output.jwt")
 	_, _, err := ExecuteCmd(createGenerateAccountCmd(), "-e", "2d", "-o", fn)
@@ -65,10 +59,7 @@ func TestGenerateAccountExpiration(t *testing.T) {
 }
 
 func TestGenerateAccountDefaultExpiration(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, dir, _ := CreateTestStore(t)
 
 	fn := filepath.Join(dir, "output.jwt")
 
@@ -87,10 +78,7 @@ func TestGenerateAccountDefaultExpiration(t *testing.T) {
 }
 
 func TestGenerateAccountNoExpiration(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, dir, _ := CreateTestStore(t)
 
 	fn := filepath.Join(dir, "output.jwt")
 
@@ -108,9 +96,7 @@ func TestGenerateAccountNoExpiration(t *testing.T) {
 }
 
 func TestGenerateAccountNoActivation(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	s, _ := InitStore(t)
+	s, _, _ := CreateTestStore(t)
 	os.Remove(filepath.Join(s.Dir, s.Profile, store.AccountActivation))
 
 	_, _, err := ExecuteCmd(createGenerateAccountCmd())
@@ -118,9 +104,7 @@ func TestGenerateAccountNoActivation(t *testing.T) {
 }
 
 func TestGenerateAccountExpiredActivation(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	s, _ := InitStore(t)
+	s, _, _ := CreateTestStore(t)
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)
 

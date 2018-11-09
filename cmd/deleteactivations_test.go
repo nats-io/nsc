@@ -16,20 +16,15 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeleteActivation(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	s, _ := InitStore(t)
+	s, dir, _ := CreateTestStore(t)
 
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)

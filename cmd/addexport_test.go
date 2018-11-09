@@ -16,24 +16,14 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAddExportFlags(t *testing.T) {
-
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-	InitStore(t)
-
-	defer func() {
-		os.Setenv(store.DataHomeEnv, "")
-		os.Setenv(store.DataProfileEnv, "")
-	}()
+	_, _, _ = CreateTestStore(t)
 
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export"}, nil, []string{"required flag(s) \"name\" not set"}, true},
@@ -58,9 +48,7 @@ func TestAddExportFlags(t *testing.T) {
 }
 
 func TestGenerateAccount_Exports(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	_, kp := InitStore(t)
+	_, _, kp := CreateTestStore(t)
 
 	_, _, err := ExecuteCmd(createAddExportCmd(), "--name", "tstream", "--stream", "foo.bar.>", "--tag", "stream")
 	require.NoError(t, err)

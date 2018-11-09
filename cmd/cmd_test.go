@@ -151,17 +151,25 @@ func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
 	return seed, string(pub), kp
 }
 
-func InitStore(t *testing.T) (*store.Store, nkeys.KeyPair) {
+func CreateTestStore(t *testing.T) (*store.Store, string, nkeys.KeyPair) {
+	p, err := ioutil.TempDir("", "store_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// reset the store - across test the first
 	// command will initialize - each test should
 	// get it's own store.
 	ngsStore = nil
 
 	_, pub, kp := CreateAccount(t)
-	s, err := store.CreateStore("", "", pub)
+	s, err := store.CreateStore(p, pub)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	os.Chdir(p) // Go to the store folder
+
 	_, _, okp := CreateOperator(t)
 
 	ac := jwt.NewActivationClaims(pub)
@@ -171,7 +179,7 @@ func InitStore(t *testing.T) (*store.Store, nkeys.KeyPair) {
 		t.Fatal(err)
 	}
 	s.SetAccountActivation(token)
-	return s, kp
+	return s, s.Dir, kp
 }
 
 func SeedKey(t *testing.T, kp nkeys.KeyPair) string {

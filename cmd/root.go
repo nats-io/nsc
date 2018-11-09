@@ -35,18 +35,19 @@ const TestEnv = "NSC_TEST"
 var Version = "DEVELOPMENT"
 
 var cfgFile string
-var profileName string
 var seedKeyPath string
-var ngsHome string
 var ngsStore *store.Store
 
 // show some other hidden commands if the env is set
 var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 func getStore() (*store.Store, error) {
-	var err error
 	if ngsStore == nil {
-		ngsStore, err = store.LoadStore(ngsHome, profileName)
+		storeDir, err := store.FindCurrentStoreDir()
+		if err != nil {
+			return nil, err
+		}
+		ngsStore, err = store.LoadStore(storeDir)
 		if err != nil {
 			return nil, err
 		}
@@ -166,8 +167,6 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&ngsHome, "nsc-home", "H", "", "nsc home directory")
-	cmd.PersistentFlags().StringVarP(&profileName, "profile-name", "a", "", "profile name")
 	cmd.PersistentFlags().StringVarP(&seedKeyPath, "private-key", "K", "", "private key")
 	return cmd
 }

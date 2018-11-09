@@ -16,18 +16,13 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEmptyExports(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	var exports Exports
 	require.NoError(t, exports.Load(), "error loading")
@@ -36,9 +31,7 @@ func TestEmptyExports(t *testing.T) {
 }
 
 func TestExports_AddService(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	var exports Exports
 	require.NoError(t, exports.Load(), "error loading")
@@ -49,9 +42,7 @@ func TestExports_AddService(t *testing.T) {
 }
 
 func TestExports_AddStream(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	var exports Exports
 	require.NoError(t, exports.Load(), "error loading")
@@ -62,9 +53,7 @@ func TestExports_AddStream(t *testing.T) {
 }
 
 func TestExports_Load(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	var exports Exports
 	require.NoError(t, exports.Load(), "error loading")

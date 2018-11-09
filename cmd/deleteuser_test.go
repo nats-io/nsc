@@ -16,17 +16,13 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeleteUserCmd(t *testing.T) {
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-	InitStore(t)
+	_, _, _ = CreateTestStore(t)
 
 	_, pk, _ := CreateUser(t)
 

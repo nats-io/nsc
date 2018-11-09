@@ -16,23 +16,12 @@
 package cmd
 
 import (
-	"os"
 	"testing"
-
-	"github.com/nats-io/nsc/cmd/store"
 )
 
 func TestGenerateActivation(t *testing.T) {
 	_, pub, _ := CreateAccount(t)
-
-	os.Setenv(store.DataHomeEnv, MakeTempDir(t))
-	os.Setenv(store.DataProfileEnv, "test")
-	InitStore(t)
-
-	defer func() {
-		os.Setenv(store.DataHomeEnv, "")
-		os.Setenv(store.DataProfileEnv, "")
-	}()
+	_, _, _ = CreateTestStore(t)
 
 	tests := CmdTests{
 		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"required flag(s) \"name\" not set"}, true},

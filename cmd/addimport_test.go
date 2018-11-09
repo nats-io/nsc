@@ -17,26 +17,16 @@ package cmd
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAddImportFlags(t *testing.T) {
-	dir := MakeTempDir(t)
-	os.Setenv(store.DataHomeEnv, dir)
-	os.Setenv(store.DataProfileEnv, "test")
+	s, dir, _ := CreateTestStore(t)
 
-	defer func() {
-		os.Setenv(store.DataHomeEnv, "")
-		os.Setenv(store.DataProfileEnv, "")
-	}()
-
-	s, _ := InitStore(t)
 	pk, err := s.GetPublicKey()
 	require.NoError(t, err)
 
