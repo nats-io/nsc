@@ -16,11 +16,9 @@
 package store
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -29,58 +27,38 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-// the keyfile name
+var accountDirs = []string{Users}
+var operatorDirs = []string{Accounts, Clusters}
+var clusterDirs = []string{Servers}
+
 const NSCFile = ".nsc"
-const DefaultProfile = "default"
-const AccountActivation = "account_activation"
-const Activations = "activations"
+
 const Users = "users"
-const Exports = "exports"
-const Imports = "imports"
-const Tokens = "tokens"
+const Accounts = "accounts"
+const Clusters = "clusters"
+const Servers = "servers"
+
+const storeVersion = "1"
 
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
-	Dir   string
-	Index *Index
+	Dir string
 }
 
-// FindCurrentStoreDir tries to find a store director
-// starting with the current working dif
-func FindCurrentStoreDir() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return FindStoreDir(wd)
-}
-
-// FindStore starts at the directory provided and tries to
-// find a directory containing the public key. This function
-// checks dir and then works its way up the folder path.
-func FindStoreDir(dir string) (string, error) {
-	var err error
-
-	pkp := filepath.Join(dir, NSCFile)
-
-	if _, err := os.Stat(pkp); os.IsNotExist(err) {
-		parent := filepath.Dir(dir)
-
-		if parent == dir {
-			return "", fmt.Errorf("no store directory found")
-		}
-
-		return FindStoreDir(parent)
-	}
-
-	return dir, err
+func SafeName(n string) string {
+	n = strings.TrimSpace(n)
+	return n
 }
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(dir string, pk string, sType string, name string) (*Store, error) {
+func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 	var err error
+
+	s := &Store{
+		Dir: dir,
+	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, err
@@ -95,83 +73,79 @@ func CreateStore(dir string, pk string, sType string, name string) (*Store, erro
 		return nil, fmt.Errorf("%s is not empty, only an empty folder can be sused for a new store", dir)
 	}
 
-	_, err = nkeys.FromPublicKey([]byte(pk))
+	pub, err := kp.PublicKey()
 	if err != nil {
-		return nil, fmt.Errorf("invalid public key: %v", err)
+		return nil, fmt.Errorf("error reading public key: %v", err)
 	}
 
-	s := &Store{
-		Dir: dir,
+	var subdirs []string
+	var v = jwt.NewGenericClaims(string(pub))
+	v.Name = name
+	if nkeys.IsValidPublicOperatorKey(pub) {
+		v.Type = jwt.OperatorClaim
+		subdirs = operatorDirs
+	} else if nkeys.IsValidPublicAccountKey(pub) {
+		v.Type = jwt.AccountClaim
+		subdirs = accountDirs
+	} else if nkeys.IsValidPublicClusterKey(pub) {
+		v.Type = jwt.ClusterClaim
+		subdirs = clusterDirs
+	} else {
+		return nil, fmt.Errorf("unexpected key type %q", pub)
 	}
-	s.Index = NewIndex(s)
 
-	m := make(map[string]string)
-	m["public_key"] = pk
-	m["type"] = sType
-	m["name"] = name
-
-	d, err := json.Marshal(m)
-	if err != nil {
-		return nil, fmt.Errorf("error serializing .nsc file: %v", err)
-	}
-	// end fixme
-
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), d, 0600); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(storeVersion), 0600); err != nil {
 		return nil, err
 	}
+
+	token, err := v.Encode(kp)
+	if err != nil {
+		return nil, err
+	}
+
+	fn := fmt.Sprintf("%s.jwt", SafeName(name))
+
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, fn), []byte(token), 0600); err != nil {
+		return nil, err
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(storeVersion), 0600); err != nil {
+		return nil, err
+	}
+
+	for _, d := range subdirs {
+		dp := s.resolve(d, "")
+		if err = os.MkdirAll(dp, 0700); err != nil {
+			return nil, fmt.Errorf("error creating %q: %v", dp, err)
+		}
+	}
+
 	return s, nil
 }
 
 // LoadStore loads a store from the specified directory path.
 func LoadStore(dir string) (*Store, error) {
-	pkf := filepath.Join(dir, NSCFile)
-	if _, err := os.Stat(pkf); os.IsNotExist(err) {
-		return nil, err
+	sf := filepath.Join(dir, NSCFile)
+	if _, err := os.Stat(sf); os.IsNotExist(err) {
+		return nil, fmt.Errorf("%q is not a valid configuration directory", sf)
 	}
-
 	s := &Store{
 		Dir: dir,
 	}
-	s.Index = NewIndex(s)
-
 	return s, nil
 }
 
-func (s *Store) Close() error {
-	if s.Index != nil {
-		return s.Index.Close()
+func (s *Store) resolve(kind string, name string) string {
+	sp := name
+	if kind != "" {
+		sp = filepath.Join(kind, name)
 	}
-	return nil
-}
-
-func (s *Store) FilePath(name string) string {
-	return filepath.Join(s.Dir, name)
-}
-
-// Write writes the specified file name or subpath in the store
-func (s *Store) Write(name string, data []byte) error {
-	s.Lock()
-	defer s.Unlock()
-
-	fp := filepath.Join(s.Dir, name)
-	dp := filepath.Dir(fp)
-	if err := os.MkdirAll(dp, 0700); err != nil {
-		return err
-	}
-	return ioutil.WriteFile(fp, data, 0600)
-}
-
-func (s *Store) WriteEntry(name string, entry interface{}) error {
-	data, err := json.MarshalIndent(entry, "", " ")
-	if err != nil {
-		return err
-	}
-	return s.Write(name, data)
+	return filepath.Join(s.Dir, sp)
 }
 
 // Has returns true if the specified asset exists
-func (s *Store) Has(name string) bool {
-	fp := filepath.Join(s.Dir, name)
+func (s *Store) Has(kind string, name string) bool {
+	fp := s.resolve(kind, name)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return false
 	}
@@ -179,155 +153,56 @@ func (s *Store) Has(name string) bool {
 }
 
 // Read reads the specified file name or subpath from the store
-func (s *Store) Read(name string) ([]byte, error) {
+func (s *Store) Read(kind string, name string) ([]byte, error) {
 	s.Lock()
 	defer s.Unlock()
-	fp := filepath.Join(s.Dir, name)
+	fp := s.resolve(kind, name)
 	return ioutil.ReadFile(fp)
 }
 
-// Read reads the specified file name or subpath from the store
-func (s *Store) Delete(name string) error {
+// Write writes the specified file name or subpath in the store
+func (s *Store) Write(kind string, name string, data []byte) error {
 	s.Lock()
 	defer s.Unlock()
-	fp := filepath.Join(s.Dir, name)
-	return os.Remove(fp)
-}
 
-func (s *Store) ReadEntry(name string, entry interface{}) error {
-	data, err := s.Read(name)
-	if err != nil {
+	fp := s.resolve(kind, name)
+	dp := filepath.Dir(fp)
+
+	if err := os.MkdirAll(dp, 0700); err != nil {
 		return err
 	}
-	return json.Unmarshal(data, entry)
+	return ioutil.WriteFile(fp, data, 0600)
 }
 
-// Returns the public key stored in the store
-func (s *Store) GetPublicKey() (string, error) {
-	pk, err := s.GetKey()
-	if err != nil {
-		return "", err
-	}
-	k, err := pk.PublicKey()
-	if err != nil {
-		return "", err
-	}
-	return string(k), nil
-}
-
-// Returns the public key stored in the store
-func (s *Store) GetKey() (nkeys.KeyPair, error) {
-	d, err := s.Read(NSCFile)
-	if err != nil {
-		return nil, err
-	}
-
-	m := make(map[string]string)
-	err = json.Unmarshal(d, &m)
-	if err != nil {
-		return nil, fmt.Errorf("error deserializing .nsc file: %v", err)
-	}
-
-	pk, err := nkeys.FromPublicKey([]byte(m["public_key"]))
-	if err != nil {
-		return nil, err
-	}
-	return pk, nil
-}
-
-func (s *Store) GetAccountActivation() (string, error) {
-	d, err := s.Read(AccountActivation)
-	if err != nil {
-		return "", err
-	}
-	return string(d), nil
-}
-
-func (s *Store) SetAccountActivation(token string) error {
-	return s.Write(AccountActivation, []byte(token))
-}
-
-func (s *Store) List(subDir string, ext string) ([]string, error) {
+func (s *Store) List(kind string, ext string) ([]string, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	names := make([]string, 0)
-	dir := filepath.Join(s.Dir, subDir)
-
-	if !s.Has(subDir) {
-		return nil, nil
-	}
-
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() && path != dir {
-			return filepath.SkipDir
-		}
-
-		if info.IsDir() && path == dir {
-			return nil
-		}
-
-		if strings.HasSuffix(info.Name(), ext) {
-			names = append(names, info.Name())
-		}
-		return nil
-	})
-
+	fp := s.resolve(kind, "")
+	infos, err := ioutil.ReadDir(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error listing %q: %v", dir, err)
+		return nil, fmt.Errorf("error reading directory %q: %v", fp, err)
 	}
+
+	var names []string
+	ext = strings.ToLower(ext)
+	if len(ext) > 0 && ext[0] != '.' {
+		ext = "." + ext
+	}
+	for _, v := range infos {
+		n := strings.ToLower(v.Name())
+		if strings.HasSuffix(n, ext) {
+			names = append(names, v.Name())
+		}
+	}
+
 	return names, nil
 }
 
-func (s *Store) WriteToken(token string, tag ...Tag) error {
-	c, err := jwt.DecodeGeneric(token)
-	if err != nil {
-		return err
-	}
-
-	var t Token
-	t.Data = token
-
-	if c != nil {
-		t.ClaimsData = c.ClaimsData
-	}
-	if tag != nil {
-		t.Add(tag...)
-	}
-	t.Add(Tag{"exp", fmt.Sprintf("%d", c.Expires)})
-	t.Add(Tag{"iat", fmt.Sprintf("%d", c.IssuedAt)})
-	t.Add(Tag{"nbf", fmt.Sprintf("%d", c.NotBefore)})
-	t.Add(Tag{"type", string(c.Type)})
-	t.Add(Tag{"jti", c.ID})
-	t.Add(Tag{"name", c.Name})
-	t.Add(Tag{"sub", c.Subject})
-	t.Add(Tag{"iss", c.Issuer})
-
-	fp := path.Join(Tokens, c.ID)
-	if err := s.WriteEntry(fp, t); err != nil {
-		return err
-	}
-
-	return s.Index.Index(c.ID, t.Tags...)
-}
-
-func (s *Store) ReadToken(id string) (*Token, error) {
-	var t Token
-	if err := s.ReadEntry(path.Join(Tokens, id), &t); err != nil {
-		return nil, err
-	}
-	return &t, nil
-}
-
-type Token struct {
-	jwt.ClaimsData
-	Tags []Tag  `json:"tags"`
-	Data string `json:"data"`
-}
-
-func (t *Token) Add(tag ...Tag) {
-	t.Tags = append(t.Tags, tag...)
+// Read reads the specified file name or subpath from the store
+func (s *Store) Delete(kind string, name string) error {
+	s.Lock()
+	defer s.Unlock()
+	fp := s.resolve(kind, name)
+	return os.Remove(fp)
 }

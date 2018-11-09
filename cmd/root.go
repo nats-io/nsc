@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mitchellh/go-homedir"
@@ -43,7 +44,7 @@ var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 func getStore() (*store.Store, error) {
 	if ngsStore == nil {
-		storeDir, err := store.FindCurrentStoreDir()
+		storeDir, err := FindCurrentStoreDir()
 		if err != nil {
 			return nil, err
 		}
@@ -110,18 +111,6 @@ func GetSeed() (nkeys.KeyPair, error) {
 }
 
 func ValidateMatchesPublicKey(kp nkeys.KeyPair) error {
-	s, err := getStore()
-	pk, err := s.GetPublicKey()
-	if err != nil {
-		return err
-	}
-	vv, err := kp.PublicKey()
-	if err != nil {
-		return fmt.Errorf("error extracting public key from private: %v", err)
-	}
-	if pk != string(vv) {
-		return fmt.Errorf("invalid context - the public key extracted from the private key %q doesn't match the public key associated with the profile %q", string(vv), pk)
-	}
 	return nil
 }
 
@@ -134,12 +123,6 @@ var rootCmd = &cobra.Command{
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
 	Version: Version,
-	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-		if ngsStore != nil {
-			return ngsStore.Close()
-		}
-		return nil
-	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -188,4 +171,35 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+// FindCurrentStoreDir tries to find a store director
+// starting with the current working dir
+func FindCurrentStoreDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return FindStoreDir(wd)
+}
+
+// FindStore starts at the directory provided and tries to
+// find a directory containing the public key. This function
+// checks dir and then works its way up the folder path.
+func FindStoreDir(dir string) (string, error) {
+	var err error
+
+	pkp := filepath.Join(dir, store.NSCFile)
+
+	if _, err := os.Stat(pkp); os.IsNotExist(err) {
+		parent := filepath.Dir(dir)
+
+		if parent == dir {
+			return "", fmt.Errorf("no store directory found")
+		}
+
+		return FindStoreDir(parent)
+	}
+
+	return dir, err
 }
