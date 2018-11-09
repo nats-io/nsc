@@ -61,6 +61,27 @@ func GetSeedPath() string {
 	return seedKeyPath
 }
 
+func GetKey(value string) (string, error) {
+	if value == "" {
+		return "", fmt.Errorf("public key or keypath must be provided (--public-key)")
+	}
+
+	_, err := nkeys.FromPublicKey([]byte(value))
+	if err != nil {
+		d, err := ioutil.ReadFile(value)
+		if err != nil {
+			return "", fmt.Errorf("error reading public key: %v", err)
+		}
+
+		value = string(d)
+		_, err = nkeys.FromPublicKey(d)
+		if err != nil {
+			return "", fmt.Errorf("error reading public key: %v", err)
+		}
+	}
+	return value, nil
+}
+
 func GetSeed() (nkeys.KeyPair, error) {
 	p := GetSeedPath()
 	if p == "" {
