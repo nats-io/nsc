@@ -17,13 +17,11 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -36,7 +34,6 @@ const TestEnv = "NSC_TEST"
 var Version = "DEVELOPMENT"
 
 var cfgFile string
-var seedKeyPath string
 var ngsStore *store.Store
 
 // show some other hidden commands if the env is set
@@ -54,64 +51,6 @@ func getStore() (*store.Store, error) {
 		}
 	}
 	return ngsStore, nil
-}
-
-func GetSeedPath() string {
-	if seedKeyPath == "" {
-		seedKeyPath = os.Getenv(SeedKeyEnv)
-	}
-	return seedKeyPath
-}
-
-func GetKey(value string) (string, error) {
-	if value == "" {
-		return "", fmt.Errorf("public key or keypath must be provided (--public-key)")
-	}
-
-	_, err := nkeys.FromPublicKey([]byte(value))
-	if err != nil {
-		d, err := ioutil.ReadFile(value)
-		if err != nil {
-			return "", fmt.Errorf("error reading public key: %v", err)
-		}
-
-		value = string(d)
-		_, err = nkeys.FromPublicKey(d)
-		if err != nil {
-			return "", fmt.Errorf("error reading public key: %v", err)
-		}
-	}
-	return value, nil
-}
-
-func GetSeed() (nkeys.KeyPair, error) {
-	p := GetSeedPath()
-	if p == "" {
-		return nil, fmt.Errorf("private key or keypath must be provided (--private-key, -K or in $%s)", SeedKeyEnv)
-	}
-
-	kp, err := nkeys.FromSeed([]byte(p))
-	if err != nil {
-		d, err := ioutil.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("error reading private key: %v", err)
-		}
-
-		kp, err := nkeys.FromSeed(d)
-		if err != nil {
-			return nil, fmt.Errorf("error reading private key: %v", err)
-		}
-
-		if err := ValidateMatchesPublicKey(kp); err != nil {
-			return nil, err
-		}
-	}
-
-	return kp, nil
-}
-
-func ValidateMatchesPublicKey(kp nkeys.KeyPair) error {
-	return nil
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -143,7 +82,7 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&seedKeyPath, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&KeyPathFromFlag, "private-key", "K", "", "private key")
 	return cmd
 }
 

@@ -44,13 +44,13 @@ func CreateTestStore(t *testing.T, name string, storeType nkeys.PrefixByte) *Sto
 	var dirs []string
 	switch storeType {
 	case nkeys.PrefixByteAccount:
-		_, _, kp = CreateAccount(t)
+		_, _, kp = CreateAccountKey(t)
 		dirs = accountDirs
 	case nkeys.PrefixByteOperator:
-		_, _, kp = CreateOperator(t)
+		_, _, kp = CreateOperatorKey(t)
 		dirs = operatorDirs
 	case nkeys.PrefixByteCluster:
-		_, _, kp = CreateCluster(t)
+		_, _, kp = CreateClusterKey(t)
 		dirs = clusterDirs
 	}
 	s := MakeTempStore(t, name, kp)
@@ -75,7 +75,7 @@ func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
 	fp := filepath.Join(p, "test")
 	require.NoError(t, ioutil.WriteFile(fp, []byte("hello"), 0666))
 
-	_, _, kp := CreateAccount(t)
+	_, _, kp := CreateAccountKey(t)
 	_, err := CreateStore(p, "foo", kp)
 	require.Error(t, err)
 }
@@ -176,15 +176,15 @@ func TestDeleteFile(t *testing.T) {
 	require.False(t, s.Has(Users, "foo"))
 }
 
-func CreateCluster(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateCluster)
 }
 
-func CreateAccount(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateAccount)
 }
 
-func CreateOperator(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateOperator)
 }
 
