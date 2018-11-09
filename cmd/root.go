@@ -133,13 +133,6 @@ var rootCmd = &cobra.Command{
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
 	Version: Version,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		_, err := getStore()
-		if err != nil {
-			return err
-		}
-		return nil
-	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 		if ngsStore != nil {
 			return ngsStore.Close()

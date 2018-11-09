@@ -28,8 +28,8 @@ func createInitCmd() *cobra.Command {
 	var params InitParams
 
 	var cmd = &cobra.Command{
-		Use:    "init",
-		Hidden: !show,
+		Use:    "initialize",
+		Hidden: true,
 		Short:  "initializes an directory for an account or operator",
 		Args:   cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
