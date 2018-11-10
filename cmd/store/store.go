@@ -16,6 +16,7 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -27,8 +28,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-const storeVersion = "1"
-
+const Version = "1"
 const NSCFile = ".nsc"
 
 const Users = "users"
@@ -96,7 +96,7 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, fmt.Errorf("unexpected key type %q", pub)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(storeVersion), 0600); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(Version), 0600); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +111,9 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, err
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(storeVersion), 0600); err != nil {
+	t := Type{Version: Version, Kind: string(v.Type), Name: v.Name}
+
+	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(t.String()), 0600); err != nil {
 		return nil, err
 	}
 
@@ -123,6 +125,24 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 	}
 
 	return s, nil
+}
+
+type Type struct {
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+}
+
+func (t *Type) String() string {
+	d, err := json.Marshal(t)
+	if err != nil {
+		return fmt.Sprintf("error serializing store type: %v", err)
+	}
+	return string(d)
+}
+
+func LoadType(startPath string) {
+
 }
 
 // LoadStore loads a store from the specified directory path.

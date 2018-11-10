@@ -17,10 +17,12 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -118,6 +120,12 @@ func (p *CreateCombiParams) Validate() error {
 
 func (p *CreateCombiParams) Run() error {
 	if err := os.MkdirAll(p.dir, 0700); err != nil {
+		return err
+	}
+	t := store.Type{Version: store.Version, Kind: "combi", Name: p.name}
+
+	err := ioutil.WriteFile(filepath.Join(p.dir, store.NSCFile), []byte(t.String()), 0700)
+	if err != nil {
 		return err
 	}
 

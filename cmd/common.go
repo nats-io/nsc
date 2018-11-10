@@ -20,6 +20,16 @@ import (
 	"os"
 )
 
+// Resolve a directory/file from an environment variable
+// if not set defaultPath is returned
+func ResolvePath(defaultPath string, varName string) string {
+	v := os.Getenv(varName)
+	if v != "" {
+		return v
+	}
+	return defaultPath
+}
+
 func GetOutput(fp string) (*os.File, error) {
 	var err error
 	var f *os.File

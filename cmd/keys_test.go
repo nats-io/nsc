@@ -27,29 +27,29 @@ import (
 )
 
 func TestResolveLocal(t *testing.T) {
-	old := os.Getenv(NkeysDirEnv)
-	os.Setenv(NkeysDirEnv, "")
+	old := os.Getenv(NkeysPathEnv)
+	os.Setenv(NkeysPathEnv, "")
 
 	dir := GetKeysDir()
 
-	os.Setenv(NkeysDirEnv, old)
+	os.Setenv(NkeysPathEnv, old)
 
 	u, err := user.Current()
 	require.NoError(t, err)
-	fp := filepath.Join(u.HomeDir, DefaultNkeysDirName)
+	fp := filepath.Join(u.HomeDir, DefaultNkeysPath)
 
 	require.Equal(t, dir, fp)
 }
 
 func TestResolveEnv(t *testing.T) {
-	old := os.Getenv(NkeysDirEnv)
+	old := os.Getenv(NkeysPathEnv)
 
 	p := filepath.Join("foo", "bar")
-	os.Setenv(NkeysDirEnv, p)
+	os.Setenv(NkeysPathEnv, p)
 
 	dir := GetKeysDir()
 
-	os.Setenv(NkeysDirEnv, old)
+	os.Setenv(NkeysPathEnv, old)
 	require.Equal(t, dir, p)
 }
 
@@ -126,8 +126,8 @@ func TestMatchKeys(t *testing.T) {
 
 func TestGetKeys(t *testing.T) {
 	dir := MakeTempDir(t)
-	old := os.Getenv(NkeysDirEnv)
-	os.Setenv(NkeysDirEnv, dir)
+	old := os.Getenv(NkeysPathEnv)
+	os.Setenv(NkeysPathEnv, dir)
 
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, okp := CreateOperatorKey(t)
@@ -147,13 +147,13 @@ func TestGetKeys(t *testing.T) {
 	}
 	require.ElementsMatch(t, pks, []string{apk, opk})
 
-	os.Setenv(NkeysDirEnv, old)
+	os.Setenv(NkeysPathEnv, old)
 }
 
 func TestGetPrivateKey(t *testing.T) {
 	dir := MakeTempDir(t)
-	old := os.Getenv(NkeysDirEnv)
-	os.Setenv(NkeysDirEnv, dir)
+	old := os.Getenv(NkeysPathEnv)
+	os.Setenv(NkeysPathEnv, dir)
 
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, okp := CreateOperatorKey(t)
@@ -178,7 +178,7 @@ func TestGetPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, kp)
 
-	os.Setenv(NkeysDirEnv, old)
+	os.Setenv(NkeysPathEnv, old)
 }
 
 func MakeTempDir(t *testing.T) string {

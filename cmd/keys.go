@@ -28,22 +28,14 @@ import (
 
 var KeyPathFlag string
 
-const DefaultNkeysDirName = ".nkeys"
+const DefaultNkeysPath = ".nkeys"
 
 func GetKeysDir() string {
 	u, err := user.Current()
 	if err != nil {
-		return ResolveKeysDir("")
+		return ResolvePath("", NkeysPathEnv)
 	}
-	return ResolveKeysDir(filepath.Join(u.HomeDir, DefaultNkeysDirName))
-}
-
-func ResolveKeysDir(defaultDir string) string {
-	v := os.Getenv(NkeysDirEnv)
-	if v != "" {
-		return v
-	}
-	return defaultDir
+	return ResolvePath(filepath.Join(u.HomeDir, DefaultNkeysPath), NkeysPathEnv)
 }
 
 func ResolveKeyFlag() (nkeys.KeyPair, error) {

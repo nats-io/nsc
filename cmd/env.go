@@ -15,4 +15,59 @@
 
 package cmd
 
-const NkeysDirEnv = "NSC_NKEYS_DIR"
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/xlab/tablewriter"
+
+	"github.com/spf13/cobra"
+)
+
+const NkeysPathEnv = "NKEYS_PATH"
+const NscPathEnv = "NSC_PATH"
+
+func envSet(varName string) string {
+	if os.Getenv(varName) == "" {
+		return "No"
+	}
+	return "Yes"
+}
+
+func createEnvCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "env",
+		Short:   "Prints the nsc environment",
+		Example: "env <optional_path>",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			var err error
+			dir, err = filepath.Abs(dir)
+			if err != nil {
+				return err
+			}
+			dir = ResolvePath(dir, NscPathEnv)
+
+			table := tablewriter.CreateTable()
+			table.UTF8Box()
+			table.AddTitle("NSC Environment")
+			table.AddHeaders("Variable", "Set", "Effective Value")
+
+			table.AddRow("$"+NkeysPathEnv, envSet(NkeysPathEnv), GetKeysDir())
+			table.AddRow("$"+NscPathEnv, envSet(NscPathEnv), dir)
+
+			cmd.Println(table.Render())
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func init() {
+	rootCmd.AddCommand(createEnvCmd())
+}
