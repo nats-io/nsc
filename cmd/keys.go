@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -27,10 +28,14 @@ import (
 
 var KeyPathFlag string
 
-const DefaultNkeysDir = "~/.nkeys"
+const DefaultNkeysDirName = ".nkeys"
 
 func GetKeysDir() string {
-	return ResolveKeysDir(DefaultNkeysDir)
+	u, err := user.Current()
+	if err != nil {
+		return ResolveKeysDir("")
+	}
+	return ResolveKeysDir(filepath.Join(u.HomeDir, DefaultNkeysDirName))
 }
 
 func ResolveKeysDir(defaultDir string) string {

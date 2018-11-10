@@ -18,6 +18,7 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"testing"
 
@@ -32,7 +33,12 @@ func TestResolveLocal(t *testing.T) {
 	dir := GetKeysDir()
 
 	os.Setenv(NkeysDirEnv, old)
-	require.Equal(t, dir, DefaultNkeysDir)
+
+	u, err := user.Current()
+	require.NoError(t, err)
+	fp := filepath.Join(u.HomeDir, DefaultNkeysDirName)
+
+	require.Equal(t, dir, fp)
 }
 
 func TestResolveEnv(t *testing.T) {
