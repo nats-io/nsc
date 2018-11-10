@@ -48,11 +48,11 @@ func TestResolveEnv(t *testing.T) {
 }
 
 func TestResolveKeyEmpty(t *testing.T) {
-	old := KeyPathFromFlag
-	KeyPathFromFlag = ""
+	old := KeyPathFlag
+	KeyPathFlag = ""
 
 	rkp, err := ResolveKeyFlag()
-	KeyPathFromFlag = old
+	KeyPathFlag = old
 
 	require.NoError(t, err)
 	require.Nil(t, rkp)
@@ -60,11 +60,11 @@ func TestResolveKeyEmpty(t *testing.T) {
 
 func TestResolveKeyFromSeed(t *testing.T) {
 	seed, p, _ := CreateAccountKey(t)
-	old := KeyPathFromFlag
-	KeyPathFromFlag = string(seed)
+	old := KeyPathFlag
+	KeyPathFlag = string(seed)
 
 	rkp, err := ResolveKeyFlag()
-	KeyPathFromFlag = old
+	KeyPathFlag = old
 
 	require.NoError(t, err)
 
@@ -77,10 +77,10 @@ func TestResolveKeyFromSeed(t *testing.T) {
 func TestResolveKeyFromFile(t *testing.T) {
 	dir := MakeTempDir(t)
 	_, p, kp := CreateAccountKey(t)
-	old := KeyPathFromFlag
-	KeyPathFromFlag = StoreKey(t, kp, dir)
+	old := KeyPathFlag
+	KeyPathFlag = StoreKey(t, kp, dir)
 	rkp, err := ResolveKeyFlag()
-	KeyPathFromFlag = old
+	KeyPathFlag = old
 
 	require.NoError(t, err)
 
@@ -93,8 +93,8 @@ func TestResolveKeyFromFile(t *testing.T) {
 func TestResolveKeyFlagPrivateKey(t *testing.T) {
 	dir := MakeTempDir(t)
 	_, p, kp := CreateAccountKey(t)
-	old := KeyPathFromFlag
-	KeyPathFromFlag = StoreKey(t, kp, dir)
+	old := KeyPathFlag
+	KeyPathFlag = StoreKey(t, kp, dir)
 
 	fk, err := GetPrivateKey(p)
 	require.NoError(t, err)
@@ -102,7 +102,7 @@ func TestResolveKeyFlagPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 
-	KeyPathFromFlag = old
+	KeyPathFlag = old
 }
 
 func TestMatchKeys(t *testing.T) {

@@ -82,7 +82,7 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&KeyPathFromFlag, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	return cmd
 }
 

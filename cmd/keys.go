@@ -25,7 +25,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-var KeyPathFromFlag string
+var KeyPathFlag string
 
 const DefaultNkeysDir = "~/.nkeys"
 
@@ -42,8 +42,8 @@ func ResolveKeysDir(defaultDir string) string {
 }
 
 func ResolveKeyFlag() (nkeys.KeyPair, error) {
-	if KeyPathFromFlag != "" {
-		kp, err := resolveKey(KeyPathFromFlag)
+	if KeyPathFlag != "" {
+		kp, err := resolveKey(KeyPathFlag)
 		if err != nil {
 			return nil, err
 		}

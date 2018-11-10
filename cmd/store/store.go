@@ -27,9 +27,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-var accountDirs = []string{Users}
-var operatorDirs = []string{Accounts, Clusters}
-var clusterDirs = []string{Servers}
+const storeVersion = "1"
 
 const NSCFile = ".nsc"
 
@@ -38,7 +36,9 @@ const Accounts = "accounts"
 const Clusters = "clusters"
 const Servers = "servers"
 
-const storeVersion = "1"
+var accountDirs = []string{Users}
+var operatorDirs = []string{Accounts, Clusters}
+var clusterDirs = []string{Servers}
 
 // Store is a directory that contains nsc assets
 type Store struct {
@@ -61,7 +61,9 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, err
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return nil, err
+		}
 	}
 
 	files, err := ioutil.ReadDir(dir)
@@ -70,7 +72,7 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 	}
 
 	if len(files) != 0 {
-		return nil, fmt.Errorf("%s is not empty, only an empty folder can be sused for a new store", dir)
+		return nil, fmt.Errorf("%s is not empty, only an empty folder can be used for a new store", dir)
 	}
 
 	pub, err := kp.PublicKey()
