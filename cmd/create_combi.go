@@ -152,7 +152,7 @@ func createCombiCmd() *cobra.Command {
 	var p CreateCombiParams
 	cmd := &cobra.Command{
 		Use:     "combi",
-		Short:   "Create an combi configuration directory - combi has layout for operator, accounts and cluster",
+		Short:   "Create a combi configuration directory - combi has layout for operator, accounts and cluster",
 		Example: "create combi --name mycombi <dirpath>",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {

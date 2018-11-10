@@ -97,7 +97,7 @@ func createClusterCmd() *cobra.Command {
 	var p CreateClusterParams
 	cmd := &cobra.Command{
 		Use:     "cluster",
-		Short:   "Create an cluster configuration directory",
+		Short:   "Create a cluster configuration directory",
 		Example: "create cluster --name mycluster <dirpath>",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
