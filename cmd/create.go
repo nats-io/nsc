@@ -15,15 +15,13 @@
 
 package cmd
 
-import (
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
-var editCmd = &cobra.Command{
-	Use:   "edit",
-	Short: "Edit assets such as users",
+var createCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a configuration directory for an operator, account",
 }
 
 func init() {
-	rootCmd.AddCommand(editCmd)
+	rootCmd.AddCommand(createCmd)
 }

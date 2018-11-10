@@ -15,15 +15,4 @@
 
 package cmd
 
-import (
-	"github.com/spf13/cobra"
-)
-
-var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete assets such as users, activations, and exports",
-}
-
-func init() {
-	rootCmd.AddCommand(deleteCmd)
-}
+const NkeysDirEnv = "NSC_NKEYS_DIR"

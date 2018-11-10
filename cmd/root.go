@@ -17,12 +17,11 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -35,7 +34,6 @@ const TestEnv = "NSC_TEST"
 var Version = "DEVELOPMENT"
 
 var cfgFile string
-var seedKeyPath string
 var ngsStore *store.Store
 
 // show some other hidden commands if the env is set
@@ -43,7 +41,7 @@ var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 func getStore() (*store.Store, error) {
 	if ngsStore == nil {
-		storeDir, err := store.FindCurrentStoreDir()
+		storeDir, err := FindCurrentStoreDir()
 		if err != nil {
 			return nil, err
 		}
@@ -55,76 +53,6 @@ func getStore() (*store.Store, error) {
 	return ngsStore, nil
 }
 
-func GetSeedPath() string {
-	if seedKeyPath == "" {
-		seedKeyPath = os.Getenv(SeedKeyEnv)
-	}
-	return seedKeyPath
-}
-
-func GetKey(value string) (string, error) {
-	if value == "" {
-		return "", fmt.Errorf("public key or keypath must be provided (--public-key)")
-	}
-
-	_, err := nkeys.FromPublicKey([]byte(value))
-	if err != nil {
-		d, err := ioutil.ReadFile(value)
-		if err != nil {
-			return "", fmt.Errorf("error reading public key: %v", err)
-		}
-
-		value = string(d)
-		_, err = nkeys.FromPublicKey(d)
-		if err != nil {
-			return "", fmt.Errorf("error reading public key: %v", err)
-		}
-	}
-	return value, nil
-}
-
-func GetSeed() (nkeys.KeyPair, error) {
-	p := GetSeedPath()
-	if p == "" {
-		return nil, fmt.Errorf("private key or keypath must be provided (--private-key, -K or in $%s)", SeedKeyEnv)
-	}
-
-	kp, err := nkeys.FromSeed([]byte(p))
-	if err != nil {
-		d, err := ioutil.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("error reading private key: %v", err)
-		}
-
-		kp, err := nkeys.FromSeed(d)
-		if err != nil {
-			return nil, fmt.Errorf("error reading private key: %v", err)
-		}
-
-		if err := ValidateMatchesPublicKey(kp); err != nil {
-			return nil, err
-		}
-	}
-
-	return kp, nil
-}
-
-func ValidateMatchesPublicKey(kp nkeys.KeyPair) error {
-	s, err := getStore()
-	pk, err := s.GetPublicKey()
-	if err != nil {
-		return err
-	}
-	vv, err := kp.PublicKey()
-	if err != nil {
-		return fmt.Errorf("error extracting public key from private: %v", err)
-	}
-	if pk != string(vv) {
-		return fmt.Errorf("invalid context - the public key extracted from the private key %q doesn't match the public key associated with the profile %q", string(vv), pk)
-	}
-	return nil
-}
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
@@ -134,12 +62,6 @@ var rootCmd = &cobra.Command{
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
 	Version: Version,
-	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-		if ngsStore != nil {
-			return ngsStore.Close()
-		}
-		return nil
-	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -160,7 +82,7 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&seedKeyPath, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	return cmd
 }
 
@@ -188,4 +110,35 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+// FindCurrentStoreDir tries to find a store director
+// starting with the current working dir
+func FindCurrentStoreDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return FindStoreDir(wd)
+}
+
+// FindStore starts at the directory provided and tries to
+// find a directory containing the public key. This function
+// checks dir and then works its way up the folder path.
+func FindStoreDir(dir string) (string, error) {
+	var err error
+
+	pkp := filepath.Join(dir, store.NSCFile)
+
+	if _, err := os.Stat(pkp); os.IsNotExist(err) {
+		parent := filepath.Dir(dir)
+
+		if parent == dir {
+			return "", fmt.Errorf("no store directory found")
+		}
+
+		return FindStoreDir(parent)
+	}
+
+	return dir, err
 }

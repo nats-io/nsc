@@ -6,7 +6,7 @@ BUILD_OS_GOPATH=`go env GOPATH`
 
 .PHONY: build
 
-build: fmt compile
+build: fmt compile test
 
 fmt:
 	gofmt -s -w *.go
