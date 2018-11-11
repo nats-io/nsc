@@ -16,8 +16,12 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 // Resolve a directory/file from an environment variable
@@ -79,4 +83,110 @@ func Write(fp string, data []byte) error {
 		}
 	}
 	return nil
+}
+
+func FormatKeys(keyType string, publicKey string, privateKey string) []byte {
+	w := bytes.NewBuffer(nil)
+	label := strings.ToUpper(keyType)
+
+	if privateKey != "" {
+		fmt.Fprintln(w, "************************* IMPORTANT *************************")
+		fmt.Fprintln(w, "Your options generated NKEYs which can be used to create")
+		fmt.Fprintln(w, "entities or prove identity.")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Generated keys printed below are sensitive and should be")
+		fmt.Fprintln(w, "treated as secrets to prevent unauthorized access.")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "The private key is not saved by the tool. Please save")
+		fmt.Fprintln(w, "it now as it will be required by the user to connect to NATS.")
+		fmt.Fprintln(w, "The public key is saved and uniquely identifies the user.")
+		fmt.Fprintln(w)
+
+		fmt.Fprintf(w, "-----BEGIN %s PRIVATE KEY-----\n", label)
+		fmt.Fprintln(w, privateKey)
+		fmt.Fprintf(w, "------END %s PRIVATE KEY------\n", label)
+		fmt.Fprintln(w)
+
+		fmt.Fprintln(w, "*************************************************************")
+		fmt.Fprintln(w)
+	}
+
+	if publicKey != "" {
+		fmt.Fprintf(w, "-----BEGIN %s PUB KEY-----\n", label)
+		fmt.Fprintln(w, publicKey)
+		fmt.Fprintf(w, "------END %s PUB KEY------\n", label)
+		fmt.Fprintln(w)
+	}
+
+	fmt.Fprintln(w)
+
+	return w.Bytes()
+}
+
+func ParseNumber(s string) (int64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	s = strings.ToUpper(s)
+	re := regexp.MustCompile(`(\d+$)`)
+	m := re.FindStringSubmatch(s)
+	if m != nil {
+		v, err := strconv.ParseInt(m[0], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return v, nil
+	}
+	re = regexp.MustCompile(`(\d+)([K|M|G])`)
+	m = re.FindStringSubmatch(s)
+	if m != nil {
+		v, err := strconv.ParseInt(m[1], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		if m[2] == "K" {
+			return v * 1000, nil
+		}
+		if m[2] == "M" {
+			return v * 1000000, nil
+		}
+		if m[2] == "G" {
+			return v * 1000000000, nil
+		}
+	}
+	return 0, fmt.Errorf("couldn't parse number: %v", s)
+}
+
+func ParseDataSize(s string) (int64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	s = strings.ToUpper(s)
+	re := regexp.MustCompile(`(\d+$)`)
+	m := re.FindStringSubmatch(s)
+	if m != nil {
+		v, err := strconv.ParseInt(m[0], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return v, nil
+	}
+	re = regexp.MustCompile(`(\d+)([B|K|M])`)
+	m = re.FindStringSubmatch(s)
+	if m != nil {
+		v, err := strconv.ParseInt(m[1], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		if m[2] == "B" {
+			return v, nil
+		}
+		if m[2] == "K" {
+			return v * 1000, nil
+		}
+		if m[2] == "M" {
+			return v * 1000000, nil
+		}
+	}
+	return 0, fmt.Errorf("couldn't parse data size: %v", s)
 }

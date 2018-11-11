@@ -193,3 +193,22 @@ func (s *Store) Delete(name ...string) error {
 	fp := s.resolve(name...)
 	return os.Remove(fp)
 }
+
+func (s *Store) ListSubContainers(name ...string) ([]string, error) {
+	var containers []string
+	fp := filepath.Join(name...)
+	if s.Has(fp) {
+		infos, err := s.List(fp)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range infos {
+			if i.IsDir() {
+				if s.Has(fp, i.Name(), fmt.Sprintf("%s.jwt", i.Name())) {
+					containers = append(containers, i.Name())
+				}
+			}
+		}
+	}
+	return containers, nil
+}
