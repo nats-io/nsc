@@ -39,20 +39,10 @@ func MakeTempDir(t *testing.T) string {
 	return p
 }
 
-func CreateTestStore(t *testing.T, name string, storeType nkeys.PrefixByte) *Store {
+func CreateTestStore(t *testing.T, name string) *Store {
 	var kp nkeys.KeyPair
-	var dirs []string
-	switch storeType {
-	case nkeys.PrefixByteAccount:
-		_, _, kp = CreateAccountKey(t)
-		dirs = accountDirs
-	case nkeys.PrefixByteOperator:
-		_, _, kp = CreateOperatorKey(t)
-		dirs = operatorDirs
-	case nkeys.PrefixByteCluster:
-		_, _, kp = CreateClusterKey(t)
-		dirs = clusterDirs
-	}
+	_, _, kp = CreateOperatorKey(t)
+
 	s := MakeTempStore(t, name, kp)
 
 	require.NotNil(t, s)
@@ -63,7 +53,7 @@ func CreateTestStore(t *testing.T, name string, storeType nkeys.PrefixByte) *Sto
 	require.FileExists(t, filepath.Join(s.Dir, tokenName))
 	require.True(t, s.Has("", tokenName))
 
-	for _, d := range dirs {
+	for _, d := range standardDirs {
 		require.DirExists(t, filepath.Join(s.Dir, d))
 		require.True(t, s.Has(d, ""))
 	}
@@ -92,45 +82,21 @@ func TestUnsupportedKeyType(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestAccountLoadStore(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
-	ss, err := LoadStore(s.Dir)
-	require.NoError(t, err)
-	require.NotNil(t, ss)
-	require.Equal(t, s.Dir, ss.Dir)
-}
-
 func TestOperatorLoadStore(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteOperator)
+	s := CreateTestStore(t, "test-account")
 	ss, err := LoadStore(s.Dir)
 	require.NoError(t, err)
 	require.NotNil(t, ss)
 	require.Equal(t, s.Dir, ss.Dir)
-}
-
-func TestClusterLoadStore(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteCluster)
-	ss, err := LoadStore(s.Dir)
-	require.NoError(t, err)
-	require.NotNil(t, ss)
-	require.Equal(t, s.Dir, ss.Dir)
-}
-
-func TestCreateAccountStore(t *testing.T) {
-	CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
 }
 
 func TestCreateOperatorStore(t *testing.T) {
-	CreateTestStore(t, "test-operator", nkeys.PrefixByteOperator)
-}
-
-func TestCreateClusterStore(t *testing.T) {
-	CreateTestStore(t, "test-cluster", nkeys.PrefixByteCluster)
+	CreateTestStore(t, "test-operator")
 }
 
 func TestWriteFile(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
-	err := s.Write(Users, "foo", []byte("foo"))
+	s := CreateTestStore(t, "test-account")
+	err := s.Write([]byte("foo"), Users, "foo")
 	require.NoError(t, err)
 
 	fp := filepath.Join(s.Dir, Users, "foo")
@@ -138,8 +104,8 @@ func TestWriteFile(t *testing.T) {
 }
 
 func TestReadFile(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
-	err := s.Write(Users, "foo", []byte("foo"))
+	s := CreateTestStore(t, "test-account")
+	err := s.Write([]byte("foo"), Users, "foo")
 	require.NoError(t, err)
 
 	fp := filepath.Join(s.Dir, Users, "foo")
@@ -151,21 +117,26 @@ func TestReadFile(t *testing.T) {
 }
 
 func TestListFiles(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
-	err := s.Write(Users, "foo", []byte("foo"))
+	s := CreateTestStore(t, "test-account")
+	err := s.Write([]byte("foo"), Users, "foo")
 	require.NoError(t, err)
 
-	err = s.Write(Users, "bar", []byte("bar"))
+	err = s.Write([]byte("bar"), Users, "bar")
 	require.NoError(t, err)
 
-	names, err := s.List(Users, "")
+	infos, err := s.List(Users, "")
 	require.NoError(t, err)
+
+	var names []string
+	for _, i := range infos {
+		names = append(names, i.Name())
+	}
 	require.ElementsMatch(t, names, []string{"foo", "bar"})
 }
 
 func TestDeleteFile(t *testing.T) {
-	s := CreateTestStore(t, "test-account", nkeys.PrefixByteAccount)
-	err := s.Write(Users, "foo", []byte("foo"))
+	s := CreateTestStore(t, "test-account")
+	err := s.Write([]byte("foo"), Users, "foo")
 	require.NoError(t, err)
 
 	fp := filepath.Join(s.Dir, Users, "foo")

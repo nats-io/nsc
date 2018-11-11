@@ -36,9 +36,7 @@ const Accounts = "accounts"
 const Clusters = "clusters"
 const Servers = "servers"
 
-var accountDirs = []string{Users}
-var operatorDirs = []string{Accounts, Clusters}
-var clusterDirs = []string{Servers}
+var standardDirs = []string{Accounts, filepath.Join(Accounts, Users)}
 
 // Store is a directory that contains nsc assets
 type Store struct {
@@ -80,18 +78,10 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, fmt.Errorf("error reading public key: %v", err)
 	}
 
-	var subdirs []string
 	var v = jwt.NewGenericClaims(string(pub))
 	v.Name = name
 	if nkeys.IsValidPublicOperatorKey(pub) {
 		v.Type = jwt.OperatorClaim
-		subdirs = operatorDirs
-	} else if nkeys.IsValidPublicAccountKey(pub) {
-		v.Type = jwt.AccountClaim
-		subdirs = accountDirs
-	} else if nkeys.IsValidPublicClusterKey(pub) {
-		v.Type = jwt.ClusterClaim
-		subdirs = clusterDirs
 	} else {
 		return nil, fmt.Errorf("unexpected key type %q", pub)
 	}
@@ -117,7 +107,7 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, err
 	}
 
-	for _, d := range subdirs {
+	for _, d := range standardDirs {
 		dp := s.resolve(d, "")
 		if err = os.MkdirAll(dp, 0700); err != nil {
 			return nil, fmt.Errorf("error creating %q: %v", dp, err)
@@ -141,10 +131,6 @@ func (t *Type) String() string {
 	return string(d)
 }
 
-func LoadType(startPath string) {
-
-}
-
 // LoadStore loads a store from the specified directory path.
 func LoadStore(dir string) (*Store, error) {
 	sf := filepath.Join(dir, NSCFile)
@@ -157,17 +143,13 @@ func LoadStore(dir string) (*Store, error) {
 	return s, nil
 }
 
-func (s *Store) resolve(kind string, name string) string {
-	sp := name
-	if kind != "" {
-		sp = filepath.Join(kind, name)
-	}
-	return filepath.Join(s.Dir, sp)
+func (s *Store) resolve(name ...string) string {
+	return filepath.Join(s.Dir, filepath.Join(name...))
 }
 
 // Has returns true if the specified asset exists
-func (s *Store) Has(kind string, name string) bool {
-	fp := s.resolve(kind, name)
+func (s *Store) Has(name ...string) bool {
+	fp := s.resolve(name...)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return false
 	}
@@ -175,19 +157,19 @@ func (s *Store) Has(kind string, name string) bool {
 }
 
 // Read reads the specified file name or subpath from the store
-func (s *Store) Read(kind string, name string) ([]byte, error) {
+func (s *Store) Read(name ...string) ([]byte, error) {
 	s.Lock()
 	defer s.Unlock()
-	fp := s.resolve(kind, name)
+	fp := s.resolve(name...)
 	return ioutil.ReadFile(fp)
 }
 
 // Write writes the specified file name or subpath in the store
-func (s *Store) Write(kind string, name string, data []byte) error {
+func (s *Store) Write(data []byte, name ...string) error {
 	s.Lock()
 	defer s.Unlock()
 
-	fp := s.resolve(kind, name)
+	fp := s.resolve(name...)
 	dp := filepath.Dir(fp)
 
 	if err := os.MkdirAll(dp, 0700); err != nil {
@@ -196,35 +178,18 @@ func (s *Store) Write(kind string, name string, data []byte) error {
 	return ioutil.WriteFile(fp, data, 0600)
 }
 
-func (s *Store) List(kind string, ext string) ([]string, error) {
+func (s *Store) List(path ...string) ([]os.FileInfo, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	fp := s.resolve(kind, "")
-	infos, err := ioutil.ReadDir(fp)
-	if err != nil {
-		return nil, fmt.Errorf("error reading directory %q: %v", fp, err)
-	}
-
-	var names []string
-	ext = strings.ToLower(ext)
-	if len(ext) > 0 && ext[0] != '.' {
-		ext = "." + ext
-	}
-	for _, v := range infos {
-		n := strings.ToLower(v.Name())
-		if strings.HasSuffix(n, ext) {
-			names = append(names, v.Name())
-		}
-	}
-
-	return names, nil
+	fp := s.resolve(path...)
+	return ioutil.ReadDir(fp)
 }
 
 // Read reads the specified file name or subpath from the store
-func (s *Store) Delete(kind string, name string) error {
+func (s *Store) Delete(name ...string) error {
 	s.Lock()
 	defer s.Unlock()
-	fp := s.resolve(kind, name)
+	fp := s.resolve(name...)
 	return os.Remove(fp)
 }

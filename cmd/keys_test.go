@@ -98,30 +98,25 @@ func TestResolveKeyFromFile(t *testing.T) {
 
 func TestResolveKeyFlagPrivateKey(t *testing.T) {
 	dir := MakeTempDir(t)
+
 	_, p, kp := CreateAccountKey(t)
 	old := KeyPathFlag
 	KeyPathFlag = StoreKey(t, kp, dir)
 
-	fk, err := GetPrivateKey(p)
+	fk, err := NewKeyStore().FindSeed(p)
 	require.NoError(t, err)
-	ok, err := MatchKeys(p, fk)
-	require.NoError(t, err)
-	require.True(t, ok)
+	require.True(t, Match(p, fk))
 
 	KeyPathFlag = old
+
 }
 
 func TestMatchKeys(t *testing.T) {
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, _ := CreateOperatorKey(t)
 
-	ok, err := MatchKeys(apk, akp)
-	require.NoError(t, err)
-	require.True(t, ok)
-
-	ok, err = MatchKeys(opk, akp)
-	require.NoError(t, err)
-	require.False(t, ok)
+	require.True(t, Match(apk, akp))
+	require.False(t, Match(opk, akp))
 }
 
 func TestGetKeys(t *testing.T) {
@@ -129,13 +124,18 @@ func TestGetKeys(t *testing.T) {
 	old := os.Getenv(NkeysPathEnv)
 	os.Setenv(NkeysPathEnv, dir)
 
+	ks := NewKeyStore()
+
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, okp := CreateOperatorKey(t)
 
-	StoreKey(t, akp, dir)
-	StoreKey(t, okp, dir)
+	err := ks.Store("account", akp)
+	require.NoError(t, err)
 
-	keys, err := GetKeys()
+	err = ks.Store("operator", okp)
+	require.NoError(t, err)
+
+	keys, err := ks.GetAllKeys()
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
@@ -159,22 +159,21 @@ func TestGetPrivateKey(t *testing.T) {
 	_, opk, okp := CreateOperatorKey(t)
 	_, cpk, _ := CreateClusterKey(t)
 
-	StoreKey(t, akp, dir)
-	StoreKey(t, okp, dir)
+	ks := NewKeyStore()
+	ks.Store("", akp)
+	ks.Store("", okp)
 
-	kp, err := GetPrivateKey(apk)
+	kp, err := ks.FindSeed(apk)
 	require.NoError(t, err)
-	ok, err := MatchKeys(apk, kp)
 	require.NoError(t, err)
-	require.True(t, ok)
+	require.True(t, Match(apk, kp))
 
-	kp, err = GetPrivateKey(opk)
+	kp, err = ks.FindSeed(opk)
 	require.NoError(t, err)
-	ok, err = MatchKeys(opk, okp)
 	require.NoError(t, err)
-	require.True(t, ok)
+	require.True(t, Match(opk, okp))
 
-	kp, err = GetPrivateKey(cpk)
+	kp, err = ks.FindSeed(cpk)
 	require.NoError(t, err)
 	require.Nil(t, kp)
 
@@ -211,8 +210,6 @@ func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) 
 func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateOperator)
 }
-
-type NKeyFactory func() (nkeys.KeyPair, error)
 
 func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
 	kp, err := f()
