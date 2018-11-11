@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Entity struct {
+type Container struct {
 	name    string
 	dir     string
 	kp      nkeys.KeyPair
@@ -37,7 +37,7 @@ type Entity struct {
 	kind    nkeys.PrefixByte
 }
 
-func (e *Entity) Valid() error {
+func (e *Container) Valid() error {
 	var err error
 	if e.keyPath != "" {
 		e.kp, err = resolveKey(e.keyPath)
@@ -62,7 +62,7 @@ func (e *Entity) Valid() error {
 	return nil
 }
 
-func (e *Entity) StoreKeys() error {
+func (e *Container) StoreKeys() error {
 	if e.keyPath == "" {
 		ks := NewKeyStore()
 		if err := ks.Store(e.name, e.kp); err != nil {
@@ -73,11 +73,11 @@ func (e *Entity) StoreKeys() error {
 }
 
 type InitParams struct {
-	Entity
-	account       Entity
-	cluster       Entity
-	server        Entity
-	user          Entity
+	Container
+	account       Container
+	cluster       Container
+	server        Container
+	user          Container
 	createCluster bool
 	createServer  bool
 	createDir     bool
@@ -125,7 +125,7 @@ func (p *InitParams) Validate() error {
 	p.server.kind = nkeys.PrefixByteServer
 	p.user.kind = nkeys.PrefixByteUser
 
-	entities := []*Entity{&p.Entity, &p.account, &p.cluster, &p.server, &p.user}
+	entities := []*Container{&p.Container, &p.account, &p.cluster, &p.server, &p.user}
 	for _, e := range entities {
 		if e.name == "" {
 			e.name = p.name
@@ -145,14 +145,14 @@ func (p *InitParams) Run() error {
 		}
 	}
 
-	entities := []Entity{p.Entity, p.account, p.cluster, p.server, p.user}
+	entities := []Container{p.Container, p.account, p.cluster, p.server, p.user}
 	for _, e := range entities {
 		if err := e.StoreKeys(); err != nil {
 			return err
 		}
 	}
 
-	s, err := store.CreateStore(p.dir, p.name, p.Entity.kp)
+	s, err := store.CreateStore(p.dir, p.name, p.Container.kp)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (p *InitParams) Run() error {
 		return err
 	}
 	ac := jwt.NewAccountClaims(string(apk))
-	as, err := ac.Encode(p.Entity.kp)
+	as, err := ac.Encode(p.Container.kp)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (p *InitParams) Run() error {
 			return err
 		}
 		cc := jwt.NewGenericClaims(string(cpk))
-		cs, err := cc.Encode(p.Entity.kp)
+		cs, err := cc.Encode(p.Container.kp)
 		if err != nil {
 			return err
 		}
@@ -206,7 +206,7 @@ func (p *InitParams) Run() error {
 			return err
 		}
 		sc := jwt.NewGenericClaims(string(spk))
-		ss, err := sc.Encode(p.Entity.kp)
+		ss, err := sc.Encode(p.Container.kp)
 		if err != nil {
 			return err
 		}

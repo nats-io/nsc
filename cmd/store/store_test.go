@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -39,11 +41,8 @@ func MakeTempDir(t *testing.T) string {
 	return p
 }
 
-func CreateTestStore(t *testing.T, name string) *Store {
-	var kp nkeys.KeyPair
-	_, _, kp = CreateOperatorKey(t)
-
-	s := MakeTempStore(t, name, kp)
+func CreateTestStoreForOperator(t *testing.T, name string, operator nkeys.KeyPair) *Store {
+	s := MakeTempStore(t, name, operator)
 
 	require.NotNil(t, s)
 	require.FileExists(t, filepath.Join(s.Dir, ".nsc"))
@@ -58,6 +57,12 @@ func CreateTestStore(t *testing.T, name string) *Store {
 		require.True(t, s.Has(d, ""))
 	}
 	return s
+}
+
+func CreateTestStore(t *testing.T, name string) *Store {
+	var kp nkeys.KeyPair
+	_, _, kp = CreateOperatorKey(t)
+	return CreateTestStoreForOperator(t, name, kp)
 }
 
 func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
@@ -147,6 +152,76 @@ func TestDeleteFile(t *testing.T) {
 	require.False(t, s.Has(Users, "foo"))
 }
 
+func TestLoadOperator(t *testing.T) {
+	s := CreateTestStore(t, "x")
+	require.True(t, s.Has(s.jwtName("x")))
+	c, err := s.loadRootJwt()
+	require.NoError(t, err)
+	require.NotNil(t, c)
+}
+
+func TestStoreOperator(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	s := CreateTestStoreForOperator(t, "x", kp)
+	c, err := s.loadJwt("x.jwt")
+	require.NoError(t, err)
+	require.NotNil(t, c)
+	require.Empty(t, c.Tags)
+
+	c.Tags.Add("A", "B", "C")
+	token, err := c.Encode(kp)
+	require.NoError(t, err)
+
+	err = s.StoreClaim([]byte(token))
+	require.NoError(t, err)
+	c, err = s.loadJwt("x.jwt")
+	require.NoError(t, err)
+	require.Len(t, c.Tags, 3)
+}
+
+func TestStoreAccount(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, _ := CreateAccountKey(t)
+	s := CreateTestStoreForOperator(t, "x", kp)
+
+	c := jwt.NewAccountClaims(apub)
+	c.Name = "foo"
+	cd, err := c.Encode(kp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	gc, err := s.loadJwt(Accounts, "foo", "foo.jwt")
+	require.NoError(t, err)
+	require.NotNil(t, gc)
+	require.Equal(t, gc.Name, "foo")
+}
+
+func TestStoreUser(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, akp := CreateAccountKey(t)
+	_, upub, _ := CreateUserKey(t)
+
+	s := CreateTestStoreForOperator(t, "x", kp)
+
+	ac := jwt.NewAccountClaims(apub)
+	ac.Name = "foo"
+	cd, err := ac.Encode(kp)
+	err = s.StoreClaim([]byte(cd))
+
+	uc := jwt.NewUserClaims(upub)
+	uc.Name = "bar"
+	ud, err := uc.Encode(akp)
+
+	err = s.StoreClaim([]byte(ud))
+	require.NoError(t, err)
+
+	gc, err := s.loadJwt(Accounts, "foo", Users, "bar.jwt")
+	require.NoError(t, err)
+	require.NotNil(t, gc)
+	require.Equal(t, gc.Name, "bar")
+}
+
 func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateCluster)
 }
@@ -157,6 +232,10 @@ func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) 
 
 func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateOperator)
+}
+
+func CreateUserKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateUser)
 }
 
 type NKeyFactory func() (nkeys.KeyPair, error)

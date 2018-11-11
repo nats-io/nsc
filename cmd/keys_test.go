@@ -16,13 +16,11 @@
 package cmd
 
 import (
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
 
@@ -178,48 +176,4 @@ func TestGetPrivateKey(t *testing.T) {
 	require.Nil(t, kp)
 
 	os.Setenv(NkeysPathEnv, old)
-}
-
-func MakeTempDir(t *testing.T) string {
-	p, err := ioutil.TempDir("", "store_test")
-	require.NoError(t, err)
-	return p
-}
-
-func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
-	p, err := kp.PublicKey()
-	require.NoError(t, err)
-
-	s, err := kp.Seed()
-	require.NoError(t, err)
-
-	fp := filepath.Join(dir, string(p)+".nk")
-	err = ioutil.WriteFile(fp, s, 0600)
-	require.NoError(t, err)
-	return fp
-}
-
-func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateCluster)
-}
-
-func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateAccount)
-}
-
-func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateOperator)
-}
-
-func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
-	kp, err := f()
-	require.NoError(t, err)
-
-	seed, err := kp.Seed()
-	require.NoError(t, err)
-
-	pub, err := kp.PublicKey()
-	require.NoError(t, err)
-
-	return seed, string(pub), kp
 }
