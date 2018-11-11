@@ -36,7 +36,7 @@ const Accounts = "accounts"
 const Clusters = "clusters"
 const Servers = "servers"
 
-var standardDirs = []string{Accounts, filepath.Join(Accounts, Users)}
+var standardDirs = []string{Accounts}
 
 // Store is a directory that contains nsc assets
 type Store struct {
