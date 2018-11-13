@@ -54,7 +54,7 @@ func createAddAccountCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.Name, "name", "", "", "account name")
 
 	cmd.Flags().StringVarP(&params.accountKeyPath, "public-key", "k", "", "public key identifying the account")
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
+	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "G", false, "generate nkeys")
 
 	cmd.MarkFlagRequired("name")
 

@@ -50,7 +50,7 @@ func createAddUserCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
+	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "G", false, "generate nkeys")
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "", "", "account name")
 
 	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "publish permissions - comma separated list or option can be specified multiple times")

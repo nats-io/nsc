@@ -43,9 +43,6 @@ func createAddServerCmd() *cobra.Command {
 			}
 
 			if params.generate {
-				if store.KeyPathFlag == "" {
-					cmd.Printf("Generated cluster key - private key stored %q\n", params.clusterKeyPath)
-				}
 				cmd.Printf("Generated server key - private key stored %q\n", params.serverKeyPath)
 			} else {
 				cmd.Printf("Success! - added server %q\n", params.Name)
@@ -58,7 +55,7 @@ func createAddServerCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.Name, "cluster-name", "", "", "server name")
 
 	cmd.Flags().StringVarP(&params.serverKeyPath, "public-key", "k", "", "public key identifying the server")
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
+	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "G", false, "generate nkeys")
 
 	cmd.MarkFlagRequired("name")
 

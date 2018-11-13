@@ -52,7 +52,7 @@ func createAddClusterCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.Name, "name", "", "", "cluster name")
 
 	cmd.Flags().StringVarP(&params.clusterKeyPath, "public-key", "k", "", "public key identifying the cluster")
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
+	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "G", false, "generate nkeys")
 
 	cmd.MarkFlagRequired("name")
 

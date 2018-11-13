@@ -33,17 +33,10 @@ func createInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "init",
 		Short:         "init a configuration directory",
-		Example:       "init --name mynats <dirpath>",
+		Example:       "init --name project --dir nats/projectdir",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				p.dir = "."
-			}
-			if len(args) == 1 {
-				p.dir = args[0]
-			}
-
 			if err := p.Validate(); err != nil {
 				return err
 			}
@@ -88,10 +81,13 @@ func createInitCmd() *cobra.Command {
 		}
 	}
 
+	cmd.Flags().StringVarP(&p.dir, "dir", "", ".", "directory path to create")
+
 	cmd.Flags().StringVarP(&p.name, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
-	cmd.Flags().StringVarP(&p.name, "operator-name", "", defaultName(dname, "operator"), "operator name")
-	cmd.Flags().StringVarP(&p.keyPath, "operator-key", "", "", "operator keypath or seed value (default generated)")
-	cmd.Flags().BoolVarP(&p.create, "create-operator", "", true, "create operator")
+
+	cmd.Flags().StringVarP(&p.Container.name, "operator-name", "", defaultName(dname, "operator"), "operator name")
+	cmd.Flags().StringVarP(&p.Container.keyPath, "operator-key", "", "", "operator keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.Container.create, "create-operator", "", true, "create an operator")
 
 	cmd.Flags().StringVarP(&p.account.name, "account-name", "", defaultName(dname, "account"), "name for the operator")
 	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath or seed value (default generated)")
@@ -99,6 +95,7 @@ func createInitCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&p.user.name, "user-name", "", dname, "name for the user")
 	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.user.create, "create-user", "", true, "create an user")
 
 	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", defaultName(dname, "cluster"), "name for the cluster")
 	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath or seed value (default generated)")
@@ -110,6 +107,7 @@ func createInitCmd() *cobra.Command {
 
 	cmd.Flags().MarkHidden("create-account")
 	cmd.Flags().MarkHidden("create-operator")
+	cmd.Flags().MarkHidden("create-user")
 
 	return cmd
 }
@@ -135,14 +133,10 @@ func (e *Container) Valid() error {
 			return err
 		}
 
-		d, err := e.kp.PublicKey()
-		if err != nil {
-			return err
-		}
-
-		if !store.IsPublicKey(e.kind, d) {
+		if !store.KeyPairTypeOk(e.kind, e.kp) {
 			return fmt.Errorf("invalid %s key", store.KeyTypeLabel(e.kind))
 		}
+
 	} else {
 		e.kp, err = store.CreateNKey(e.kind)
 		if err != nil {
@@ -153,9 +147,10 @@ func (e *Container) Valid() error {
 }
 
 func (e *Container) StoreKeys(root string) error {
+	var err error
 	if e.create && e.keyPath == "" {
 		ks := store.NewKeyStore()
-		if _, err := ks.Store(root, e.name, e.kp); err != nil {
+		if e.keyPath, err = ks.Store(root, e.name, e.kp); err != nil {
 			return err
 		}
 	}
@@ -203,7 +198,7 @@ func (p *InitParams) Validate() error {
 			return err
 		}
 		if len(files) > 0 {
-			return fmt.Errorf("%q is not empty", p.dir)
+			return fmt.Errorf("the %q directory is not empty - refusing to init", p.dir)
 		}
 	}
 
