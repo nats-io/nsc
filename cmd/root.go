@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/nats-io/nsc/cmd/kstore"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -82,7 +84,7 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&kstore.KeyPathFlag, "private-key", "K", "", "private key")
 	return cmd
 }
 

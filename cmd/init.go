@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nats-io/nsc/cmd/kstore"
+
 	"github.com/nats-io/jwt"
 
 	"github.com/nats-io/nkeys"
@@ -40,7 +42,7 @@ type Container struct {
 func (e *Container) Valid() error {
 	var err error
 	if e.keyPath != "" {
-		e.kp, err = resolveKey(e.keyPath)
+		e.kp, err = kstore.ResolveKey(e.keyPath)
 		if err != nil {
 			return err
 		}
@@ -50,11 +52,11 @@ func (e *Container) Valid() error {
 			return err
 		}
 
-		if !IsPublicKey(e.kind, d) {
-			return fmt.Errorf("invalid %s key", KeyTypeLabel(e.kind))
+		if !kstore.IsPublicKey(e.kind, d) {
+			return fmt.Errorf("invalid %s key", kstore.KeyTypeLabel(e.kind))
 		}
 	} else {
-		e.kp, err = CreateNKey(e.kind)
+		e.kp, err = kstore.CreateNKey(e.kind)
 		if err != nil {
 			return err
 		}
@@ -62,10 +64,10 @@ func (e *Container) Valid() error {
 	return nil
 }
 
-func (e *Container) StoreKeys() error {
+func (e *Container) StoreKeys(root string) error {
 	if e.keyPath == "" {
-		ks := NewKeyStore()
-		if err := ks.Store(e.name, e.kp); err != nil {
+		ks := kstore.NewKeyStore()
+		if _, err := ks.Store(root, e.name, e.kp); err != nil {
 			return err
 		}
 	}
@@ -147,7 +149,7 @@ func (p *InitParams) Run() error {
 
 	entities := []Container{p.Container, p.account, p.cluster, p.server, p.user}
 	for _, e := range entities {
-		if err := e.StoreKeys(); err != nil {
+		if err := e.StoreKeys(p.name); err != nil {
 			return err
 		}
 	}
@@ -252,7 +254,7 @@ func createInitCmd() *cobra.Command {
 				cmd.Printf("Generated account key - private key stored %q\n", p.account.keyPath)
 			}
 
-			cmd.Printf("Success! - created combi directory %q\n", p.dir)
+			cmd.Printf("Success! - created project directory %q\n", p.dir)
 
 			return nil
 		},

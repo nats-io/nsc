@@ -154,8 +154,8 @@ func TestDeleteFile(t *testing.T) {
 
 func TestLoadOperator(t *testing.T) {
 	s := CreateTestStore(t, "x")
-	require.True(t, s.Has(s.jwtName("x")))
-	c, err := s.loadRootJwt()
+	require.True(t, s.Has(JwtName("x")))
+	c, err := s.LoadRootJwt()
 	require.NoError(t, err)
 	require.NotNil(t, c)
 }
@@ -163,7 +163,7 @@ func TestLoadOperator(t *testing.T) {
 func TestStoreOperator(t *testing.T) {
 	_, _, kp := CreateOperatorKey(t)
 	s := CreateTestStoreForOperator(t, "x", kp)
-	c, err := s.loadJwt("x.jwt")
+	c, err := s.LoadClaim("x.jwt")
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	require.Empty(t, c.Tags)
@@ -174,7 +174,7 @@ func TestStoreOperator(t *testing.T) {
 
 	err = s.StoreClaim([]byte(token))
 	require.NoError(t, err)
-	c, err = s.loadJwt("x.jwt")
+	c, err = s.LoadClaim("x.jwt")
 	require.NoError(t, err)
 	require.Len(t, c.Tags, 3)
 }
@@ -191,7 +191,7 @@ func TestStoreAccount(t *testing.T) {
 	err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
-	gc, err := s.loadJwt(Accounts, "foo", "foo.jwt")
+	gc, err := s.LoadClaim(Accounts, "foo", "foo.jwt")
 	require.NoError(t, err)
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "foo")
@@ -216,7 +216,7 @@ func TestStoreUser(t *testing.T) {
 	err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)
 
-	gc, err := s.loadJwt(Accounts, "foo", Users, "bar.jwt")
+	gc, err := s.LoadClaim(Accounts, "foo", Users, "bar.jwt")
 	require.NoError(t, err)
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "bar")

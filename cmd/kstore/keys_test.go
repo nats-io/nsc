@@ -13,41 +13,44 @@
  * limitations under the License.
  */
 
-package cmd
+package kstore
 
 import (
+	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/nkeys"
+
 	"github.com/stretchr/testify/require"
 )
 
 func TestResolveLocal(t *testing.T) {
-	old := os.Getenv(NkeysPathEnv)
-	os.Setenv(NkeysPathEnv, "")
+	old := os.Getenv(NKeysPathEnv)
+	os.Setenv(NKeysPathEnv, "")
 
 	dir := GetKeysDir()
 
-	os.Setenv(NkeysPathEnv, old)
+	os.Setenv(NKeysPathEnv, old)
 
 	u, err := user.Current()
 	require.NoError(t, err)
-	fp := filepath.Join(u.HomeDir, DefaultNkeysPath)
+	fp := filepath.Join(u.HomeDir, DEfaultNKeysPath)
 
 	require.Equal(t, dir, fp)
 }
 
 func TestResolveEnv(t *testing.T) {
-	old := os.Getenv(NkeysPathEnv)
+	old := os.Getenv(NKeysPathEnv)
 
 	p := filepath.Join("foo", "bar")
-	os.Setenv(NkeysPathEnv, p)
+	os.Setenv(NKeysPathEnv, p)
 
 	dir := GetKeysDir()
 
-	os.Setenv(NkeysPathEnv, old)
+	os.Setenv(NKeysPathEnv, old)
 	require.Equal(t, dir, p)
 }
 
@@ -94,21 +97,6 @@ func TestResolveKeyFromFile(t *testing.T) {
 	require.Equal(t, string(pp), string(p))
 }
 
-func TestResolveKeyFlagPrivateKey(t *testing.T) {
-	dir := MakeTempDir(t)
-
-	_, p, kp := CreateAccountKey(t)
-	old := KeyPathFlag
-	KeyPathFlag = StoreKey(t, kp, dir)
-
-	fk, err := NewKeyStore().FindSeed(p)
-	require.NoError(t, err)
-	require.True(t, Match(p, fk))
-
-	KeyPathFlag = old
-
-}
-
 func TestMatchKeys(t *testing.T) {
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, _ := CreateOperatorKey(t)
@@ -119,61 +107,90 @@ func TestMatchKeys(t *testing.T) {
 
 func TestGetKeys(t *testing.T) {
 	dir := MakeTempDir(t)
-	old := os.Getenv(NkeysPathEnv)
-	os.Setenv(NkeysPathEnv, dir)
+	old := os.Getenv(NKeysPathEnv)
+	os.Setenv(NKeysPathEnv, dir)
 
 	ks := NewKeyStore()
 
-	_, apk, akp := CreateAccountKey(t)
 	_, opk, okp := CreateOperatorKey(t)
+	_, apk, akp := CreateAccountKey(t)
 
-	err := ks.Store("account", akp)
+	_, err := ks.Store("operator", "operator", okp)
 	require.NoError(t, err)
 
-	err = ks.Store("operator", okp)
+	_, err = ks.Store("operator", "account", akp)
 	require.NoError(t, err)
 
-	keys, err := ks.GetAllKeys()
+	ookp, err := ks.GetOperatorKey("operator")
 	require.NoError(t, err)
-	require.Len(t, keys, 2)
 
-	var pks []string
-	for _, k := range keys {
-		pk, err := k.PublicKey()
-		require.NoError(t, err)
-		pks = append(pks, string(pk))
-	}
-	require.ElementsMatch(t, pks, []string{apk, opk})
+	aakp, err := ks.GetAccountKey("operator", "account")
+	require.NoError(t, err)
 
-	os.Setenv(NkeysPathEnv, old)
+	require.True(t, Match(opk, ookp))
+	require.True(t, Match(apk, aakp))
+
+	os.Setenv(NKeysPathEnv, old)
 }
 
 func TestGetPrivateKey(t *testing.T) {
 	dir := MakeTempDir(t)
-	old := os.Getenv(NkeysPathEnv)
-	os.Setenv(NkeysPathEnv, dir)
+	old := os.Getenv(NKeysPathEnv)
+	os.Setenv(NKeysPathEnv, dir)
 
-	_, apk, akp := CreateAccountKey(t)
-	_, opk, okp := CreateOperatorKey(t)
-	_, cpk, _ := CreateClusterKey(t)
+	_, _, okp := CreateOperatorKey(t)
+	_, _, akp := CreateAccountKey(t)
 
 	ks := NewKeyStore()
-	ks.Store("", akp)
-	ks.Store("", okp)
+	ks.Store("o", "o", okp)
+	ks.Store("o", "a", akp)
+	ckp, err := ks.GetClusterKey("o", "c")
+	require.Error(t, err)
+	require.Nil(t, ckp)
 
-	kp, err := ks.FindSeed(apk)
-	require.NoError(t, err)
-	require.NoError(t, err)
-	require.True(t, Match(apk, kp))
+	os.Setenv(NKeysPathEnv, old)
+}
 
-	kp, err = ks.FindSeed(opk)
+func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
+	p, err := kp.PublicKey()
 	require.NoError(t, err)
-	require.NoError(t, err)
-	require.True(t, Match(opk, okp))
 
-	kp, err = ks.FindSeed(cpk)
+	s, err := kp.Seed()
 	require.NoError(t, err)
-	require.Nil(t, kp)
 
-	os.Setenv(NkeysPathEnv, old)
+	fp := filepath.Join(dir, string(p)+".nk")
+	err = ioutil.WriteFile(fp, s, 0600)
+	require.NoError(t, err)
+	return fp
+}
+
+func MakeTempDir(t *testing.T) string {
+	p, err := ioutil.TempDir("", "store_test")
+	require.NoError(t, err)
+	return p
+}
+
+func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateCluster)
+}
+
+func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateAccount)
+}
+
+func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateOperator)
+}
+
+func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
+	kp, err := f()
+	require.NoError(t, err)
+
+	seed, err := kp.Seed()
+	require.NoError(t, err)
+
+	pub, err := kp.PublicKey()
+	require.NoError(t, err)
+
+	return seed, string(pub), kp
 }

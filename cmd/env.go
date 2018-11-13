@@ -19,12 +19,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nats-io/nsc/cmd/kstore"
+
 	"github.com/xlab/tablewriter"
 
 	"github.com/spf13/cobra"
 )
 
-const NkeysPathEnv = "NKEYS_PATH"
 const NscPathEnv = "NSC_PATH"
 
 func envSet(varName string) string {
@@ -56,7 +57,7 @@ func createEnvCmd() *cobra.Command {
 			table.AddTitle("NSC Environment")
 			table.AddHeaders("Variable", "Set", "Effective Value")
 
-			table.AddRow("$"+NkeysPathEnv, envSet(NkeysPathEnv), GetKeysDir())
+			table.AddRow("$"+kstore.NKeysPathEnv, envSet(kstore.NKeysPathEnv), kstore.GetKeysDir())
 			table.AddRow("$"+NscPathEnv, envSet(NscPathEnv), dir)
 
 			cmd.Println(table.Render())

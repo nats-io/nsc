@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/nats-io/nsc/cmd/kstore"
+
 	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/nats-io/jwt"
@@ -54,7 +56,6 @@ func createAddUserCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
-
 	cmd.Flags().StringVarP(&params.account, "account", "", "", "account name")
 
 	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "publish permissions - comma separated list or option can be specified multiple times")
@@ -125,14 +126,8 @@ func (p *AddUserParams) Validate() error {
 		p.account = a[0]
 	}
 
-	d, err := s.Read(store.Accounts, p.account, fmt.Sprintf("%s.jwt", p.account))
-	accountToken := string(d)
-	ac, err := jwt.DecodeAccountClaims(accountToken)
-	if err != nil {
-		return err
-	}
-
-	p.kp, err = NewKeyStore().FindSeed(ac.Subject)
+	ks := kstore.NewKeyStore()
+	p.kp, err = ks.GetAccountKey(s.GetName(), p.account)
 	if err != nil {
 		return err
 	}

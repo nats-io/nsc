@@ -17,6 +17,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -41,7 +42,14 @@ var standardDirs = []string{Accounts}
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
-	Dir string
+	Dir  string
+	Info Info
+}
+
+type Info struct {
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
 }
 
 func SafeName(n string) string {
@@ -56,6 +64,10 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 
 	s := &Store{
 		Dir: dir,
+		Info: Info{
+			Name:    name,
+			Version: Version,
+		},
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -80,14 +92,20 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 
 	var v = jwt.NewGenericClaims(string(pub))
 	v.Name = name
+
 	if nkeys.IsValidPublicOperatorKey(pub) {
+		s.Info.Kind = jwt.OperatorClaim
 		v.Type = jwt.OperatorClaim
 	} else {
-		return nil, fmt.Errorf("unexpected key type %q", pub)
+		return nil, fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(Version), 0600); err != nil {
-		return nil, err
+	d, err := json.Marshal(s.Info)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing .nsc: %v", err)
+	}
+	if err := s.Write(d, NSCFile); err != nil {
+		return nil, fmt.Errorf("error writing .nsc in %q: %v", s.Dir, err)
 	}
 
 	token, err := v.Encode(kp)
@@ -95,16 +113,8 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, err
 	}
 
-	fn := fmt.Sprintf("%s.jwt", SafeName(name))
-
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, fn), []byte(token), 0600); err != nil {
-		return nil, err
-	}
-
-	t := Type{Version: Version, Kind: string(v.Type), Name: v.Name}
-
-	if err := ioutil.WriteFile(filepath.Join(s.Dir, ".nsc"), []byte(t.String()), 0600); err != nil {
-		return nil, err
+	if err := s.StoreClaim([]byte(token)); err != nil {
+		return nil, fmt.Errorf("error writing operator jwt: %v", err)
 	}
 
 	for _, d := range standardDirs {
@@ -117,13 +127,7 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 	return s, nil
 }
 
-type Type struct {
-	Version string `json:"version"`
-	Kind    string `json:"kind"`
-	Name    string `json:"name"`
-}
-
-func (t *Type) String() string {
+func (t *Info) String() string {
 	d, err := json.Marshal(t)
 	if err != nil {
 		return fmt.Sprintf("error serializing store type: %v", err)
@@ -137,9 +141,12 @@ func LoadStore(dir string) (*Store, error) {
 	if _, err := os.Stat(sf); os.IsNotExist(err) {
 		return nil, fmt.Errorf("%q is not a valid configuration directory", sf)
 	}
-	s := &Store{
-		Dir: dir,
+
+	s := &Store{Dir: dir}
+	if err := s.loadJson(&s.Info, ".nsc"); err != nil {
+		return nil, fmt.Errorf("error loading '.nsc' file: %v", err)
 	}
+
 	return s, nil
 }
 
@@ -208,7 +215,7 @@ func (s *Store) ListSubContainers(name ...string) ([]string, error) {
 		}
 		for _, i := range infos {
 			if i.IsDir() {
-				if s.Has(fp, i.Name(), fmt.Sprintf("%s.jwt", i.Name())) {
+				if s.Has(fp, i.Name(), JwtName(i.Name())) {
 					containers = append(containers, i.Name())
 				}
 			}
@@ -223,10 +230,13 @@ func (s *Store) StoreClaim(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("invalid jwt: %v", err)
 	}
+	if gc.Name == "" {
+		return errors.New("jwt claim doesn't have a name")
+	}
 	var path string
 	switch gc.Type {
 	case jwt.AccountClaim:
-		path = filepath.Join(Accounts, gc.Name, s.jwtName(gc.Name))
+		path = filepath.Join(Accounts, gc.Name, JwtName(gc.Name))
 	case jwt.UserClaim:
 		issuer := gc.Issuer
 		var account string
@@ -236,7 +246,7 @@ func (s *Store) StoreClaim(data []byte) error {
 		}
 		for _, i := range infos {
 			if i.IsDir() {
-				c, err := s.loadJwt(Accounts, i.Name(), s.jwtName(i.Name()))
+				c, err := s.LoadClaim(Accounts, i.Name(), JwtName(i.Name()))
 				if err != nil {
 					return err
 				}
@@ -251,7 +261,7 @@ func (s *Store) StoreClaim(data []byte) error {
 		if account == "" {
 			return fmt.Errorf("account with public key %q is not in the store", issuer)
 		}
-		path = filepath.Join(Accounts, account, Users, s.jwtName(gc.Name))
+		path = filepath.Join(Accounts, account, Users, JwtName(gc.Name))
 	case jwt.ServerClaim:
 		issuer := gc.Issuer
 		var cluster string
@@ -261,7 +271,7 @@ func (s *Store) StoreClaim(data []byte) error {
 		}
 		for _, i := range infos {
 			if i.IsDir() {
-				c, err := s.loadJwt(Clusters, i.Name(), s.jwtName(i.Name()))
+				c, err := s.LoadClaim(Clusters, i.Name(), JwtName(i.Name()))
 				if err != nil {
 					return err
 				}
@@ -276,10 +286,11 @@ func (s *Store) StoreClaim(data []byte) error {
 		if cluster == "" {
 			return fmt.Errorf("cluster with public key %q is not in the store", issuer)
 		}
-		path = filepath.Join(Clusters, cluster, Servers, s.jwtName(gc.Name))
+		path = filepath.Join(Clusters, cluster, Servers, JwtName(gc.Name))
 	case jwt.ClusterClaim:
+		path = filepath.Join(Clusters, gc.Name, JwtName(gc.Name))
 	case jwt.OperatorClaim:
-		path = s.jwtName(gc.Name)
+		path = JwtName(gc.Name)
 	default:
 		return fmt.Errorf("unsuported store claim type: %s", gc.Type)
 	}
@@ -287,20 +298,24 @@ func (s *Store) StoreClaim(data []byte) error {
 	return s.Write(data, path)
 }
 
+func (s *Store) GetName() string {
+	return s.Info.Name
+}
+
 func (s *Store) operatorJwtName() (string, error) {
 	if s.Has(".nsc") {
-		var t Type
+		var t Info
 		err := s.loadJson(&t, ".nsc")
 		if err != nil {
 			return "", err
 		}
-		return s.jwtName(t.Name), nil
+		return JwtName(t.Name), nil
 	}
 	return "", fmt.Errorf("'.nsc' file was not found")
 }
 
-func (s *Store) jwtName(name string) string {
-	return fmt.Sprintf("%s.jwt", name)
+func JwtName(name string) string {
+	return fmt.Sprintf("%s.jwt", SafeName(name))
 }
 
 func (s *Store) loadJson(v interface{}, name ...string) error {
@@ -318,7 +333,7 @@ func (s *Store) loadJson(v interface{}, name ...string) error {
 	return nil
 }
 
-func (s *Store) loadJwt(name ...string) (*jwt.GenericClaims, error) {
+func (s *Store) LoadClaim(name ...string) (*jwt.GenericClaims, error) {
 	if s.Has(name...) {
 		d, err := s.Read(name...)
 		if err != nil {
@@ -333,13 +348,21 @@ func (s *Store) loadJwt(name ...string) (*jwt.GenericClaims, error) {
 	return nil, nil
 }
 
-func (s *Store) loadRootJwt() (*jwt.GenericClaims, error) {
-	fn, err := s.operatorJwtName()
-	if err != nil {
-		return nil, err
-	}
+func (s *Store) LoadRootJwt() (*jwt.GenericClaims, error) {
+	fn := JwtName(s.GetName())
 	if s.Has(fn) {
-		return s.loadJwt(fn)
+		return s.LoadClaim(fn)
 	}
 	return nil, nil
+}
+
+func (s *Store) GetRootPublicKey() (string, error) {
+	c, err := s.LoadRootJwt()
+	if err != nil {
+		return "", err
+	}
+	if c != nil {
+		return c.Subject, nil
+	}
+	return "", nil
 }
