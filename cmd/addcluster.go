@@ -64,25 +64,21 @@ func init() {
 }
 
 type AddClusterParams struct {
-	okp            nkeys.KeyPair
-	ckp            nkeys.KeyPair
+	operatorKP     nkeys.KeyPair
+	clusterKP      nkeys.KeyPair
 	clusterKeyPath string
 	generate       bool
 	jwt.ClusterClaims
 }
 
 func (p *AddClusterParams) Validate() error {
-	s, err := getStore()
-	if err != nil {
-		return err
-	}
-
 	if p.clusterKeyPath != "" && p.generate {
 		return errors.New("specify one of --public-key or --generate-nkeys")
 	}
 
-	if s.Has(store.Clusters, p.Name) {
-		return fmt.Errorf("cluster %q already exists", p.Name)
+	s, err := getStore()
+	if err != nil {
+		return err
 	}
 
 	ctx, err := s.GetContext()
@@ -90,27 +86,38 @@ func (p *AddClusterParams) Validate() error {
 		return fmt.Errorf("error getting context: %v", err)
 	}
 
-	p.okp, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
+	if s.Has(store.Clusters, p.Name) {
+		return fmt.Errorf("cluster %q already exists", p.Name)
+	}
+
+	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the operator private key with --private-key to use for signing the cluster")
 	}
 
-	p.ckp, err = ctx.ResolveKey(nkeys.PrefixByteCluster, p.clusterKeyPath)
-	if err != nil {
-		return fmt.Errorf("error resolving cluster key: %v", err)
+	if p.generate {
+		p.clusterKP, err = nkeys.CreateCluster()
+		if err != nil {
+			return fmt.Errorf("error generating an cluster key: %v", err)
+		}
+	} else {
+		p.clusterKP, err = ctx.ResolveKey(nkeys.PrefixByteCluster, p.clusterKeyPath)
+		if err != nil {
+			return fmt.Errorf("error resolving account key: %v", err)
+		}
 	}
 
 	return nil
 }
 
 func (p *AddClusterParams) Run() error {
-	pkd, err := p.ckp.PublicKey()
+	pkd, err := p.clusterKP.PublicKey()
 	if err != nil {
 		return err
 	}
 	p.Subject = string(pkd)
 
-	token, err := p.ClusterClaims.Encode(p.okp)
+	token, err := p.ClusterClaims.Encode(p.operatorKP)
 	if err != nil {
 		return err
 	}
@@ -126,7 +133,7 @@ func (p *AddClusterParams) Run() error {
 
 	if p.generate {
 		ks := store.NewKeyStore()
-		p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.ckp)
+		p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.clusterKP)
 		if err != nil {
 			return err
 		}

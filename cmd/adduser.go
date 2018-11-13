@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -28,24 +29,21 @@ import (
 func createAddUserCmd() *cobra.Command {
 	var params AddUserParams
 	cmd := &cobra.Command{
-		Use:   "user",
-		Short: "Add an user to the account",
+		Use:           "user",
+		Short:         "Add an user to the account",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := params.Validate(); err != nil {
 				return err
 			}
-
 			if err := params.Run(); err != nil {
 				return err
 			}
-
 			if params.generate {
-				d := FormatKeys("user", params.publicKey, string(params.seed))
-				if err := Write(params.outputFile, d); err != nil {
-					return err
-				}
+				cmd.Printf("Generated user key - private key stored %q\n", params.userKeyPath)
 			} else {
-				cmd.Printf("Success! - added user %q\n", params.publicKey)
+				cmd.Printf("Success! - added user %q\n", params.Name)
 			}
 
 			return nil
@@ -53,7 +51,7 @@ func createAddUserCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
-	cmd.Flags().StringVarP(&params.account, "account", "", "", "account name")
+	cmd.Flags().StringVarP(&params.accountName, "account-name", "", "", "account name")
 
 	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "publish permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.allowPubsub, "allow-pubsub", "", nil, "publish and subscribe permissions - comma separated list or option can be specified multiple times")
@@ -66,9 +64,9 @@ func createAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "name to assign the user")
-	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	cmd.Flags().StringVarP(&params.publicKey, "public-key", "k", "", "public key identifying the user")
+	cmd.Flags().StringVarP(&params.Name, "name", "", "", "name to assign the user")
+	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file - '--' is stdout")
+	cmd.Flags().StringVarP(&params.userKeyPath, "public-key", "k", "", "public key identifying the user")
 	cmd.Flags().StringVarP(&params.payload, "max-payload", "", "", "max message payload - number followed by units (b)yte, (k)b, (M)egabyte")
 	cmd.Flags().StringVarP(&params.max, "max-messages", "", "", "max messages - number optionally followed by units (K)ilo, (M)illion, (G)iga")
 
@@ -82,8 +80,13 @@ func init() {
 }
 
 type AddUserParams struct {
-	kp          nkeys.KeyPair
-	account     string
+	jwt.UserClaims
+
+	accountKP   nkeys.KeyPair
+	userKP      nkeys.KeyPair
+	userKeyPath string
+
+	accountName string
 	allowPubs   []string
 	allowPubsub []string
 	allowSubs   []string
@@ -94,49 +97,62 @@ type AddUserParams struct {
 
 	generate   bool
 	max        string
-	name       string
 	outputFile string
 	payload    string
-	publicKey  string
-	seed       []byte
 	src        []string
 	tags       []string
 }
 
 func (p *AddUserParams) Validate() error {
+	if !p.generate && p.userKeyPath == "" {
+		return fmt.Errorf("provide --public-key or --generate-nkeys flags")
+	}
+
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
-	if p.account == "" {
-		a, err := s.ListSubContainers(store.Accounts)
-		if err != nil {
-			return err
-		}
-		if len(a) == 0 {
-			return fmt.Errorf("no accounts defined")
-		}
-		if len(a) > 1 {
-			return fmt.Errorf("multiple accounts defined specify --account to disambiguiate")
-		}
-
-		p.account = a[0]
-	}
-
-	ks := store.NewKeyStore()
-	p.kp, err = ks.GetAccountKey(s.GetName(), p.account)
+	ctx, err := s.GetContext()
 	if err != nil {
 		return err
 	}
-	if p.kp == nil {
-		return fmt.Errorf("account private key was not found - specify it with -K")
+	if p.accountName == "" {
+		p.accountName = ctx.Account.Name
 	}
 
-	if p.publicKey != "" && p.generate {
-		return fmt.Errorf("error specify one of --public-key or --generate-nkeys")
+	if p.accountName == "" {
+		// default account was not found by get context, so we either we have none or many
+		cNames, err := s.ListSubContainers(store.Accounts)
+		if err != nil {
+			return err
+		}
+		c := len(cNames)
+		if c == 0 {
+			return errors.New("no accounts defined - add account first")
+		} else {
+			return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
+		}
 	}
-	if !p.generate && p.publicKey == "" {
-		return fmt.Errorf("provide --public-key or --generate-nkeys flags")
+
+	if s.Has(store.Accounts, p.accountName, store.Users, store.JwtName(p.Name)) {
+		return fmt.Errorf("account %q already has a user named %q", p.Name, p.Name)
+	}
+
+	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, store.KeyPathFlag)
+	if err != nil {
+		return fmt.Errorf("specify the account private key with --private-key to use for signing the user")
+	}
+
+	if p.generate {
+		p.userKP, err = nkeys.CreateUser()
+		if err != nil {
+			return fmt.Errorf("error generating an user key: %v", err)
+		}
+	} else {
+		p.userKP, err = ctx.ResolveKey(nkeys.PrefixByteUser, p.userKeyPath)
+		if err != nil {
+			return fmt.Errorf("error resolving user key: %v", err)
+		}
 	}
 
 	if p.max != "" {
@@ -156,48 +172,35 @@ func (p *AddUserParams) Validate() error {
 
 func (p *AddUserParams) Run() error {
 	var err error
-	var kp nkeys.KeyPair
-	if p.generate {
-		kp, err = nkeys.CreateUser()
-		if err != nil {
-			return fmt.Errorf("error generating keypair: %v", err)
-		}
 
-		pkBytes, err := kp.PublicKey()
-		if err != nil {
-			return fmt.Errorf("error generating public key: %v", err)
-		}
-		p.publicKey = string(pkBytes)
-
-		p.seed, err = kp.Seed()
-		if err != nil {
-			return fmt.Errorf("error generating seed: %v", err)
-		}
+	upk, err := p.userKP.PublicKey()
+	if err != nil {
+		return err
 	}
-	p.allowPubs = append(p.allowPubs, p.allowPubsub...)
-	p.denyPubs = append(p.denyPubs, p.denyPubsub...)
+	p.Subject = string(upk)
+	p.Permissions.Pub.Allow.Add(p.allowPubs...)
+	p.Permissions.Pub.Allow.Add(p.allowPubsub...)
+	sort.Strings(p.UserClaims.Pub.Allow)
 
-	p.allowSubs = append(p.allowSubs, p.allowPubsub...)
-	p.denySubs = append(p.denySubs, p.denyPubsub...)
+	p.Permissions.Pub.Deny.Add(p.denyPubs...)
+	p.Permissions.Pub.Deny.Add(p.denyPubsub...)
+	sort.Strings(p.Permissions.Pub.Deny)
 
-	sort.Strings(p.allowPubs)
-	sort.Strings(p.denyPubs)
+	p.Permissions.Sub.Allow.Add(p.allowSubs...)
+	p.Permissions.Sub.Allow.Add(p.allowPubsub...)
+	sort.Strings(p.Permissions.Sub.Allow)
 
-	sort.Strings(p.allowSubs)
-	sort.Strings(p.denySubs)
+	p.Permissions.Sub.Deny.Add(p.denySubs...)
+	p.Permissions.Sub.Deny.Add(p.denyPubsub...)
+	sort.Strings(p.Permissions.Sub.Deny)
 
-	sort.Strings(p.tags)
+	p.Tags.Add(p.tags...)
+	sort.Strings(p.Tags)
 
-	uc := jwt.NewUserClaims(p.publicKey)
-	uc.Name = p.name
-	uc.User.Permissions.Sub.Allow = p.allowSubs
-	uc.User.Permissions.Sub.Deny = p.denySubs
-	uc.User.Permissions.Pub.Allow = p.allowPubs
-	uc.User.Permissions.Pub.Deny = p.denyPubs
-	uc.User.Limits.Max, _ = ParseNumber(p.max)
-	uc.User.Limits.Payload, _ = ParseDataSize(p.payload)
+	p.User.Limits.Max, _ = ParseNumber(p.max)
+	p.User.Limits.Payload, _ = ParseDataSize(p.payload)
 
-	us, err := uc.Encode(p.kp)
+	us, err := p.Encode(p.accountKP)
 	if err != nil {
 		return err
 	}
@@ -206,6 +209,18 @@ func (p *AddUserParams) Run() error {
 	if err != nil {
 		return err
 	}
+	if err = s.StoreClaim([]byte(us)); err != nil {
+		return err
+	}
 
-	return s.Write([]byte(us), store.Accounts, p.account, store.Users, fmt.Sprintf("%s.jwt", uc.Name))
+	if p.generate {
+		ks := store.NewKeyStore()
+		if p.userKeyPath == "" {
+			p.userKeyPath, err = ks.Store(s.Info.Name, p.Name, p.userKP)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

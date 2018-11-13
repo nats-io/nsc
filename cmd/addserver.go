@@ -28,8 +28,10 @@ import (
 func createAddServerCmd() *cobra.Command {
 	var params AddServerParams
 	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "Add a server (operator only)",
+		Use:           "server",
+		Short:         "Add a server to a cluster (operator only)",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if err := params.Validate(); err != nil {
@@ -79,13 +81,13 @@ type AddServerParams struct {
 }
 
 func (p *AddServerParams) Validate() error {
+	if p.serverKeyPath != "" && p.generate {
+		return errors.New("specify one of --public-key or --generate-nkeys")
+	}
+
 	s, err := getStore()
 	if err != nil {
 		return err
-	}
-
-	if p.serverKeyPath != "" && p.generate {
-		return errors.New("specify one of --public-key or --generate-nkeys")
 	}
 
 	ctx, err := s.GetContext()
@@ -115,64 +117,23 @@ func (p *AddServerParams) Validate() error {
 		return fmt.Errorf("cluster %q already has a server named %q", p.clusterName, p.Name)
 	}
 
-	if err = p.resolveClusterKey(); err != nil {
-		return err
-	}
-
-	if err = p.resolveServerKey(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *AddServerParams) resolveClusterKey() error {
-	s, err := getStore()
+	p.clusterKP, err = ctx.ResolveKey(nkeys.PrefixByteCluster, store.KeyPathFlag)
 	if err != nil {
-		return err
-	}
-
-	ks := store.NewKeyStore()
-	// sign key - operator
-	p.clusterKP, err = store.ResolveKeyFlag()
-	if err != nil {
-		return err
-	}
-	if p.clusterKP == nil {
-		p.clusterKP, err = ks.GetClusterKey(s.GetName(), p.clusterName)
-		if err != nil {
-			return err
-		}
-		if p.clusterKP == nil {
-			return fmt.Errorf("specify the cluster private key with --private-key for signing the server")
-		}
-	}
-
-	if !store.KeyPairTypeOk(nkeys.PrefixByteCluster, p.clusterKP) {
-		return fmt.Errorf("resolved --private-key key is not an operator key")
-	}
-	return nil
-}
-
-func (p *AddServerParams) resolveServerKey() error {
-	var err error
-	if p.serverKeyPath != "" {
-		kp, err := store.ResolveKey(p.serverKeyPath)
-		if err != nil {
-			return err
-		}
-		if !store.KeyPairTypeOk(nkeys.PrefixByteServer, kp) {
-			return fmt.Errorf("specified server key is not a server key")
-		}
-		p.serverKP = kp
+		return fmt.Errorf("specify the cluster private key with --private-key to use for signing the server")
 	}
 
 	if p.generate {
 		p.serverKP, err = nkeys.CreateServer()
 		if err != nil {
-			return err
+			return fmt.Errorf("error generating a server key: %v", err)
+		}
+	} else {
+		p.serverKP, err = ctx.ResolveKey(nkeys.PrefixByteServer, p.serverKeyPath)
+		if err != nil {
+			return fmt.Errorf("error resolving server key: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -199,13 +160,6 @@ func (p *AddServerParams) Run() error {
 
 	if p.generate {
 		ks := store.NewKeyStore()
-		if p.clusterKeyPath == "" {
-			p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.clusterKP)
-			if err != nil {
-				return err
-			}
-		}
-
 		if p.serverKeyPath == "" {
 			p.serverKeyPath, err = ks.Store(s.Info.Name, p.Name, p.serverKP)
 			if err != nil {

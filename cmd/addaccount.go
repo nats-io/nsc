@@ -28,8 +28,10 @@ import (
 func createAddAccountCmd() *cobra.Command {
 	var params AddAccountParams
 	cmd := &cobra.Command{
-		Use:   "account",
-		Short: "Add an account",
+		Use:           "account",
+		Short:         "Add an account",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if err := params.Validate(); err != nil {
@@ -64,30 +66,31 @@ func init() {
 }
 
 type AddAccountParams struct {
+	jwt.AccountClaims
+
 	operatorKP     nkeys.KeyPair
 	accountKP      nkeys.KeyPair
 	accountKeyPath string
 	generate       bool
-	jwt.AccountClaims
 }
 
 func (p *AddAccountParams) Validate() error {
+	if p.accountKeyPath != "" && p.generate {
+		return errors.New("specify one of --public-key or --generate-nkeys")
+	}
+
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
 
-	if p.accountKeyPath != "" && p.generate {
-		return errors.New("specify one of --public-key or --generate-nkeys")
+	ctx, err := s.GetContext()
+	if err != nil {
+		return fmt.Errorf("error getting context: %v", err)
 	}
 
 	if s.Has(store.Accounts, p.Name) {
 		return fmt.Errorf("account %q already exists", p.Name)
-	}
-
-	ctx, err := s.GetContext()
-	if err != nil {
-		return fmt.Errorf("error getting context: %v", err)
 	}
 
 	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
