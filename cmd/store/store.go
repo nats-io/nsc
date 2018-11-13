@@ -417,7 +417,7 @@ type Context struct {
 	Cluster  Entity
 }
 
-func (c *Context) SetContext(name string, pub string) error {
+func (ctx *Context) SetContext(name string, pub string) error {
 	kp, err := nkeys.FromPublicKey([]byte(pub))
 	if err != nil {
 		return fmt.Errorf("error parsing public key: %v", err)
@@ -430,11 +430,11 @@ func (c *Context) SetContext(name string, pub string) error {
 	var e *Entity
 	switch pre {
 	case nkeys.PrefixByteOperator:
-		e = &c.Operator
+		e = &ctx.Operator
 	case nkeys.PrefixByteCluster:
-		e = &c.Cluster
+		e = &ctx.Cluster
 	case nkeys.PrefixByteAccount:
-		e = &c.Account
+		e = &ctx.Account
 	}
 
 	if e != nil {
@@ -462,7 +462,7 @@ func (s *Store) GetContext() (*Context, error) {
 	if ac != nil {
 		c.SetContext(ac.Name, ac.Subject)
 	}
-	// try to seet a default cluster
+	// try to set a default cluster
 	cc, err := s.LoadDefaultEntity(Clusters)
 	if err != nil {
 		return nil, err
@@ -472,4 +472,28 @@ func (s *Store) GetContext() (*Context, error) {
 	}
 
 	return &c, nil
+}
+
+func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.KeyPair, error) {
+	kp, err := ResolveKey(flagValue)
+	if err != nil {
+		return nil, err
+	}
+	if kp == nil {
+		ks := NewKeyStore()
+		switch kind {
+		case nkeys.PrefixByteAccount:
+			kp, err = ks.GetAccountKey(ctx.Operator.Name, ctx.Account.Name)
+		case nkeys.PrefixByteCluster:
+			kp, err = ks.GetClusterKey(ctx.Operator.Name, ctx.Cluster.Name)
+		case nkeys.PrefixByteOperator:
+			kp, err = ks.GetOperatorKey(ctx.Operator.Name)
+		default:
+			return nil, fmt.Errorf("unsupported key %d resolution", kind)
+		}
+	}
+	if !KeyPairTypeOk(kind, kp) {
+		return nil, fmt.Errorf("unexpected resolved keytype type")
+	}
+	return kp, nil
 }

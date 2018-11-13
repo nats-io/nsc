@@ -52,6 +52,9 @@ func GetKeysDir() string {
 
 // Resolve a key a direct key key value or a path storing a key value
 func ResolveKey(value string) (nkeys.KeyPair, error) {
+	if value == "" {
+		return nil, nil
+	}
 	d := []byte(value)
 	kp, err := resolveAsKey(d)
 	if err != nil {

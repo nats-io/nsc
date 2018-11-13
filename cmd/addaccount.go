@@ -25,11 +25,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createAddClusterCmd() *cobra.Command {
-	var params AddClusterParams
+func createAddAccountCmd() *cobra.Command {
+	var params AddAccountParams
 	cmd := &cobra.Command{
-		Use:   "cluster",
-		Short: "Add a cluster (operator only)",
+		Use:   "account",
+		Short: "Add an account",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if err := params.Validate(); err != nil {
@@ -41,17 +41,17 @@ func createAddClusterCmd() *cobra.Command {
 			}
 
 			if params.generate {
-				cmd.Printf("Generated cluster key - private key stored %q\n", params.clusterKeyPath)
+				cmd.Printf("Generated account key - private key stored %q\n", params.accountKeyPath)
 			} else {
-				cmd.Printf("Success! - added cluster %q\n", params.Name)
+				cmd.Printf("Success! - added account %q\n", params.Name)
 			}
 
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.Name, "name", "", "", "cluster name")
+	cmd.Flags().StringVarP(&params.Name, "name", "", "", "account name")
 
-	cmd.Flags().StringVarP(&params.clusterKeyPath, "public-key", "k", "", "public key identifying the cluster")
+	cmd.Flags().StringVarP(&params.accountKeyPath, "public-key", "k", "", "public key identifying the account")
 	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "", false, "generate nkeys")
 
 	cmd.MarkFlagRequired("name")
@@ -60,29 +60,29 @@ func createAddClusterCmd() *cobra.Command {
 }
 
 func init() {
-	addCmd.AddCommand(createAddClusterCmd())
+	addCmd.AddCommand(createAddAccountCmd())
 }
 
-type AddClusterParams struct {
-	okp            nkeys.KeyPair
-	ckp            nkeys.KeyPair
-	clusterKeyPath string
+type AddAccountParams struct {
+	operatorKP     nkeys.KeyPair
+	accountKP      nkeys.KeyPair
+	accountKeyPath string
 	generate       bool
-	jwt.ClusterClaims
+	jwt.AccountClaims
 }
 
-func (p *AddClusterParams) Validate() error {
+func (p *AddAccountParams) Validate() error {
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
 
-	if p.clusterKeyPath != "" && p.generate {
+	if p.accountKeyPath != "" && p.generate {
 		return errors.New("specify one of --public-key or --generate-nkeys")
 	}
 
-	if s.Has(store.Clusters, p.Name) {
-		return fmt.Errorf("cluster %q already exists", p.Name)
+	if s.Has(store.Accounts, p.Name) {
+		return fmt.Errorf("account %q already exists", p.Name)
 	}
 
 	ctx, err := s.GetContext()
@@ -90,27 +90,33 @@ func (p *AddClusterParams) Validate() error {
 		return fmt.Errorf("error getting context: %v", err)
 	}
 
-	p.okp, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
+	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the operator private key with --private-key to use for signing the cluster")
 	}
 
-	p.ckp, err = ctx.ResolveKey(nkeys.PrefixByteCluster, p.clusterKeyPath)
-	if err != nil {
-		return fmt.Errorf("error resolving cluster key: %v", err)
+	if p.generate {
+		p.accountKP, err = nkeys.CreateAccount()
+		if err != nil {
+			return fmt.Errorf("error generating an account key: %v", err)
+		}
+	} else {
+		p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, p.accountKeyPath)
+		if err != nil {
+			return fmt.Errorf("error resolving account key: %v", err)
+		}
 	}
 
 	return nil
 }
 
-func (p *AddClusterParams) Run() error {
-	pkd, err := p.ckp.PublicKey()
+func (p *AddAccountParams) Run() error {
+	pkd, err := p.accountKP.PublicKey()
 	if err != nil {
 		return err
 	}
 	p.Subject = string(pkd)
-
-	token, err := p.ClusterClaims.Encode(p.okp)
+	token, err := p.AccountClaims.Encode(p.operatorKP)
 	if err != nil {
 		return err
 	}
@@ -126,7 +132,7 @@ func (p *AddClusterParams) Run() error {
 
 	if p.generate {
 		ks := store.NewKeyStore()
-		p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.ckp)
+		p.accountKeyPath, err = ks.Store(s.Info.Name, p.Name, p.accountKP)
 		if err != nil {
 			return err
 		}
