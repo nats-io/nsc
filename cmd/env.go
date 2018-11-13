@@ -17,16 +17,12 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 
-	"github.com/nats-io/nsc/cmd/kstore"
-
-	"github.com/xlab/tablewriter"
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/spf13/cobra"
+	"github.com/xlab/tablewriter"
 )
-
-const NscPathEnv = "NSC_PATH"
 
 func envSet(varName string) string {
 	if os.Getenv(varName) == "" {
@@ -37,28 +33,43 @@ func envSet(varName string) string {
 
 func createEnvCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "env",
-		Short:   "Prints the nsc environment",
-		Example: "env <optional_path>",
+		Use:           "env",
+		Short:         "Prints the nsc environment",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dir := "."
-			if len(args) > 0 {
-				dir = args[0]
-			}
-			var err error
-			dir, err = filepath.Abs(dir)
-			if err != nil {
-				return err
-			}
-			dir = ResolvePath(dir, NscPathEnv)
+			s, err := getStore()
 
 			table := tablewriter.CreateTable()
 			table.UTF8Box()
 			table.AddTitle("NSC Environment")
-			table.AddHeaders("Variable", "Set", "Effective Value")
+			table.AddHeaders("Setting", "Set", "Effective Value")
 
-			table.AddRow("$"+kstore.NKeysPathEnv, envSet(kstore.NKeysPathEnv), kstore.GetKeysDir())
-			table.AddRow("$"+NscPathEnv, envSet(NscPathEnv), dir)
+			table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
+			if s == nil {
+				table.AddRow("Configuration Dir", "No", "not in a configuration directory")
+			} else {
+				table.AddRow("Configuration Dir", "Yes", s.Dir)
+
+				var ctx *store.Context
+				if s != nil {
+					ctx, err = s.GetContext()
+				}
+				if err != nil {
+					table.AddRow("Store Context", "", err.Error())
+				} else {
+					fn := func(s string) string {
+						if s == "" {
+							return "No"
+						}
+						return "Yes"
+					}
+					table.AddRow("Operator", fn(ctx.Operator.Name), ctx.Operator.Name)
+					table.AddRow("Account", fn(ctx.Account.Name), ctx.Account.Name)
+					table.AddRow("Cluster", fn(ctx.Cluster.Name), ctx.Cluster.Name)
+				}
+			}
 
 			cmd.Println(table.Render())
 

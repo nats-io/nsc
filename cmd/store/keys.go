@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package kstore
+package store
 
 import (
 	"errors"

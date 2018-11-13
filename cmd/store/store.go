@@ -157,6 +157,10 @@ func (s *Store) resolve(name ...string) string {
 // Has returns true if the specified asset exists
 func (s *Store) Has(name ...string) bool {
 	fp := s.resolve(name...)
+	return s.has(fp)
+}
+
+func (s *Store) has(fp string) bool {
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return false
 	}
@@ -356,6 +360,41 @@ func (s *Store) LoadRootJwt() (*jwt.GenericClaims, error) {
 	return nil, nil
 }
 
+func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
+	dirs, err := s.ListSubContainers(kind)
+	if err != nil {
+		return nil, fmt.Errorf("error listing %s: %v", kind, err)
+	}
+	if len(dirs) == 1 {
+		ac, err := s.LoadClaim(kind, dirs[0], JwtName(dirs[0]))
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s %q: %v", kind, dirs[0], err)
+		}
+		return ac, nil
+	}
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get pwd: %v", err)
+	}
+
+	for _, n := range dirs {
+		tp := filepath.Join(s.Dir, kind, n)
+		if strings.HasPrefix(pwd, tp) {
+			if s.Has(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd))) {
+				ac, err := s.LoadClaim(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd)))
+				if err != nil {
+					return nil, fmt.Errorf("error reading %s %q: %v", kind, dirs[0], err)
+				}
+				return ac, nil
+			} else {
+				continue
+			}
+		}
+	}
+	return nil, nil
+}
+
 func (s *Store) GetRootPublicKey() (string, error) {
 	c, err := s.LoadRootJwt()
 	if err != nil {
@@ -365,4 +404,72 @@ func (s *Store) GetRootPublicKey() (string, error) {
 		return c.Subject, nil
 	}
 	return "", nil
+}
+
+type Entity struct {
+	Name      string
+	PublicKey string
+}
+
+type Context struct {
+	Operator Entity
+	Account  Entity
+	Cluster  Entity
+}
+
+func (c *Context) SetContext(name string, pub string) error {
+	kp, err := nkeys.FromPublicKey([]byte(pub))
+	if err != nil {
+		return fmt.Errorf("error parsing public key: %v", err)
+	}
+	pre, err := KeyType(kp)
+	if err != nil {
+		return err
+	}
+
+	var e *Entity
+	switch pre {
+	case nkeys.PrefixByteOperator:
+		e = &c.Operator
+	case nkeys.PrefixByteCluster:
+		e = &c.Cluster
+	case nkeys.PrefixByteAccount:
+		e = &c.Account
+	}
+
+	if e != nil {
+		e.Name = name
+		e.PublicKey = pub
+	}
+
+	return nil
+}
+
+func (s *Store) GetContext() (*Context, error) {
+	var c Context
+	root, err := s.LoadRootJwt()
+	if err != nil {
+		return nil, fmt.Errorf("error reading root: %v", err)
+	}
+	if err = c.SetContext(root.Name, root.Subject); err != nil {
+		return nil, err
+	}
+	// try to set a default account
+	ac, err := s.LoadDefaultEntity(Accounts)
+	if err != nil {
+		return nil, err
+	}
+	if ac != nil {
+		c.SetContext(ac.Name, ac.Subject)
+	}
+	// try to seet a default cluster
+	cc, err := s.LoadDefaultEntity(Clusters)
+	if err != nil {
+		return nil, err
+	}
+	if cc != nil {
+		c.SetContext(cc.Name, cc.Subject)
+	}
+
+	return &c, nil
 }

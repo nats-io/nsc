@@ -13,13 +13,13 @@ fmt:
 	gofmt -s -w cli/*.go
 	gofmt -s -w cmd/*.go
 	gofmt -s -w cmd/store/*.go
-	gofmt -s -w cmd/kstore/*.go
+#	gofmt -s -w cmd/kstore/*.go
 
 	goimports -w *.go
 	goimports -w cli/*.go
 	goimports -w cmd/*.go
 	goimports -w cmd/store/*.go
-	goimports -w cmd/kstore/*.go
+#	goimports -w cmd/kstore/*.go
 
 compile:
 	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 8
@@ -38,5 +38,5 @@ test: fmt
 	go test -covermode=atomic -coverprofile=./cov/cli.out ./cli
 	go test -covermode=atomic -coverprofile=./cov/cmd.out ./cmd
 	go test -covermode=atomic -coverprofile=./cov/cmdstore.out ./cmd/store
-	go test -covermode=atomic -coverprofile=./cov/kstore.out ./cmd/kstore
+#	go test -covermode=atomic -coverprofile=./cov/kstore.out ./cmd/kstore
 

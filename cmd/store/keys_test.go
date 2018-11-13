@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package kstore
+package store
 
 import (
 	"io/ioutil"
@@ -164,25 +164,23 @@ func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
 	return fp
 }
 
-func MakeTempDir(t *testing.T) string {
-	p, err := ioutil.TempDir("", "store_test")
-	require.NoError(t, err)
-	return p
-}
-
 func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateCluster)
+	return CreateTestNKey(t, nkeys.CreateCluster)
 }
 
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateAccount)
+	return CreateTestNKey(t, nkeys.CreateAccount)
 }
 
 func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateOperator)
+	return CreateTestNKey(t, nkeys.CreateOperator)
 }
 
-func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
+func CreateUserKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateTestNKey(t, nkeys.CreateUser)
+}
+
+func CreateTestNKey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
 	kp, err := f()
 	require.NoError(t, err)
 

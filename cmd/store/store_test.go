@@ -221,34 +221,3 @@ func TestStoreUser(t *testing.T) {
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "bar")
 }
-
-func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateCluster)
-}
-
-func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateAccount)
-}
-
-func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateOperator)
-}
-
-func CreateUserKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateUser)
-}
-
-type NKeyFactory func() (nkeys.KeyPair, error)
-
-func CreateNkey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair) {
-	kp, err := f()
-	require.NoError(t, err)
-
-	seed, err := kp.Seed()
-	require.NoError(t, err)
-
-	pub, err := kp.PublicKey()
-	require.NoError(t, err)
-
-	return seed, string(pub), kp
-}

@@ -20,8 +20,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/kstore"
-
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -66,7 +64,7 @@ func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair)
 	return CreateNkey(t, nkeys.CreateOperator)
 }
 
-func CreateNkey(t *testing.T, f kstore.NKeyFactory) ([]byte, string, nkeys.KeyPair) {
+func CreateNkey(t *testing.T, f store.NKeyFactory) ([]byte, string, nkeys.KeyPair) {
 	kp, err := f()
 	require.NoError(t, err)
 

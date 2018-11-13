@@ -19,12 +19,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/nats-io/nsc/cmd/kstore"
-
-	"github.com/nats-io/nsc/cmd/store"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -126,7 +123,7 @@ func (p *AddUserParams) Validate() error {
 		p.account = a[0]
 	}
 
-	ks := kstore.NewKeyStore()
+	ks := store.NewKeyStore()
 	p.kp, err = ks.GetAccountKey(s.GetName(), p.account)
 	if err != nil {
 		return err

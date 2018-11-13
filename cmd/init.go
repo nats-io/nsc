@@ -19,19 +19,107 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 
-	"github.com/nats-io/nsc/cmd/kstore"
-
 	"github.com/nats-io/jwt"
-
 	"github.com/nats-io/nkeys"
-
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
+func createInitCmd() *cobra.Command {
+	var p InitParams
+	cmd := &cobra.Command{
+		Use:           "init",
+		Short:         "init a configuration directory",
+		Example:       "init --name mynats <dirpath>",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				p.dir = "."
+			}
+			if len(args) == 1 {
+				p.dir = args[0]
+			}
+
+			if err := p.Validate(); err != nil {
+				return err
+			}
+
+			if err := p.Run(); err != nil {
+				return err
+			}
+
+			if p.keyPath != "" {
+				cmd.Printf("Generated operator key - private key stored %q\n", p.keyPath)
+			}
+
+			if p.cluster.keyPath != "" {
+				cmd.Printf("Generated cluster key - private key stored %q\n", p.cluster.keyPath)
+			}
+
+			if p.account.keyPath != "" {
+				cmd.Printf("Generated account key - private key stored %q\n", p.account.keyPath)
+			}
+
+			cmd.Printf("Success! - created project directory %q\n", p.dir)
+
+			return nil
+		},
+	}
+
+	dname := "default"
+	u, err := user.Current()
+	if err == nil {
+		if u.Username != "" {
+			dname = u.Username
+		} else if u.Name != "" {
+			dname = u.Name
+		}
+	}
+
+	defaultName := func(s string, role string) string {
+		if s == "default" {
+			return fmt.Sprintf("%s_%s", role, s)
+		} else {
+			return fmt.Sprintf("%s_%s", s, role)
+		}
+	}
+
+	cmd.Flags().StringVarP(&p.name, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
+	cmd.Flags().StringVarP(&p.name, "operator-name", "", defaultName(dname, "operator"), "operator name")
+	cmd.Flags().StringVarP(&p.keyPath, "operator-key", "", "", "operator keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.create, "create-operator", "", true, "create operator")
+
+	cmd.Flags().StringVarP(&p.account.name, "account-name", "", defaultName(dname, "account"), "name for the operator")
+	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.account.create, "create-account", "", true, "create an account")
+
+	cmd.Flags().StringVarP(&p.user.name, "user-name", "", dname, "name for the user")
+	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath or seed value (default generated)")
+
+	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", defaultName(dname, "cluster"), "name for the cluster")
+	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.cluster.create, "create-cluster", "", false, "create a cluster")
+
+	cmd.Flags().StringVarP(&p.server.name, "server-name", "", defaultName(dname, "server"), "name for the server")
+	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath or seed value (default generated)")
+	cmd.Flags().BoolVarP(&p.server.create, "create-server", "", false, "create a server")
+
+	cmd.Flags().MarkHidden("create-account")
+	cmd.Flags().MarkHidden("create-operator")
+
+	return cmd
+}
+
+func init() {
+	rootCmd.AddCommand(createInitCmd())
+}
+
 type Container struct {
+	create  bool
 	name    string
 	dir     string
 	kp      nkeys.KeyPair
@@ -42,7 +130,7 @@ type Container struct {
 func (e *Container) Valid() error {
 	var err error
 	if e.keyPath != "" {
-		e.kp, err = kstore.ResolveKey(e.keyPath)
+		e.kp, err = store.ResolveKey(e.keyPath)
 		if err != nil {
 			return err
 		}
@@ -52,11 +140,11 @@ func (e *Container) Valid() error {
 			return err
 		}
 
-		if !kstore.IsPublicKey(e.kind, d) {
-			return fmt.Errorf("invalid %s key", kstore.KeyTypeLabel(e.kind))
+		if !store.IsPublicKey(e.kind, d) {
+			return fmt.Errorf("invalid %s key", store.KeyTypeLabel(e.kind))
 		}
 	} else {
-		e.kp, err = kstore.CreateNKey(e.kind)
+		e.kp, err = store.CreateNKey(e.kind)
 		if err != nil {
 			return err
 		}
@@ -65,8 +153,8 @@ func (e *Container) Valid() error {
 }
 
 func (e *Container) StoreKeys(root string) error {
-	if e.keyPath == "" {
-		ks := kstore.NewKeyStore()
+	if e.create && e.keyPath == "" {
+		ks := store.NewKeyStore()
 		if _, err := ks.Store(root, e.name, e.kp); err != nil {
 			return err
 		}
@@ -76,16 +164,18 @@ func (e *Container) StoreKeys(root string) error {
 
 type InitParams struct {
 	Container
-	account       Container
-	cluster       Container
-	server        Container
-	user          Container
-	createCluster bool
-	createServer  bool
-	createDir     bool
+	account Container
+	cluster Container
+	server  Container
+	user    Container
 }
 
 func (p *InitParams) Validate() error {
+	s, _ := getStore()
+	if s != nil {
+		return fmt.Errorf("%q is already a store", s.Dir)
+	}
+
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -94,16 +184,16 @@ func (p *InitParams) Validate() error {
 		p.dir = filepath.Join(dir, p.dir)
 	}
 
-	p.createDir = false
+	p.create = false
 	stat, err := os.Stat(p.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			p.createDir = true
+			p.create = true
 		} else {
 			return err
 		}
 	}
-	if !p.createDir {
+	if !p.create {
 		if !stat.IsDir() {
 			return fmt.Errorf("%q is not a directory", p.dir)
 		}
@@ -141,7 +231,7 @@ func (p *InitParams) Validate() error {
 }
 
 func (p *InitParams) Run() error {
-	if p.createDir {
+	if p.create {
 		if err := os.MkdirAll(p.dir, 0700); err != nil {
 			return err
 		}
@@ -165,6 +255,7 @@ func (p *InitParams) Run() error {
 		return err
 	}
 	ac := jwt.NewAccountClaims(string(apk))
+	ac.Name = p.account.name
 	as, err := ac.Encode(p.Container.kp)
 	if err != nil {
 		return err
@@ -179,6 +270,7 @@ func (p *InitParams) Run() error {
 		return err
 	}
 	uc := jwt.NewUserClaims(string(upk))
+	uc.Name = p.user.name
 	us, err := uc.Encode(p.account.kp)
 	if err != nil {
 		return err
@@ -187,12 +279,13 @@ func (p *InitParams) Run() error {
 		return err
 	}
 
-	if p.createCluster {
+	if p.cluster.create {
 		cpk, err := p.cluster.kp.PublicKey()
 		if err != nil {
 			return err
 		}
 		cc := jwt.NewGenericClaims(string(cpk))
+		cc.Name = p.cluster.name
 		cs, err := cc.Encode(p.Container.kp)
 		if err != nil {
 			return err
@@ -202,7 +295,7 @@ func (p *InitParams) Run() error {
 		}
 	}
 
-	if p.createServer {
+	if p.server.create {
 		spk, err := p.server.kp.PublicKey()
 		if err != nil {
 			return err
@@ -218,69 +311,4 @@ func (p *InitParams) Run() error {
 	}
 
 	return nil
-}
-
-func createInitCmd() *cobra.Command {
-	var p InitParams
-	cmd := &cobra.Command{
-		Use:     "init",
-		Short:   "int a default configuration directory",
-		Example: "init --name mynats <dirpath>",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				p.dir = "."
-			}
-			if len(args) == 1 {
-				p.dir = args[0]
-			}
-
-			if err := p.Validate(); err != nil {
-				return err
-			}
-
-			if err := p.Run(); err != nil {
-				return err
-			}
-
-			if p.keyPath != "" {
-				cmd.Printf("Generated operator key - private key stored %q\n", p.keyPath)
-			}
-
-			if p.cluster.keyPath != "" {
-				cmd.Printf("Generated cluster key - private key stored %q\n", p.cluster.keyPath)
-			}
-
-			if p.account.keyPath != "" {
-				cmd.Printf("Generated account key - private key stored %q\n", p.account.keyPath)
-			}
-
-			cmd.Printf("Success! - created project directory %q\n", p.dir)
-
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVarP(&p.name, "name", "n", "", "name for the combi, if not specified uses <dirname>")
-	cmd.Flags().StringVarP(&p.name, "operator-name", "", "", "name for the operator, if not specified uses operator")
-	cmd.Flags().StringVarP(&p.keyPath, "operator-key", "", "", "operator keypath or seed value, generated if not specified")
-
-	cmd.Flags().StringVarP(&p.account.name, "account-name", "", "", "name for the operator, if not specified uses account")
-	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath or seed value, generated if not specified")
-
-	cmd.Flags().StringVarP(&p.cluster.name, "user-name", "", "", "name for the user, if not specified uses user")
-	cmd.Flags().StringVarP(&p.cluster.keyPath, "user-key", "", "", "user keypath or seed value, generated if not specified")
-
-	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", "", "name for the cluster, if not specified uses cluster")
-	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath or seed value, generated if not specified")
-	cmd.Flags().BoolVarP(&p.createCluster, "create-cluster", "", false, "create a cluster")
-
-	cmd.Flags().StringVarP(&p.server.name, "server-name", "", "", "name for the server, if not specified uses server")
-	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath or seed value, generated if not specified")
-	cmd.Flags().BoolVarP(&p.createServer, "create-server", "", false, "create a server")
-
-	return cmd
-}
-
-func init() {
-	rootCmd.AddCommand(createInitCmd())
 }

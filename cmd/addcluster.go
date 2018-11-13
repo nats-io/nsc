@@ -21,7 +21,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/kstore"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -73,13 +72,13 @@ type AddClusterParams struct {
 }
 
 func (p *AddClusterParams) Validate() error {
-	if p.clusterKeyPath != "" && p.generate {
-		return errors.New("specify one of --public-key or --generate-nkeys")
-	}
-
 	s, err := getStore()
 	if err != nil {
 		return err
+	}
+
+	if p.clusterKeyPath != "" && p.generate {
+		return errors.New("specify one of --public-key or --generate-nkeys")
 	}
 
 	if s.Has(store.Clusters, p.Name) {
@@ -102,9 +101,9 @@ func (p *AddClusterParams) resolveOperatorKey() error {
 	if err != nil {
 		return err
 	}
-	ks := kstore.NewKeyStore()
+	ks := store.NewKeyStore()
 	// sign key - operator
-	p.okp, err = kstore.ResolveKeyFlag()
+	p.okp, err = store.ResolveKeyFlag()
 	if err != nil {
 		return err
 	}
@@ -118,7 +117,7 @@ func (p *AddClusterParams) resolveOperatorKey() error {
 		}
 	}
 
-	if !kstore.KeyPairTypeOk(nkeys.PrefixByteOperator, p.okp) {
+	if !store.KeyPairTypeOk(nkeys.PrefixByteOperator, p.okp) {
 		return fmt.Errorf("resolved --private-key key is not an operator key")
 	}
 	return nil
@@ -127,11 +126,11 @@ func (p *AddClusterParams) resolveOperatorKey() error {
 func (p *AddClusterParams) resolveClusterKey() error {
 	var err error
 	if p.clusterKeyPath != "" {
-		kp, err := kstore.ResolveKey(p.clusterKeyPath)
+		kp, err := store.ResolveKey(p.clusterKeyPath)
 		if err != nil {
 			return err
 		}
-		if !kstore.KeyPairTypeOk(nkeys.PrefixByteCluster, kp) {
+		if !store.KeyPairTypeOk(nkeys.PrefixByteCluster, kp) {
 			return fmt.Errorf("specified public key is not a cluster key")
 		}
 		p.ckp = kp
@@ -168,7 +167,7 @@ func (p *AddClusterParams) Run() error {
 	}
 
 	if p.generate {
-		ks := kstore.NewKeyStore()
+		ks := store.NewKeyStore()
 		p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.ckp)
 		if err != nil {
 			return err

@@ -21,7 +21,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/kstore"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +41,7 @@ func createAddServerCmd() *cobra.Command {
 			}
 
 			if params.generate {
-				if kstore.KeyPathFlag == "" {
+				if store.KeyPathFlag == "" {
 					cmd.Printf("Generated cluster key - private key stored %q\n", params.clusterKeyPath)
 				}
 				cmd.Printf("Generated server key - private key stored %q\n", params.serverKeyPath)
@@ -80,15 +79,26 @@ type AddServerParams struct {
 }
 
 func (p *AddServerParams) Validate() error {
-	if p.serverKeyPath != "" && p.generate {
-		return errors.New("specify one of --public-key or --generate-nkeys")
-	}
-
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
+
+	if p.serverKeyPath != "" && p.generate {
+		return errors.New("specify one of --public-key or --generate-nkeys")
+	}
+
+	ctx, err := s.GetContext()
+	if err != nil {
+		return err
+	}
+
 	if p.clusterName == "" {
+		p.clusterName = ctx.Cluster.Name
+	}
+
+	if p.clusterName == "" {
+		// default cluster was not found by get context, so we either we have none or many
 		cNames, err := s.ListSubContainers(store.Clusters)
 		if err != nil {
 			return err
@@ -96,13 +106,8 @@ func (p *AddServerParams) Validate() error {
 		c := len(cNames)
 		if c == 0 {
 			return errors.New("no clusters defined - add cluster first")
-		}
-		if c == 1 {
-			p.clusterName = cNames[0]
-		}
-		if c > 1 {
-		} else if len(cNames) > 1 {
-			return errors.New("multiple clusters found - specify --cluster-name")
+		} else {
+			return errors.New("multiple clusters found - specify --cluster-name or navigate to a cluster directory")
 		}
 	}
 
@@ -126,9 +131,10 @@ func (p *AddServerParams) resolveClusterKey() error {
 	if err != nil {
 		return err
 	}
-	ks := kstore.NewKeyStore()
+
+	ks := store.NewKeyStore()
 	// sign key - operator
-	p.clusterKP, err = kstore.ResolveKeyFlag()
+	p.clusterKP, err = store.ResolveKeyFlag()
 	if err != nil {
 		return err
 	}
@@ -142,7 +148,7 @@ func (p *AddServerParams) resolveClusterKey() error {
 		}
 	}
 
-	if !kstore.KeyPairTypeOk(nkeys.PrefixByteCluster, p.clusterKP) {
+	if !store.KeyPairTypeOk(nkeys.PrefixByteCluster, p.clusterKP) {
 		return fmt.Errorf("resolved --private-key key is not an operator key")
 	}
 	return nil
@@ -151,11 +157,11 @@ func (p *AddServerParams) resolveClusterKey() error {
 func (p *AddServerParams) resolveServerKey() error {
 	var err error
 	if p.serverKeyPath != "" {
-		kp, err := kstore.ResolveKey(p.serverKeyPath)
+		kp, err := store.ResolveKey(p.serverKeyPath)
 		if err != nil {
 			return err
 		}
-		if !kstore.KeyPairTypeOk(nkeys.PrefixByteServer, kp) {
+		if !store.KeyPairTypeOk(nkeys.PrefixByteServer, kp) {
 			return fmt.Errorf("specified server key is not a server key")
 		}
 		p.serverKP = kp
@@ -192,7 +198,7 @@ func (p *AddServerParams) Run() error {
 	}
 
 	if p.generate {
-		ks := kstore.NewKeyStore()
+		ks := store.NewKeyStore()
 		if p.clusterKeyPath == "" {
 			p.clusterKeyPath, err = ks.Store(s.Info.Name, p.Name, p.clusterKP)
 			if err != nil {
