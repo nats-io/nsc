@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 
 	"github.com/nats-io/jwt"
@@ -63,45 +62,27 @@ func createInitCmd() *cobra.Command {
 		},
 	}
 
-	dname := "default"
-	u, err := user.Current()
-	if err == nil {
-		if u.Username != "" {
-			dname = u.Username
-		} else if u.Name != "" {
-			dname = u.Name
-		}
-	}
-
-	defaultName := func(s string, role string) string {
-		if s == "default" {
-			return fmt.Sprintf("%s_%s", role, s)
-		} else {
-			return fmt.Sprintf("%s_%s", s, role)
-		}
-	}
-
 	cmd.Flags().StringVarP(&p.dir, "dir", "", ".", "directory path to create")
 
 	cmd.Flags().StringVarP(&p.name, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
 
-	cmd.Flags().StringVarP(&p.Container.name, "operator-name", "", defaultName(dname, "operator"), "operator name")
+	cmd.Flags().StringVarP(&p.Container.name, "operator-name", "", "", "operator name (default '<name>_operator')")
 	cmd.Flags().StringVarP(&p.Container.keyPath, "operator-key", "", "", "operator keypath or seed value (default generated)")
 	cmd.Flags().BoolVarP(&p.Container.create, "create-operator", "", true, "create an operator")
 
-	cmd.Flags().StringVarP(&p.account.name, "account-name", "", defaultName(dname, "account"), "name for the operator")
+	cmd.Flags().StringVarP(&p.account.name, "account-name", "", "", "name for the account (default '<name>_account')")
 	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath or seed value (default generated)")
 	cmd.Flags().BoolVarP(&p.account.create, "create-account", "", true, "create an account")
 
-	cmd.Flags().StringVarP(&p.user.name, "user-name", "", dname, "name for the user")
+	cmd.Flags().StringVarP(&p.user.name, "user-name", "", "", "name for the user (default '<name>_user')")
 	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath or seed value (default generated)")
 	cmd.Flags().BoolVarP(&p.user.create, "create-user", "", true, "create an user")
 
-	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", defaultName(dname, "cluster"), "name for the cluster")
+	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", "", "name for the cluster (default '<name>_cluster')")
 	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath or seed value (default generated)")
 	cmd.Flags().BoolVarP(&p.cluster.create, "create-cluster", "", false, "create a cluster")
 
-	cmd.Flags().StringVarP(&p.server.name, "server-name", "", defaultName(dname, "server"), "name for the server")
+	cmd.Flags().StringVarP(&p.server.name, "server-name", "", "", "name for the server (default '<name>_server')")
 	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath or seed value (default generated)")
 	cmd.Flags().BoolVarP(&p.server.create, "create-server", "", false, "create a server")
 
@@ -178,17 +159,20 @@ func (p *InitParams) Validate() error {
 	if !filepath.IsAbs(p.dir) {
 		p.dir = filepath.Join(dir, p.dir)
 	}
+	if p.name == "" {
+		p.name = filepath.Base(p.dir)
+	}
 
-	p.create = false
+	checkExisting := true
 	stat, err := os.Stat(p.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			p.create = true
+			checkExisting = false
 		} else {
 			return err
 		}
 	}
-	if !p.create {
+	if checkExisting {
 		if !stat.IsDir() {
 			return fmt.Errorf("%q is not a directory", p.dir)
 		}
@@ -202,15 +186,23 @@ func (p *InitParams) Validate() error {
 		}
 	}
 
-	if p.name == "" {
-		p.name = filepath.Base(p.dir)
-	}
-
 	p.kind = nkeys.PrefixByteOperator
 	p.account.kind = nkeys.PrefixByteAccount
+	if p.account.name == "" {
+		p.account.name = fmt.Sprintf("%s_account", p.name)
+	}
 	p.cluster.kind = nkeys.PrefixByteCluster
+	if p.cluster.name == "" {
+		p.cluster.name = fmt.Sprintf("%s_cluster", p.name)
+	}
 	p.server.kind = nkeys.PrefixByteServer
+	if p.server.name == "" {
+		p.server.name = fmt.Sprintf("%s_server", p.name)
+	}
 	p.user.kind = nkeys.PrefixByteUser
+	if p.user.name == "" {
+		p.user.name = fmt.Sprintf("%s_user", p.name)
+	}
 
 	entities := []*Container{&p.Container, &p.account, &p.cluster, &p.server, &p.user}
 	for _, e := range entities {
@@ -226,8 +218,13 @@ func (p *InitParams) Validate() error {
 }
 
 func (p *InitParams) Run() error {
-	if p.create {
-		if err := os.MkdirAll(p.dir, 0700); err != nil {
+	_, err := os.Stat(p.dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(p.dir, 0700); err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 	}
