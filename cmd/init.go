@@ -20,14 +20,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/xlab/tablewriter"
-
-	"github.com/nats-io/nsc/cli"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+	"github.com/xlab/tablewriter"
 )
 
 func createInitCmd() *cobra.Command {
@@ -88,26 +86,26 @@ func createInitCmd() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&p.defaults, "yes", "y", false, "generate all defaults and skip questions")
 
-	cmd.Flags().StringVarP(&p.name, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
+	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
 
-	cmd.Flags().StringVarP(&p.Container.name, "operator-name", "", "", "operator name (default '<name>_operator')")
-	cmd.Flags().StringVarP(&p.Container.keyPath, "operator-key", "", "", "operator keypath or seed value (default generated)")
-	cmd.Flags().BoolVarP(&p.Container.create, "create-operator", "", true, "create an operator")
+	cmd.Flags().StringVarP(&p.operator.name, "operator-name", "", "", "operator name (default '<name>_operator')")
+	cmd.Flags().StringVarP(&p.operator.keyPath, "operator-key", "", "", "operator keypath (default generated)")
+	cmd.Flags().BoolVarP(&p.operator.create, "create-operator", "", true, "create an operator")
 
 	cmd.Flags().StringVarP(&p.account.name, "account-name", "", "", "name for the account (default '<name>_account')")
-	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath or seed value (default generated)")
+	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.account.create, "create-account", "", true, "create an account")
 
 	cmd.Flags().StringVarP(&p.user.name, "user-name", "", "", "name for the user (default '<name>_user')")
-	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath or seed value (default generated)")
+	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.user.create, "create-user", "", true, "create an user")
 
 	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", "", "name for the cluster (default '<name>_cluster')")
-	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath or seed value (default generated)")
+	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.cluster.create, "create-cluster", "", false, "create a cluster")
 
-	cmd.Flags().StringVarP(&p.server.name, "server-name", "", "", "name for the server (default '<name>_server')")
-	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath or seed value (default generated)")
+	cmd.Flags().StringVarP(&p.server.name, "server-name", "", "localhost", "name for the server")
+	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.server.create, "create-server", "", false, "create a server")
 
 	cmd.Flags().MarkHidden("create-account")
@@ -122,16 +120,18 @@ func init() {
 }
 
 type InitParams struct {
-	defaults bool
-	Container
-	account Container
-	cluster Container
-	server  Container
-	user    Container
+	pwd             string
+	environmentName string
+	defaults        bool
+	operator        Container
+	account         Container
+	cluster         Container
+	server          Container
+	user            Container
 }
 
 func (p *InitParams) Containers() []*Container {
-	return []*Container{&p.Container, &p.account, &p.user, &p.cluster, &p.server}
+	return []*Container{&p.operator, &p.account, &p.user, &p.cluster, &p.server}
 }
 
 func ValidateNkey(kind nkeys.PrefixByte) cli.Validator {
@@ -152,35 +152,41 @@ func ValidateNkey(kind nkeys.PrefixByte) cli.Validator {
 }
 
 func (p *InitParams) SetDefaults() error {
-	var err error
-
-	p.kind = nkeys.PrefixByteOperator
+	p.operator.kind = nkeys.PrefixByteOperator
 	p.account.kind = nkeys.PrefixByteAccount
 	p.cluster.kind = nkeys.PrefixByteCluster
 	p.server.kind = nkeys.PrefixByteServer
 	p.user.kind = nkeys.PrefixByteUser
 
-	p.dir, err = os.Getwd()
-	if err != nil {
-		return err
+	// if defaults are set we are not prompting
+	if p.defaults && p.environmentName == "" {
+		var err error
+		p.pwd, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+		p.environmentName = filepath.Base(p.pwd)
+		p.SetDefaultNames()
 	}
-	base := filepath.Base(p.dir)
+	return nil
+}
 
+func (p *InitParams) SetDefaultNames() error {
 	// set the operator name
-	if p.name == "" {
-		p.name = fmt.Sprintf("%s_operator", base)
+	if p.operator.name == "" {
+		p.operator.name = fmt.Sprintf("%s_operator", p.environmentName)
 	}
 
 	if p.account.name == "" {
-		p.account.name = fmt.Sprintf("%s_account", base)
+		p.account.name = fmt.Sprintf("%s_account", p.environmentName)
 	}
 
 	if p.user.name == "" {
-		p.user.name = fmt.Sprintf("%s_user", base)
+		p.user.name = fmt.Sprintf("%s_user", p.environmentName)
 	}
 
 	if p.cluster.name == "" {
-		p.cluster.name = fmt.Sprintf("%s_cluster", base)
+		p.cluster.name = fmt.Sprintf("%s_cluster", p.environmentName)
 	}
 
 	if p.server.name == "" {
@@ -190,6 +196,7 @@ func (p *InitParams) SetDefaults() error {
 }
 
 func (p *InitParams) Interactive(cmd *cobra.Command) error {
+	var err error
 	if p.defaults {
 		return nil
 	}
@@ -209,7 +216,25 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		"to specify an key or have nsc generate them for you.\n")
 	cmd.Println(m)
 
-	if err := p.Container.Edit(); err != nil {
+	if p.environmentName == "" {
+		var err error
+		p.pwd, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+		p.environmentName = filepath.Base(p.pwd)
+	}
+
+	p.environmentName, err = cli.Prompt("environment name", p.environmentName, true, cli.LengthValidator(1))
+	if err != nil {
+		return err
+	}
+
+	if err = p.SetDefaultNames(); err != nil {
+		return err
+	}
+
+	if err := p.operator.Edit(); err != nil {
 		return err
 	}
 
@@ -243,7 +268,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		case 1:
 			return fmt.Errorf("cancelled")
 		case 2:
-			p.Container.Edit()
+			p.operator.Edit()
 		case 3:
 			p.account.Edit()
 		case 4:
@@ -261,7 +286,7 @@ func (p *InitParams) PrintSummary(cmd *cobra.Command) {
 	table.UTF8Box()
 	table.AddTitle("Project Options")
 	table.AddHeaders("Entity", "Name", "NKey")
-	table.AddRow("Operator", p.Container.name, p.Container.KeySource())
+	table.AddRow("Operator", p.operator.name, p.operator.KeySource())
 	table.AddRow("Account", p.account.name, p.account.KeySource())
 	table.AddRow("User", p.user.name, p.user.KeySource())
 	if p.cluster.create {
@@ -289,12 +314,12 @@ func (p *InitParams) Validate() error {
 func (p *InitParams) Run() error {
 	containers := p.Containers()
 	for _, e := range containers {
-		if err := e.StoreKeys(p.name); err != nil {
+		if err := e.StoreKeys(p.operator.name); err != nil {
 			return err
 		}
 	}
 
-	_, err := store.CreateStore(p.dir, p.name, p.Container.kp)
+	_, err := store.CreateStore(p.pwd, p.operator.name, p.operator.kp)
 	if err != nil {
 		return err
 	}
@@ -415,8 +440,8 @@ func (c *Container) GenerateClaim(signer nkeys.KeyPair) error {
 	case nkeys.PrefixByteServer:
 		claim = jwt.NewServerClaims(pub)
 	}
-	cd := claim.Claims()
-	cd.Name = c.name
+	d := claim.Claims()
+	d.Name = c.name
 	token, err := claim.Encode(signer)
 	if err != nil {
 		return err
