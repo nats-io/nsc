@@ -35,7 +35,11 @@ func Prompt(label string, value string, edit bool, validator Validator) (string,
 }
 
 func PromptYN(m string) (bool, error) {
-	return cli.PromptYN(m)
+	return cli.PromptYN(m, true)
+}
+
+func PromptNY(m string) (bool, error) {
+	return cli.PromptYN(m, false)
 }
 
 func PromptSecret(m string) (string, error) {

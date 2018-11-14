@@ -28,11 +28,11 @@ func (sui *SurveyUI) wrap(validator Validator) survey.Validator {
 	}
 }
 
-func (sui *SurveyUI) PromptYN(m string) (bool, error) {
-	v := true
+func (sui *SurveyUI) PromptYN(m string, defaultValue bool) (bool, error) {
+	v := defaultValue
 	p := &survey.Confirm{
 		Message: m,
-		Default: true,
+		Default: defaultValue,
 	}
 	if err := survey.AskOne(p, &v, nil); err != nil {
 		return false, err
