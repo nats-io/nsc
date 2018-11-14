@@ -22,6 +22,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 // Resolve a directory/file from an environment variable
@@ -189,4 +192,25 @@ func ParseDataSize(s string) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("couldn't parse data size: %v", s)
+}
+
+func UnixToDate(d int64) string {
+	if d == 0 {
+		return ""
+	}
+	return time.Unix(d, 0).UTC().String()
+}
+
+func HumanizedDate(d int64) string {
+	if d == 0 {
+		return ""
+	}
+	now := time.Now()
+	when := time.Unix(d, 0).UTC()
+
+	if now.After(when) {
+		return strings.Title(humanize.RelTime(when, now, "ago", ""))
+	} else {
+		return strings.Title("in " + humanize.RelTime(now, when, "", ""))
+	}
 }

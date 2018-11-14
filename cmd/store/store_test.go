@@ -155,7 +155,7 @@ func TestDeleteFile(t *testing.T) {
 func TestLoadOperator(t *testing.T) {
 	s := CreateTestStore(t, "x")
 	require.True(t, s.Has(JwtName("x")))
-	c, err := s.LoadRootJwt()
+	c, err := s.LoadRootClaim()
 	require.NoError(t, err)
 	require.NotNil(t, c)
 }

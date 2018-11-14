@@ -352,7 +352,67 @@ func (s *Store) LoadClaim(name ...string) (*jwt.GenericClaims, error) {
 	return nil, nil
 }
 
-func (s *Store) LoadRootJwt() (*jwt.GenericClaims, error) {
+func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
+	if s.Has(Accounts, name, JwtName(name)) {
+		d, err := s.Read(Accounts, name, JwtName(name))
+		if err != nil {
+			return nil, err
+		}
+		c, err := jwt.DecodeAccountClaims(string(d))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	return nil, nil
+}
+
+func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims, error) {
+	if s.Has(Clusters, name, JwtName(name)) {
+		d, err := s.Read(Accounts, accountName, Users, JwtName(name))
+		if err != nil {
+			return nil, err
+		}
+		c, err := jwt.DecodeUserClaims(string(d))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	return nil, nil
+}
+
+func (s *Store) ReadClusterClaim(name string) (*jwt.ClusterClaims, error) {
+	if s.Has(Clusters, name, JwtName(name)) {
+		d, err := s.Read(Clusters, name, JwtName(name))
+		if err != nil {
+			return nil, err
+		}
+		c, err := jwt.DecodeClusterClaims(string(d))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	return nil, nil
+}
+
+func (s *Store) ReadServerClaim(clusterName string, name string) (*jwt.ServerClaims, error) {
+	if s.Has(Clusters, name, JwtName(name)) {
+		d, err := s.Read(Clusters, clusterName, Servers, JwtName(name))
+		if err != nil {
+			return nil, err
+		}
+		c, err := jwt.DecodeServerClaims(string(d))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	return nil, nil
+}
+
+func (s *Store) LoadRootClaim() (*jwt.GenericClaims, error) {
 	fn := JwtName(s.GetName())
 	if s.Has(fn) {
 		return s.LoadClaim(fn)
@@ -396,7 +456,7 @@ func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 }
 
 func (s *Store) GetRootPublicKey() (string, error) {
-	c, err := s.LoadRootJwt()
+	c, err := s.LoadRootClaim()
 	if err != nil {
 		return "", err
 	}
@@ -447,7 +507,7 @@ func (ctx *Context) SetContext(name string, pub string) error {
 
 func (s *Store) GetContext() (*Context, error) {
 	var c Context
-	root, err := s.LoadRootJwt()
+	root, err := s.LoadRootClaim()
 	if err != nil {
 		return nil, fmt.Errorf("error reading root: %v", err)
 	}
