@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
@@ -34,7 +35,7 @@ func createDescribeAccountCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Validate(); err != nil {
+			if err := params.Validate(cmd); err != nil {
 				return err
 			}
 
@@ -50,7 +51,7 @@ func createDescribeAccountCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
 	cmd.Flags().StringVarP(&params.accountName, "name", "n", "", "account name to describe")
-	//cmd.Flags().StringVarP(&params.file, "file", "f", "", "an account token file")
+	cmd.Flags().StringVarP(&params.file, "file", "f", "", "an account token file")
 
 	return cmd
 }
@@ -67,44 +68,63 @@ type DescribeAccountParams struct {
 	token       string
 }
 
-func (p *DescribeAccountParams) Validate() error {
-	s, err := getStore()
-	if err != nil {
-		return err
+func (p *DescribeAccountParams) Validate(cmd *cobra.Command) error {
+	if p.accountName != "" && p.file != "" {
+		cmd.SilenceUsage = false
+		return errors.New("specify one of --name or --file")
 	}
 
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	if p.accountName == "" {
-		p.accountName = ctx.Account.Name
-	}
-
-	if p.accountName == "" {
-		// default cluster was not found by get context, so we either we have none or many
-		cNames, err := s.ListSubContainers(store.Accounts)
+	var ac *jwt.AccountClaims
+	if p.file != "" {
+		d, err := ioutil.ReadFile(p.file)
+		if err != nil {
+			return fmt.Errorf("error reading %q: %v", p.file, err)
+		}
+		ac, err = jwt.DecodeAccountClaims(string(d))
+		if err != nil {
+			return fmt.Errorf("error decoding account claim %q: %v", p.file, err)
+		}
+	} else {
+		s, err := getStore()
 		if err != nil {
 			return err
 		}
-		c := len(cNames)
-		if c == 0 {
-			return errors.New("no accounts defined - add account first")
-		} else {
-			return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
+
+		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+
+		if p.accountName == "" {
+			p.accountName = ctx.Account.Name
+		}
+
+		if p.accountName == "" {
+			// default cluster was not found by get context, so we either we have none or many
+			cNames, err := s.ListSubContainers(store.Accounts)
+			if err != nil {
+				return err
+			}
+			c := len(cNames)
+			if c == 0 {
+				return errors.New("no accounts defined - add account first")
+			} else {
+				return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
+			}
+		}
+
+		if !s.Has(store.Accounts, p.accountName, store.JwtName(p.accountName)) {
+			return fmt.Errorf("account %q is not defined in the current context", p.accountName)
+		}
+
+		ac, err = s.ReadAccountClaim(p.accountName)
+		if err != nil {
+			return err
 		}
 	}
-
-	if !s.Has(store.Accounts, p.accountName, store.JwtName(p.accountName)) {
-		return fmt.Errorf("account %q is not defined in the current context", p.accountName)
+	if ac != nil {
+		p.AccountClaims = *ac
 	}
-
-	ac, err := s.ReadAccountClaim(p.accountName)
-	if err != nil {
-		return err
-	}
-	p.AccountClaims = *ac
 	return nil
 }
 
