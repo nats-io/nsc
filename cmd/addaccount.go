@@ -16,10 +16,6 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -33,6 +29,14 @@ func createAddAccountCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			params.create = true
+			params.kind = nkeys.PrefixByteAccount
+
+			if params.name == "" {
+				if err := params.Edit(); err != nil {
+					return err
+				}
+			}
 
 			if err := params.Validate(); err != nil {
 				return err
@@ -42,21 +46,17 @@ func createAddAccountCmd() *cobra.Command {
 				return err
 			}
 
-			if params.generate {
-				cmd.Printf("Generated account key - private key stored %q\n", params.accountKeyPath)
+			if params.generated {
+				cmd.Printf("Generated account key - private key stored %q\n", params.keyPath)
 			} else {
-				cmd.Printf("Success! - added account %q\n", params.Name)
+				cmd.Printf("Success! - added account %q\n", params.name)
 			}
 
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.Name, "name", "", "", "account name")
-
-	cmd.Flags().StringVarP(&params.accountKeyPath, "public-key", "k", "", "public key identifying the account")
-	cmd.Flags().BoolVarP(&params.generate, "generate-nkeys", "G", false, "generate nkeys")
-
-	cmd.MarkFlagRequired("name")
+	cmd.Flags().StringVarP(&params.name, "name", "", "", "account name")
+	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the account")
 
 	return cmd
 }
@@ -66,79 +66,38 @@ func init() {
 }
 
 type AddAccountParams struct {
-	jwt.AccountClaims
-
-	operatorKP     nkeys.KeyPair
-	accountKP      nkeys.KeyPair
-	accountKeyPath string
-	generate       bool
+	Entity
+	operatorKP nkeys.KeyPair
 }
 
 func (p *AddAccountParams) Validate() error {
-	if p.accountKeyPath != "" && p.generate {
-		return errors.New("specify one of --public-key or --generate-nkeys")
-	}
-
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
-
 	ctx, err := s.GetContext()
 	if err != nil {
-		return fmt.Errorf("error getting context: %v", err)
+		return err
 	}
-
-	if s.Has(store.Accounts, p.Name) {
-		return fmt.Errorf("account %q already exists", p.Name)
-	}
-
 	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
 	if err != nil {
-		return fmt.Errorf("specify the operator private key with --private-key to use for signing the cluster")
+		return err
 	}
-
-	if p.generate {
-		p.accountKP, err = nkeys.CreateAccount()
-		if err != nil {
-			return fmt.Errorf("error generating an account key: %v", err)
-		}
-	} else {
-		p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, p.accountKeyPath)
-		if err != nil {
-			return fmt.Errorf("error resolving account key: %v", err)
-		}
-	}
-
-	return nil
+	return p.Valid()
 }
 
 func (p *AddAccountParams) Run() error {
-	pkd, err := p.accountKP.PublicKey()
-	if err != nil {
-		return err
-	}
-	p.Subject = string(pkd)
-	token, err := p.AccountClaims.Encode(p.operatorKP)
-	if err != nil {
-		return err
-	}
-
 	s, err := getStore()
 	if err != nil {
 		return err
 	}
 
-	if err := s.StoreClaim([]byte(token)); err != nil {
+	if err := p.Entity.StoreKeys(s.GetName()); err != nil {
 		return err
 	}
 
-	if p.generate {
-		ks := store.NewKeyStore()
-		p.accountKeyPath, err = ks.Store(s.Info.Name, p.Name, p.accountKP)
-		if err != nil {
-			return err
-		}
+	if err := p.Entity.GenerateClaim(p.operatorKP); err != nil {
+		return err
 	}
 
 	return nil

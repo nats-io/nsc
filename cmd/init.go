@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -123,32 +122,15 @@ type InitParams struct {
 	pwd             string
 	environmentName string
 	defaults        bool
-	operator        Container
-	account         Container
-	cluster         Container
-	server          Container
-	user            Container
+	operator        Entity
+	account         Entity
+	cluster         Entity
+	server          Entity
+	user            Entity
 }
 
-func (p *InitParams) Containers() []*Container {
-	return []*Container{&p.operator, &p.account, &p.user, &p.cluster, &p.server}
-}
-
-func ValidateNkey(kind nkeys.PrefixByte) cli.Validator {
-	return func(v string) error {
-		nk, err := store.ResolveKey(v)
-		if err != nil {
-			return err
-		}
-		t, err := store.KeyType(nk)
-		if err != nil {
-			return err
-		}
-		if t != kind {
-			return fmt.Errorf("specified key is not valid for an %s", store.KeyTypeLabel(kind))
-		}
-		return nil
-	}
+func (p *InitParams) Containers() []*Entity {
+	return []*Entity{&p.operator, &p.account, &p.user, &p.cluster, &p.server}
 }
 
 func (p *InitParams) SetDefaults() error {
@@ -246,8 +228,14 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		return err
 	}
 
-	if err := p.cluster.Edit(); err != nil {
+	p.cluster.create, err = cli.PromptNY(fmt.Sprintf("create a %s", store.KeyTypeLabel(nkeys.PrefixByteCluster)))
+	if err != nil {
 		return err
+	}
+	if p.cluster.create {
+		if err := p.cluster.Edit(); err != nil {
+			return err
+		}
 	}
 	if p.cluster.create {
 		if err := p.server.Edit(); err != nil {
@@ -275,6 +263,9 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 			p.user.Edit()
 		case 5:
 			p.cluster.Edit()
+			if !p.cluster.create {
+				p.server.create = false
+			}
 		case 6:
 			p.server.Edit()
 		}
@@ -333,122 +324,4 @@ func (p *InitParams) Run() error {
 	}
 
 	return nil
-}
-
-type Container struct {
-	create    bool
-	dir       string
-	generated bool
-	keyPath   string
-	kind      nkeys.PrefixByte
-	kp        nkeys.KeyPair
-	name      string
-}
-
-func (c *Container) Valid() error {
-	var err error
-	if c.keyPath != "" {
-		c.kp, err = store.ResolveKey(c.keyPath)
-		if err != nil {
-			return err
-		}
-
-		if !store.KeyPairTypeOk(c.kind, c.kp) {
-			return fmt.Errorf("invalid %s key", store.KeyTypeLabel(c.kind))
-		}
-
-	} else {
-		c.kp, err = store.CreateNKey(c.kind)
-		if err != nil {
-			return err
-		}
-		c.generated = true
-	}
-	return nil
-}
-
-func (c *Container) StoreKeys(root string) error {
-	var err error
-	if c.create && c.keyPath == "" {
-		ks := store.NewKeyStore()
-		if c.keyPath, err = ks.Store(root, c.name, c.kp); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Container) KeySource() string {
-	if c.keyPath == "" {
-		return "Generated"
-	}
-	return c.keyPath
-}
-
-func (c *Container) Edit() error {
-	var err error
-	label := store.KeyTypeLabel(c.kind)
-
-	if c.kind == nkeys.PrefixByteCluster || c.kind == nkeys.PrefixByteServer {
-		c.create, err = cli.PromptNY(fmt.Sprintf("create a %s", label))
-		if err != nil {
-			return err
-		}
-		if !c.create {
-			return nil
-		}
-	}
-
-	c.name, err = cli.Prompt(fmt.Sprintf("%s name", label), c.name, true, cli.LengthValidator(1))
-	if err != nil {
-		return err
-	}
-
-	ok, err := cli.PromptYN(fmt.Sprintf("generate an %s nkey", label))
-	if err != nil {
-		return err
-	}
-	if !ok {
-		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to the %s nkey", label), "",
-			true, ValidateNkey(c.kind))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Container) GenerateClaim(signer nkeys.KeyPair) error {
-	if !c.create {
-		return nil
-	}
-	pk, err := c.kp.PublicKey()
-	if err != nil {
-		return err
-	}
-	pub := string(pk)
-	var claim jwt.Claims
-	switch c.kind {
-	case nkeys.PrefixByteOperator:
-		claim = jwt.NewOperatorClaims(pub)
-	case nkeys.PrefixByteAccount:
-		claim = jwt.NewAccountClaims(pub)
-	case nkeys.PrefixByteUser:
-		claim = jwt.NewUserClaims(pub)
-	case nkeys.PrefixByteCluster:
-		claim = jwt.NewClusterClaims(pub)
-	case nkeys.PrefixByteServer:
-		claim = jwt.NewServerClaims(pub)
-	}
-	d := claim.Claims()
-	d.Name = c.name
-	token, err := claim.Encode(signer)
-	if err != nil {
-		return err
-	}
-	s, err := getStore()
-	if err != nil {
-		return err
-	}
-	return s.StoreClaim([]byte(token))
 }
