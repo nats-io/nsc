@@ -136,7 +136,7 @@ func (p *AddServerParams) Validate() error {
 		ctx.Cluster.Name = p.clusterName
 	}
 
-	p.clusterKP, err = ctx.ResolveKey(nkeys.PrefixByteCluster, store.KeyPathFlag)
+	p.clusterKP, err = ctx.ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the cluster private key with --private-key to use for signing the server")
 	}

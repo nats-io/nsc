@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/nats-io/nkeys"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -33,6 +35,7 @@ const TestEnv = "NSC_TEST"
 
 var Version = "DEVELOPMENT"
 
+var KeyPathFlag string
 var cfgFile string
 var ngsStore *store.Store
 
@@ -51,6 +54,17 @@ func getStore() (*store.Store, error) {
 		}
 	}
 	return ngsStore, nil
+}
+
+func ResolveKeyFlag() (nkeys.KeyPair, error) {
+	if KeyPathFlag != "" {
+		kp, err := store.ResolveKey(KeyPathFlag)
+		if err != nil {
+			return nil, err
+		}
+		return kp, nil
+	}
+	return nil, nil
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -82,7 +96,7 @@ func init() {
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&store.KeyPathFlag, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	return cmd
 }
 

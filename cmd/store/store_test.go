@@ -29,7 +29,7 @@ import (
 
 func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *Store {
 	p := MakeTempDir(t)
-	s, err := CreateStore(p, name, kp)
+	s, err := CreateStore(name, p, NamedKey{Name: name, KP: kp})
 	require.NoError(t, err)
 	require.NotNil(t, s)
 	return s
@@ -71,7 +71,7 @@ func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
 	require.NoError(t, ioutil.WriteFile(fp, []byte("hello"), 0666))
 
 	_, _, kp := CreateAccountKey(t)
-	_, err := CreateStore(p, "foo", kp)
+	_, err := CreateStore("foo", p, NamedKey{Name: "foo", KP: kp})
 	require.Error(t, err)
 }
 
@@ -83,7 +83,7 @@ func TestUnsupportedKeyType(t *testing.T) {
 	kp, err := nkeys.CreateServer()
 	require.NoError(t, err)
 
-	_, err = CreateStore(p, "foo", kp)
+	_, err = CreateStore("foo", p, NamedKey{Name: "foo", KP: kp})
 	require.Error(t, err)
 }
 

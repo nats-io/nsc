@@ -54,49 +54,6 @@ func TestResolveEnv(t *testing.T) {
 	require.Equal(t, dir, p)
 }
 
-func TestResolveKeyEmpty(t *testing.T) {
-	old := KeyPathFlag
-	KeyPathFlag = ""
-
-	rkp, err := ResolveKeyFlag()
-	KeyPathFlag = old
-
-	require.NoError(t, err)
-	require.Nil(t, rkp)
-}
-
-func TestResolveKeyFromSeed(t *testing.T) {
-	seed, p, _ := CreateAccountKey(t)
-	old := KeyPathFlag
-	KeyPathFlag = string(seed)
-
-	rkp, err := ResolveKeyFlag()
-	KeyPathFlag = old
-
-	require.NoError(t, err)
-
-	pp, err := rkp.PublicKey()
-	require.NoError(t, err)
-
-	require.Equal(t, string(pp), string(p))
-}
-
-func TestResolveKeyFromFile(t *testing.T) {
-	dir := MakeTempDir(t)
-	_, p, kp := CreateAccountKey(t)
-	old := KeyPathFlag
-	KeyPathFlag = StoreKey(t, kp, dir)
-	rkp, err := ResolveKeyFlag()
-	KeyPathFlag = old
-
-	require.NoError(t, err)
-
-	pp, err := rkp.PublicKey()
-	require.NoError(t, err)
-
-	require.Equal(t, string(pp), string(p))
-}
-
 func TestMatchKeys(t *testing.T) {
 	_, apk, akp := CreateAccountKey(t)
 	_, opk, _ := CreateOperatorKey(t)
@@ -110,7 +67,7 @@ func TestGetKeys(t *testing.T) {
 	old := os.Getenv(NKeysPathEnv)
 	os.Setenv(NKeysPathEnv, dir)
 
-	ks := NewKeyStore()
+	ks := NewKeyStore("test_get_keys")
 
 	_, opk, okp := CreateOperatorKey(t)
 	_, apk, akp := CreateAccountKey(t)
@@ -141,7 +98,7 @@ func TestGetPrivateKey(t *testing.T) {
 	_, _, okp := CreateOperatorKey(t)
 	_, _, akp := CreateAccountKey(t)
 
-	ks := NewKeyStore()
+	ks := NewKeyStore("test_get_private_key")
 	ks.Store("o", "o", okp)
 	ks.Store("o", "a", akp)
 	ckp, err := ks.GetClusterKey("o", "c")

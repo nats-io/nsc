@@ -47,9 +47,10 @@ type Store struct {
 }
 
 type Info struct {
-	Version string `json:"version"`
-	Kind    string `json:"kind"`
-	Name    string `json:"name"`
+	EntityName      string `json:"name"`
+	EnvironmentName string `json:"env"`
+	Kind            string `json:"kind"`
+	Version         string `json:"version"`
 }
 
 func SafeName(n string) string {
@@ -59,14 +60,15 @@ func SafeName(n string) string {
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
+func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
 	var err error
 
 	s := &Store{
 		Dir: dir,
 		Info: Info{
-			Name:    name,
-			Version: Version,
+			EnvironmentName: env,
+			EntityName:      root.Name,
+			Version:         Version,
 		},
 	}
 
@@ -85,13 +87,13 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, fmt.Errorf("%s is not empty, only an empty folder can be used for a new store", dir)
 	}
 
-	pub, err := kp.PublicKey()
+	pub, err := root.KP.PublicKey()
 	if err != nil {
 		return nil, fmt.Errorf("error reading public key: %v", err)
 	}
 
 	var v = jwt.NewGenericClaims(string(pub))
-	v.Name = name
+	v.Name = root.Name
 
 	if nkeys.IsValidPublicOperatorKey(pub) {
 		s.Info.Kind = jwt.OperatorClaim
@@ -108,7 +110,7 @@ func CreateStore(dir string, name string, kp nkeys.KeyPair) (*Store, error) {
 		return nil, fmt.Errorf("error writing .nsc in %q: %v", s.Dir, err)
 	}
 
-	token, err := v.Encode(kp)
+	token, err := v.Encode(root.KP)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +305,7 @@ func (s *Store) StoreClaim(data []byte) error {
 }
 
 func (s *Store) GetName() string {
-	return s.Info.Name
+	return s.Info.EntityName
 }
 
 func (s *Store) operatorJwtName() (string, error) {
@@ -313,7 +315,7 @@ func (s *Store) operatorJwtName() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return JwtName(t.Name), nil
+		return JwtName(t.EntityName), nil
 	}
 	return "", fmt.Errorf("'.nsc' file was not found")
 }
@@ -472,9 +474,11 @@ type Entity struct {
 }
 
 type Context struct {
-	Operator Entity
-	Account  Entity
-	Cluster  Entity
+	StoreInfo Info
+	Operator  Entity
+	Account   Entity
+	Cluster   Entity
+	KeyStore  KeyStore
 }
 
 func (ctx *Context) SetContext(name string, pub string) error {
@@ -507,6 +511,9 @@ func (ctx *Context) SetContext(name string, pub string) error {
 
 func (s *Store) GetContext() (*Context, error) {
 	var c Context
+	c.StoreInfo = s.Info
+	c.KeyStore = NewKeyStore(s.Info.EnvironmentName)
+
 	root, err := s.LoadRootClaim()
 	if err != nil {
 		return nil, fmt.Errorf("error reading root: %v", err)
@@ -540,14 +547,13 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 		return nil, err
 	}
 	if kp == nil {
-		ks := NewKeyStore()
 		switch kind {
 		case nkeys.PrefixByteAccount:
-			kp, err = ks.GetAccountKey(ctx.Operator.Name, ctx.Account.Name)
+			kp, err = ctx.KeyStore.GetAccountKey(ctx.Operator.Name, ctx.Account.Name)
 		case nkeys.PrefixByteCluster:
-			kp, err = ks.GetClusterKey(ctx.Operator.Name, ctx.Cluster.Name)
+			kp, err = ctx.KeyStore.GetClusterKey(ctx.Operator.Name, ctx.Cluster.Name)
 		case nkeys.PrefixByteOperator:
-			kp, err = ks.GetOperatorKey(ctx.Operator.Name)
+			kp, err = ctx.KeyStore.GetOperatorKey(ctx.Operator.Name)
 		default:
 			return nil, fmt.Errorf("unsupported key %d resolution", kind)
 		}

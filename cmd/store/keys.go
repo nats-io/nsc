@@ -26,11 +26,14 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-var KeyPathFlag string
-
 const DEfaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
 const NKeyExtension = "nk"
+
+type NamedKey struct {
+	Name string
+	KP   nkeys.KeyPair
+}
 
 // Resolve a directory/file from an environment variable
 // if not set defaultPath is returned
@@ -50,7 +53,7 @@ func GetKeysDir() string {
 	return ResolvePath(filepath.Join(u.HomeDir, DEfaultNKeysPath), NKeysPathEnv)
 }
 
-// Resolve a key a direct key key value or a path storing a key value
+// Resolve a key value provided as a flag - value could be an actual nkey or a path to an nkey
 func ResolveKey(value string) (nkeys.KeyPair, error) {
 	if value == "" {
 		return nil, nil
@@ -66,22 +69,12 @@ func ResolveKey(value string) (nkeys.KeyPair, error) {
 	return kp, nil
 }
 
-func ResolveKeyFlag() (nkeys.KeyPair, error) {
-	if KeyPathFlag != "" {
-		kp, err := ResolveKey(KeyPathFlag)
-		if err != nil {
-			return nil, err
-		}
-		return kp, nil
-	}
-	return nil, nil
-}
-
 type KeyStore struct {
+	Env string
 }
 
-func NewKeyStore() *KeyStore {
-	return &KeyStore{}
+func NewKeyStore(environmentName string) KeyStore {
+	return KeyStore{Env: environmentName}
 }
 
 func (k *KeyStore) keyName(n string) string {
@@ -95,39 +88,38 @@ func (k *KeyStore) keypath(operator string, name string, kp nkeys.KeyPair) (stri
 	}
 	switch kt {
 	case nkeys.PrefixByteAccount:
-		return filepath.Join(GetKeysDir(), operator, "accounts", k.keyName(name)), nil
+		return filepath.Join(GetKeysDir(), k.Env, operator, "accounts", k.keyName(name)), nil
 	case nkeys.PrefixByteCluster:
-		return filepath.Join(GetKeysDir(), operator, "clusters", k.keyName(name)), nil
+		return filepath.Join(GetKeysDir(), k.Env, operator, "clusters", k.keyName(name)), nil
 	case nkeys.PrefixByteOperator:
-		return filepath.Join(GetKeysDir(), operator, k.keyName(operator)), nil
+		return filepath.Join(GetKeysDir(), k.Env, operator, k.keyName(operator)), nil
 	case nkeys.PrefixByteServer:
-		return filepath.Join(GetKeysDir(), operator, "servers", k.keyName(name)), nil
+		return filepath.Join(GetKeysDir(), k.Env, operator, "servers", k.keyName(name)), nil
 	case nkeys.PrefixByteUser:
-		return filepath.Join(GetKeysDir(), operator, "users", k.keyName(name)), nil
+		return filepath.Join(GetKeysDir(), k.Env, operator, "users", k.keyName(name)), nil
 	default:
 		return "", nil
 	}
-
 }
 
 func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), name, k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, name, k.keyName(name)))
 }
 
 func (k *KeyStore) GetAccountKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), operator, "accounts", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "accounts", k.keyName(name)))
 }
 
 func (k *KeyStore) GetUserKey(operator string, account string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), operator, "users", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "users", k.keyName(name)))
 }
 
 func (k *KeyStore) GetClusterKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), operator, "clusters", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "clusters", k.keyName(name)))
 }
 
 func (k *KeyStore) GetServerKey(operator string, cluster string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), operator, "servers", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "servers", k.keyName(name)))
 }
 
 func (k *KeyStore) Store(operator string, keyname string, kp nkeys.KeyPair) (string, error) {

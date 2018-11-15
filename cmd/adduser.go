@@ -166,7 +166,7 @@ func (p *AddUserParams) Validate() error {
 		ctx.Account.Name = p.accountName
 	}
 
-	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, store.KeyPathFlag)
+	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the account private key with --private-key to use for signing the user")
 	}

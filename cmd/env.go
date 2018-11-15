@@ -48,9 +48,10 @@ func createEnvCmd() *cobra.Command {
 
 			table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
 			if s == nil {
-				table.AddRow("Configuration Dir", "No", "not in a configuration directory")
+				table.AddRow("Project Dir", "", "not in a configuration directory")
 			} else {
-				table.AddRow("Configuration Dir", "Yes", s.Dir)
+				table.AddRow("Name", "", s.Info.EnvironmentName)
+				table.AddRow("Project Dir", "", s.Dir)
 
 				var ctx *store.Context
 				if s != nil {
@@ -59,15 +60,9 @@ func createEnvCmd() *cobra.Command {
 				if err != nil {
 					table.AddRow("Store Context", "", err.Error())
 				} else {
-					fn := func(s string) string {
-						if s == "" {
-							return "No"
-						}
-						return "Yes"
-					}
-					table.AddRow("Operator", fn(ctx.Operator.Name), ctx.Operator.Name)
-					table.AddRow("Account", fn(ctx.Account.Name), ctx.Account.Name)
-					table.AddRow("Cluster", fn(ctx.Cluster.Name), ctx.Cluster.Name)
+					table.AddRow("Operator Name", "", ctx.Operator.Name)
+					table.AddRow("Account Name", "", ctx.Account.Name)
+					table.AddRow("Cluster Name", "", ctx.Cluster.Name)
 				}
 			}
 

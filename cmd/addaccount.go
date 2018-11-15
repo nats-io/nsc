@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +78,7 @@ func (p *AddAccountParams) Validate() error {
 	if err != nil {
 		return err
 	}
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, store.KeyPathFlag)
+	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
 		return err
 	}

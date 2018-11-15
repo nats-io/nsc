@@ -30,9 +30,11 @@ import (
 func createInitCmd() *cobra.Command {
 	var p InitParams
 	cmd := &cobra.Command{
-		Use:           "init",
-		Short:         "init a configuration directory",
-		Example:       "init --name project --dir nats/projectdir",
+		Use:   "init",
+		Short: "init a configuration directory",
+		Example: `init --name project
+init --interactive
+`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,9 +72,10 @@ func createInitCmd() *cobra.Command {
 			}
 
 			if printed {
-				cmd.Println(cli.Wrap(70, "Project initialization generated NKeys. These keys should be treated as secrets.",
-					"You can move the directory, and reference them from the",
-					fmt.Sprintf("`$%s`", store.NKeysPathEnv), "environment variable. To remind yourself of current environment",
+				cmd.Println(cli.Wrap(70, "Project initialization generated NKeys.",
+					"These keys should be treated as secrets.", "You can move the directory,",
+					"and reference them from the", fmt.Sprintf("`$%s`", store.NKeysPathEnv),
+					"environment variable. To remind yourself of current environment",
 					"configuration type `nsc env` while in a project directory.\n"))
 				cmd.Println(table.Render())
 			}
@@ -83,7 +86,8 @@ func createInitCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&p.defaults, "yes", "y", false, "generate all defaults and skip questions")
+	cmd.Flags().BoolVarP(&p.interactive, "interactive", "i", false, "ask questions for various settings")
+	cmd.Flags().StringVarP(&p.projectRoot, "dir", "d", ".", "project directory")
 
 	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
 
@@ -119,9 +123,9 @@ func init() {
 }
 
 type InitParams struct {
-	pwd             string
+	projectRoot     string
 	environmentName string
-	defaults        bool
+	interactive     bool
 	operator        Entity
 	account         Entity
 	cluster         Entity
@@ -140,14 +144,18 @@ func (p *InitParams) SetDefaults() error {
 	p.server.kind = nkeys.PrefixByteServer
 	p.user.kind = nkeys.PrefixByteUser
 
+	var err error
+	d := p.projectRoot
+	p.projectRoot, err = filepath.Abs(p.projectRoot)
+	if err != nil {
+		return fmt.Errorf("error calculating the absolute filepath for %q: %v", d, err)
+	}
+
 	// if defaults are set we are not prompting
-	if p.defaults && p.environmentName == "" {
-		var err error
-		p.pwd, err = os.Getwd()
-		if err != nil {
-			return err
-		}
-		p.environmentName = filepath.Base(p.pwd)
+	if p.environmentName == "" {
+		p.environmentName = filepath.Base(p.projectRoot)
+	}
+	if !p.interactive {
 		p.SetDefaultNames()
 	}
 	return nil
@@ -179,7 +187,7 @@ func (p *InitParams) SetDefaultNames() error {
 
 func (p *InitParams) Interactive(cmd *cobra.Command) error {
 	var err error
-	if p.defaults {
+	if !p.interactive {
 		return nil
 	}
 	m := cli.Wrap(70, "The nsc utility will walk you through creating a JWT-based NATS project.",
@@ -197,15 +205,6 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		"servers are individually identified by NKeys (Ed25519 public key signature). You can choose",
 		"to specify an key or have nsc generate them for you.\n")
 	cmd.Println(m)
-
-	if p.environmentName == "" {
-		var err error
-		p.pwd, err = os.Getwd()
-		if err != nil {
-			return err
-		}
-		p.environmentName = filepath.Base(p.pwd)
-	}
 
 	p.environmentName, err = cli.Prompt("environment name", p.environmentName, true, cli.LengthValidator(1))
 	if err != nil {
@@ -303,16 +302,20 @@ func (p *InitParams) Validate() error {
 }
 
 func (p *InitParams) Run() error {
+	_, err := store.CreateStore(p.environmentName, p.projectRoot, store.NamedKey{Name: p.operator.name, KP: p.operator.kp})
+	if err != nil {
+		return err
+	}
+
+	if err = os.Chdir(p.projectRoot); err != nil {
+		return fmt.Errorf("error changing dir to %q: %v", p.projectRoot, err)
+	}
+
 	containers := p.Containers()
 	for _, e := range containers {
 		if err := e.StoreKeys(p.operator.name); err != nil {
 			return err
 		}
-	}
-
-	_, err := store.CreateStore(p.pwd, p.operator.name, p.operator.kp)
-	if err != nil {
-		return err
 	}
 
 	for i, c := range containers {

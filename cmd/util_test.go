@@ -27,7 +27,7 @@ import (
 
 func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {
 	p := MakeTempDir(t)
-	s, err := store.CreateStore(p, name, kp)
+	s, err := store.CreateStore(name, p, store.NamedKey{Name: name, KP: kp})
 	require.NoError(t, err)
 	require.NotNil(t, s)
 	return s

@@ -92,10 +92,13 @@ func (c *Entity) Valid() error {
 }
 
 func (c *Entity) StoreKeys(root string) error {
-	var err error
 	if c.create && c.keyPath == "" {
-		ks := store.NewKeyStore()
-		if c.keyPath, err = ks.Store(root, c.name, c.kp); err != nil {
+		s, err := getStore()
+		if err != nil {
+			return err
+		}
+		ctx, err := s.GetContext()
+		if c.keyPath, err = ctx.KeyStore.Store(root, c.name, c.kp); err != nil {
 			return err
 		}
 	}
