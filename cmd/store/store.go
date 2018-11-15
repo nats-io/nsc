@@ -557,6 +557,11 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 		default:
 			return nil, fmt.Errorf("unsupported key %d resolution", kind)
 		}
+
+		// not found
+		if kp == nil {
+			return nil, nil
+		}
 	}
 	if !KeyPairTypeOk(kind, kp) {
 		return nil, fmt.Errorf("unexpected resolved keytype type")

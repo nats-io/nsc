@@ -119,6 +119,14 @@ func (p *AddUserParams) Interactive() error {
 	}
 
 	if p.accountName == "" {
+		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+		p.accountName = ctx.Account.Name
+	}
+
+	if p.accountName == "" {
 		accounts, err := s.ListSubContainers(store.Accounts)
 		if err != nil {
 			return err

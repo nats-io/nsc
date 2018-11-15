@@ -89,6 +89,14 @@ func (p *AddServerParams) Interactive() error {
 	}
 
 	if p.clusterName == "" {
+		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+		p.clusterName = ctx.Cluster.Name
+	}
+
+	if p.clusterName == "" {
 		clusters, err := s.ListSubContainers(store.Clusters)
 		if err != nil {
 			return err

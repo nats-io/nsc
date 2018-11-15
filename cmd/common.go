@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 // Resolve a directory/file from an environment variable
@@ -213,4 +216,37 @@ func HumanizedDate(d int64) string {
 	} else {
 		return strings.Title("in " + humanize.RelTime(now, when, "", ""))
 	}
+}
+
+func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
+	return func(v string) error {
+		nk, err := store.ResolveKey(v)
+		if err != nil {
+			return err
+		}
+		t, err := store.KeyType(nk)
+		if err != nil {
+			return err
+		}
+		if t != kind {
+			return fmt.Errorf("specified key is not valid for an %s", store.KeyTypeLabel(kind))
+		}
+		return nil
+	}
+}
+
+func EditKeyPath(kind nkeys.PrefixByte, label string, keypath *string) error {
+	ok, err := cli.PromptYN(fmt.Sprintf("generate an %s nkey", label))
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		v, err := cli.Prompt(fmt.Sprintf("path to the %s nkey", label), "", true, NKeyValidator(kind))
+		if err != nil {
+			return err
+		}
+		*keypath = v
+	}
+	return nil
 }
