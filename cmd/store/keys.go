@@ -107,19 +107,19 @@ func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
 }
 
 func (k *KeyStore) GetAccountKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "accounts", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "accounts", name, k.keyName(name)))
 }
 
 func (k *KeyStore) GetUserKey(operator string, account string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "users", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, account, "users", k.keyName(name)))
 }
 
 func (k *KeyStore) GetClusterKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "clusters", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "clusters", name, k.keyName(name)))
 }
 
 func (k *KeyStore) GetServerKey(operator string, cluster string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "servers", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, cluster, "servers", k.keyName(name)))
 }
 
 func (k *KeyStore) Store(operator string, keyname string, kp nkeys.KeyPair) (string, error) {

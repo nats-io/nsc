@@ -132,39 +132,39 @@ func (p *DescribeAccountParams) Validate(cmd *cobra.Command) error {
 
 func RenderLimits(table *tablewriter.Table, lim jwt.OperatorLimits) {
 	if lim.Conn > 0 {
-		table.AddRow("Max. Active Connections", fmt.Sprintf("%d", lim.Conn))
+		table.AddRow("Max Active Connections", fmt.Sprintf("%d", lim.Conn))
 	} else {
-		table.AddRow("Max. Active Connections", "Unlimited")
+		table.AddRow("Max Active Connections", "Unlimited")
 	}
 
 	if lim.Data > 0 {
-		table.AddRow("Max. Data", humanize.Bytes(uint64(lim.Data)))
+		table.AddRow("Max Data", humanize.Bytes(uint64(lim.Data)))
 	} else {
-		table.AddRow("Max. Data", "Unlimited")
+		table.AddRow("Max Data", "Unlimited")
 	}
 
 	if lim.Exports > 0 {
-		table.AddRow("Max. Exports", fmt.Sprintf("%d", lim.Exports))
+		table.AddRow("Max Exports", fmt.Sprintf("%d", lim.Exports))
 	} else {
-		table.AddRow("Max. Exports", "Unlimited")
+		table.AddRow("Max Exports", "Unlimited")
 	}
 
 	if lim.Imports > 0 {
-		table.AddRow("Max. Imports", fmt.Sprintf("%d", lim.Imports))
+		table.AddRow("Max Imports", fmt.Sprintf("%d", lim.Imports))
 	} else {
-		table.AddRow("Max. Imports", "Unlimited")
+		table.AddRow("Max Imports", "Unlimited")
 	}
 
 	if lim.Payload > 0 {
-		table.AddRow("Max. Msg. Payload", humanize.Bytes(uint64(lim.Payload)))
+		table.AddRow("Max Msg Payload", humanize.Bytes(uint64(lim.Payload)))
 	} else {
-		table.AddRow("Max. Msg. Payload", "Unlimited")
+		table.AddRow("Max Msg Payload", "Unlimited")
 	}
 
 	if lim.Subs > 0 {
-		table.AddRow("Max. Subscriptions", fmt.Sprintf("%d", lim.Subs))
+		table.AddRow("Max Subscriptions", fmt.Sprintf("%d", lim.Subs))
 	} else {
-		table.AddRow("Max. Subscriptions", "Unlimited")
+		table.AddRow("Max Subscriptions", "Unlimited")
 	}
 }
 
