@@ -141,6 +141,29 @@ func FormatJwt(jwtType string, jwt string) []byte {
 	return w.Bytes()
 }
 
+func ExtractToken(s string) string {
+	// remove all the spaces
+	re := regexp.MustCompile(`\s+`)
+	w := re.ReplaceAllString(s, "")
+	// remove multiple dashes
+	re = regexp.MustCompile(`\-+`)
+	w = re.ReplaceAllString(w, "-")
+
+	// the token can now look like
+	// -BEGINXXXXPUBKEY-token-ENDXXXXPUBKEY-
+	re = regexp.MustCompile(`(?m)(\-BEGIN.+(JWT|KEY)\-)(?P<token>.+)(\-END.+(JWT|KEY)\-)`)
+	// find the index of the token
+	m := re.FindStringSubmatch(w)
+	if len(m) > 0 {
+		for i, name := range re.SubexpNames() {
+			if name == "token" {
+				return m[i]
+			}
+		}
+	}
+	return s
+}
+
 func ParseNumber(s string) (int64, error) {
 	if s == "" {
 		return 0, nil

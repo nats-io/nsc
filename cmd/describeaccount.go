@@ -243,7 +243,7 @@ func (p *DescribeAccountParams) Run() error {
 	if importedServiceCount > 0 {
 		et := tablewriter.CreateTable()
 		et.AddTitle("Imported Services")
-		et.AddHeaders("Name", "Subject", "Target", "Expires", "Target Account")
+		et.AddHeaders("Name", "Subject", "To", "Expires", "Target Account")
 		for _, e := range p.Imports {
 			if e.IsService() {
 				if e.Token != "" {
@@ -267,7 +267,7 @@ func (p *DescribeAccountParams) Run() error {
 	if importedStreamCount > 0 {
 		et := tablewriter.CreateTable()
 		et.AddTitle("Imported Streams")
-		et.AddHeaders("Name", "Subject", "Prefix", "Expires", "Source Account")
+		et.AddHeaders("Name", "Subject", "To", "Expires", "Source Account")
 		for _, e := range p.Imports {
 			if e.IsStream() {
 				ic, err := jwt.DecodeActivationClaims(e.Token)
