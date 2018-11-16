@@ -311,7 +311,15 @@ func (p *InitParams) Run() error {
 
 	containers := p.Containers()
 	for _, e := range containers {
-		if err := e.StoreKeys(p.operator.name); err != nil {
+		var parent string
+		switch e.kind {
+		case nkeys.PrefixByteUser:
+			parent = p.account.name
+		case nkeys.PrefixByteServer:
+			parent = p.cluster.name
+		}
+
+		if err := e.StoreKeys(parent); err != nil {
 			return err
 		}
 	}

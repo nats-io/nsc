@@ -16,7 +16,6 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -81,55 +80,55 @@ func (k *KeyStore) keyName(n string) string {
 	return fmt.Sprintf("%s.%s", n, NKeyExtension)
 }
 
-func (k *KeyStore) keypath(operator string, name string, kp nkeys.KeyPair) (string, error) {
+func (k *KeyStore) keypath(name string, kp nkeys.KeyPair, parent string) (string, error) {
 	kt, err := KeyType(kp)
 	if err != nil {
 		return "", err
 	}
 	switch kt {
-	case nkeys.PrefixByteAccount:
-		return filepath.Join(GetKeysDir(), k.Env, operator, "accounts", k.keyName(name)), nil
-	case nkeys.PrefixByteCluster:
-		return filepath.Join(GetKeysDir(), k.Env, operator, "clusters", k.keyName(name)), nil
 	case nkeys.PrefixByteOperator:
-		return filepath.Join(GetKeysDir(), k.Env, operator, k.keyName(operator)), nil
-	case nkeys.PrefixByteServer:
-		return filepath.Join(GetKeysDir(), k.Env, operator, "servers", k.keyName(name)), nil
+		return filepath.Join(GetKeysDir(), k.Env, k.keyName(name)), nil
+	case nkeys.PrefixByteAccount:
+		return filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)), nil
 	case nkeys.PrefixByteUser:
-		return filepath.Join(GetKeysDir(), k.Env, operator, "users", k.keyName(name)), nil
+		if parent == "" {
+			return "", fmt.Errorf("user keys require an account parent")
+		}
+		return filepath.Join(GetKeysDir(), k.Env, Accounts, parent, Users, k.keyName(name)), nil
+	case nkeys.PrefixByteCluster:
+		return filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)), nil
+	case nkeys.PrefixByteServer:
+		if parent == "" {
+			return "", fmt.Errorf("servers keys require a cluster parent")
+		}
+		return filepath.Join(GetKeysDir(), k.Env, Clusters, parent, Servers, k.keyName(name)), nil
 	default:
 		return "", nil
 	}
 }
 
 func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, name, k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, k.keyName(name)))
 }
 
 func (k *KeyStore) GetAccountKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "accounts", name, k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)))
 }
 
 func (k *KeyStore) GetUserKey(operator string, account string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, account, "users", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.keyName(name)))
 }
 
 func (k *KeyStore) GetClusterKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, "clusters", name, k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
 }
 
 func (k *KeyStore) GetServerKey(operator string, cluster string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, operator, cluster, "servers", k.keyName(name)))
+	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Clusters, cluster, Servers, k.keyName(name)))
 }
 
-func (k *KeyStore) Store(operator string, keyname string, kp nkeys.KeyPair) (string, error) {
-	if operator == "" {
-		return "", errors.New("operator name is required")
-	}
-	if keyname == "" {
-		return "", errors.New("key name is required")
-	}
-	fp, err := k.keypath(operator, keyname, kp)
+func (k *KeyStore) Store(keyname string, kp nkeys.KeyPair, parent string) (string, error) {
+	fp, err := k.keypath(keyname, kp, parent)
 	if err != nil {
 		return "", err
 	}

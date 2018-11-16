@@ -91,14 +91,14 @@ func (c *Entity) Valid() error {
 	return nil
 }
 
-func (c *Entity) StoreKeys(root string) error {
+func (c *Entity) StoreKeys(parent string) error {
 	if c.create && c.keyPath == "" {
 		s, err := getStore()
 		if err != nil {
 			return err
 		}
 		ctx, err := s.GetContext()
-		if c.keyPath, err = ctx.KeyStore.Store(root, c.name, c.kp); err != nil {
+		if c.keyPath, err = ctx.KeyStore.Store(c.name, c.kp, parent); err != nil {
 			return err
 		}
 	}
