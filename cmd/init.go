@@ -86,7 +86,6 @@ init --interactive
 		},
 	}
 
-	cmd.Flags().BoolVarP(&p.interactive, "interactive", "i", false, "ask questions for various settings")
 	cmd.Flags().StringVarP(&p.projectRoot, "dir", "d", ".", "project directory")
 
 	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
@@ -125,7 +124,6 @@ func init() {
 type InitParams struct {
 	projectRoot     string
 	environmentName string
-	interactive     bool
 	operator        Entity
 	account         Entity
 	cluster         Entity
@@ -155,7 +153,7 @@ func (p *InitParams) SetDefaults() error {
 	if p.environmentName == "" {
 		p.environmentName = filepath.Base(p.projectRoot)
 	}
-	if !p.interactive {
+	if !InteractiveFlag {
 		p.SetDefaultNames()
 	}
 	return nil
@@ -187,7 +185,7 @@ func (p *InitParams) SetDefaultNames() error {
 
 func (p *InitParams) Interactive(cmd *cobra.Command) error {
 	var err error
-	if !p.interactive {
+	if !InteractiveFlag {
 		return nil
 	}
 	m := cli.Wrap(70, "The nsc utility will walk you through creating a JWT-based NATS project.",

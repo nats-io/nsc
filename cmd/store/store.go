@@ -84,7 +84,7 @@ func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
 	}
 
 	if len(files) != 0 {
-		return nil, fmt.Errorf("%s is not empty, only an empty folder can be used for a new store", dir)
+		return nil, fmt.Errorf("%q is not empty, only an empty folder can be used for a new project", dir)
 	}
 
 	pub, err := root.KP.PublicKey()

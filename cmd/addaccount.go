@@ -16,6 +16,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 )
@@ -31,13 +33,13 @@ func createAddAccountCmd() *cobra.Command {
 			params.create = true
 			params.kind = nkeys.PrefixByteAccount
 
-			if params.name == "" {
+			if InteractiveFlag {
 				if err := params.Edit(); err != nil {
 					return err
 				}
 			}
 
-			if err := params.Validate(); err != nil {
+			if err := params.Validate(cmd); err != nil {
 				return err
 			}
 
@@ -69,7 +71,12 @@ type AddAccountParams struct {
 	operatorKP nkeys.KeyPair
 }
 
-func (p *AddAccountParams) Validate() error {
+func (p *AddAccountParams) Validate(cmd *cobra.Command) error {
+	if p.name == "" {
+		cmd.SilenceUsage = false
+		return fmt.Errorf("account name is required")
+	}
+
 	s, err := getStore()
 	if err != nil {
 		return err

@@ -40,7 +40,7 @@ func createAddUserCmd() *cobra.Command {
 			params.kind = nkeys.PrefixByteUser
 			params.editFn = params.editUserClaim
 
-			if params.name == "" {
+			if InteractiveFlag {
 				if err := params.Interactive(); err != nil {
 					return err
 				}

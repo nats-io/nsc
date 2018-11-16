@@ -36,6 +36,8 @@ const TestEnv = "NSC_TEST"
 var Version = "DEVELOPMENT"
 
 var KeyPathFlag string
+var InteractiveFlag bool
+
 var cfgFile string
 var ngsStore *store.Store
 
@@ -97,6 +99,8 @@ func init() {
 // but are not because the unit tests are testing the command directly
 func hoistFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
+
 	return cmd
 }
 

@@ -123,8 +123,11 @@ func (k *KeyStore) GetServerKey(operator string, cluster string, name string) (n
 }
 
 func (k *KeyStore) Store(operator string, keyname string, kp nkeys.KeyPair) (string, error) {
-	if keyname == "" || operator == "" {
-		return "", errors.New("operator name and keyname are required")
+	if operator == "" {
+		return "", errors.New("operator name is required")
+	}
+	if keyname == "" {
+		return "", errors.New("key name is required")
 	}
 	fp, err := k.keypath(operator, keyname, kp)
 	if err != nil {

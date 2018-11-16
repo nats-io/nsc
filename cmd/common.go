@@ -129,6 +129,18 @@ func FormatKeys(keyType string, publicKey string, privateKey string) []byte {
 	return w.Bytes()
 }
 
+func FormatJwt(jwtType string, jwt string) []byte {
+	w := bytes.NewBuffer(nil)
+
+	label := strings.ToUpper(jwtType)
+	fmt.Fprintf(w, "-----BEGIN %s JWT-----\n", label)
+	fmt.Fprintln(w, jwt)
+	fmt.Fprintf(w, "------END %s JWT------\n", label)
+	fmt.Fprintln(w)
+
+	return w.Bytes()
+}
+
 func ParseNumber(s string) (int64, error) {
 	if s == "" {
 		return 0, nil
