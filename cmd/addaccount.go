@@ -77,7 +77,7 @@ func (p *AddAccountParams) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("account name is required")
 	}
 
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (p *AddAccountParams) Validate(cmd *cobra.Command) error {
 }
 
 func (p *AddAccountParams) Run() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

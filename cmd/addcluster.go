@@ -70,7 +70,7 @@ type AddClusterParams struct {
 }
 
 func (p *AddClusterParams) Validate() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (p *AddClusterParams) Validate() error {
 }
 
 func (p *AddClusterParams) Run() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

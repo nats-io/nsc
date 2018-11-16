@@ -79,7 +79,7 @@ type AddExportParams struct {
 }
 
 func (p *AddExportParams) Init() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (p *AddExportParams) Init() error {
 }
 
 func (p *AddExportParams) Interactive() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (p *AddExportParams) Interactive() error {
 }
 
 func (p *AddExportParams) Validate() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (p *AddExportParams) Validate() error {
 }
 
 func (p *AddExportParams) Run() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return nil
 	}

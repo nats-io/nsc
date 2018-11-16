@@ -113,7 +113,7 @@ func (p *AddUserParams) Interactive() error {
 		return err
 	}
 
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (p *AddUserParams) Interactive() error {
 }
 
 func (p *AddUserParams) Validate() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (p *AddUserParams) Validate() error {
 }
 
 func (p *AddUserParams) Run() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

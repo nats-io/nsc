@@ -44,7 +44,7 @@ var ngsStore *store.Store
 // show some other hidden commands if the env is set
 var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
-func getStore() (*store.Store, error) {
+func GetStore() (*store.Store, error) {
 	if ngsStore == nil {
 		storeDir, err := FindCurrentStoreDir()
 		if err != nil {
@@ -96,12 +96,12 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	hoistFlags(rootCmd)
+	HoistRootFlags(rootCmd)
 }
 
 // hostFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
-func hoistFlags(cmd *cobra.Command) *cobra.Command {
+func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
 

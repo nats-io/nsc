@@ -38,7 +38,7 @@ init --interactive
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, _ := getStore()
+			s, _ := GetStore()
 			if s != nil {
 				return fmt.Errorf("%q is already a store", s.Dir)
 			}

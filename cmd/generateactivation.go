@@ -79,7 +79,7 @@ type GenerateActivationParams struct {
 }
 
 func (p *GenerateActivationParams) Init() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (p *GenerateActivationParams) Init() error {
 }
 
 func (p *GenerateActivationParams) Interactive() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (p *GenerateActivationParams) Interactive() error {
 }
 
 func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

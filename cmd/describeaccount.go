@@ -87,7 +87,7 @@ func (p *DescribeAccountParams) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("error decoding account claim %q: %v", p.file, err)
 		}
 	} else {
-		s, err := getStore()
+		s, err := GetStore()
 		if err != nil {
 			return err
 		}

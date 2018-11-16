@@ -57,7 +57,7 @@ func (c *Entity) Valid() error {
 		c.generated = true
 	}
 
-	s, _ := getStore()
+	s, _ := GetStore()
 	if s == nil {
 		// this happens on init
 		return nil
@@ -93,7 +93,7 @@ func (c *Entity) Valid() error {
 
 func (c *Entity) StoreKeys(parent string) error {
 	if c.create && c.keyPath == "" {
-		s, err := getStore()
+		s, err := GetStore()
 		if err != nil {
 			return err
 		}
@@ -169,7 +169,7 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair) error {
 	if err != nil {
 		return err
 	}
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

@@ -83,7 +83,7 @@ func (p *AddServerParams) Interactive() error {
 		return err
 	}
 
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (p *AddServerParams) Interactive() error {
 }
 
 func (p *AddServerParams) Validate() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (p *AddServerParams) Validate() error {
 }
 
 func (p *AddServerParams) Run() error {
-	s, err := getStore()
+	s, err := GetStore()
 	if err != nil {
 		return err
 	}

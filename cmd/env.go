@@ -39,7 +39,7 @@ func createEnvCmd() *cobra.Command {
 		SilenceUsage:  true,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := getStore()
+			s, err := GetStore()
 
 			table := tablewriter.CreateTable()
 			table.UTF8Box()
