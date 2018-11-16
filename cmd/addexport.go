@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -136,7 +135,6 @@ func (p *AddExportParams) Interactive() error {
 	}
 
 	p.export.Name, err = cli.Prompt("export name", p.export.Name, true, cli.LengthValidator(1))
-
 	choices := []string{jwt.StreamType, jwt.ServiceType}
 	i, err := cli.PromptChoices("export type", choices)
 	if err != nil {
@@ -181,8 +179,36 @@ func (p *AddExportParams) Validate() error {
 		return err
 	}
 
-	if p.claim.Exports.HasExportContainingSubject(p.export.Subject) {
-		return fmt.Errorf("%q already has an export for subject %q", p.accountName, p.export.Subject)
+	// get the old validation results
+	var vr jwt.ValidationResults
+	if err = p.claim.Exports.Validate(&vr); err != nil {
+		return err
+	}
+
+	// add the new claim
+	p.claim.Exports.Add(&p.export)
+	var vr2 jwt.ValidationResults
+	if err = p.claim.Exports.Validate(&vr2); err != nil {
+		return err
+	}
+
+	// filter out all the old validations
+	uvr := jwt.CreateValidationResults()
+	if len(vr.Issues) > 0 {
+		for _, nis := range vr.Issues {
+			for _, is := range vr2.Issues {
+				if nis.Description == is.Description {
+					continue
+				}
+			}
+			uvr.Add(nis)
+		}
+	} else {
+		uvr = &vr2
+	}
+	// fail validation
+	if len(uvr.Issues) > 0 {
+		return errors.New(uvr.Issues[0].Error())
 	}
 
 	ctx, err := s.GetContext()
@@ -202,8 +228,6 @@ func (p *AddExportParams) Run() error {
 	if err != nil {
 		return nil
 	}
-
-	p.claim.Exports.Add(&p.export)
 	token, err := p.claim.Encode(p.operatorKP)
 	return s.StoreClaim([]byte(token))
 }
