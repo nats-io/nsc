@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/dustin/go-humanize"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -128,6 +130,44 @@ func (p *DescribeAccountParams) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+func RenderLimits(table *tablewriter.Table, lim jwt.OperatorLimits) {
+	if lim.Conn > 0 {
+		table.AddRow("Max. Active Connections", fmt.Sprintf("%d", lim.Conn))
+	} else {
+		table.AddRow("Max. Active Connections", "Unlimited")
+	}
+
+	if lim.Data > 0 {
+		table.AddRow("Max. Data", humanize.Bytes(uint64(lim.Data)))
+	} else {
+		table.AddRow("Max. Data", "Unlimited")
+	}
+
+	if lim.Exports > 0 {
+		table.AddRow("Max. Exports", fmt.Sprintf("%d", lim.Exports))
+	} else {
+		table.AddRow("Max. Exports", "Unlimited")
+	}
+
+	if lim.Imports > 0 {
+		table.AddRow("Max. Imports", fmt.Sprintf("%d", lim.Imports))
+	} else {
+		table.AddRow("Max. Imports", "Unlimited")
+	}
+
+	if lim.Payload > 0 {
+		table.AddRow("Max. Msg. Payload", humanize.Bytes(uint64(lim.Payload)))
+	} else {
+		table.AddRow("Max. Msg. Payload", "Unlimited")
+	}
+
+	if lim.Subs > 0 {
+		table.AddRow("Max. Subscriptions", fmt.Sprintf("%d", lim.Subs))
+	} else {
+		table.AddRow("Max. Subscriptions", "Unlimited")
+	}
+}
+
 func (p *DescribeAccountParams) Run() error {
 	buf := bytes.NewBuffer(nil)
 
@@ -138,9 +178,15 @@ func (p *DescribeAccountParams) Run() error {
 	table.AddRow("Subject", p.Subject)
 	table.AddRow("Issuer", p.Issuer)
 	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(p.IssuedAt), HumanizedDate(p.IssuedAt)))
+
 	if p.Expires > 0 {
 		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(p.Expires), HumanizedDate(p.Expires)))
+	} else {
+		table.AddRow("Expires", "No expiration")
 	}
+
+	RenderLimits(table, p.Limits)
+
 	buf.WriteString(table.Render())
 
 	serviceCount := 0
