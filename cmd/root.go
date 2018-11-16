@@ -69,6 +69,10 @@ func ResolveKeyFlag() (nkeys.KeyPair, error) {
 	return nil, nil
 }
 
+func GetRootCmd() *cobra.Command {
+	return rootCmd
+}
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
