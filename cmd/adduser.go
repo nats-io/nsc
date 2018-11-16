@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/nats-io/nsc/cli"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +59,7 @@ func createAddUserCmd() *cobra.Command {
 				cmd.Printf("Success! - added user %q\n", params.name)
 			}
 
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 

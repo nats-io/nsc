@@ -21,9 +21,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/nats-io/nkeys"
-
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -40,9 +39,12 @@ var InteractiveFlag bool
 
 var cfgFile string
 var ngsStore *store.Store
+var interceptorFn InterceptorFn
 
 // show some other hidden commands if the env is set
 var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
+
+type InterceptorFn func(cmd *cobra.Command) error
 
 func GetStore() (*store.Store, error) {
 	if ngsStore == nil {
@@ -67,6 +69,17 @@ func ResolveKeyFlag() (nkeys.KeyPair, error) {
 		return kp, nil
 	}
 	return nil, nil
+}
+
+func SetInterceptor(fn InterceptorFn) {
+	interceptorFn = fn
+}
+
+func RunInterceptor(cmd *cobra.Command) error {
+	if interceptorFn != nil {
+		return interceptorFn(cmd)
+	}
+	return nil
 }
 
 func GetRootCmd() *cobra.Command {

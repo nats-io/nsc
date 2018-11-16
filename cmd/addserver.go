@@ -58,7 +58,7 @@ func createAddServerCmd() *cobra.Command {
 				cmd.Printf("Success! - added server %q\n", params.name)
 			}
 
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "", "", "server name")

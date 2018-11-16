@@ -37,7 +37,7 @@ func createExportCmd() *cobra.Command {
 				return err
 			}
 
-			if params.export.Name == "" {
+			if InteractiveFlag {
 				if err := params.Interactive(); err != nil {
 					return err
 				}
@@ -53,7 +53,7 @@ func createExportCmd() *cobra.Command {
 
 			cmd.Printf("Success! - added %s export %q\n", params.export.Type, params.export.Name)
 
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")

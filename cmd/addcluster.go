@@ -51,7 +51,7 @@ func createAddClusterCmd() *cobra.Command {
 				cmd.Printf("Success! - added cluster %q\n", params.name)
 			}
 
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "", "", "cluster name")

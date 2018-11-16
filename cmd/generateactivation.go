@@ -19,11 +19,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nats-io/nsc/cli"
-	"github.com/nats-io/nsc/cmd/store"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +56,7 @@ func createGenerateExport() *cobra.Command {
 			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
 				params.export.Name, params.targetAccount, params.jti)
 
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")

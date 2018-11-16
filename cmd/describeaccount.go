@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 
 	"github.com/dustin/go-humanize"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -48,7 +47,7 @@ func createDescribeAccountCmd() *cobra.Command {
 			if !IsStdOut(params.outputFile) {
 				cmd.Printf("Success! - wrote account description to %q\n", params.outputFile)
 			}
-			return nil
+			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")

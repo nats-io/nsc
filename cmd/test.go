@@ -40,10 +40,8 @@ func (p *GenerateNKeysParam) PrintKey(kind nkeys.PrefixByte, cmd *cobra.Command)
 	if err != nil {
 		panic(err)
 	}
-	seed, err := kp.Seed()
 	pub, err := kp.PublicKey()
-
-	cmd.Println(string(FormatKeys(store.KeyTypeLabel(kind), string(pub), string(seed))))
+	cmd.Println(string(pub))
 }
 
 func (p *GenerateNKeysParam) Run(cmd *cobra.Command) error {
@@ -62,7 +60,7 @@ func (p *GenerateNKeysParam) Run(cmd *cobra.Command) error {
 	if p.server {
 		p.PrintKey(nkeys.PrefixByteServer, cmd)
 	}
-	return nil
+	return RunInterceptor(cmd)
 }
 
 func createGenerateNkey() *cobra.Command {
