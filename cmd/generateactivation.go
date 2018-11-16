@@ -38,6 +38,11 @@ func createGenerateExport() *cobra.Command {
 			if err := params.Init(); err != nil {
 				return err
 			}
+			if InteractiveFlag {
+				if err := params.Interactive(); err != nil {
+					return err
+				}
+			}
 			if err := params.Validate(cmd); err != nil {
 				return err
 			}
@@ -49,7 +54,8 @@ func createGenerateExport() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - generated %q activation for %q\n", params.export.Name, params.targetAccount)
+			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
+				params.export.Name, params.targetAccount, params.jti)
 
 			return nil
 		},
@@ -67,7 +73,6 @@ func init() {
 }
 
 type GenerateActivationParams struct {
-	interactive   bool
 	accountKP     nkeys.KeyPair
 	accountName   string
 	claims        *jwt.AccountClaims
@@ -76,6 +81,7 @@ type GenerateActivationParams struct {
 	subject       string
 	targetAccount string
 	token         string
+	jti           string
 }
 
 func (p *GenerateActivationParams) Init() error {
@@ -115,12 +121,15 @@ func (p *GenerateActivationParams) Interactive() error {
 	}
 
 	if p.targetAccount == "" {
-		cli.Prompt("target account nkey", p.targetAccount, true, func(s string) error {
+		p.targetAccount, err = cli.Prompt("target account nkey", p.targetAccount, true, func(s string) error {
 			if !nkeys.IsValidPublicAccountKey([]byte(s)) {
 				return errors.New("not a valid account nkey")
 			}
 			return nil
 		})
+		if err != nil {
+			return err
+		}
 	}
 
 	p.claims, err = s.ReadAccountClaim(p.accountName)
@@ -156,6 +165,11 @@ func (p *GenerateActivationParams) Interactive() error {
 }
 
 func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
+	if p.export.Subject == "" {
+		cmd.SilenceUsage = false
+		return fmt.Errorf("subject not specified")
+	}
+
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -227,5 +241,7 @@ func (p *GenerateActivationParams) Run() error {
 	if err != nil {
 		return err
 	}
+	p.jti = ac.ID
+
 	return nil
 }
