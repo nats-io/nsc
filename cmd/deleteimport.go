@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -24,11 +25,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createExportCmd() *cobra.Command {
-	var params AddExportParams
+func deleteImportCmd() *cobra.Command {
+	var params DeleteImportParams
 	cmd := &cobra.Command{
-		Use:           "export",
-		Short:         "Add an export",
+		Use:           "import",
+		Short:         "Delete an import",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,34 +51,33 @@ func createExportCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - added %s export %q\n", params.export.Type, params.export.Name)
+			cmd.Printf("Success! - deleted import of %q\n", params.deletedImport.Subject)
 
 			return RunInterceptor(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
-	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
-	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 
 	return cmd
 }
 
 func init() {
-	addCmd.AddCommand(createExportCmd())
+	deleteCmd.AddCommand(deleteImportCmd())
 }
 
-type AddExportParams struct {
-	claim       *jwt.AccountClaims
-	export      jwt.Export
-	subject     string
-	accountName string
-	operatorKP  nkeys.KeyPair
-	stream      bool
-	service     bool
+type DeleteImportParams struct {
+	deletedImport *jwt.Import
+	claim         *jwt.AccountClaims
+	index         int
+	subject       string
+	accountName   string
+	operatorKP    nkeys.KeyPair
 }
 
-func (p *AddExportParams) Init() error {
+func (p *DeleteImportParams) Init() error {
+	p.index = -1
+
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -91,20 +91,10 @@ func (p *AddExportParams) Init() error {
 		p.accountName = ctx.Account.Name
 	}
 
-	p.export.Subject = jwt.Subject(p.subject)
-	p.export.Type = jwt.StreamType
-	if p.service {
-		p.export.Type = jwt.ServiceType
-	}
-
-	if p.export.Name == "" {
-		p.export.Name = p.subject
-	}
-
 	return nil
 }
 
-func (p *AddExportParams) Interactive() error {
+func (p *DeleteImportParams) Interactive() error {
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -119,26 +109,23 @@ func (p *AddExportParams) Interactive() error {
 		return err
 	}
 
-	choices := []string{jwt.StreamType, jwt.ServiceType}
-	i, err := cli.PromptChoices("export type", choices)
+	p.claim, err = s.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
 	}
-	p.export.Type = choices[i]
-	p.subject, err = cli.Prompt("subject", p.subject, true, func(s string) error {
-		p.export.Subject = jwt.Subject(s)
-		var vr jwt.ValidationResults
-		p.export.Validate(&vr)
-		if len(vr.Issues) > 0 {
-			return errors.New(vr.Issues[0].Description)
-		}
-		return nil
-	})
 
-	if p.export.Name == "" {
-		p.export.Name = p.subject
+	if len(p.claim.Imports) == 0 {
+		return fmt.Errorf("account %q doesn't have imports", p.accountName)
 	}
-	p.export.Name, err = cli.Prompt("export name", p.export.Name, true, cli.LengthValidator(1))
+
+	var choices []string
+	for _, c := range p.claim.Imports {
+		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
+	}
+	p.index, err = cli.PromptChoices("select import to delete", choices)
+	if err != nil {
+		return err
+	}
 
 	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
@@ -154,7 +141,7 @@ func (p *AddExportParams) Interactive() error {
 	return nil
 }
 
-func (p *AddExportParams) Validate(cmd *cobra.Command) error {
+func (p *DeleteImportParams) Validate(cmd *cobra.Command) error {
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -165,46 +152,31 @@ func (p *AddExportParams) Validate(cmd *cobra.Command) error {
 		return errors.New("an account is required")
 	}
 
-	if p.subject == "" {
-		cmd.SilenceUsage = false
-		return errors.New("a subject is required")
+	if p.claim == nil {
+		p.claim, err = s.ReadAccountClaim(p.accountName)
+		if err != nil {
+			return err
+		}
 	}
 
-	p.claim, err = s.ReadAccountClaim(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	// get the old validation results
-	var vr jwt.ValidationResults
-	if err = p.claim.Exports.Validate(&vr); err != nil {
-		return err
-	}
-
-	// add the new claim
-	p.claim.Exports.Add(&p.export)
-	var vr2 jwt.ValidationResults
-	if err = p.claim.Exports.Validate(&vr2); err != nil {
-		return err
-	}
-
-	// filter out all the old validations
-	uvr := jwt.CreateValidationResults()
-	if len(vr.Issues) > 0 {
-		for _, nis := range vr.Issues {
-			for _, is := range vr2.Issues {
-				if nis.Description == is.Description {
-					continue
+	if !InteractiveFlag {
+		switch len(p.claim.Imports) {
+		case 0:
+			return fmt.Errorf("account %q doesn't have imports", p.accountName)
+		case 1:
+			p.index = 0
+		default:
+			for i, v := range p.claim.Imports {
+				if string(v.Subject) == p.subject {
+					p.index = i
+					break
 				}
 			}
-			uvr.Add(nis)
 		}
-	} else {
-		uvr = &vr2
 	}
-	// fail validation
-	if len(uvr.Issues) > 0 {
-		return errors.New(uvr.Issues[0].Error())
+
+	if p.index == -1 {
+		return fmt.Errorf("no matching imports found")
 	}
 
 	ctx, err := s.GetContext()
@@ -219,11 +191,15 @@ func (p *AddExportParams) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
-func (p *AddExportParams) Run() error {
+func (p *DeleteImportParams) Run() error {
 	s, err := GetStore()
 	if err != nil {
 		return nil
 	}
+
+	p.deletedImport = p.claim.Imports[p.index]
+	p.claim.Imports = append(p.claim.Imports[:p.index], p.claim.Imports[p.index+1:]...)
+
 	token, err := p.claim.Encode(p.operatorKP)
 	return s.StoreClaim([]byte(token))
 }

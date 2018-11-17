@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nats-io/nsc/cli"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 )
@@ -474,11 +476,11 @@ type Entity struct {
 }
 
 type Context struct {
-	StoreInfo Info
-	Operator  Entity
-	Account   Entity
-	Cluster   Entity
-	KeyStore  KeyStore
+	Operator Entity
+	Account  Entity
+	Cluster  Entity
+	KeyStore KeyStore
+	Store    *Store
 }
 
 func (ctx *Context) SetContext(name string, pub string) error {
@@ -511,7 +513,7 @@ func (ctx *Context) SetContext(name string, pub string) error {
 
 func (s *Store) GetContext() (*Context, error) {
 	var c Context
-	c.StoreInfo = s.Info
+	c.Store = s
 	c.KeyStore = NewKeyStore(s.Info.EnvironmentName)
 
 	root, err := s.LoadRootClaim()
@@ -567,4 +569,28 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 		return nil, fmt.Errorf("unexpected resolved keytype type")
 	}
 	return kp, nil
+}
+
+func (ctx *Context) PickAccount(store *Store, name string) (string, error) {
+	if name == "" {
+		name = ctx.Account.Name
+	}
+
+	if name == "" {
+		accounts, err := store.ListSubContainers(Accounts)
+		if err != nil {
+			return "", err
+		}
+		if len(accounts) > 1 {
+			i, err := cli.PromptChoices("select account", accounts)
+			if err != nil {
+				return "", err
+			}
+			name = accounts[i]
+		}
+	}
+	// allow downstream use of context to have account
+	ctx.Account.Name = name
+
+	return name, nil
 }
