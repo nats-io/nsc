@@ -97,6 +97,8 @@ func (p *GenerateActivationParams) Init() error {
 		p.accountName = ctx.Account.Name
 	}
 
+	p.export.Subject = jwt.Subject(p.subject)
+
 	return nil
 }
 
