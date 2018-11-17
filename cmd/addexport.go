@@ -43,7 +43,7 @@ func createExportCmd() *cobra.Command {
 				}
 			}
 
-			if err := params.Validate(); err != nil {
+			if err := params.Validate(cmd); err != nil {
 				return err
 			}
 
@@ -57,9 +57,9 @@ func createExportCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
-	cmd.Flags().StringVarP(&params.export.Name, "name", "", "", "export name")
-	cmd.Flags().StringVarP(&params.subject, "subject", "", "", "subject")
-	cmd.Flags().BoolVarP(&params.service, "service", "", false, "export type service")
+	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
+	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
+	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 
 	return cmd
 }
@@ -96,6 +96,10 @@ func (p *AddExportParams) Init() error {
 	p.export.Type = jwt.StreamType
 	if p.service {
 		p.export.Type = jwt.ServiceType
+	}
+
+	if p.export.Name == "" {
+		p.export.Name = p.subject
 	}
 
 	return nil
@@ -165,15 +169,22 @@ func (p *AddExportParams) Interactive() error {
 	return nil
 }
 
-func (p *AddExportParams) Validate() error {
+func (p *AddExportParams) Validate(cmd *cobra.Command) error {
 	s, err := GetStore()
 	if err != nil {
 		return err
 	}
 
 	if p.accountName == "" {
+		cmd.SilenceUsage = false
 		return errors.New("an account is required")
 	}
+
+	if p.subject == "" {
+		cmd.SilenceUsage = false
+		return errors.New("a subject is required")
+	}
+
 	p.claim, err = s.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err

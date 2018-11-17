@@ -54,7 +54,18 @@ func createGenerateExport() *cobra.Command {
 			}
 
 			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-				params.export.Name, params.targetAccount, params.jti)
+				params.export.Name, params.targetAccount, params.activation.ID)
+
+			if params.activation.NotBefore > 0 {
+				cmd.Printf("Token valid on %s - %s\n",
+					UnixToDate(params.activation.NotBefore),
+					HumanizedDate(params.activation.NotBefore))
+			}
+			if params.activation.Expires > 0 {
+				cmd.Printf("Token expires on %s - %s\n",
+					UnixToDate(params.activation.Expires),
+					HumanizedDate(params.activation.Expires))
+			}
 
 			return RunInterceptor(cmd)
 		},
@@ -63,6 +74,7 @@ func createGenerateExport() *cobra.Command {
 	cmd.Flags().StringVarP(&params.targetAccount, "target-account", "t", "", "account public key")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
+	params.BindFlags(cmd)
 
 	return cmd
 }
@@ -72,6 +84,7 @@ func init() {
 }
 
 type GenerateActivationParams struct {
+	TimeParams
 	accountKP     nkeys.KeyPair
 	accountName   string
 	claims        *jwt.AccountClaims
@@ -80,7 +93,7 @@ type GenerateActivationParams struct {
 	subject       string
 	targetAccount string
 	token         string
-	jti           string
+	activation    *jwt.ActivationClaims
 }
 
 func (p *GenerateActivationParams) Init() error {
@@ -162,17 +175,25 @@ func (p *GenerateActivationParams) Interactive() error {
 	}
 	p.export = *p.claims.Exports[i]
 
+	if err := p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
+	s, err := GetStore()
+	if err != nil {
+		return err
+	}
+
 	if p.export.Subject == "" {
 		cmd.SilenceUsage = false
 		return fmt.Errorf("subject not specified")
 	}
 
-	s, err := GetStore()
-	if err != nil {
+	if err := p.TimeParams.Validate(); err != nil {
 		return err
 	}
 
@@ -199,10 +220,6 @@ func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid target account public key")
 	}
 
-	if p.accountName == "" {
-		return errors.New("an account is required")
-	}
-
 	p.claims, err = s.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
@@ -225,6 +242,10 @@ func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
 		return err
 	}
 
+	if ctx.Account.Name == "" {
+		ctx.Account.Name = p.accountName
+	}
+
 	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the account private key with --private-key to use for signing the activation")
@@ -235,14 +256,15 @@ func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
 
 func (p *GenerateActivationParams) Run() error {
 	var err error
-	ac := jwt.NewActivationClaims(p.targetAccount)
-	ac.Exports.Add(&p.export)
+	p.activation = jwt.NewActivationClaims(p.targetAccount)
+	p.activation.NotBefore, _ = p.TimeParams.StartDate()
+	p.activation.Expires, _ = p.TimeParams.ExpiryDate()
+	p.activation.Exports.Add(&p.export)
 
-	p.token, err = ac.Encode(p.accountKP)
+	p.token, err = p.activation.Encode(p.accountKP)
 	if err != nil {
 		return err
 	}
-	p.jti = ac.ID
 
 	return nil
 }

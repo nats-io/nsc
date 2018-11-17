@@ -49,14 +49,13 @@ func createAddAccountCmd() *cobra.Command {
 
 			if params.generated {
 				cmd.Printf("Generated account key - private key stored %q\n", params.keyPath)
-			} else {
-				cmd.Printf("Success! - added account %q\n", params.name)
 			}
+			cmd.Printf("Success! - added account %q\n", params.name)
 
 			return RunInterceptor(cmd)
 		},
 	}
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "account name")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "account name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the account")
 
 	return cmd

@@ -198,40 +198,6 @@ func ParseNumber(s string) (int64, error) {
 	return 0, fmt.Errorf("couldn't parse number: %v", s)
 }
 
-func ParseDataSize(s string) (int64, error) {
-	if s == "" {
-		return 0, nil
-	}
-	s = strings.ToUpper(s)
-	re := regexp.MustCompile(`(\d+$)`)
-	m := re.FindStringSubmatch(s)
-	if m != nil {
-		v, err := strconv.ParseInt(m[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return v, nil
-	}
-	re = regexp.MustCompile(`(\d+)([B|K|M])`)
-	m = re.FindStringSubmatch(s)
-	if m != nil {
-		v, err := strconv.ParseInt(m[1], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		if m[2] == "B" {
-			return v, nil
-		}
-		if m[2] == "K" {
-			return v * 1000, nil
-		}
-		if m[2] == "M" {
-			return v * 1000000, nil
-		}
-	}
-	return 0, fmt.Errorf("couldn't parse data size: %v", s)
-}
-
 func UnixToDate(d int64) string {
 	if d == 0 {
 		return ""
@@ -247,9 +213,9 @@ func HumanizedDate(d int64) string {
 	when := time.Unix(d, 0).UTC()
 
 	if now.After(when) {
-		return strings.Title(humanize.RelTime(when, now, "ago", ""))
+		return strings.TrimSpace(strings.Title(humanize.RelTime(when, now, "ago", "")))
 	} else {
-		return strings.Title("in " + humanize.RelTime(now, when, "", ""))
+		return strings.TrimSpace(strings.Title("in " + humanize.RelTime(now, when, "", "")))
 	}
 }
 

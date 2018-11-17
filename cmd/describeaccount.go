@@ -110,7 +110,7 @@ func (p *DescribeAccountParams) Validate(cmd *cobra.Command) error {
 			if c == 0 {
 				return errors.New("no accounts defined - add account first")
 			} else {
-				return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
+				return errors.New("multiple accounts - specify --name or navigate to an account directory")
 			}
 		}
 
