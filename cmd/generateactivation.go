@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: convert to Action
 func createGenerateExport() *cobra.Command {
 	var params GenerateActivationParams
 	cmd := &cobra.Command{

@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: convert to Action
 func deleteImportCmd() *cobra.Command {
 	var params DeleteImportParams
 	cmd := &cobra.Command{

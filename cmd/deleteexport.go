@@ -33,30 +33,14 @@ func deleteExportCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Init(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
-				return err
-			}
-
 			cmd.Printf("Success! - deleted export of %q\n", params.deletedExport.Subject)
-
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
+	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account storing the export")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 
 	return cmd
@@ -67,56 +51,61 @@ func init() {
 }
 
 type DeleteExportParams struct {
-	deletedExport *jwt.Export
-	claim         *jwt.AccountClaims
-	index         int
-	subject       string
 	accountName   string
+	claim         *jwt.AccountClaims
+	deletedExport *jwt.Export
+	index         int
 	operatorKP    nkeys.KeyPair
+	subject       string
 }
 
-func (p *DeleteExportParams) Init() error {
+func (p *DeleteExportParams) SetDefaults(ctx ActionCtx) error {
 	p.index = -1
+	if p.accountName == "" {
+		p.accountName = ctx.StoreCtx().Account.Name
+	}
+	return nil
+}
 
-	s, err := GetStore()
+func (p *DeleteExportParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *DeleteExportParams) Load(ctx ActionCtx) error {
+	var err error
+
+	if p.accountName == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("an account is required")
+	}
+
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
 	}
 
-	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
+	switch len(p.claim.Exports) {
+	case 0:
+		return fmt.Errorf("account %q doesn't have exports", p.accountName)
+	default:
+		for i, e := range p.claim.Exports {
+			if string(e.Subject) == p.subject {
+				p.index = i
+				break
+			}
 		}
-		p.accountName = ctx.Account.Name
 	}
 
 	return nil
 }
 
-func (p *DeleteExportParams) Interactive() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.accountName, err = ctx.PickAccount(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	p.claim, err = s.ReadAccountClaim(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	if len(p.claim.Exports) == 0 {
-		return fmt.Errorf("account %q doesn't have exports", p.accountName)
-	}
+func (p *DeleteExportParams) PostInteractive(ctx ActionCtx) error {
+	var err error
 
 	var choices []string
 	for _, c := range p.claim.Exports {
@@ -127,7 +116,7 @@ func (p *DeleteExportParams) Interactive() error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
 		return err
 	}
@@ -141,65 +130,27 @@ func (p *DeleteExportParams) Interactive() error {
 	return nil
 }
 
-func (p *DeleteExportParams) Validate(cmd *cobra.Command) error {
-	s, err := GetStore()
-	if err != nil {
-		return err
+func (p *DeleteExportParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.index == -1 {
+		return fmt.Errorf("no matching export found")
 	}
-
-	if p.accountName == "" {
-		cmd.SilenceUsage = false
-		return errors.New("an account is required")
-	}
-
-	if p.claim == nil {
-		p.claim, err = s.ReadAccountClaim(p.accountName)
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 		if err != nil {
 			return err
 		}
 	}
-
-	if !InteractiveFlag {
-		switch len(p.claim.Exports) {
-		case 0:
-			return fmt.Errorf("account %q doesn't have exports", p.accountName)
-		case 1:
-			p.index = 0
-		default:
-			for i, e := range p.claim.Exports {
-				if string(e.Subject) == p.subject {
-					p.index = i
-					break
-				}
-			}
-		}
-	}
-
-	if p.index == -1 {
-		return fmt.Errorf("no matching exports found")
-	}
-
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (p *DeleteExportParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
-		return nil
-	}
-
+func (p *DeleteExportParams) Run(ctx ActionCtx) error {
 	p.deletedExport = p.claim.Exports[p.index]
 	p.claim.Exports = append(p.claim.Exports[:p.index], p.claim.Exports[p.index+1:]...)
 
 	token, err := p.claim.Encode(p.operatorKP)
-	return s.StoreClaim([]byte(token))
+	if err != nil {
+		return err
+	}
+	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

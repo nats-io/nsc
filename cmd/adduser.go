@@ -34,31 +34,16 @@ func createAddUserCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params.create = true
-			params.kind = nkeys.PrefixByteUser
-			params.editFn = params.editUserClaim
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
 			if params.generated {
 				cmd.Printf("Generated user key - private key stored %q\n", params.keyPath)
-			} else {
-				cmd.Printf("Success! - added user %q\n", params.name)
 			}
+			cmd.Printf("Success! - added user %q to %q\n", params.name, params.accountName)
 
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
 
@@ -88,65 +73,75 @@ func init() {
 }
 
 type AddUserParams struct {
-	TimeParams
-	Entity
 	accountKP   nkeys.KeyPair
 	accountName string
-
 	allowPubs   []string
 	allowPubsub []string
 	allowSubs   []string
-
-	denyPubs   []string
-	denyPubsub []string
-	denySubs   []string
-
+	denyPubs    []string
+	denyPubsub  []string
+	denySubs    []string
+	Entity
 	src  []string
 	tags []string
+	TimeParams
 }
 
-func (p *AddUserParams) Interactive() error {
-	if err := p.Entity.Edit(); err != nil {
+func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
+	p.create = true
+	p.kind = nkeys.PrefixByteUser
+	p.editFn = p.editUserClaim
+	return nil
+}
+
+func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	if err = p.Entity.Edit(); err != nil {
 		return err
 	}
 
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
 	if err != nil {
 		return err
 	}
 
-	p.accountName, err = ctx.PickAccount(p.accountName)
+	if err = p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
+	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
 	if err != nil {
 		return err
 	}
 
-	if err := p.TimeParams.Edit(); err != nil {
-		return err
+	if p.accountKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteAccount, "account keypath", &KeyPathFlag)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (p *AddUserParams) Validate() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-	if p.accountName == "" {
-		p.accountName = ctx.Account.Name
+func (p *AddUserParams) Load(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddUserParams) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddUserParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.name == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("user name is required")
 	}
 
 	if p.accountName == "" {
 		// default account was not found by get context, so we either we have none or many
-		accounts, err := s.ListSubContainers(store.Accounts)
+		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
 		if err != nil {
 			return err
 		}
@@ -158,14 +153,9 @@ func (p *AddUserParams) Validate() error {
 		}
 	}
 
-	// allow downstream validation to have a surrogate account name
-	if ctx.Account.Name == "" {
-		ctx.Account.Name = p.accountName
-	}
-
-	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
+	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
 	if err != nil {
-		return fmt.Errorf("specify the account private key with --private-key to use for signing the user")
+		return err
 	}
 
 	if err := p.TimeParams.Validate(); err != nil {
@@ -175,7 +165,7 @@ func (p *AddUserParams) Validate() error {
 	return p.Entity.Valid()
 }
 
-func (p *AddUserParams) Run() error {
+func (p *AddUserParams) Run(ctx ActionCtx) error {
 	if err := p.Entity.StoreKeys(p.accountName); err != nil {
 		return err
 	}

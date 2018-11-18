@@ -28,6 +28,7 @@ import (
 	"github.com/xlab/tablewriter"
 )
 
+// TODO: convert to Action
 func createDescribeAccountCmd() *cobra.Command {
 	var params DescribeAccountParams
 	cmd := &cobra.Command{

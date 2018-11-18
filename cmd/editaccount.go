@@ -32,26 +32,7 @@ func createEditAccount() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if NothingToDo(cmd, "start", "expiry") {
-				cmd.SilenceUsage = false
-				return fmt.Errorf("specify an edit option")
-			}
-
-			if err := params.Init(); err != nil {
-				return err
-			}
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
@@ -70,22 +51,13 @@ func createEditAccount() *cobra.Command {
 					HumanizedDate(params.claim.Expires))
 			}
 
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "name", "n", "", "account name")
 	params.BindFlags(cmd)
 
 	return cmd
-}
-
-func NothingToDo(cmd *cobra.Command, names ...string) bool {
-	for _, n := range names {
-		if cmd.Flag(n).Changed {
-			return false
-		}
-	}
-	return true
 }
 
 func init() {
@@ -100,76 +72,87 @@ type EditAccountParams struct {
 	token       string
 }
 
-func (p *EditAccountParams) Init() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
+func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
+	if !InteractiveFlag && ctx.NothingToDo("start", "expiry") {
+		return fmt.Errorf("specify an edit option")
 	}
-
 	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
-		}
-		p.accountName = ctx.Account.Name
+		p.accountName = ctx.StoreCtx().Account.Name
 	}
 	return nil
 }
 
-func (p *EditAccountParams) Interactive() error {
-	return p.TimeParams.Edit()
+func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (p *EditAccountParams) Validate(cmd *cobra.Command) error {
+func (p *EditAccountParams) Load(ctx ActionCtx) error {
+	var err error
+
 	if p.accountName == "" {
-		cmd.SilenceUsage = false
+		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("account name is required")
 	}
 
-	if err := p.TimeParams.Validate(); err != nil {
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
+	var err error
+	if err = p.TimeParams.Edit(); err != nil {
 		return err
 	}
 
-	s, err := GetStore()
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
 		return err
 	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
-		return err
-	}
-
-	p.claim, err = s.ReadAccountClaim(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	if cmd.Flag("start").Changed {
-		p.claim.NotBefore, err = p.TimeParams.StartDate()
+	if p.operatorKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
 		if err != nil {
 			return err
 		}
 	}
-
-	if cmd.Flag("expiry").Changed {
-		p.claim.Expires, err = p.TimeParams.ExpiryDate()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func (p *EditAccountParams) Run() error {
-	s, err := GetStore()
+func (p *EditAccountParams) Validate(ctx ActionCtx) error {
+	var err error
+	if err = p.TimeParams.Validate(); err != nil {
+		return err
+	}
+
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *EditAccountParams) Run(ctx ActionCtx) error {
+	var err error
+	if p.TimeParams.IsStartChanged() {
+		p.claim.NotBefore, _ = p.TimeParams.StartDate()
+	}
+
+	if p.TimeParams.IsExpiryChanged() {
+		p.claim.Expires, _ = p.TimeParams.ExpiryDate()
+	}
+
+	p.token, err = p.claim.Encode(p.operatorKP)
 	if err != nil {
 		return err
 	}
-	p.token, err = p.claim.Encode(p.operatorKP)
-	return s.StoreClaim([]byte(p.token))
+	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
 }

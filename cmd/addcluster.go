@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -31,33 +32,15 @@ func createAddClusterCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params.create = true
-			params.kind = nkeys.PrefixByteCluster
-			params.editFn = params.editClusterClaim
-			params.start = -1
-			params.expiry = -1
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
 			if params.generated {
 				cmd.Printf("Generated cluster key - private key stored %q\n", params.keyPath)
-			} else {
-				cmd.Printf("Success! - added cluster %q\n", params.name)
 			}
-
-			return RunInterceptor(cmd)
+			cmd.Printf("Success! - added cluster %q\n", params.name)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "cluster name")
@@ -72,46 +55,66 @@ func init() {
 }
 
 type AddClusterParams struct {
-	TimeParams
 	Entity
-	start      int64
 	expiry     int64
 	operatorKP nkeys.KeyPair
+	start      int64
+	TimeParams
 }
 
-func (p *AddClusterParams) Interactive() error {
-	if err := p.Entity.Edit(); err != nil {
-		return err
-	}
-	if err := p.TimeParams.Edit(); err != nil {
-		return err
-	}
+func (p *AddClusterParams) SetDefaults(ctx ActionCtx) error {
+	p.create = true
+	p.kind = nkeys.PrefixByteCluster
+	p.editFn = p.editClusterClaim
 	return nil
 }
 
-func (p *AddClusterParams) Validate(cmd *cobra.Command) error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+func (p *AddClusterParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+
+	if err = p.Entity.Edit(); err != nil {
 		return err
 	}
 
-	if cmd.Flag("start").Changed {
-		p.start, err = p.TimeParams.StartDate()
+	if err = p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+	if err != nil {
+		return err
+	}
+	if p.operatorKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
 		if err != nil {
 			return err
 		}
 	}
 
-	if cmd.Flag("expiry").Changed {
-		p.expiry, err = p.TimeParams.ExpiryDate()
+	return nil
+}
+
+func (p *AddClusterParams) Load(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddClusterParams) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddClusterParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.name == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("cluster name is required")
+	}
+
+	if err = p.TimeParams.Validate(); err != nil {
+		return err
+	}
+
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 		if err != nil {
 			return err
 		}
@@ -120,27 +123,9 @@ func (p *AddClusterParams) Validate(cmd *cobra.Command) error {
 	return p.Valid()
 }
 
-func (p *AddClusterParams) editClusterClaim(c interface{}) error {
-	cc, ok := c.(*jwt.ClusterClaims)
-	if !ok {
-		return errors.New("unable to cast to user claim")
-	}
-	if p.start > -1 {
-		cc.NotBefore = p.start
-	}
-	if p.expiry > -1 {
-		cc.Expires = p.expiry
-	}
-	return nil
-}
+func (p *AddClusterParams) Run(ctx ActionCtx) error {
 
-func (p *AddClusterParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-
-	if err := p.Entity.StoreKeys(s.GetName()); err != nil {
+	if err := p.Entity.StoreKeys(ctx.StoreCtx().Store.GetName()); err != nil {
 		return err
 	}
 
@@ -148,5 +133,20 @@ func (p *AddClusterParams) Run() error {
 		return err
 	}
 
+	return nil
+}
+
+func (p *AddClusterParams) editClusterClaim(c interface{}) error {
+	cc, ok := c.(*jwt.ClusterClaims)
+	if !ok {
+		return errors.New("unable to cast to cluster claim")
+	}
+	if p.TimeParams.IsStartChanged() {
+		cc.NotBefore, _ = p.TimeParams.StartDate()
+	}
+
+	if p.TimeParams.IsExpiryChanged() {
+		cc.Expires, _ = p.TimeParams.ExpiryDate()
+	}
 	return nil
 }

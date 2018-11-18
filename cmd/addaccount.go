@@ -16,8 +16,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 )
@@ -30,20 +32,7 @@ func createAddAccountCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params.create = true
-			params.kind = nkeys.PrefixByteAccount
-
-			if InteractiveFlag {
-				if err := params.Edit(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
@@ -52,11 +41,12 @@ func createAddAccountCmd() *cobra.Command {
 			}
 			cmd.Printf("Success! - added account %q\n", params.name)
 
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "account name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the account")
+	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -66,43 +56,91 @@ func init() {
 }
 
 type AddAccountParams struct {
+	TimeParams
 	Entity
 	operatorKP nkeys.KeyPair
 }
 
-func (p *AddAccountParams) Validate(cmd *cobra.Command) error {
+func (p *AddAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.create = true
+	p.kind = nkeys.PrefixByteAccount
+	p.editFn = p.editAccount
+	return nil
+}
+
+func (p *AddAccountParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	if err = p.Entity.Edit(); err != nil {
+		return err
+	}
+
+	if err = p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+	if err != nil {
+		return err
+	}
+	if p.operatorKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *AddAccountParams) Load(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddAccountParams) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddAccountParams) Validate(ctx ActionCtx) error {
+	var err error
 	if p.name == "" {
-		cmd.SilenceUsage = false
+		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("account name is required")
 	}
 
-	s, err := GetStore()
-	if err != nil {
+	if err = p.TimeParams.Validate(); err != nil {
 		return err
 	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
-		return err
+
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+		if err != nil {
+			return err
+		}
 	}
 	return p.Valid()
 }
 
-func (p *AddAccountParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
+func (p *AddAccountParams) Run(ctx ActionCtx) error {
+	if err := p.Entity.StoreKeys(ctx.StoreCtx().Store.GetName()); err != nil {
 		return err
 	}
-
-	if err := p.Entity.StoreKeys(s.GetName()); err != nil {
-		return err
-	}
-
 	if err := p.Entity.GenerateClaim(p.operatorKP); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (p *AddAccountParams) editAccount(c interface{}) error {
+	ac, ok := c.(*jwt.AccountClaims)
+	if !ok {
+		return errors.New("unable to cast to account claim")
+	}
+
+	if p.TimeParams.IsStartChanged() {
+		ac.NotBefore, _ = p.TimeParams.StartDate()
+	}
+
+	if p.TimeParams.IsExpiryChanged() {
+		ac.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
 	return nil

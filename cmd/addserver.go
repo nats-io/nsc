@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: convert to Action
 func createAddServerCmd() *cobra.Command {
 	var params AddServerParams
 	cmd := &cobra.Command{
