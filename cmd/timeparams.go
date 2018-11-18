@@ -55,10 +55,18 @@ func (p *TimeParams) ValidateStart() error {
 }
 
 func (p *TimeParams) ValidateExpiry() error {
-	if err := p.valid(p.Expiry, "expiry", true); err != nil {
+	if err := p.valid(p.Expiry, "expiry", false); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (p *TimeParams) IsStartChanged() bool {
+	return p.Start != ""
+}
+
+func (p *TimeParams) IsExpiryChanged() bool {
+	return p.Expiry != ""
 }
 
 func (p *TimeParams) Validate() error {

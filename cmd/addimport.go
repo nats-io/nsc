@@ -64,7 +64,7 @@ nsc add import --url https://some.service.com/path --to import.>`,
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
-	cmd.Flags().StringVarP(&params.Import.Name, "name", "", "", "import name")
+	cmd.Flags().StringVarP(&params.Import.Name, "name", "n", "", "import name")
 	cmd.Flags().StringVarP(&params.Import.TokenURL, "token-url", "u", "", "token url")
 	cmd.Flags().StringVarP(&params.to, "to", "t", "", "target subject")
 	cmd.Flags().StringVarP(&params.tokenFile, "token-file", "f", "", "token file")

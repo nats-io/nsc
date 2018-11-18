@@ -22,7 +22,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -76,10 +75,10 @@ func createAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "name to assign the user")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
-	cmd.Flags().StringVarP(&params.payload, "max-payload", "", "", "max message payload - number followed by units (b)yte, (k)b, (M)egabyte")
-	cmd.Flags().StringVarP(&params.max, "max-messages", "", "", "max messages - number optionally followed by units (K)ilo, (M)illion, (G)iga")
+
+	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -89,6 +88,7 @@ func init() {
 }
 
 type AddUserParams struct {
+	TimeParams
 	Entity
 	accountKP   nkeys.KeyPair
 	accountName string
@@ -101,14 +101,12 @@ type AddUserParams struct {
 	denyPubsub []string
 	denySubs   []string
 
-	max     string
-	payload string
-	src     []string
-	tags    []string
+	src  []string
+	tags []string
 }
 
 func (p *AddUserParams) Interactive() error {
-	if err := p.Edit(); err != nil {
+	if err := p.Entity.Edit(); err != nil {
 		return err
 	}
 
@@ -116,28 +114,20 @@ func (p *AddUserParams) Interactive() error {
 	if err != nil {
 		return err
 	}
-
-	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
-		}
-		p.accountName = ctx.Account.Name
+	ctx, err := s.GetContext()
+	if err != nil {
+		return err
 	}
 
-	if p.accountName == "" {
-		accounts, err := s.ListSubContainers(store.Accounts)
-		if err != nil {
-			return err
-		}
-		if len(accounts) > 1 {
-			i, err := cli.PromptChoices("user account", accounts)
-			if err != nil {
-				return err
-			}
-			p.accountName = accounts[i]
-		}
+	p.accountName, err = ctx.PickAccount(p.accountName)
+	if err != nil {
+		return err
 	}
+
+	if err := p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -178,28 +168,15 @@ func (p *AddUserParams) Validate() error {
 		return fmt.Errorf("specify the account private key with --private-key to use for signing the user")
 	}
 
-	if p.max != "" {
-		if _, err := ParseNumber(p.max); err != nil {
-			return err
-		}
-	}
-
-	if p.payload != "" {
-		if _, err := ParseDataSize(p.payload); err != nil {
-			return err
-		}
+	if err := p.TimeParams.Validate(); err != nil {
+		return err
 	}
 
 	return p.Entity.Valid()
 }
 
 func (p *AddUserParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-
-	if err := p.Entity.StoreKeys(s.GetName()); err != nil {
+	if err := p.Entity.StoreKeys(p.accountName); err != nil {
 		return err
 	}
 
@@ -214,6 +191,14 @@ func (p *AddUserParams) editUserClaim(c interface{}) error {
 	uc, ok := c.(*jwt.UserClaims)
 	if !ok {
 		return errors.New("unable to cast to user claim")
+	}
+
+	if p.TimeParams.IsStartChanged() {
+		uc.NotBefore, _ = p.TimeParams.StartDate()
+	}
+
+	if p.TimeParams.IsExpiryChanged() {
+		uc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
 	uc.Permissions.Pub.Allow.Add(p.allowPubs...)
@@ -234,9 +219,6 @@ func (p *AddUserParams) editUserClaim(c interface{}) error {
 
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
-
-	uc.User.Limits.Max, _ = ParseNumber(p.max)
-	uc.User.Limits.Payload, _ = ParseDataSize(p.payload)
 
 	return nil
 }

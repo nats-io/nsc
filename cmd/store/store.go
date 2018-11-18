@@ -571,13 +571,13 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 	return kp, nil
 }
 
-func (ctx *Context) PickAccount(store *Store, name string) (string, error) {
+func (ctx *Context) PickAccount(name string) (string, error) {
 	if name == "" {
 		name = ctx.Account.Name
 	}
 
 	if name == "" {
-		accounts, err := store.ListSubContainers(Accounts)
+		accounts, err := ctx.Store.ListSubContainers(Accounts)
 		if err != nil {
 			return "", err
 		}
@@ -591,6 +591,30 @@ func (ctx *Context) PickAccount(store *Store, name string) (string, error) {
 	}
 	// allow downstream use of context to have account
 	ctx.Account.Name = name
+
+	return name, nil
+}
+
+func (ctx *Context) PickCluster(name string) (string, error) {
+	if name == "" {
+		name = ctx.Cluster.Name
+	}
+
+	if name == "" {
+		clusters, err := ctx.Store.ListSubContainers(Clusters)
+		if err != nil {
+			return "", err
+		}
+		if len(clusters) > 1 {
+			i, err := cli.PromptChoices("select cluster", clusters)
+			if err != nil {
+				return "", err
+			}
+			name = clusters[i]
+		}
+	}
+	// allow downstream use of context to have account
+	ctx.Cluster.Name = name
 
 	return name, nil
 }

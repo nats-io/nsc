@@ -104,7 +104,7 @@ func (p *DeleteExportParams) Interactive() error {
 		return err
 	}
 
-	p.accountName, err = PickAccount(ctx, p.accountName)
+	p.accountName, err = ctx.PickAccount(p.accountName)
 	if err != nil {
 		return err
 	}

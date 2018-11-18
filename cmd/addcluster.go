@@ -16,6 +16,9 @@
 package cmd
 
 import (
+	"errors"
+
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 )
@@ -30,14 +33,17 @@ func createAddClusterCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			params.create = true
 			params.kind = nkeys.PrefixByteCluster
+			params.editFn = params.editClusterClaim
+			params.start = -1
+			params.expiry = -1
 
-			if params.name == "" {
-				if err := params.Edit(); err != nil {
+			if InteractiveFlag {
+				if err := params.Interactive(); err != nil {
 					return err
 				}
 			}
 
-			if err := params.Validate(); err != nil {
+			if err := params.Validate(cmd); err != nil {
 				return err
 			}
 
@@ -54,8 +60,9 @@ func createAddClusterCmd() *cobra.Command {
 			return RunInterceptor(cmd)
 		},
 	}
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "cluster name")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "cluster name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the cluster")
+	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -65,11 +72,24 @@ func init() {
 }
 
 type AddClusterParams struct {
+	TimeParams
 	Entity
+	start      int64
+	expiry     int64
 	operatorKP nkeys.KeyPair
 }
 
-func (p *AddClusterParams) Validate() error {
+func (p *AddClusterParams) Interactive() error {
+	if err := p.Entity.Edit(); err != nil {
+		return err
+	}
+	if err := p.TimeParams.Edit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *AddClusterParams) Validate(cmd *cobra.Command) error {
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -82,7 +102,36 @@ func (p *AddClusterParams) Validate() error {
 	if err != nil {
 		return err
 	}
+
+	if cmd.Flag("start").Changed {
+		p.start, err = p.TimeParams.StartDate()
+		if err != nil {
+			return err
+		}
+	}
+
+	if cmd.Flag("expiry").Changed {
+		p.expiry, err = p.TimeParams.ExpiryDate()
+		if err != nil {
+			return err
+		}
+	}
+
 	return p.Valid()
+}
+
+func (p *AddClusterParams) editClusterClaim(c interface{}) error {
+	cc, ok := c.(*jwt.ClusterClaims)
+	if !ok {
+		return errors.New("unable to cast to user claim")
+	}
+	if p.start > -1 {
+		cc.NotBefore = p.start
+	}
+	if p.expiry > -1 {
+		cc.Expires = p.expiry
+	}
+	return nil
 }
 
 func (p *AddClusterParams) Run() error {

@@ -21,7 +21,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +37,7 @@ func createAddServerCmd() *cobra.Command {
 			params.kind = nkeys.PrefixByteServer
 			params.editFn = params.editServerClaim
 
-			if params.name == "" {
+			if InteractiveFlag {
 				if err := params.Interactive(); err != nil {
 					return err
 				}
@@ -61,9 +60,10 @@ func createAddServerCmd() *cobra.Command {
 			return RunInterceptor(cmd)
 		},
 	}
-	cmd.Flags().StringVarP(&params.name, "name", "", "", "server name")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "server name")
 	cmd.Flags().StringVarP(&params.clusterName, "cluster", "", "", "server name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the server")
+	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -73,13 +73,14 @@ func init() {
 }
 
 type AddServerParams struct {
+	TimeParams
 	Entity
 	clusterKP   nkeys.KeyPair
 	clusterName string
 }
 
 func (p *AddServerParams) Interactive() error {
-	if err := p.Edit(); err != nil {
+	if err := p.Entity.Edit(); err != nil {
 		return err
 	}
 
@@ -88,27 +89,20 @@ func (p *AddServerParams) Interactive() error {
 		return err
 	}
 
-	if p.clusterName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
-		}
-		p.clusterName = ctx.Cluster.Name
+	ctx, err := s.GetContext()
+	if err != nil {
+		return err
 	}
 
-	if p.clusterName == "" {
-		clusters, err := s.ListSubContainers(store.Clusters)
-		if err != nil {
-			return err
-		}
-		if len(clusters) > 1 {
-			i, err := cli.PromptChoices("server cluster", clusters)
-			if err != nil {
-				return err
-			}
-			p.clusterName = clusters[i]
-		}
+	p.clusterName, err = ctx.PickCluster(p.clusterName)
+	if err != nil {
+		return err
 	}
+
+	if err := p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -149,16 +143,20 @@ func (p *AddServerParams) Validate() error {
 		return fmt.Errorf("specify the cluster private key with --private-key to use for signing the server")
 	}
 
-	return p.Entity.Valid()
-}
-
-func (p *AddServerParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
+	if err := p.Entity.Valid(); err != nil {
 		return err
 	}
 
-	if err := p.Entity.StoreKeys(s.GetName()); err != nil {
+	if err := p.TimeParams.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *AddServerParams) Run() error {
+
+	if err := p.Entity.StoreKeys(p.clusterName); err != nil {
 		return err
 	}
 
@@ -170,9 +168,17 @@ func (p *AddServerParams) Run() error {
 }
 
 func (p *AddServerParams) editServerClaim(c interface{}) error {
-	_, ok := c.(*jwt.ServerClaims)
+	sc, ok := c.(*jwt.ServerClaims)
 	if !ok {
 		return errors.New("unable to cast to server claim")
+	}
+
+	if p.TimeParams.IsStartChanged() {
+		sc.NotBefore, _ = p.TimeParams.StartDate()
+	}
+
+	if p.TimeParams.IsExpiryChanged() {
+		sc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
 	return nil
