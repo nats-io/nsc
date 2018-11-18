@@ -24,39 +24,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: convert to Action
 func createExportCmd() *cobra.Command {
 	var params AddExportParams
 	cmd := &cobra.Command{
-		Use:           "export",
-		Short:         "Add an export",
+		Use:   "export",
+		Short: "Add an export",
+		Example: `nsc add export -i
+nsc add export --subject "a.b.c.>"
+nsc add export --service --subject a.b
+ncc add export --name myexport --subject a.b --service`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Init(); err != nil {
-				return err
-			}
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
 			cmd.Printf("Success! - added %s export %q\n", params.export.Type, params.export.Name)
-
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
+	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
@@ -69,27 +57,18 @@ func init() {
 }
 
 type AddExportParams struct {
+	accountName string
 	claim       *jwt.AccountClaims
 	export      jwt.Export
-	subject     string
-	accountName string
 	operatorKP  nkeys.KeyPair
-	stream      bool
 	service     bool
+	stream      bool
+	subject     string
 }
 
-func (p *AddExportParams) Init() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-
+func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
-		}
-		p.accountName = ctx.Account.Name
+		p.accountName = ctx.StoreCtx().Account.Name
 	}
 
 	p.export.Subject = jwt.Subject(p.subject)
@@ -105,17 +84,9 @@ func (p *AddExportParams) Init() error {
 	return nil
 }
 
-func (p *AddExportParams) Interactive() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.accountName, err = ctx.PickAccount(p.accountName)
+func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
 	if err != nil {
 		return err
 	}
@@ -141,7 +112,7 @@ func (p *AddExportParams) Interactive() error {
 	}
 	p.export.Name, err = cli.Prompt("export name", p.export.Name, true, cli.LengthValidator(1))
 
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
 		return err
 	}
@@ -155,25 +126,31 @@ func (p *AddExportParams) Interactive() error {
 	return nil
 }
 
-func (p *AddExportParams) Validate(cmd *cobra.Command) error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
+func (p *AddExportParams) Load(ctx ActionCtx) error {
+	var err error
 
 	if p.accountName == "" {
-		cmd.SilenceUsage = false
+		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("an account is required")
 	}
 
-	if p.subject == "" {
-		cmd.SilenceUsage = false
-		return errors.New("a subject is required")
-	}
-
-	p.claim, err = s.ReadAccountClaim(p.accountName)
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (p *AddExportParams) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddExportParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.subject == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("a subject is required")
 	}
 
 	// get the old validation results
@@ -208,23 +185,19 @@ func (p *AddExportParams) Validate(cmd *cobra.Command) error {
 		return errors.New(uvr.Issues[0].Error())
 	}
 
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
-		return err
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (p *AddExportParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
-		return nil
-	}
+func (p *AddExportParams) Run(ctx ActionCtx) error {
 	token, err := p.claim.Encode(p.operatorKP)
-	return s.StoreClaim([]byte(token))
+	if err != nil {
+		return err
+	}
+	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }
