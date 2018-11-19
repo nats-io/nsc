@@ -259,7 +259,7 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	if p.im.Name == "" {
 		p.im.Name = export.Name
 	}
-	p.im.NamedSubject = export.NamedSubject
+	p.im.Subject = export.Subject
 	p.im.Type = export.Type
 	p.im.Account = p.activation.Issuer
 	p.im.To = jwt.Subject(p.to)
