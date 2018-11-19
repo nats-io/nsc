@@ -10,9 +10,29 @@ import (
 
 type Validator func(string) error
 
-var cli = &SurveyUI{}
+var cli PromptLib
 
 var output io.Writer = os.Stdout
+
+type PromptLib interface {
+	Prompt(label string, value string, edit bool, validator Validator) (string, error)
+	PromptYN(m string, defaultValue bool) (bool, error)
+	PromptSecret(m string) (string, error)
+	PromptChoices(m string, choices []string) (int, error)
+	PromptMultipleChoices(m string, choices []string) ([]int, error)
+}
+
+func init() {
+	ResetPromptLib()
+}
+
+func SetPromptLib(p PromptLib) {
+	cli = p
+}
+
+func ResetPromptLib() {
+	SetPromptLib(&SurveyUI{})
+}
 
 func SetOutput(out io.Writer) {
 	output = out
@@ -52,13 +72,6 @@ func PromptChoices(m string, choices []string) (int, error) {
 
 func PromptMultipleChoices(m string, choices []string) ([]int, error) {
 	return cli.PromptMultipleChoices(m, choices)
-}
-
-type PromptLib interface {
-	Prompt(label string, value string, edit bool, validator Validator) (string, error)
-	PromptYN(m string) (bool, error)
-	PromptSecret(m string) (string, error)
-	PromptChoices(m string, choices []string) (int, error)
 }
 
 func EmailValidator() Validator {

@@ -40,6 +40,18 @@ func (sui *SurveyUI) PromptYN(m string, defaultValue bool) (bool, error) {
 	return v, nil
 }
 
+func (sui *SurveyUI) PromptNY(m string, defaultValue bool) (bool, error) {
+	v := defaultValue
+	p := &survey.Confirm{
+		Message: m,
+		Default: defaultValue,
+	}
+	if err := survey.AskOne(p, &v, nil); err != nil {
+		return false, err
+	}
+	return v, nil
+}
+
 func (sui *SurveyUI) PromptSecret(m string) (string, error) {
 	v := ""
 	p := &survey.Password{
