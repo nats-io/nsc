@@ -22,11 +22,9 @@ import (
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
-// TODO: convert to Action
 func createGenerateExport() *cobra.Command {
 	var params GenerateActivationParams
 	cmd := &cobra.Command{
@@ -35,27 +33,16 @@ func createGenerateExport() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Init(); err != nil {
-				return err
-			}
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-			if err := params.Validate(cmd); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
-			if err := params.Run(); err != nil {
-				return err
-			}
 			if err := Write(params.out, FormatJwt("Activation", params.token)); err != nil {
 				return err
 			}
 
 			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-				params.export.Name, params.targetAccount, params.activation.ID)
+				params.export.Name, params.targetPublic, params.activation.ID)
 
 			if params.activation.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",
@@ -71,11 +58,11 @@ func createGenerateExport() *cobra.Command {
 			return RunInterceptor(cmd)
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
-	cmd.Flags().StringVarP(&params.targetAccount, "target-account", "t", "", "account public key")
+	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
-	params.BindFlags(cmd)
+	params.targetKey.BindFlags("target-account", nkeys.PrefixByteAccount, false, cmd)
+	params.timeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -85,69 +72,63 @@ func init() {
 }
 
 type GenerateActivationParams struct {
-	TimeParams
-	accountKP     nkeys.KeyPair
-	accountName   string
-	claims        *jwt.AccountClaims
-	export        jwt.Export
-	out           string
-	subject       string
-	targetAccount string
-	token         string
-	activation    *jwt.ActivationClaims
+	accountKP    nkeys.KeyPair
+	accountName  string
+	activation   *jwt.ActivationClaims
+	claims       *jwt.AccountClaims
+	export       jwt.Export
+	out          string
+	subject      string
+	targetKey    NKeyParams
+	targetPublic string
+	timeParams   TimeParams
+	token        string
 }
 
-func (p *GenerateActivationParams) Init() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-
+func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
 	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
-		}
-		p.accountName = ctx.Account.Name
+		p.accountName = ctx.StoreCtx().Account.Name
 	}
-
 	p.export.Subject = jwt.Subject(p.subject)
 
 	return nil
 }
 
-func (p *GenerateActivationParams) Interactive() error {
-	s, err := GetStore()
+func (p *GenerateActivationParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
 	if err != nil {
 		return err
 	}
+
+	if err = p.targetKey.Edit(); err != nil {
+		return err
+	}
+
+	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
+	if err != nil {
+		return err
+	}
+
+	if p.accountKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteAccount, "account keypath", &KeyPathFlag)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
+	var err error
+
 	if p.accountName == "" {
-		accounts, err := s.ListSubContainers(store.Accounts)
-		if err != nil {
-			return err
-		}
-		if len(accounts) > 1 {
-			i, err := cli.PromptChoices("user account", accounts)
-			if err != nil {
-				return err
-			}
-			p.accountName = accounts[i]
-		}
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("an account is required")
 	}
 
-	if p.targetAccount == "" {
-		p.targetAccount, err = cli.Prompt("target account nkey", p.targetAccount, true, func(s string) error {
-			if !nkeys.IsValidPublicAccountKey([]byte(s)) {
-				return errors.New("not a valid account nkey")
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	p.claims, err = s.ReadAccountClaim(p.accountName)
+	p.claims, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
 	}
@@ -156,6 +137,10 @@ func (p *GenerateActivationParams) Interactive() error {
 		return fmt.Errorf("account %q doesn't have exports", p.accountName)
 	}
 
+	return nil
+}
+
+func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	sub := jwt.Subject(p.subject)
 	for _, e := range p.claims.Exports {
 		if sub.IsContainedIn(e.Subject) {
@@ -163,7 +148,6 @@ func (p *GenerateActivationParams) Interactive() error {
 			break
 		}
 	}
-
 	var choices []string
 	if p.export.Subject == "" {
 		for _, v := range p.claims.Exports {
@@ -175,54 +159,37 @@ func (p *GenerateActivationParams) Interactive() error {
 		return err
 	}
 	p.export = *p.claims.Exports[i]
+	p.subject = string(p.export.Subject)
 
-	if err := p.TimeParams.Edit(); err != nil {
+	if err := p.timeParams.Edit(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
+func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
+	var err error
 
 	if p.export.Subject == "" {
-		cmd.SilenceUsage = false
+		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("subject not specified")
 	}
 
-	if err := p.TimeParams.Validate(); err != nil {
+	if p.accountName == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("an account is required")
+	}
+
+	if p.subject == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("a subject is required")
+	}
+
+	if err = p.timeParams.Validate(); err != nil {
 		return err
 	}
 
-	if p.accountName == "" {
-		// default account was not found by get context, so we either we have none or many
-		accounts, err := s.ListSubContainers(store.Accounts)
-		if err != nil {
-			return err
-		}
-		c := len(accounts)
-		if c == 0 {
-			return errors.New("no accounts defined - add account first")
-		} else {
-			return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
-		}
-	}
-
-	if p.targetAccount == "" {
-		cmd.SilenceUsage = false
-		return fmt.Errorf("target account cannot be empty")
-	}
-
-	if !nkeys.IsValidPublicAccountKey([]byte(p.targetAccount)) {
-		return fmt.Errorf("invalid target account public key")
-	}
-
-	p.claims, err = s.ReadAccountClaim(p.accountName)
-	if err != nil {
+	if p.targetPublic, err = p.targetKey.PublicKey(); err != nil {
 		return err
 	}
 
@@ -238,16 +205,7 @@ func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("an export containing %q was not found in account %q", p.subject, p.accountName)
 	}
 
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	if ctx.Account.Name == "" {
-		ctx.Account.Name = p.accountName
-	}
-
-	p.accountKP, err = ctx.ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
+	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
 	if err != nil {
 		return fmt.Errorf("specify the account private key with --private-key to use for signing the activation")
 	}
@@ -255,11 +213,11 @@ func (p *GenerateActivationParams) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
-func (p *GenerateActivationParams) Run() error {
+func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	var err error
-	p.activation = jwt.NewActivationClaims(p.targetAccount)
-	p.activation.NotBefore, _ = p.TimeParams.StartDate()
-	p.activation.Expires, _ = p.TimeParams.ExpiryDate()
+	p.activation = jwt.NewActivationClaims(p.targetPublic)
+	p.activation.NotBefore, _ = p.timeParams.StartDate()
+	p.activation.Expires, _ = p.timeParams.ExpiryDate()
 	p.activation.Exports.Add(&p.export)
 
 	p.token, err = p.activation.Encode(p.accountKP)

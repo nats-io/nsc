@@ -25,36 +25,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: convert to Action
 func deleteImportCmd() *cobra.Command {
 	var params DeleteImportParams
 	cmd := &cobra.Command{
-		Use:           "import",
-		Short:         "Delete an import",
+		Use:   "import",
+		Short: "Delete an import",
+		Example: `nsc delete import -i
+nsc delete import -s "bar.>"`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := params.Init(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(cmd); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
-				return err
-			}
-
 			cmd.Printf("Success! - deleted import of %q\n", params.deletedImport.Subject)
-
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
@@ -68,59 +53,64 @@ func init() {
 }
 
 type DeleteImportParams struct {
-	deletedImport *jwt.Import
-	claim         *jwt.AccountClaims
-	index         int
-	subject       string
 	accountName   string
+	claim         *jwt.AccountClaims
+	deletedImport *jwt.Import
+	index         int
 	operatorKP    nkeys.KeyPair
+	subject       string
 }
 
-func (p *DeleteImportParams) Init() error {
+func (p *DeleteImportParams) SetDefaults(ctx ActionCtx) error {
 	p.index = -1
+	if p.accountName == "" {
+		p.accountName = ctx.StoreCtx().Account.Name
+	}
+	return nil
+}
 
-	s, err := GetStore()
+func (p *DeleteImportParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *DeleteImportParams) Load(ctx ActionCtx) error {
+	var err error
+
+	if p.accountName == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("an account is required")
+	}
+
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
 	if err != nil {
 		return err
 	}
 
-	if p.accountName == "" {
-		ctx, err := s.GetContext()
-		if err != nil {
-			return err
+	switch len(p.claim.Imports) {
+	case 0:
+		return fmt.Errorf("account %q doesn't have imports", p.accountName)
+	default:
+		for i, e := range p.claim.Imports {
+			if string(e.Subject) == p.subject {
+				p.index = i
+				break
+			}
 		}
-		p.accountName = ctx.Account.Name
 	}
 
 	return nil
 }
 
-func (p *DeleteImportParams) Interactive() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.accountName, err = ctx.PickAccount(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	p.claim, err = s.ReadAccountClaim(p.accountName)
-	if err != nil {
-		return err
-	}
-
-	if len(p.claim.Imports) == 0 {
-		return fmt.Errorf("account %q doesn't have imports", p.accountName)
-	}
+func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
+	var err error
 
 	var choices []string
-	for _, c := range p.claim.Imports {
+	for _, c := range p.claim.Exports {
 		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
 	}
 	p.index, err = cli.PromptChoices("select import to delete", choices)
@@ -128,7 +118,7 @@ func (p *DeleteImportParams) Interactive() error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
+	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {
 		return err
 	}
@@ -142,65 +132,27 @@ func (p *DeleteImportParams) Interactive() error {
 	return nil
 }
 
-func (p *DeleteImportParams) Validate(cmd *cobra.Command) error {
-	s, err := GetStore()
-	if err != nil {
-		return err
+func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.index == -1 {
+		return fmt.Errorf("no matching import found")
 	}
-
-	if p.accountName == "" {
-		cmd.SilenceUsage = false
-		return errors.New("an account is required")
-	}
-
-	if p.claim == nil {
-		p.claim, err = s.ReadAccountClaim(p.accountName)
+	if p.operatorKP == nil {
+		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 		if err != nil {
 			return err
 		}
 	}
-
-	if !InteractiveFlag {
-		switch len(p.claim.Imports) {
-		case 0:
-			return fmt.Errorf("account %q doesn't have imports", p.accountName)
-		case 1:
-			p.index = 0
-		default:
-			for i, v := range p.claim.Imports {
-				if string(v.Subject) == p.subject {
-					p.index = i
-					break
-				}
-			}
-		}
-	}
-
-	if p.index == -1 {
-		return fmt.Errorf("no matching imports found")
-	}
-
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-
-	p.operatorKP, err = ctx.ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (p *DeleteImportParams) Run() error {
-	s, err := GetStore()
-	if err != nil {
-		return nil
-	}
-
+func (p *DeleteImportParams) Run(ctx ActionCtx) error {
 	p.deletedImport = p.claim.Imports[p.index]
 	p.claim.Imports = append(p.claim.Imports[:p.index], p.claim.Imports[p.index+1:]...)
 
 	token, err := p.claim.Encode(p.operatorKP)
-	return s.StoreClaim([]byte(token))
+	if err != nil {
+		return err
+	}
+	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

@@ -33,6 +33,9 @@ func createAddUserCmd() *cobra.Command {
 		Short:         "Add an user to the account",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		Example: `nsc add user -i
+nsc add user --name u --deny-pubsub "bar.>"
+nsc add user --name u --tag test,service_a`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: convert to Action
 func createAddServerCmd() *cobra.Command {
 	var params AddServerParams
 	cmd := &cobra.Command{
@@ -33,36 +32,23 @@ func createAddServerCmd() *cobra.Command {
 		Short:         "Add a server to a cluster (operator only)",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		Example: `nsc add server -i
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params.create = true
-			params.kind = nkeys.PrefixByteServer
-			params.editFn = params.editServerClaim
-
-			if InteractiveFlag {
-				if err := params.Interactive(); err != nil {
-					return err
-				}
-			}
-
-			if err := params.Validate(); err != nil {
-				return err
-			}
-
-			if err := params.Run(); err != nil {
+			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
 			if params.generated {
 				cmd.Printf("Generated server key - private key stored %q\n", params.keyPath)
-			} else {
-				cmd.Printf("Success! - added server %q\n", params.name)
 			}
 
-			return RunInterceptor(cmd)
+			cmd.Printf("Success! - added server %q\n", params.name)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "server name")
-	cmd.Flags().StringVarP(&params.clusterName, "cluster", "", "", "server name")
+	cmd.Flags().StringVarP(&params.clusterName, "cluster", "", "", "cluster name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the server")
 	params.TimeParams.BindFlags(cmd)
 
@@ -80,53 +66,66 @@ type AddServerParams struct {
 	clusterName string
 }
 
-func (p *AddServerParams) Interactive() error {
+func (p *AddServerParams) SetDefaults(ctx ActionCtx) error {
+	p.create = true
+	p.kind = nkeys.PrefixByteServer
+	p.editFn = p.editServerClaim
+	return nil
+}
+
+func (p *AddServerParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+
 	if err := p.Entity.Edit(); err != nil {
 		return err
 	}
 
-	s, err := GetStore()
+	p.clusterName, err = ctx.StoreCtx().PickCluster(p.clusterName)
 	if err != nil {
 		return err
 	}
 
-	ctx, err := s.GetContext()
+	if err = p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
+	p.clusterKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
 	if err != nil {
 		return err
 	}
 
-	p.clusterName, err = ctx.PickCluster(p.clusterName)
-	if err != nil {
-		return err
-	}
-
-	if err := p.TimeParams.Edit(); err != nil {
-		return err
+	if p.clusterKP == nil {
+		err = EditKeyPath(nkeys.PrefixByteAccount, "cluster keypath", &KeyPathFlag)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (p *AddServerParams) Validate() error {
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
-	if p.clusterName == "" {
-		p.clusterName = ctx.Cluster.Name
+func (p *AddServerParams) Load(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddServerParams) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *AddServerParams) Validate(ctx ActionCtx) error {
+	var err error
+	if p.name == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("server name is required")
 	}
 
 	if p.clusterName == "" {
-		// default cluster was not found by get context, so we either we have none or many
-		clusters, err := s.ListSubContainers(store.Clusters)
+		// default account was not found by get context, so we either we have none or many
+		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Clusters)
 		if err != nil {
 			return err
 		}
-		c := len(clusters)
+		c := len(accounts)
 		if c == 0 {
 			return errors.New("no clusters defined - add cluster first")
 		} else {
@@ -134,17 +133,8 @@ func (p *AddServerParams) Validate() error {
 		}
 	}
 
-	// allow downstream validation to have a surrogate account name
-	if ctx.Cluster.Name == "" {
-		ctx.Cluster.Name = p.clusterName
-	}
-
-	p.clusterKP, err = ctx.ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
+	p.clusterKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
 	if err != nil {
-		return fmt.Errorf("specify the cluster private key with --private-key to use for signing the server")
-	}
-
-	if err := p.Entity.Valid(); err != nil {
 		return err
 	}
 
@@ -152,10 +142,10 @@ func (p *AddServerParams) Validate() error {
 		return err
 	}
 
-	return nil
+	return p.Entity.Valid()
 }
 
-func (p *AddServerParams) Run() error {
+func (p *AddServerParams) Run(ctx ActionCtx) error {
 
 	if err := p.Entity.StoreKeys(p.clusterName); err != nil {
 		return err
