@@ -72,9 +72,9 @@ func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 	}
 
 	p.export.Subject = jwt.Subject(p.subject)
-	p.export.Type = jwt.StreamType
+	p.export.Type = jwt.Stream
 	if p.service {
-		p.export.Type = jwt.ServiceType
+		p.export.Type = jwt.Service
 	}
 
 	if p.export.Name == "" {
@@ -91,12 +91,17 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	choices := []string{jwt.StreamType, jwt.ServiceType}
+	choices := []string{jwt.Stream.String(), jwt.Service.String()}
 	i, err := cli.PromptChoices("export type", choices)
 	if err != nil {
 		return err
 	}
-	p.export.Type = choices[i]
+	if i == 0 {
+		p.export.Type = jwt.Stream
+	} else {
+		p.export.Type = jwt.Service
+	}
+
 	p.subject, err = cli.Prompt("subject", p.subject, true, func(s string) error {
 		p.export.Subject = jwt.Subject(s)
 		var vr jwt.ValidationResults
