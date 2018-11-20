@@ -102,7 +102,6 @@ to your users and services.`,
 func Execute() {
 	cli.SetOutput(rootCmd.OutOrStderr())
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }

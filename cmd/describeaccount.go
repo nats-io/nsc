@@ -32,10 +32,9 @@ import (
 func createDescribeAccountCmd() *cobra.Command {
 	var params DescribeAccountParams
 	cmd := &cobra.Command{
-		Use:           "account",
-		Short:         "Describes an account",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "account",
+		Short:        "Describes an account",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := params.Validate(cmd); err != nil {
 				return err

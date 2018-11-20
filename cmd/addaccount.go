@@ -27,15 +27,14 @@ import (
 func createAddAccountCmd() *cobra.Command {
 	var params AddAccountParams
 	cmd := &cobra.Command{
-		Use:           "account",
-		Short:         "Add an account",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "account",
+		Short:        "Add an account",
+		SilenceUsage: true,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-
 			if params.generated {
 				cmd.Printf("Generated account key - private key stored %q\n", params.keyPath)
 			}

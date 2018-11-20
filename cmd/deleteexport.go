@@ -28,10 +28,9 @@ import (
 func deleteExportCmd() *cobra.Command {
 	var params DeleteExportParams
 	cmd := &cobra.Command{
-		Use:           "export",
-		Short:         "Delete an export",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "export",
+		Short:        "Delete an export",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

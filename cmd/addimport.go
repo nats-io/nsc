@@ -38,8 +38,7 @@ func createImportCmd() *cobra.Command {
 		Example: `nsc add import -i
 nsc add import --token-file path --to import.>
 nsc add import --url https://some.service.com/path --to import.>`,
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

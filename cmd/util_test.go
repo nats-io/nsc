@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -25,13 +26,78 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {
-	p := MakeTempDir(t)
-	s, err := store.CreateStore(name, p, store.NamedKey{Name: name, KP: kp})
-	require.NoError(t, err)
-	require.NotNil(t, s)
-	return s
+type TestStore struct {
+	Dir      string
+	StartDir string
+
+	Store    *store.Store
+	KeyStore store.KeyStore
+
+	OperatorKey     nkeys.KeyPair
+	OperatorKeyPath string
+
+	AccountKey     nkeys.KeyPair
+	AccountKeyPath string
 }
+
+func NewTestStore(t *testing.T, name string) *TestStore {
+	var ts TestStore
+	var err error
+
+	// ngsStore is a global - so first test to get it initializes it
+	ngsStore = nil
+
+	_, _, ts.OperatorKey = CreateOperatorKey(t)
+	_, _, ts.AccountKey = CreateAccountKey(t)
+
+	ts.StartDir, err = os.Getwd()
+	require.NoError(t, err)
+	ts.Dir = MakeTempDir(t)
+
+	storeDir := filepath.Join(ts.Dir, "store")
+	err = os.Mkdir(storeDir, 0700)
+	require.NoError(t, err, "error creating %q", storeDir)
+
+	nkeysDir := filepath.Join(ts.Dir, "keys")
+	err = os.Mkdir(nkeysDir, 0700)
+	require.NoError(t, err, "error creating %q", nkeysDir)
+	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
+	require.NoError(t, err, "nkeys env")
+
+	ts.Store, err = store.CreateStore(name, storeDir, store.NamedKey{Name: "operator", KP: ts.OperatorKey})
+	ctx, err := ts.Store.GetContext()
+	require.NoError(t, err, "getting context")
+
+	ts.KeyStore = ctx.KeyStore
+	ts.OperatorKeyPath, err = ts.KeyStore.Store("operator", ts.OperatorKey, "")
+	require.NoError(t, err, "store operator key")
+	ts.AccountKeyPath, err = ts.KeyStore.Store(name, ts.AccountKey, "operator")
+	require.NoError(t, err, "store account key")
+
+	os.Chdir(ts.Store.Dir)
+
+	return &ts
+}
+
+func (ts *TestStore) Done(t *testing.T) {
+	if t.Failed() {
+		t.Log("test artifacts:", ts.Dir)
+	}
+	os.Chdir(ts.StartDir)
+}
+
+//func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {
+//	p := MakeTempDir(t)
+//	err := os.Setenv(store.NKeysPathEnv, filepath.Join(p, "nkeys"))
+//	require.NoError(t, err, "setting environment")
+//	kind, err := store.KeyType(kp)
+//	require.NoError(t, err, "getting key kind")
+//	keyName := fmt.Sprintf("%s_%s", name, store.KeyTypeLabel(kind))
+//	s, err := store.CreateStore(name, p, store.NamedKey{Name: keyName, KP: kp})
+//	require.NoError(t, err, "creating store")
+//	require.NotNil(t, s, "store not nil")
+//	return s
+//}
 
 func MakeTempDir(t *testing.T) string {
 	p, err := ioutil.TempDir("", "store_test")
@@ -56,8 +122,16 @@ func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) 
 	return CreateNkey(t, nkeys.CreateCluster)
 }
 
+func CreateServerKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateServer)
+}
+
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
 	return CreateNkey(t, nkeys.CreateAccount)
+}
+
+func CreateUserKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.CreateUser)
 }
 
 func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {

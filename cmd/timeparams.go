@@ -41,7 +41,7 @@ func (p *TimeParams) valid(value string, label string, oldOK bool) error {
 	if err != nil {
 		return fmt.Errorf("%s %q is invalid: %v", label, value, err)
 	}
-	if when != 0 && now > when {
+	if !oldOK && when != 0 && now > when {
 		return fmt.Errorf("%s %q is in the past (%s)", label, value, HumanizedDate(when))
 	}
 	return nil

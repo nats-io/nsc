@@ -33,8 +33,7 @@ func createExportCmd() *cobra.Command {
 nsc add export --subject "a.b.c.>"
 nsc add export --service --subject a.b
 ncc add export --name myexport --subject a.b --service`,
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

@@ -372,7 +372,7 @@ func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
 }
 
 func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims, error) {
-	if s.Has(Clusters, name, JwtName(name)) {
+	if s.Has(Accounts, accountName, Users, JwtName(name)) {
 		d, err := s.Read(Accounts, accountName, Users, JwtName(name))
 		if err != nil {
 			return nil, err
@@ -402,7 +402,7 @@ func (s *Store) ReadClusterClaim(name string) (*jwt.ClusterClaims, error) {
 }
 
 func (s *Store) ReadServerClaim(clusterName string, name string) (*jwt.ServerClaims, error) {
-	if s.Has(Clusters, name, JwtName(name)) {
+	if s.Has(Clusters, clusterName, Servers, JwtName(name)) {
 		d, err := s.Read(Clusters, clusterName, Servers, JwtName(name))
 		if err != nil {
 			return nil, err

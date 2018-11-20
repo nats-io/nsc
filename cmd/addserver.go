@@ -28,10 +28,9 @@ import (
 func createAddServerCmd() *cobra.Command {
 	var params AddServerParams
 	cmd := &cobra.Command{
-		Use:           "server",
-		Short:         "Add a server to a cluster (operator only)",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "server",
+		Short:        "Add a server to a cluster (operator only)",
+		SilenceUsage: true,
 		Example: `nsc add server -i
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,6 +69,11 @@ func (p *AddServerParams) SetDefaults(ctx ActionCtx) error {
 	p.create = true
 	p.kind = nkeys.PrefixByteServer
 	p.editFn = p.editServerClaim
+
+	if p.clusterName == "" {
+		p.clusterName = ctx.StoreCtx().Cluster.Name
+	}
+
 	return nil
 }
 

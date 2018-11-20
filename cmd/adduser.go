@@ -29,10 +29,9 @@ import (
 func createAddUserCmd() *cobra.Command {
 	var params AddUserParams
 	cmd := &cobra.Command{
-		Use:           "user",
-		Short:         "Add an user to the account",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "user",
+		Short:        "Add an user to the account",
+		SilenceUsage: true,
 		Example: `nsc add user -i
 nsc add user --name u --deny-pubsub "bar.>"
 nsc add user --name u --tag test,service_a`,
@@ -94,6 +93,11 @@ func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
 	p.create = true
 	p.kind = nkeys.PrefixByteUser
 	p.editFn = p.editUserClaim
+
+	if p.accountName == "" {
+		p.accountName = ctx.StoreCtx().Account.Name
+	}
+
 	return nil
 }
 

@@ -28,10 +28,9 @@ import (
 func createGenerateExport() *cobra.Command {
 	var params GenerateActivationParams
 	cmd := &cobra.Command{
-		Use:           "activation",
-		Short:         "Generate an export activation jwt token",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "activation",
+		Short:        "Generate an export activation jwt token",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

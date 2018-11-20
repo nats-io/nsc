@@ -27,10 +27,9 @@ import (
 func createAddClusterCmd() *cobra.Command {
 	var params AddClusterParams
 	cmd := &cobra.Command{
-		Use:           "cluster",
-		Short:         "Add a cluster (operator only)",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "cluster",
+		Short:        "Add a cluster (operator only)",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

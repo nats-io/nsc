@@ -27,10 +27,9 @@ import (
 func createEditAccount() *cobra.Command {
 	var params EditAccountParams
 	cmd := &cobra.Command{
-		Use:           "account",
-		Short:         "Edit an account",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:          "account",
+		Short:        "Edit an account",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

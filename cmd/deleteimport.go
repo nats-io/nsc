@@ -32,8 +32,7 @@ func deleteImportCmd() *cobra.Command {
 		Short: "Delete an import",
 		Example: `nsc delete import -i
 nsc delete import -s "bar.>"`,
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
