@@ -47,7 +47,7 @@ func createDescribeAccountCmd() *cobra.Command {
 			if !IsStdOut(params.outputFile) {
 				cmd.Printf("Success! - wrote account description to %q\n", params.outputFile)
 			}
-			return RunInterceptor(cmd)
+			return RunInterceptor(nil)
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")

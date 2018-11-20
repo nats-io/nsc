@@ -101,7 +101,7 @@ func RunAction(cmd *cobra.Command, args []string, action interface{}) error {
 		return err
 	}
 
-	return RunInterceptor(cmd)
+	return RunInterceptor(ctx)
 
 }
 

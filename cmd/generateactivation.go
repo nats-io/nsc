@@ -54,7 +54,7 @@ func createGenerateExport() *cobra.Command {
 					HumanizedDate(params.activation.Expires))
 			}
 
-			return RunInterceptor(cmd)
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")

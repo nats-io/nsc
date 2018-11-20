@@ -44,7 +44,7 @@ var interceptorFn InterceptorFn
 // show some other hidden commands if the env is set
 var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
-type InterceptorFn func(cmd *cobra.Command) error
+type InterceptorFn func(ctx ActionCtx) error
 
 func GetStore() (*store.Store, error) {
 	if ngsStore == nil {
@@ -75,9 +75,9 @@ func SetInterceptor(fn InterceptorFn) {
 	interceptorFn = fn
 }
 
-func RunInterceptor(cmd *cobra.Command) error {
+func RunInterceptor(ctx ActionCtx) error {
 	if interceptorFn != nil {
-		return interceptorFn(cmd)
+		return interceptorFn(ctx)
 	}
 	return nil
 }
