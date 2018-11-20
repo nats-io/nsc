@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"github.com/nats-io/nsc/cli"
 
@@ -50,8 +51,7 @@ nsc add import --url https://some.service.com/path --to import.>`,
 	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.im.Name, "name", "n", "", "import name")
 	cmd.Flags().StringVarP(&params.to, "to", "t", "", "target subject")
-	cmd.Flags().StringVarP(&params.tokenFile, "token-file", "f", "", "token file")
-	cmd.Flags().StringVarP(&params.tokenUrl, "token-url", "u", "", "token url")
+	cmd.Flags().StringVarP(&params.src, "token", "u", "", "path to token file can be a local path or an url")
 
 	return cmd
 }
@@ -68,8 +68,7 @@ type AddImportParams struct {
 	operatorKP  nkeys.KeyPair
 	to          string
 	token       []byte
-	tokenFile   string
-	tokenUrl    string
+	src         string
 }
 
 func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
@@ -90,63 +89,43 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	choices := []string{"file", "url"}
-	i, err := cli.PromptChoices("import from", choices)
-	switch choices[i] {
-	case "file":
-		p.tokenFile, err = cli.Prompt("enter the path to the file", p.tokenFile, true, func(s string) error {
-			p.tokenFile = s
-			p.token, err = p.LoadImport()
-			if err != nil {
-				return err
-			}
-			return nil
-		})
+	p.src, err = cli.Prompt("token path or url", p.src, true, func(s string) error {
+		p.src = s
+		p.token, err = p.LoadImport()
 		if err != nil {
 			return err
 		}
-	case "url":
-		p.tokenUrl, err = cli.Prompt("enter the url to the token", p.tokenUrl, true, func(s string) error {
-			p.im.TokenURL = s
-			p.token, err = p.LoadImport()
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (p *AddImportParams) LoadImport() ([]byte, error) {
-	var err error
-	var data []byte
-	if p.tokenFile != "" {
-		data, err = ioutil.ReadFile(p.tokenFile)
+	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {
+		r, err := http.Get(p.src)
 		if err != nil {
-			return nil, fmt.Errorf("error loading %q: %v", p.tokenFile, err)
-		}
-		v := ExtractToken(string(data))
-		return []byte(v), nil
-	} else if p.tokenUrl != "" {
-		r, err := http.Get(p.tokenUrl)
-		if err != nil {
-			return nil, fmt.Errorf("error loading %q: %v", p.im.TokenURL, err)
+			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
 		}
 		defer r.Body.Close()
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, r.Body)
 		if err != nil {
-			return nil, fmt.Errorf("error reading response from %q: %v", p.im.TokenURL, err)
+			return nil, fmt.Errorf("error reading response from %q: %v", p.src, err)
 		}
-		data = buf.Bytes()
+		data := buf.Bytes()
 		return data, nil
+	} else {
+		data, err := ioutil.ReadFile(p.src)
+		if err != nil {
+			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
+		}
+		v := ExtractToken(string(data))
+		return []byte(v), nil
 	}
-	return nil, nil
 }
 
 func (p *AddImportParams) Load(ctx ActionCtx) error {
@@ -157,9 +136,9 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		return errors.New("an account is required")
 	}
 
-	if p.tokenUrl == "" && p.tokenFile == "" {
+	if p.src == "" {
 		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("specify --token-url or --token-file ")
+		return errors.New("--token is required")
 	}
 
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
@@ -188,11 +167,7 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 	}
 
 	if len(p.activation.Exports) == 0 {
-		src := p.tokenFile
-		if p.tokenFile == "" {
-			src = p.tokenUrl
-		}
-		return fmt.Errorf("activation %q doesn't have any exports", src)
+		return fmt.Errorf("activation %q doesn't have any exports", p.src)
 	}
 
 	// FIXME: validation issues on the loaded activation - jwt needs to return some sort of error we can render
@@ -262,7 +237,9 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	p.im.Type = export.Type
 	p.im.Account = p.activation.Issuer
 	p.im.To = jwt.Subject(p.to)
-	if p.tokenFile != "" {
+	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {
+		p.im.Token = p.src
+	} else {
 		p.im.Token = string(p.token)
 	}
 
