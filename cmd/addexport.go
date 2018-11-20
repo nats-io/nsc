@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -24,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createExportCmd() *cobra.Command {
+func createAddExportCmd() *cobra.Command {
 	var params AddExportParams
 	cmd := &cobra.Command{
 		Use:   "export",
@@ -38,8 +39,11 @@ ncc add export --name myexport --subject a.b --service`,
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-
-			cmd.Printf("Success! - added %s export %q\n", params.export.Type, params.export.Name)
+			visibility := "public"
+			if params.export.TokenReq {
+				visibility = "private"
+			}
+			cmd.Printf("Success! - added %s %s export %q\n", visibility, params.export.Type, params.export.Name)
 			return nil
 		},
 	}
@@ -47,12 +51,13 @@ ncc add export --name myexport --subject a.b --service`,
 	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
+	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 
 	return cmd
 }
 
 func init() {
-	addCmd.AddCommand(createExportCmd())
+	addCmd.AddCommand(createAddExportCmd())
 }
 
 type AddExportParams struct {
@@ -63,6 +68,7 @@ type AddExportParams struct {
 	service     bool
 	stream      bool
 	subject     string
+	private     bool
 }
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
@@ -70,6 +76,7 @@ func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 		p.accountName = ctx.StoreCtx().Account.Name
 	}
 
+	p.export.TokenReq = p.private
 	p.export.Subject = jwt.Subject(p.subject)
 	p.export.Type = jwt.Stream
 	if p.service {
@@ -115,6 +122,8 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		p.export.Name = p.subject
 	}
 	p.export.Name, err = cli.Prompt("export name", p.export.Name, true, cli.LengthValidator(1))
+
+	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
 
 	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
 	if err != nil {

@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/nsc/cli"
+
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -80,10 +82,11 @@ func NewTestStore(t *testing.T, name string) *TestStore {
 }
 
 func (ts *TestStore) Done(t *testing.T) {
+	cli.ResetPromptLib()
+	os.Chdir(ts.StartDir)
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
 	}
-	os.Chdir(ts.StartDir)
 }
 
 //func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {

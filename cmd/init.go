@@ -225,7 +225,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		return err
 	}
 
-	p.cluster.create, err = cli.PromptNY(fmt.Sprintf("create a %s", store.KeyTypeLabel(nkeys.PrefixByteCluster)))
+	p.cluster.create, err = cli.PromptBoolean(fmt.Sprintf("create a %s", store.KeyTypeLabel(nkeys.PrefixByteCluster)), false)
 	if err != nil {
 		return err
 	}

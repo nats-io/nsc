@@ -113,9 +113,11 @@ func ExecuteInteractiveCmd(root *cobra.Command, inputs []interface{}, args ...st
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
+	InteractiveFlag = true
 	cli.SetPromptLib(cli.NewTestPrompts(inputs))
 	_, err = root.ExecuteC()
 	cli.ResetPromptLib()
+	InteractiveFlag = false
 
 	w.Close()
 	os.Stdout = old

@@ -58,8 +58,8 @@ func PromptYN(m string) (bool, error) {
 	return cli.PromptYN(m, true)
 }
 
-func PromptNY(m string) (bool, error) {
-	return cli.PromptYN(m, false)
+func PromptBoolean(m string, defaultValue bool) (bool, error) {
+	return cli.PromptYN(m, defaultValue)
 }
 
 func PromptSecret(m string) (string, error) {
