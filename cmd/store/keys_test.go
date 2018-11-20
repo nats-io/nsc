@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/nkeys"
-
 	"github.com/stretchr/testify/require"
 )
 

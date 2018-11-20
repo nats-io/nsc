@@ -27,11 +27,11 @@ import (
 	"github.com/xlab/tablewriter"
 )
 
-func createInitCmd() *cobra.Command {
+func CreateInitCmd() *cobra.Command {
 	var p InitParams
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "init a configuration directory",
+		Short: "Init a configuration directory",
 		Example: `init --name project
 init --interactive
 `,
@@ -118,7 +118,7 @@ init --interactive
 }
 
 func init() {
-	rootCmd.AddCommand(createInitCmd())
+	rootCmd.AddCommand(CreateInitCmd())
 }
 
 type InitParams struct {

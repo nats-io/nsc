@@ -60,6 +60,11 @@ func GetStore() (*store.Store, error) {
 	return ngsStore, nil
 }
 
+// ResetStore to nil for tests
+func ResetStore() {
+	ngsStore = nil
+}
+
 func ResolveKeyFlag() (nkeys.KeyPair, error) {
 	if KeyPathFlag != "" {
 		kp, err := store.ResolveKey(KeyPathFlag)

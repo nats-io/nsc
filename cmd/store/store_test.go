@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt"
-
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )

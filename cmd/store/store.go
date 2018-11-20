@@ -25,10 +25,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nats-io/nsc/cli"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 )
 
 const Version = "1"
