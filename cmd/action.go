@@ -29,6 +29,8 @@ type ActionCtx interface {
 	NothingToDo(flagNames ...string) bool
 }
 
+type ActionFn func(ctx ActionCtx) error
+
 type Action interface {
 	// SetDefaults that can be derived from cmd flags
 	SetDefaults(ctx ActionCtx) error
