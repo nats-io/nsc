@@ -19,8 +19,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
 )
@@ -56,11 +57,12 @@ type DeleteImportParams struct {
 	claim         *jwt.AccountClaims
 	deletedImport *jwt.Import
 	index         int
-	operatorKP    nkeys.KeyPair
-	subject       string
+	SignerParams
+	subject string
 }
 
 func (p *DeleteImportParams) SetDefaults(ctx ActionCtx) error {
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	p.index = -1
 	if p.accountName == "" {
 		p.accountName = ctx.StoreCtx().Account.Name
@@ -117,15 +119,8 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -136,11 +131,8 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 	if p.index == -1 {
 		return fmt.Errorf("no matching import found")
 	}
-	if p.operatorKP == nil {
-		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-		if err != nil {
-			return err
-		}
+	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
 	}
 	return nil
 }
@@ -149,7 +141,7 @@ func (p *DeleteImportParams) Run(ctx ActionCtx) error {
 	p.deletedImport = p.claim.Imports[p.index]
 	p.claim.Imports = append(p.claim.Imports[:p.index], p.claim.Imports[p.index+1:]...)
 
-	token, err := p.claim.Encode(p.operatorKP)
+	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}

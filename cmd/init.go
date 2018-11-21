@@ -274,9 +274,15 @@ func (p *InitParams) PrintSummary(cmd *cobra.Command) {
 	table.UTF8Box()
 	table.AddTitle("Project Options")
 	table.AddHeaders("Entity", "Name", "NKey")
-	table.AddRow("Operator", p.operator.name, p.operator.KeySource())
-	table.AddRow("Account", p.account.name, p.account.KeySource())
-	table.AddRow("User", p.user.name, p.user.KeySource())
+	if p.operator.create {
+		table.AddRow("Operator", p.operator.name, p.operator.KeySource())
+	}
+	if p.account.create {
+		table.AddRow("Account", p.account.name, p.account.KeySource())
+	}
+	if p.user.create {
+		table.AddRow("User", p.user.name, p.user.KeySource())
+	}
 	if p.cluster.create {
 		table.AddRow("Cluster", p.cluster.name, p.cluster.KeySource())
 	} else {
@@ -300,7 +306,11 @@ func (p *InitParams) Validate() error {
 }
 
 func (p *InitParams) Run() error {
-	_, err := store.CreateStore(p.environmentName, p.projectRoot, store.NamedKey{Name: p.operator.name, KP: p.operator.kp})
+	var operator *store.NamedKey
+	if p.operator.create {
+		operator = &store.NamedKey{Name: p.operator.name, KP: p.operator.kp}
+	}
+	_, err := store.CreateStore(p.environmentName, p.projectRoot, operator)
 	if err != nil {
 		return err
 	}
@@ -311,6 +321,9 @@ func (p *InitParams) Run() error {
 
 	containers := p.Containers()
 	for _, e := range containers {
+		if !e.create {
+			continue
+		}
 		var parent string
 		switch e.kind {
 		case nkeys.PrefixByteUser:
@@ -325,8 +338,8 @@ func (p *InitParams) Run() error {
 	}
 
 	for i, c := range containers {
-		if i == 0 {
-			// operator container is created by the store
+		// operator container is created by the store - some flags may prevent creation
+		if !c.create || i == 0 {
 			continue
 		}
 		c.GenerateClaim(containers[i-1].kp)

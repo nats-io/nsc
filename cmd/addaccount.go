@@ -55,15 +55,16 @@ func init() {
 }
 
 type AddAccountParams struct {
-	TimeParams
 	Entity
-	operatorKP nkeys.KeyPair
+	SignerParams
+	TimeParams
 }
 
 func (p *AddAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.create = true
-	p.kind = nkeys.PrefixByteAccount
+	p.Entity.kind = nkeys.PrefixByteAccount
 	p.editFn = p.editAccount
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
 
@@ -77,16 +78,10 @@ func (p *AddAccountParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
-	}
+
 	return nil
 }
 
@@ -109,12 +104,10 @@ func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.operatorKP == nil {
-		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-		if err != nil {
-			return err
-		}
+	if err := p.Resolve(ctx); err != nil {
+		return err
 	}
+
 	return p.Valid()
 }
 
@@ -122,7 +115,7 @@ func (p *AddAccountParams) Run(ctx ActionCtx) error {
 	if err := p.Entity.StoreKeys(ctx.StoreCtx().Store.GetName()); err != nil {
 		return err
 	}
-	if err := p.Entity.GenerateClaim(p.operatorKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
 		return err
 	}
 	return nil

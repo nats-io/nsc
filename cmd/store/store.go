@@ -48,10 +48,19 @@ type Store struct {
 }
 
 type Info struct {
+	Managed         bool   `json:"managed"`
 	EntityName      string `json:"name"`
 	EnvironmentName string `json:"env"`
 	Kind            string `json:"kind"`
 	Version         string `json:"version"`
+}
+
+func (i *Info) String() string {
+	d, err := json.Marshal(i)
+	if err != nil {
+		return fmt.Sprintf("error serializing store type: %v", err)
+	}
+	return string(d)
 }
 
 func SafeName(n string) string {
@@ -61,16 +70,20 @@ func SafeName(n string) string {
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
+func CreateStore(env string, dir string, root *NamedKey) (*Store, error) {
 	var err error
 
 	s := &Store{
 		Dir: dir,
 		Info: Info{
 			EnvironmentName: env,
-			EntityName:      root.Name,
 			Version:         Version,
 		},
+	}
+	if root != nil {
+		s.Info.EntityName = root.Name
+	} else {
+		s.Info.Managed = true
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -88,19 +101,15 @@ func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
 		return nil, fmt.Errorf("%q is not empty, only an empty folder can be used for a new project", dir)
 	}
 
-	pub, err := root.KP.PublicKey()
-	if err != nil {
-		return nil, fmt.Errorf("error reading public key: %v", err)
-	}
+	if !s.Info.Managed {
+		token, err := s.createOperatorToken(root)
+		if err != nil {
+			return nil, err
+		}
 
-	var v = jwt.NewGenericClaims(string(pub))
-	v.Name = root.Name
-
-	if nkeys.IsValidPublicOperatorKey(pub) {
-		s.Info.Kind = jwt.OperatorClaim
-		v.Type = jwt.OperatorClaim
-	} else {
-		return nil, fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
+		if err := s.StoreClaim([]byte(token)); err != nil {
+			return nil, fmt.Errorf("error writing operator jwt: %v", err)
+		}
 	}
 
 	d, err := json.Marshal(s.Info)
@@ -109,15 +118,6 @@ func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
 	}
 	if err := s.Write(d, NSCFile); err != nil {
 		return nil, fmt.Errorf("error writing .nsc in %q: %v", s.Dir, err)
-	}
-
-	token, err := v.Encode(root.KP)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.StoreClaim([]byte(token)); err != nil {
-		return nil, fmt.Errorf("error writing operator jwt: %v", err)
 	}
 
 	for _, d := range standardDirs {
@@ -130,12 +130,28 @@ func CreateStore(env string, dir string, root NamedKey) (*Store, error) {
 	return s, nil
 }
 
-func (t *Info) String() string {
-	d, err := json.Marshal(t)
+func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
+	pub, err := operator.KP.PublicKey()
 	if err != nil {
-		return fmt.Sprintf("error serializing store type: %v", err)
+		return "", fmt.Errorf("error reading public key: %v", err)
 	}
-	return string(d)
+
+	var v = jwt.NewGenericClaims(string(pub))
+	v.Name = operator.Name
+
+	if nkeys.IsValidPublicOperatorKey(pub) {
+		s.Info.Kind = jwt.OperatorClaim
+		v.Type = jwt.OperatorClaim
+	} else {
+		return "", fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
+	}
+
+	token, err := v.Encode(operator.KP)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 // LoadStore loads a store from the specified directory path.
@@ -151,6 +167,10 @@ func LoadStore(dir string) (*Store, error) {
 	}
 
 	return s, nil
+}
+
+func (s *Store) IsManaged() bool {
+	return s.Info.Managed
 }
 
 func (s *Store) resolve(name ...string) string {
@@ -519,8 +539,11 @@ func (s *Store) GetContext() (*Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading root: %v", err)
 	}
-	if err = c.SetContext(root.Name, root.Subject); err != nil {
-		return nil, err
+
+	if root != nil {
+		if err = c.SetContext(root.Name, root.Subject); err != nil {
+			return nil, err
+		}
 	}
 	// try to set a default account
 	ac, err := s.LoadDefaultEntity(Accounts)
@@ -550,9 +573,9 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 	if kp == nil {
 		switch kind {
 		case nkeys.PrefixByteAccount:
-			kp, err = ctx.KeyStore.GetAccountKey(ctx.Operator.Name, ctx.Account.Name)
+			kp, err = ctx.KeyStore.GetAccountKey(ctx.Account.Name)
 		case nkeys.PrefixByteCluster:
-			kp, err = ctx.KeyStore.GetClusterKey(ctx.Operator.Name, ctx.Cluster.Name)
+			kp, err = ctx.KeyStore.GetClusterKey(ctx.Cluster.Name)
 		case nkeys.PrefixByteOperator:
 			kp, err = ctx.KeyStore.GetOperatorKey(ctx.Operator.Name)
 		default:

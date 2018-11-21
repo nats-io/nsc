@@ -108,31 +108,26 @@ func (k *KeyStore) keypath(name string, kp nkeys.KeyPair, parent string) (string
 }
 
 func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, k.keyName(name)))
+	return k.Read(filepath.Join(GetKeysDir(), k.Env, k.keyName(name)))
 }
 
-func (k *KeyStore) GetAccountKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)))
+func (k *KeyStore) GetAccountKey(name string) (nkeys.KeyPair, error) {
+	return k.Read(filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)))
 }
 
-func (k *KeyStore) GetUserKey(operator string, account string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.keyName(name)))
+func (k *KeyStore) GetUserKey(account string, name string) (nkeys.KeyPair, error) {
+	return k.Read(filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.keyName(name)))
 }
 
-func (k *KeyStore) GetClusterKey(operator string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
+func (k *KeyStore) GetClusterKey(name string) (nkeys.KeyPair, error) {
+	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
 }
 
-func (k *KeyStore) GetServerKey(operator string, cluster string, name string) (nkeys.KeyPair, error) {
-	return ResolveKey(filepath.Join(GetKeysDir(), k.Env, Clusters, cluster, Servers, k.keyName(name)))
+func (k *KeyStore) GetServerKey(cluster string, name string) (nkeys.KeyPair, error) {
+	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, cluster, Servers, k.keyName(name)))
 }
 
-func (k *KeyStore) Store(keyname string, kp nkeys.KeyPair, parent string) (string, error) {
-	fp, err := k.keypath(keyname, kp, parent)
-	if err != nil {
-		return "", err
-	}
-
+func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, error) {
 	seed, err := kp.Seed()
 	if err != nil {
 		return "", fmt.Errorf("error reading seed from nkey: %v", err)
@@ -163,9 +158,28 @@ func (k *KeyStore) Store(keyname string, kp nkeys.KeyPair, parent string) (strin
 		return "", fmt.Errorf("error reading %q: %v", fp, err)
 	}
 	if string(d) != string(seed) {
-		return "", fmt.Errorf("key %q already exists and is different", keyname)
+		return "", fmt.Errorf("key %q already exists and is different", name)
 	}
 	return "", nil
+}
+
+func (k *KeyStore) Store(keyname string, kp nkeys.KeyPair, parent string) (string, error) {
+	fp, err := k.keypath(keyname, kp, parent)
+	if err != nil {
+		return "", err
+	}
+	return k.store(keyname, fp, kp)
+}
+
+func (k *KeyStore) Read(path string) (nkeys.KeyPair, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	return keyFromFile(path)
 }
 
 func Match(pubkey string, kp nkeys.KeyPair) bool {

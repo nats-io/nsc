@@ -71,7 +71,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 }
 
 func validateAddAccountClaims(t *testing.T, ts *TestStore) {
-	kp, err := ts.KeyStore.GetAccountKey("operator", "A")
+	kp, err := ts.KeyStore.GetAccountKey("A")
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -84,6 +84,10 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	okp, err := ts.KeyStore.GetOperatorKey("operator")
 	require.NoError(t, err)
 
+	if okp == nil {
+		okp = kp
+	}
+
 	oppub, err := okp.PublicKey()
 	require.NoError(t, err, "getting public key for operator")
 	require.Equal(t, ac.Issuer, string(oppub), "operator signed it")
@@ -95,4 +99,13 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	expire, err := ParseExpiry("2050-01-01")
 	require.NoError(t, err)
 	require.Equal(t, expire, ac.Expires)
+}
+
+func Test_AddAccountOperatorLessStore(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+	validateAddAccountClaims(t, ts)
 }

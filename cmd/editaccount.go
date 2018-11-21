@@ -63,14 +63,16 @@ func init() {
 }
 
 type EditAccountParams struct {
-	TimeParams
-	claim       *jwt.AccountClaims
 	accountName string
-	operatorKP  nkeys.KeyPair
-	token       string
+	claim       *jwt.AccountClaims
+	SignerParams
+	TimeParams
+	token string
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry") {
 		return fmt.Errorf("specify an edit option")
 	}
@@ -110,15 +112,8 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -128,12 +123,8 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	if err = p.TimeParams.Validate(); err != nil {
 		return err
 	}
-
-	if p.operatorKP == nil {
-		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-		if err != nil {
-			return err
-		}
+	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
 	}
 	return nil
 }
@@ -148,7 +139,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 		p.claim.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	p.token, err = p.claim.Encode(p.operatorKP)
+	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}

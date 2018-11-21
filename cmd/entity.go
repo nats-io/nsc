@@ -138,6 +138,11 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair) error {
 	if !c.create {
 		return nil
 	}
+	// self-sign if we don't have a parent keypair
+	if signer == nil {
+		signer = c.kp
+	}
+
 	pk, err := c.kp.PublicKey()
 	if err != nil {
 		return err

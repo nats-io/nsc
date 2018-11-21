@@ -19,8 +19,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
 )
@@ -64,14 +65,16 @@ type AddExportParams struct {
 	accountName string
 	claim       *jwt.AccountClaims
 	export      jwt.Export
-	operatorKP  nkeys.KeyPair
-	service     bool
-	stream      bool
-	subject     string
 	private     bool
+	service     bool
+	SignerParams
+	stream  bool
+	subject string
 }
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+
 	if p.accountName == "" {
 		p.accountName = ctx.StoreCtx().Account.Name
 	}
@@ -125,15 +128,8 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 
 	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -198,17 +194,15 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 		return errors.New(uvr.Issues[0].Error())
 	}
 
-	if p.operatorKP == nil {
-		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-		if err != nil {
-			return err
-		}
+	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
 	}
+
 	return nil
 }
 
 func (p *AddExportParams) Run(ctx ActionCtx) error {
-	token, err := p.claim.Encode(p.operatorKP)
+	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}
