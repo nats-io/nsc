@@ -245,14 +245,16 @@ func (p *DescribeAccountParams) Run() error {
 		et.AddTitle("Imported Services")
 		et.AddHeaders("Name", "Subject", "To", "Expires", "Target Account")
 		for _, e := range p.Imports {
+			expires := ""
 			if e.IsService() {
 				if e.Token != "" {
 					ic, err := jwt.DecodeActivationClaims(e.Token)
 					if err != nil {
 						return err
 					}
-					et.AddRow(e.Name, e.Subject, e.To, UnixToDate(ic.Expires), ic.Issuer)
+					expires = UnixToDate(ic.Expires)
 				}
+				et.AddRow(e.Name, e.Subject, e.To, expires, e.Account)
 			}
 		}
 		buf.WriteString(et.Render())
@@ -270,11 +272,15 @@ func (p *DescribeAccountParams) Run() error {
 		et.AddHeaders("Name", "Subject", "To", "Expires", "Source Account")
 		for _, e := range p.Imports {
 			if e.IsStream() {
-				ic, err := jwt.DecodeActivationClaims(e.Token)
-				if err != nil {
-					return err
+				expires := ""
+				if e.Token != "" {
+					ic, err := jwt.DecodeActivationClaims(e.Token)
+					if err != nil {
+						return err
+					}
+					expires = UnixToDate(ic.Expires)
 				}
-				et.AddRow(e.Name, e.Subject, e.To, UnixToDate(ic.Expires), ic.Issuer)
+				et.AddRow(e.Name, e.Subject, e.To, expires, e.Account)
 			}
 		}
 		buf.WriteString(et.Render())
