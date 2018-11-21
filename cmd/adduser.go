@@ -22,7 +22,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -43,13 +42,11 @@ nsc add user --name u --tag test,service_a`,
 			if params.generated {
 				cmd.Printf("Generated user key - private key stored %q\n", params.keyPath)
 			}
-			cmd.Printf("Success! - added user %q to %q\n", params.name, params.accountName)
+			cmd.Printf("Success! - added user %q to %q\n", params.name, params.AccountContextParams.Name)
 
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 
 	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "publish permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.allowPubsub, "allow-pubsub", "", nil, "publish and subscribe permissions - comma separated list or option can be specified multiple times")
@@ -66,6 +63,7 @@ nsc add user --name u --tag test,service_a`,
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
 
 	params.TimeParams.BindFlags(cmd)
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -75,7 +73,7 @@ func init() {
 }
 
 type AddUserParams struct {
-	accountName string
+	AccountContextParams
 	allowPubs   []string
 	allowPubsub []string
 	allowSubs   []string
@@ -90,14 +88,12 @@ type AddUserParams struct {
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.SetDefaults(ctx)
+
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 	p.create = true
 	p.Entity.kind = nkeys.PrefixByteUser
 	p.editFn = p.editUserClaim
-
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
-	}
 
 	return nil
 }
@@ -108,8 +104,7 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
@@ -139,18 +134,8 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("user name is required")
 	}
 
-	if p.accountName == "" {
-		// default account was not found by get context, so we either we have none or many
-		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
-		if err != nil {
-			return err
-		}
-		c := len(accounts)
-		if c == 0 {
-			return errors.New("no accounts defined - add account first")
-		} else {
-			return errors.New("multiple accounts found - specify --account-name or navigate to an account directory")
-		}
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {
@@ -165,7 +150,7 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *AddUserParams) Run(ctx ActionCtx) error {
-	if err := p.Entity.StoreKeys(p.accountName); err != nil {
+	if err := p.Entity.StoreKeys(p.AccountContextParams.Name); err != nil {
 		return err
 	}
 

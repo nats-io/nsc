@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/nats-io/jwt"
@@ -39,8 +38,8 @@ func deleteExportCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account storing the export")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -50,7 +49,7 @@ func init() {
 }
 
 type DeleteExportParams struct {
-	accountName   string
+	AccountContextParams
 	claim         *jwt.AccountClaims
 	deletedExport *jwt.Export
 	index         int
@@ -59,18 +58,15 @@ type DeleteExportParams struct {
 }
 
 func (p *DeleteExportParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	p.index = -1
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
-	}
 	return nil
 }
 
 func (p *DeleteExportParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -79,19 +75,18 @@ func (p *DeleteExportParams) PreInteractive(ctx ActionCtx) error {
 func (p *DeleteExportParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("an account is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
 
 	switch len(p.claim.Exports) {
 	case 0:
-		return fmt.Errorf("account %q doesn't have exports", p.accountName)
+		return fmt.Errorf("account %q doesn't have exports", p.AccountContextParams.Name)
 	default:
 		for i, e := range p.claim.Exports {
 			if string(e.Subject) == p.subject {

@@ -47,11 +47,11 @@ ncc add export --name myexport --subject a.b --service`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -61,22 +61,20 @@ func init() {
 }
 
 type AddExportParams struct {
-	accountName string
-	claim       *jwt.AccountClaims
-	export      jwt.Export
-	private     bool
-	service     bool
+	AccountContextParams
+	claim   *jwt.AccountClaims
+	export  jwt.Export
+	private bool
+	service bool
 	SignerParams
 	stream  bool
 	subject string
 }
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
-	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+	p.AccountContextParams.SetDefaults(ctx)
 
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
-	}
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	p.export.TokenReq = p.private
 	p.export.Subject = jwt.Subject(p.subject)
@@ -94,8 +92,8 @@ func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
@@ -137,12 +135,11 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 func (p *AddExportParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("an account is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}

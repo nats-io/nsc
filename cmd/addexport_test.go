@@ -108,7 +108,7 @@ func Test_AddExportOperatorLessStore(t *testing.T) {
 	require.Equal(t, "aaaa", string(ac.Exports[0].Subject))
 }
 
-func Test_AddAccountNameRequired(t *testing.T) {
+func Test_AddExportAccountNameRequired(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 

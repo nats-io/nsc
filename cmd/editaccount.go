@@ -34,7 +34,7 @@ func createEditAccount() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - edited account %q\n", params.accountName)
+			cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
 
 			Write("--", FormatJwt("Account", params.token))
 
@@ -52,8 +52,8 @@ func createEditAccount() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "name", "n", "", "account name")
-	params.BindFlags(cmd)
+	params.AccountContextParams.BindFlags(cmd)
+	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -63,29 +63,26 @@ func init() {
 }
 
 type EditAccountParams struct {
-	accountName string
-	claim       *jwt.AccountClaims
+	AccountContextParams
+	claim *jwt.AccountClaims
 	SignerParams
 	TimeParams
 	token string
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry") {
 		return fmt.Errorf("specify an edit option")
-	}
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
 	}
 	return nil
 }
 
 func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -94,12 +91,11 @@ func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
 func (p *EditAccountParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("account name is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}

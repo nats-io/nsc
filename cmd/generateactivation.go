@@ -57,11 +57,11 @@ func createGenerateActivation() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
 	params.targetKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, false, cmd)
 	params.timeParams.BindFlags(cmd)
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -71,7 +71,7 @@ func init() {
 }
 
 type GenerateActivationParams struct {
-	accountName    string
+	AccountContextParams
 	activation     *jwt.ActivationClaims
 	claims         *jwt.AccountClaims
 	export         jwt.Export
@@ -86,10 +86,8 @@ type GenerateActivationParams struct {
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, false, ctx)
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
-	}
 	p.export.Subject = jwt.Subject(p.subject)
 
 	return nil
@@ -97,29 +95,26 @@ func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *GenerateActivationParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("an account is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
-	p.claims, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	p.claims, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
 
 	if len(p.claims.Exports) == 0 {
-		return fmt.Errorf("account %q doesn't have exports", p.accountName)
+		return fmt.Errorf("account %q doesn't have exports", p.AccountContextParams.Name)
 	}
 
 	for _, v := range p.claims.Exports {
@@ -129,7 +124,7 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 	}
 
 	if len(p.privateExports) == 0 {
-		return fmt.Errorf("account %q doesn't have exports that require token generation", p.accountName)
+		return fmt.Errorf("account %q doesn't have exports that require token generation", p.AccountContextParams.Name)
 	}
 
 	return nil
@@ -199,7 +194,7 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	}
 
 	if p.export.Subject == "" {
-		return fmt.Errorf("an export containing %q was not found in account %q", p.subject, p.accountName)
+		return fmt.Errorf("an export containing %q was not found in account %q", p.subject, p.AccountContextParams.Name)
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {

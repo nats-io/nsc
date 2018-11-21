@@ -47,10 +47,10 @@ nsc add import --url https://some.service.com/path --to import.>`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.accountName, "account-name", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.im.Name, "name", "n", "", "import name")
 	cmd.Flags().StringVarP(&params.to, "to", "t", "", "target subject")
 	cmd.Flags().StringVarP(&params.src, "token", "u", "", "path to token file can be a local path or an url")
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -60,21 +60,18 @@ func init() {
 }
 
 type AddImportParams struct {
-	accountName string
-	claim       *jwt.AccountClaims
-	activation  *jwt.ActivationClaims
-	im          jwt.Import
-	operatorKP  nkeys.KeyPair
-	to          string
-	token       []byte
-	src         string
+	AccountContextParams
+	claim      *jwt.AccountClaims
+	activation *jwt.ActivationClaims
+	im         jwt.Import
+	operatorKP nkeys.KeyPair
+	to         string
+	token      []byte
+	src        string
 }
 
 func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
-	if p.accountName == "" {
-		p.accountName = ctx.StoreCtx().Account.Name
-	}
-
+	p.AccountContextParams.SetDefaults(ctx)
 	p.im.To = jwt.Subject(p.to)
 
 	return nil
@@ -83,8 +80,7 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 
-	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
-	if err != nil {
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
@@ -130,9 +126,8 @@ func (p *AddImportParams) LoadImport() ([]byte, error) {
 func (p *AddImportParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("an account is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
 	if p.src == "" {
@@ -140,7 +135,7 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		return errors.New("--token is required")
 	}
 
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.accountName)
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
@@ -213,15 +208,15 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	var err error
 
-	if p.accountName == "" {
-		return errors.New("an account is required")
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
 	}
 
 	var export = p.activation.Export
 
 	for _, im := range p.claim.Imports {
 		if im.Account == p.activation.Issuer && string(im.Subject) == string(export.Subject) {
-			return fmt.Errorf("account %s already imports %q from %s", p.accountName, im.Subject, p.activation.Issuer)
+			return fmt.Errorf("account %s already imports %q from %s", p.AccountContextParams.Name, im.Subject, p.activation.Issuer)
 		}
 	}
 
