@@ -53,6 +53,7 @@ type Info struct {
 	EnvironmentName string `json:"env"`
 	Kind            string `json:"kind"`
 	Version         string `json:"version"`
+	LastUpdateCheck int64  `json:"last_update_check"`
 }
 
 func (i *Info) String() string {

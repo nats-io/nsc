@@ -19,9 +19,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nats-io/nkeys"
-
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
 )
