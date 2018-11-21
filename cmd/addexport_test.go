@@ -111,3 +111,42 @@ func Test_AddExportOperatorLessStore(t *testing.T) {
 	require.Len(t, ac.Exports, 1)
 	require.Equal(t, "aaaa", string(ac.Exports[0].Subject))
 }
+
+func Test_AddAccountNameRequired(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createAddAccountCmd(), "--name", "B")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
+	require.Error(t, err)
+	require.Equal(t, "an account is required", err.Error())
+}
+
+func TestAddExportInteractive(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createAddAccountCmd(), "--name", "B")
+	require.NoError(t, err)
+
+	input := []interface{}{0, 0, "foo.>", "Foo Stream", false}
+	cmd := createAddExportCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "Foo Stream", ac.Exports[0].Name)
+	require.Equal(t, "foo.>", string(ac.Exports[0].Subject))
+}
