@@ -43,7 +43,7 @@ nsc add import --url https://some.service.com/path --to import.>`,
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			cmd.Printf("Success! - added %s import %q\n", params.activation.Exports[0].Type, params.activation.Exports[0].Subject)
+			cmd.Printf("Success! - added %s import %q\n", params.activation.Export.Type, params.activation.Export.Subject)
 			return nil
 		},
 	}
@@ -165,10 +165,6 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("activation is not intended for this account - it is for %q", p.activation.Subject)
 	}
 
-	if len(p.activation.Exports) == 0 {
-		return fmt.Errorf("activation %q doesn't have any exports", p.src)
-	}
-
 	// FIXME: validation issues on the loaded activation - jwt needs to return some sort of error we can render
 
 	return nil
@@ -183,7 +179,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if p.to == "" {
-		p.to = string(p.activation.Exports[0].Subject)
+		p.to = string(p.activation.Export.Subject)
 	}
 
 	p.to, err = cli.Prompt("subject mapping", p.to, true, func(s string) error {
@@ -221,7 +217,7 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 		return errors.New("an account is required")
 	}
 
-	var export = p.activation.Exports[0]
+	var export = p.activation.Export
 
 	for _, im := range p.claim.Imports {
 		if im.Account == p.activation.Issuer && string(im.Subject) == string(export.Subject) {

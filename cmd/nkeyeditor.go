@@ -32,28 +32,28 @@ type NKeyParams struct {
 	kp       nkeys.KeyPair
 }
 
-func (e *NKeyParams) BindFlags(flagName string, kind nkeys.PrefixByte, seed bool, cmd *cobra.Command) {
+func (e *NKeyParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, seed bool, cmd *cobra.Command) {
 	e.flagName = flagName
 	e.kind = kind
 	e.private = seed
-	cmd.Flags().StringVarP(&e.path, flagName, "", "", fmt.Sprintf("%s keypath", flagName))
+	cmd.Flags().StringVarP(&e.path, flagName, shorthand, "", fmt.Sprintf("%s keypath", flagName))
 }
 
 func (e *NKeyParams) valid(s string) error {
 	if s == "" {
-		return fmt.Errorf("%s nkey cannot be empty", store.KeyTypeLabel(e.kind))
+		return fmt.Errorf("%s cannot be empty", e.flagName)
 	}
 	kp, err := store.ResolveKey(s)
 	if err != nil {
 		return err
 	}
 	if !store.KeyPairTypeOk(e.kind, kp) {
-		return fmt.Errorf("invalid %s nkey", store.KeyTypeLabel(e.kind))
+		return fmt.Errorf("%s has invalid %s nkey", e.flagName, store.KeyTypeLabel(e.kind))
 	}
 	if e.private {
 		_, err = kp.Seed()
 		if err != nil {
-			return fmt.Errorf("%s nkey is not a seed", store.KeyTypeLabel(e.kind))
+			return fmt.Errorf("%s is not a seed", e.flagName)
 		}
 	}
 	e.kp = kp

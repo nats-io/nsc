@@ -22,6 +22,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+////this is shared by all cmds that may require an account as an argument
+//var AccountFlag string
+//
+//// this is shared by all cmds that may require an cluster as an argument
+//var ClusterFlag string
+//
+//func HoistAccountFlag(cmd *cobra.Command) {
+//	cmd.Flags().StringVarP(&AccountFlag, "account", "a", "", "account name")
+//}
+//
+//func HoistClusterFlag(cmd *cobra.Command) {
+//	cmd.Flags().StringVarP(&AccountFlag, "cluster", "c", "", "cluster name")
+//}
+
 type ActionCtx interface {
 	StoreCtx() *store.Context
 	CurrentCmd() *cobra.Command
@@ -61,6 +75,19 @@ func NewActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	//if AccountFlag != "" {
+	//	ctx.Account.Name = AccountFlag
+	//}
+	//if AccountFlag == "" {
+	//	AccountFlag = ctx.Account.Name
+	//}
+	//if ClusterFlag != "" {
+	//	ctx.Cluster.Name = ClusterFlag
+	//}
+	//if ClusterFlag == "" {
+	//	ClusterFlag = ctx.Cluster.Name
+	//}
 
 	return &Actx{cmd: cmd, ctx: ctx, args: args}, nil
 }

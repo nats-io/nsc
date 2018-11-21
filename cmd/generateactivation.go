@@ -60,7 +60,7 @@ func createGenerateActivation() *cobra.Command {
 	cmd.Flags().StringVarP(&params.accountName, "account", "a", "", "account name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
-	params.targetKey.BindFlags("target-account", nkeys.PrefixByteAccount, false, cmd)
+	params.targetKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, false, cmd)
 	params.timeParams.BindFlags(cmd)
 
 	return cmd
@@ -71,11 +71,11 @@ func init() {
 }
 
 type GenerateActivationParams struct {
-	accountName  string
-	activation   *jwt.ActivationClaims
-	claims       *jwt.AccountClaims
-	export       jwt.Export
-	out          string
+	accountName    string
+	activation     *jwt.ActivationClaims
+	claims         *jwt.AccountClaims
+	export         jwt.Export
+	out            string
 	privateExports jwt.Exports
 	SignerParams
 	subject    string
@@ -122,7 +122,6 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("account %q doesn't have exports", p.accountName)
 	}
 
-
 	for _, v := range p.claims.Exports {
 		if v.TokenReq {
 			p.privateExports.Add(v)
@@ -139,12 +138,8 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	sub := jwt.Subject(p.subject)
-	for _, e := range p.privateExports {
-		if sub.IsContainedIn(e.Subject) {
-			p.export = *e
-			break
-		}
+	if p.subject == "" && len(p.privateExports) == 1 {
+		p.subject = string(p.privateExports[0].Subject)
 	}
 
 	var choices []string
@@ -178,14 +173,8 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	var err error
 
-	if p.export.Subject == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("subject not specified")
-	}
-
-	if p.accountName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("an account is required")
+	if len(p.privateExports) == 1 {
+		p.subject = string(p.privateExports[0].Subject)
 	}
 
 	if p.subject == "" {
@@ -202,7 +191,7 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	}
 
 	sub := jwt.Subject(p.subject)
-	for _, e := range p.claims.Exports {
+	for _, e := range p.privateExports {
 		if sub.IsContainedIn(e.Subject) {
 			p.export = *e
 			break
@@ -224,7 +213,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	p.activation = jwt.NewActivationClaims(p.targetPK)
 	p.activation.NotBefore, _ = p.timeParams.StartDate()
 	p.activation.Expires, _ = p.timeParams.ExpiryDate()
-	p.activation.Exports.Add(&p.export)
+	p.activation.Export = p.export
 
 	p.token, err = p.activation.Encode(p.signerKP)
 	if err != nil {

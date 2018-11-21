@@ -28,9 +28,6 @@ func Test_AddExport(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err, "export creation")
-
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export"}, nil, []string{"subject is required"}, true},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "foo"}, nil, []string{"added public stream export \"foo\""}, false},

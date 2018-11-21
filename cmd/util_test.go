@@ -103,15 +103,18 @@ func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	}
 }
 
-func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string) {
-	ts.AddAccount(t, accountName)
-	if kind == jwt.Stream {
-		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject)
-		require.NoError(t, err)
-	} else {
-		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject, "--service")
-		require.NoError(t, err)
+func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {
+	flags := []string{"--account", accountName, "--subject", subject}
+	if !public {
+		flags = append(flags, "--private")
 	}
+	if kind == jwt.Service {
+		flags = append(flags, "--service")
+	}
+
+	ts.AddAccount(t, accountName)
+	_, _, err := ExecuteCmd(createAddExportCmd(), flags...)
+	require.NoError(t, err)
 }
 
 //func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {
