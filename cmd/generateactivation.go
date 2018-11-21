@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createGenerateExport() *cobra.Command {
+func createGenerateActivation() *cobra.Command {
 	var params GenerateActivationParams
 	cmd := &cobra.Command{
 		Use:          "activation",
@@ -41,7 +41,7 @@ func createGenerateExport() *cobra.Command {
 			}
 
 			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-				params.export.Name, params.targetPublic, params.activation.ID)
+				params.export.Name, params.targetPK, params.activation.ID)
 
 			if params.activation.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",
@@ -67,24 +67,26 @@ func createGenerateExport() *cobra.Command {
 }
 
 func init() {
-	generateCmd.AddCommand(createGenerateExport())
+	generateCmd.AddCommand(createGenerateActivation())
 }
 
 type GenerateActivationParams struct {
-	accountKP    nkeys.KeyPair
 	accountName  string
 	activation   *jwt.ActivationClaims
 	claims       *jwt.AccountClaims
 	export       jwt.Export
 	out          string
-	subject      string
-	targetKey    NKeyParams
-	targetPublic string
-	timeParams   TimeParams
-	token        string
+	privateExports jwt.Exports
+	SignerParams
+	subject    string
+	targetKey  NKeyParams
+	targetPK   string
+	timeParams TimeParams
+	token      string
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
+	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, false, ctx)
 	if p.accountName == "" {
 		p.accountName = ctx.StoreCtx().Account.Name
 	}
@@ -98,22 +100,6 @@ func (p *GenerateActivationParams) PreInteractive(ctx ActionCtx) error {
 	p.accountName, err = ctx.StoreCtx().PickAccount(p.accountName)
 	if err != nil {
 		return err
-	}
-
-	if err = p.targetKey.Edit(); err != nil {
-		return err
-	}
-
-	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
-	if err != nil {
-		return err
-	}
-
-	if p.accountKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteAccount, "account keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -136,20 +122,34 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("account %q doesn't have exports", p.accountName)
 	}
 
+
+	for _, v := range p.claims.Exports {
+		if v.TokenReq {
+			p.privateExports.Add(v)
+		}
+	}
+
+	if len(p.privateExports) == 0 {
+		return fmt.Errorf("account %q doesn't have exports that require token generation", p.accountName)
+	}
+
 	return nil
 }
 
 func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
+	var err error
+
 	sub := jwt.Subject(p.subject)
-	for _, e := range p.claims.Exports {
+	for _, e := range p.privateExports {
 		if sub.IsContainedIn(e.Subject) {
 			p.export = *e
 			break
 		}
 	}
+
 	var choices []string
 	if p.export.Subject == "" {
-		for _, v := range p.claims.Exports {
+		for _, v := range p.privateExports {
 			choices = append(choices, fmt.Sprintf("[%s] %s - %s", v.Type, v.Name, v.Subject))
 		}
 	}
@@ -157,12 +157,21 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	p.export = *p.claims.Exports[i]
+	p.export = *p.privateExports[i]
 	p.subject = string(p.export.Subject)
+
+	if err = p.targetKey.Edit(); err != nil {
+		return err
+	}
 
 	if err := p.timeParams.Edit(); err != nil {
 		return err
 	}
+
+	if err = p.SignerParams.Edit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -188,7 +197,7 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.targetPublic, err = p.targetKey.PublicKey(); err != nil {
+	if p.targetPK, err = p.targetKey.PublicKey(); err != nil {
 		return err
 	}
 
@@ -204,22 +213,20 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("an export containing %q was not found in account %q", p.subject, p.accountName)
 	}
 
-	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
-	if err != nil {
-		return fmt.Errorf("specify the account private key with --private-key to use for signing the activation")
+	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
 	}
-
 	return nil
 }
 
 func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	var err error
-	p.activation = jwt.NewActivationClaims(p.targetPublic)
+	p.activation = jwt.NewActivationClaims(p.targetPK)
 	p.activation.NotBefore, _ = p.timeParams.StartDate()
 	p.activation.Expires, _ = p.timeParams.ExpiryDate()
 	p.activation.Exports.Add(&p.export)
 
-	p.token, err = p.activation.Encode(p.accountKP)
+	p.token, err = p.activation.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}

@@ -26,6 +26,8 @@ func Test_AddExport(t *testing.T) {
 	ts := NewTestStore(t, "add_export")
 	defer ts.Done(t)
 
+	ts.AddAccount(t, "A")
+
 	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "export creation")
 
@@ -50,8 +52,7 @@ func Test_AddExportVerify(t *testing.T) {
 	ts := NewTestStore(t, "add_export")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err, "export creation")
+	ts.AddAccount(t, "A")
 
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubfoo"}, nil, []string{"added public stream export \"pubfoo\""}, false},
@@ -99,10 +100,8 @@ func Test_AddExportOperatorLessStore(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -116,13 +115,10 @@ func Test_AddAccountNameRequired(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
 
-	_, _, err = ExecuteCmd(createAddAccountCmd(), "--name", "B")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
 	require.Error(t, err)
 	require.Equal(t, "an account is required", err.Error())
 }
@@ -131,16 +127,13 @@ func TestAddExportInteractive(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(createAddAccountCmd(), "--name", "B")
-	require.NoError(t, err)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
 
 	input := []interface{}{0, 0, "foo.>", "Foo Stream", false}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

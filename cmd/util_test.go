@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -91,6 +93,24 @@ func (ts *TestStore) Done(t *testing.T) {
 	os.Chdir(ts.StartDir)
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
+	}
+}
+
+func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
+	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
+		_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", accountName)
+		require.NoError(t, err, "account creation for export")
+	}
+}
+
+func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string) {
+	ts.AddAccount(t, accountName)
+	if kind == jwt.Stream {
+		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject)
+		require.NoError(t, err)
+	} else {
+		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject, "--service")
+		require.NoError(t, err)
 	}
 }
 
