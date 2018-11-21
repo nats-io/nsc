@@ -27,7 +27,7 @@ func Test_AddExport(t *testing.T) {
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err, "account creation")
+	require.NoError(t, err, "export creation")
 
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export"}, nil, []string{"subject is required"}, true},
@@ -51,7 +51,7 @@ func Test_AddExportVerify(t *testing.T) {
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-	require.NoError(t, err, "account creation")
+	require.NoError(t, err, "export creation")
 
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubfoo"}, nil, []string{"added public stream export \"pubfoo\""}, false},
@@ -93,4 +93,21 @@ func validateAddExports(t *testing.T, ts *TestStore) {
 	require.Equal(t, "privbar", string(privbar.Subject))
 	require.Equal(t, jwt.Service, privbar.Type)
 	require.True(t, privbar.TokenReq)
+}
+
+func Test_AddExportOperatorLessStore(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "aaaa", string(ac.Exports[0].Subject))
 }

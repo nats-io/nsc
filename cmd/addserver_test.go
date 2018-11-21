@@ -62,7 +62,7 @@ func Test_AddServerOutput(t *testing.T) {
 	_, _, err = ExecuteCmd(createAddServerCmd(), "--name", "a", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 
-	skp, err := ts.KeyStore.GetServerKey("operator", "c", "a")
+	skp, err := ts.KeyStore.GetServerKey("c", "a")
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -72,7 +72,7 @@ func Test_AddServerOutput(t *testing.T) {
 	pub, err := skp.PublicKey()
 	require.Equal(t, sc.Subject, string(pub), "public key is subject")
 
-	okp, err := ts.KeyStore.GetClusterKey("operator", "c")
+	okp, err := ts.KeyStore.GetClusterKey("c")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()

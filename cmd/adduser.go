@@ -75,7 +75,6 @@ func init() {
 }
 
 type AddUserParams struct {
-	accountKP   nkeys.KeyPair
 	accountName string
 	allowPubs   []string
 	allowPubsub []string
@@ -84,14 +83,16 @@ type AddUserParams struct {
 	denyPubsub  []string
 	denySubs    []string
 	Entity
+	SignerParams
 	src  []string
 	tags []string
 	TimeParams
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
+	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 	p.create = true
-	p.kind = nkeys.PrefixByteUser
+	p.Entity.kind = nkeys.PrefixByteUser
 	p.editFn = p.editUserClaim
 
 	if p.accountName == "" {
@@ -116,16 +117,8 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-
-	if p.accountKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteAccount, "account keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -160,8 +153,7 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
-	p.accountKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteAccount, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
 
@@ -177,7 +169,7 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.Entity.GenerateClaim(p.accountKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
 		return err
 	}
 

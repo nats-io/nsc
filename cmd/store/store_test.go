@@ -28,7 +28,13 @@ import (
 
 func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *Store {
 	p := MakeTempDir(t)
-	s, err := CreateStore(name, p, NamedKey{Name: name, KP: kp})
+
+	var nk *NamedKey
+	if kp != nil {
+		nk = &NamedKey{Name: name, KP: kp}
+	}
+
+	s, err := CreateStore(name, p, nk)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 	return s
@@ -47,9 +53,13 @@ func CreateTestStoreForOperator(t *testing.T, name string, operator nkeys.KeyPai
 	require.FileExists(t, filepath.Join(s.Dir, ".nsc"))
 	require.True(t, s.Has("", ".nsc"))
 
-	tokenName := fmt.Sprintf("%s.jwt", SafeName(name))
-	require.FileExists(t, filepath.Join(s.Dir, tokenName))
-	require.True(t, s.Has("", tokenName))
+	if operator != nil {
+		tokenName := fmt.Sprintf("%s.jwt", SafeName(name))
+		require.FileExists(t, filepath.Join(s.Dir, tokenName))
+		require.True(t, s.Has("", tokenName))
+	} else {
+		require.True(t, s.Info.Managed)
+	}
 
 	for _, d := range standardDirs {
 		require.DirExists(t, filepath.Join(s.Dir, d))
@@ -70,7 +80,7 @@ func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
 	require.NoError(t, ioutil.WriteFile(fp, []byte("hello"), 0666))
 
 	_, _, kp := CreateAccountKey(t)
-	_, err := CreateStore("foo", p, NamedKey{Name: "foo", KP: kp})
+	_, err := CreateStore("foo", p, &NamedKey{Name: "foo", KP: kp})
 	require.Error(t, err)
 }
 
@@ -82,7 +92,7 @@ func TestUnsupportedKeyType(t *testing.T) {
 	kp, err := nkeys.CreateServer()
 	require.NoError(t, err)
 
-	_, err = CreateStore("foo", p, NamedKey{Name: "foo", KP: kp})
+	_, err = CreateStore("foo", p, &NamedKey{Name: "foo", KP: kp})
 	require.Error(t, err)
 }
 
@@ -219,4 +229,12 @@ func TestStoreUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "bar")
+}
+
+func TestOperatorLessStore(t *testing.T) {
+	s := CreateTestStoreForOperator(t, "test", nil)
+	require.NotNil(t, s)
+	ss, err := LoadStore(s.Dir)
+	require.NoError(t, err)
+	require.NotNil(t, ss)
 }

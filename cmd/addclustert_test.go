@@ -56,7 +56,7 @@ func Test_AddClusterOutput(t *testing.T) {
 	_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", "a", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 
-	kp, err := ts.KeyStore.GetClusterKey("operator", "a")
+	kp, err := ts.KeyStore.GetClusterKey("a")
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -80,4 +80,13 @@ func Test_AddClusterOutput(t *testing.T) {
 	expire, err := ParseExpiry("2050-01-01")
 	require.NoError(t, err)
 	require.Equal(t, expire, ac.Expires)
+}
+
+func Test_AddClusterFailsOnManagedStores(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", "a")
+	require.Error(t, err)
+	require.Equal(t, "clusters cannot be created on managed configurations", err.Error())
 }

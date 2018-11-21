@@ -80,7 +80,7 @@ func TestGetKeys(t *testing.T) {
 	ookp, err := ks.GetOperatorKey("operator")
 	require.NoError(t, err)
 
-	aakp, err := ks.GetAccountKey("operator", "account")
+	aakp, err := ks.GetAccountKey("account")
 	require.NoError(t, err)
 
 	require.True(t, Match(opk, ookp))
@@ -100,8 +100,8 @@ func TestGetPrivateKey(t *testing.T) {
 	ks := NewKeyStore("test_get_private_key")
 	ks.Store("o", okp, "o")
 	ks.Store("a", akp, "o")
-	ckp, err := ks.GetClusterKey("o", "c")
-	require.Error(t, err)
+	ckp, err := ks.GetClusterKey("c")
+	require.Nil(t, err)
 	require.Nil(t, ckp)
 
 	os.Setenv(NKeysPathEnv, old)

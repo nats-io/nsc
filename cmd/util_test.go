@@ -36,20 +36,16 @@ type TestStore struct {
 
 	OperatorKey     nkeys.KeyPair
 	OperatorKeyPath string
-
-	AccountKey     nkeys.KeyPair
-	AccountKeyPath string
 }
 
-func NewTestStore(t *testing.T, name string) *TestStore {
+func NewTestStoreWithOperator(t *testing.T, name string, operator nkeys.KeyPair) *TestStore {
 	var ts TestStore
 	var err error
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
 
-	_, _, ts.OperatorKey = CreateOperatorKey(t)
-	_, _, ts.AccountKey = CreateAccountKey(t)
+	ts.OperatorKey = operator
 
 	ts.StartDir, err = os.Getwd()
 	require.NoError(t, err)
@@ -65,19 +61,29 @@ func NewTestStore(t *testing.T, name string) *TestStore {
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
 	require.NoError(t, err, "nkeys env")
 
-	ts.Store, err = store.CreateStore(name, storeDir, store.NamedKey{Name: "operator", KP: ts.OperatorKey})
+	var nk *store.NamedKey
+	if ts.OperatorKey != nil {
+		nk = &store.NamedKey{Name: "operator", KP: ts.OperatorKey}
+	}
+
+	ts.Store, err = store.CreateStore(name, storeDir, nk)
 	ctx, err := ts.Store.GetContext()
 	require.NoError(t, err, "getting context")
 
 	ts.KeyStore = ctx.KeyStore
-	ts.OperatorKeyPath, err = ts.KeyStore.Store("operator", ts.OperatorKey, "")
-	require.NoError(t, err, "store operator key")
-	ts.AccountKeyPath, err = ts.KeyStore.Store(name, ts.AccountKey, "operator")
-	require.NoError(t, err, "store account key")
+	if nk != nil {
+		ts.OperatorKeyPath, err = ts.KeyStore.Store("operator", ts.OperatorKey, "")
+		require.NoError(t, err, "store operator key")
+	}
 
 	os.Chdir(ts.Store.Dir)
 
 	return &ts
+}
+
+func NewTestStore(t *testing.T, name string) *TestStore {
+	_, _, kp := CreateOperatorKey(t)
+	return NewTestStoreWithOperator(t, name, kp)
 }
 
 func (ts *TestStore) Done(t *testing.T) {

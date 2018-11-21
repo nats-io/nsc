@@ -55,15 +55,20 @@ func init() {
 
 type AddClusterParams struct {
 	Entity
-	expiry     int64
-	operatorKP nkeys.KeyPair
-	start      int64
+	expiry int64
+	SignerParams
+	start int64
 	TimeParams
 }
 
 func (p *AddClusterParams) SetDefaults(ctx ActionCtx) error {
+	if ctx.StoreCtx().Store.IsManaged() {
+		return fmt.Errorf("clusters cannot be created on managed configurations")
+	}
+
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 	p.create = true
-	p.kind = nkeys.PrefixByteCluster
+	p.Entity.kind = nkeys.PrefixByteCluster
 	p.editFn = p.editClusterClaim
 	return nil
 }
@@ -79,15 +84,8 @@ func (p *AddClusterParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -112,11 +110,8 @@ func (p *AddClusterParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.operatorKP == nil {
-		p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-		if err != nil {
-			return err
-		}
+	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
 	}
 
 	return p.Valid()
@@ -128,7 +123,7 @@ func (p *AddClusterParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.Entity.GenerateClaim(p.operatorKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
 		return err
 	}
 

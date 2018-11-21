@@ -56,23 +56,26 @@ func Test_AddUserrOutput(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "c")
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	_, _, err = ExecuteCmd(createAddUserCmd(), "--name", "a", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err = ExecuteCmd(createAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
+	validateAddUserClaims(t, ts)
+}
 
-	skp, err := ts.KeyStore.GetUserKey("operator", "c", "a")
+func validateAddUserClaims(t *testing.T, ts *TestStore) {
+	skp, err := ts.KeyStore.GetUserKey("A", "U")
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
-	sc, err := ts.Store.ReadUserClaim("c", "a")
+	sc, err := ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err, "reading user claim")
 
 	pub, err := skp.PublicKey()
 	require.Equal(t, sc.Subject, string(pub), "public key is subject")
 
-	okp, err := ts.KeyStore.GetAccountKey("operator", "c")
+	okp, err := ts.KeyStore.GetAccountKey("A")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()
@@ -86,4 +89,17 @@ func Test_AddUserrOutput(t *testing.T) {
 	expire, err := ParseExpiry("2050-01-01")
 	require.NoError(t, err)
 	require.Equal(t, expire, sc.Expires)
+}
+
+func Test_AddUserOperatorLessStore(t *testing.T) {
+	ts := NewTestStoreWithOperator(t, "test", nil)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+
+	validateAddUserClaims(t, ts)
 }

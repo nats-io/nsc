@@ -59,15 +59,19 @@ func init() {
 }
 
 type AddServerParams struct {
+	SignerParams
 	TimeParams
 	Entity
-	clusterKP   nkeys.KeyPair
 	clusterName string
 }
 
 func (p *AddServerParams) SetDefaults(ctx ActionCtx) error {
+	if ctx.StoreCtx().Store.IsManaged() {
+		return fmt.Errorf("servers cannot be created on managed configurations")
+	}
+	p.SignerParams.SetDefaults(nkeys.PrefixByteCluster, false, ctx)
 	p.create = true
-	p.kind = nkeys.PrefixByteServer
+	p.Entity.kind = nkeys.PrefixByteServer
 	p.editFn = p.editServerClaim
 
 	if p.clusterName == "" {
@@ -93,16 +97,8 @@ func (p *AddServerParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.clusterKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-
-	if p.clusterKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteAccount, "cluster keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -137,8 +133,7 @@ func (p *AddServerParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
-	p.clusterKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteCluster, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
 
@@ -155,7 +150,7 @@ func (p *AddServerParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.Entity.GenerateClaim(p.clusterKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
 		return err
 	}
 
