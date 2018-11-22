@@ -239,3 +239,29 @@ func TestOperatorLessStore(t *testing.T) {
 	require.NotNil(t, ss)
 	require.True(t, s.IsManaged())
 }
+
+func TestStore_ListSubContainers(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, akp := CreateAccountKey(t)
+	_, upub, _ := CreateUserKey(t)
+
+	s := CreateTestStoreForOperator(t, "store", kp)
+
+	ac := jwt.NewAccountClaims(apub)
+	ac.Name = "foo"
+	cd, err := ac.Encode(kp)
+	err = s.StoreClaim([]byte(cd))
+
+	uc := jwt.NewUserClaims(upub)
+	uc.Name = "bar"
+	ud, err := uc.Encode(akp)
+
+	err = s.StoreClaim([]byte(ud))
+	require.NoError(t, err)
+
+	v, err := s.ListEntries(Accounts, "foo", Users)
+	require.NoError(t, err)
+	require.NotNil(t, v)
+	require.Len(t, v, 1)
+	require.Equal(t, "bar", v[0])
+}

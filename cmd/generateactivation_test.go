@@ -36,8 +36,8 @@ func Test_GenerateActivation(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	tests := CmdTests{
-		{createGenerateActivation(), []string{"generate", "activation"}, nil, []string{"target-account cannot be empty"}, true},
-		{createGenerateActivation(), []string{"generate", "activation", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
+		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"target-account cannot be empty"}, true},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
 	}
 
 	tests.Run(t, "root", "generate")
@@ -55,10 +55,10 @@ func Test_GenerateActivationMultiple(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	tests := CmdTests{
-		{createGenerateActivation(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
-		{createGenerateActivation(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
-		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
-		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
+		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
 	}
 
 	tests.Run(t, "root", "generate")
@@ -69,7 +69,7 @@ func Test_GenerateActivationEmptyExports(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createGenerateActivation())
+	_, _, err := ExecuteCmd(createGenerateActivationCmd())
 	require.Error(t, err)
 	require.Equal(t, "account \"A\" doesn't have exports", err.Error())
 }
@@ -81,7 +81,7 @@ func Test_GenerateActivationNoPrivateExports(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foo", true)
 
-	_, _, err := ExecuteCmd(createGenerateActivation())
+	_, _, err := ExecuteCmd(createGenerateActivationCmd())
 	require.Error(t, err)
 	require.Equal(t, "account \"A\" doesn't have exports that require token generation", err.Error())
 }
@@ -96,7 +96,7 @@ func Test_GenerateActivationOutputsFile(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	_, _, err := ExecuteCmd(createGenerateActivation(), "--target-account", pub, "--output-file", outpath)
+	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "--target-account", pub, "--output-file", outpath)
 	require.NoError(t, err)
 	testExternalToken(t, outpath)
 }
@@ -122,7 +122,7 @@ func Test_InteractiveGenerate(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foo", false)
 
-	cmd := createGenerateActivation()
+	cmd := createGenerateActivationCmd()
 	HoistRootFlags(cmd)
 
 	_, pub, _ := CreateAccountKey(t)
@@ -142,7 +142,7 @@ func Test_InteractiveExternalKeyGenerate(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foo", false)
 
-	cmd := createGenerateActivation()
+	cmd := createGenerateActivationCmd()
 	HoistRootFlags(cmd)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
@@ -167,7 +167,7 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "foo", false)
 	ts.AddAccount(t, "B")
 
-	cmd := createGenerateActivation()
+	cmd := createGenerateActivationCmd()
 	HoistRootFlags(cmd)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")

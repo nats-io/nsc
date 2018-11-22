@@ -252,6 +252,24 @@ func (s *Store) ListSubContainers(name ...string) ([]string, error) {
 	return containers, nil
 }
 
+func (s *Store) ListEntries(name ...string) ([]string, error) {
+	var entries []string
+	fp := filepath.Join(name...)
+	if s.Has(fp) {
+		infos, err := s.List(fp)
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range infos {
+			if !v.IsDir() && IsJwtName(v.Name()) {
+				entries = append(entries, PlainName(v.Name()))
+
+			}
+		}
+	}
+	return entries, nil
+}
+
 func (s *Store) StoreClaim(data []byte) error {
 	// Decode the jwt to figure out where it goes
 	gc, err := jwt.DecodeGeneric(string(data))
@@ -344,6 +362,17 @@ func (s *Store) operatorJwtName() (string, error) {
 
 func JwtName(name string) string {
 	return fmt.Sprintf("%s.jwt", SafeName(name))
+}
+
+func IsJwtName(name string) bool {
+	return strings.HasSuffix(name, ".jwt")
+}
+
+func PlainName(name string) string {
+	if strings.HasSuffix(name, ".jwt") {
+		return name[:len(name)-4]
+	}
+	return name
 }
 
 func (s *Store) loadJson(v interface{}, name ...string) error {
@@ -616,6 +645,35 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 	ctx.Account.Name = name
 
 	return name, nil
+}
+
+func (ctx *Context) PickUser(accountName string) (string, error) {
+	var err error
+	if accountName == "" {
+		accountName = ctx.Account.Name
+	}
+
+	if accountName == "" {
+		accountName, err = ctx.PickAccount(accountName)
+		if err != nil {
+			return "", err
+		}
+	}
+	// allow downstream use of context to have account
+	ctx.Account.Name = accountName
+
+	users, err := ctx.Store.ListEntries(Accounts, accountName, Users)
+	if err != nil {
+		return "", err
+	}
+	if len(users) > 1 {
+		i, err := cli.PromptChoices("select user", users)
+		if err != nil {
+			return "", err
+		}
+		return users[i], nil
+	}
+	return "", nil
 }
 
 func (ctx *Context) PickCluster(name string) (string, error) {

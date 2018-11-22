@@ -129,6 +129,33 @@ func FormatKeys(keyType string, publicKey string, privateKey string) []byte {
 	return w.Bytes()
 }
 
+func FormatConfig(jwtType string, jwtString string, seed string) []byte {
+	w := bytes.NewBuffer(nil)
+	label := strings.ToUpper(jwtType)
+
+	fmt.Fprintf(w, "-----BEGIN NATS %s JWT-----\n", label)
+	fmt.Fprintln(w, jwtString)
+	fmt.Fprintf(w, "------END NATS %s JWT------\n", label)
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w, "************************* IMPORTANT *************************")
+	fmt.Fprintln(w, "NKEY Seed printed below can be used to sign and prove identity.")
+	fmt.Fprintln(w, "NKEYs are sensitive and should be treated as secrets.")
+	fmt.Fprintln(w)
+
+	fmt.Fprintf(w, "-----BEGIN %s NKEY SEED-----\n", label)
+	fmt.Fprintln(w, seed)
+	fmt.Fprintf(w, "------END %s NKEY SEED------\n", label)
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w, "*************************************************************")
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w)
+
+	return w.Bytes()
+}
+
 func FormatJwt(jwtType string, jwt string) []byte {
 	w := bytes.NewBuffer(nil)
 

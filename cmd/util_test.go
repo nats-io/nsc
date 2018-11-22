@@ -120,7 +120,7 @@ func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.Export
 func (ts *TestStore) GenerateActivation(t *testing.T, targetAccount string, accountName string, kind jwt.ExportType, subject string) string {
 	ts.AddExport(t, accountName, kind, subject, false)
 	flags := []string{"--account", accountName, "--target-account", targetAccount, "--subject", subject}
-	stdout, _, err := ExecuteCmd(createGenerateActivation(), flags...)
+	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
 	return ExtractToken(stdout)
 }

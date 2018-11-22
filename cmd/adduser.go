@@ -16,9 +16,12 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sort"
+
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -62,6 +65,8 @@ nsc add user --name u --tag test,service_a`,
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
 
+	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
+
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -74,17 +79,18 @@ func init() {
 
 type AddUserParams struct {
 	AccountContextParams
+	SignerParams
+	Entity
+	TimeParams
 	allowPubs   []string
 	allowPubsub []string
 	allowSubs   []string
 	denyPubs    []string
 	denyPubsub  []string
 	denySubs    []string
-	Entity
-	SignerParams
-	src  []string
-	tags []string
-	TimeParams
+	out         string
+	src         []string
+	tags        []string
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
@@ -156,6 +162,39 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 
 	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
 		return err
+	}
+
+	if p.out != "" {
+		if ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.name)) {
+			var buf bytes.Buffer
+
+			kp, err := ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.name)
+			if err != nil {
+				return err
+			}
+			pub, err := kp.PublicKey()
+			if err != nil {
+				return err
+			}
+
+			seed, err := kp.PrivateKey()
+			if err != nil {
+				return err
+			}
+			buf.Write(FormatKeys("User", pub, string(seed)))
+
+			d, err := ctx.StoreCtx().Store.Read(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.name))
+			if err != nil {
+				return err
+			}
+			buf.WriteString("\n\n")
+			buf.Write(FormatJwt("User", string(d)))
+
+			if err := Write(p.out, buf.Bytes()); err != nil {
+				return err
+			}
+			return nil
+		}
 	}
 
 	return nil

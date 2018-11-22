@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createGenerateActivation() *cobra.Command {
+func createGenerateActivationCmd() *cobra.Command {
 	var params GenerateActivationParams
 	cmd := &cobra.Command{
 		Use:          "activation",
@@ -67,7 +67,7 @@ func createGenerateActivation() *cobra.Command {
 }
 
 func init() {
-	generateCmd.AddCommand(createGenerateActivation())
+	generateCmd.AddCommand(createGenerateActivationCmd())
 }
 
 type GenerateActivationParams struct {
