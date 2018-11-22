@@ -143,11 +143,11 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair) error {
 		signer = c.kp
 	}
 
-	pk, err := c.kp.PublicKey()
+	pub, err := c.kp.PublicKey()
 	if err != nil {
 		return err
 	}
-	pub := string(pk)
+
 	var claim jwt.Claims
 	switch c.kind {
 	case nkeys.PrefixByteOperator:

@@ -102,7 +102,7 @@ func TestResolveKeyFromSeed(t *testing.T) {
 	pp, err := rkp.PublicKey()
 	require.NoError(t, err)
 
-	require.Equal(t, string(pp), string(p))
+	require.Equal(t, pp, p)
 }
 
 func TestResolveKeyFromFile(t *testing.T) {
@@ -118,5 +118,5 @@ func TestResolveKeyFromFile(t *testing.T) {
 	pp, err := rkp.PublicKey()
 	require.NoError(t, err)
 
-	require.Equal(t, string(pp), string(p))
+	require.Equal(t, pp, p)
 }

@@ -64,14 +64,14 @@ func Test_AddClusterOutput(t *testing.T) {
 	require.NoError(t, err, "reading cluster claim")
 
 	pub, err := kp.PublicKey()
-	require.Equal(t, ac.Subject, string(pub), "public key is subject")
+	require.Equal(t, ac.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetOperatorKey("operator")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()
 	require.NoError(t, err, "getting public key for operator")
-	require.Equal(t, ac.Issuer, string(oppub), "operator signed it")
+	require.Equal(t, ac.Issuer, oppub, "operator signed it")
 
 	start, err := ParseExpiry("2018-01-01")
 	require.NoError(t, err)

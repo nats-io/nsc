@@ -70,14 +70,14 @@ func Test_AddServerOutput(t *testing.T) {
 	require.NoError(t, err, "reading server claim")
 
 	pub, err := skp.PublicKey()
-	require.Equal(t, sc.Subject, string(pub), "public key is subject")
+	require.Equal(t, sc.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetClusterKey("c")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()
 	require.NoError(t, err, "getting public key for operator")
-	require.Equal(t, sc.Issuer, string(oppub), "operator signed it")
+	require.Equal(t, sc.Issuer, oppub, "operator signed it")
 
 	start, err := ParseExpiry("2018-01-01")
 	require.NoError(t, err)

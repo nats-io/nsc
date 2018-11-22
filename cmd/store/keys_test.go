@@ -146,5 +146,5 @@ func CreateTestNKey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair)
 	pub, err := kp.PublicKey()
 	require.NoError(t, err)
 
-	return seed, string(pub), kp
+	return seed, pub, kp
 }

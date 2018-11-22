@@ -174,5 +174,5 @@ func CreateNkey(t *testing.T, kind nkeys.PrefixByte) ([]byte, string, nkeys.KeyP
 	pub, err := kp.PublicKey()
 	require.NoError(t, err)
 
-	return seed, string(pub), kp
+	return seed, pub, kp
 }

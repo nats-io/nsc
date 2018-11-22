@@ -36,9 +36,9 @@ func Test_AddImport(t *testing.T) {
 	kp, err := ts.KeyStore.GetAccountKey("B")
 	require.NoError(t, err)
 	require.NotNil(t, kp)
-	d, err := kp.PublicKey()
+	pub, err := kp.PublicKey()
 
-	token := ts.GenerateActivation(t, string(d), "A", jwt.Stream, "foobar.>")
+	token := ts.GenerateActivation(t, pub, "A", jwt.Stream, "foobar.>")
 	fp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(fp, []byte(token)))
 

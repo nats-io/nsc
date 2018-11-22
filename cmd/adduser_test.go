@@ -73,14 +73,14 @@ func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err, "reading user claim")
 
 	pub, err := skp.PublicKey()
-	require.Equal(t, sc.Subject, string(pub), "public key is subject")
+	require.Equal(t, sc.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetAccountKey("A")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()
 	require.NoError(t, err, "getting public key for account")
-	require.Equal(t, sc.Issuer, string(oppub), "account signed it")
+	require.Equal(t, sc.Issuer, oppub, "account signed it")
 
 	start, err := ParseExpiry("2018-01-01")
 	require.NoError(t, err)
