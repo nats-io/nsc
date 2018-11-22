@@ -230,7 +230,7 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 			return err
 		}
 		if t != kind {
-			return fmt.Errorf("specified key is not valid for an %s", store.KeyTypeLabel(kind))
+			return fmt.Errorf("specified key is not valid for an %s", kind.String())
 		}
 		return nil
 	}

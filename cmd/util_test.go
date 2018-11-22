@@ -145,27 +145,27 @@ func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
 }
 
 func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateCluster)
+	return CreateNkey(t, nkeys.PrefixByteCluster)
 }
 
 func CreateServerKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateServer)
+	return CreateNkey(t, nkeys.PrefixByteServer)
 }
 
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateAccount)
+	return CreateNkey(t, nkeys.PrefixByteAccount)
 }
 
 func CreateUserKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateUser)
+	return CreateNkey(t, nkeys.PrefixByteUser)
 }
 
 func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.CreateOperator)
+	return CreateNkey(t, nkeys.PrefixByteOperator)
 }
 
-func CreateNkey(t *testing.T, f store.NKeyFactory) ([]byte, string, nkeys.KeyPair) {
-	kp, err := f()
+func CreateNkey(t *testing.T, kind nkeys.PrefixByte) ([]byte, string, nkeys.KeyPair) {
+	kp, err := nkeys.CreatePair(kind)
 	require.NoError(t, err)
 
 	seed, err := kp.Seed()

@@ -504,7 +504,7 @@ type Context struct {
 }
 
 func (ctx *Context) SetContext(name string, pub string) error {
-	kp, err := nkeys.FromPublicKey([]byte(pub))
+	kp, err := nkeys.FromPublicKey(pub)
 	if err != nil {
 		return fmt.Errorf("error parsing public key: %v", err)
 	}

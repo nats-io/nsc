@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +35,7 @@ type GenerateNKeysParam struct {
 }
 
 func (p *GenerateNKeysParam) PrintKey(kind nkeys.PrefixByte, cmd *cobra.Command) {
-	kp, err := store.CreateNKey(kind)
+	kp, err := nkeys.CreatePair(kind)
 	if err != nil {
 		panic(err)
 	}

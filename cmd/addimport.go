@@ -43,7 +43,7 @@ nsc add import --url https://some.service.com/path --to import.>`,
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			cmd.Printf("Success! - added %s import %q\n", params.activation.Export.Type, params.activation.Export.Subject)
+			cmd.Printf("Success! - added %s import %q\n", params.activation.Activation.ImportType, params.activation.Activation.ImportSubject)
 			return nil
 		},
 	}
@@ -174,7 +174,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if p.to == "" {
-		p.to = string(p.activation.Export.Subject)
+		p.to = string(p.activation.Activation.ImportSubject)
 	}
 
 	p.to, err = cli.Prompt("subject mapping", p.to, true, func(s string) error {
@@ -212,19 +212,19 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	var export = p.activation.Export
+	var export = p.activation.Activation
 
 	for _, im := range p.claim.Imports {
-		if im.Account == p.activation.Issuer && string(im.Subject) == string(export.Subject) {
+		if im.Account == p.activation.Issuer && string(im.Subject) == string(export.ImportSubject) {
 			return fmt.Errorf("account %s already imports %q from %s", p.AccountContextParams.Name, im.Subject, p.activation.Issuer)
 		}
 	}
 
 	if p.im.Name == "" {
-		p.im.Name = export.Name
+		p.im.Name = string(p.im.Subject)
 	}
-	p.im.Subject = export.Subject
-	p.im.Type = export.Type
+	p.im.Subject = export.ImportSubject
+	p.im.Type = export.ImportType
 	p.im.Account = p.activation.Issuer
 	p.im.To = jwt.Subject(p.to)
 	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {

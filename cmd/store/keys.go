@@ -213,7 +213,7 @@ func resolveAsKey(d []byte) (nkeys.KeyPair, error) {
 		return kp, nil
 	}
 
-	kp, err = nkeys.FromPublicKey(d)
+	kp, err = nkeys.FromPublicKey(string(d))
 	if err == nil {
 		return kp, nil
 	}
@@ -222,34 +222,14 @@ func resolveAsKey(d []byte) (nkeys.KeyPair, error) {
 
 type NKeyFactory func() (nkeys.KeyPair, error)
 
-func CreateNKey(kind nkeys.PrefixByte) (nkeys.KeyPair, error) {
-	var f NKeyFactory
-	switch kind {
-	case nkeys.PrefixByteAccount:
-		f = nkeys.CreateAccount
-	case nkeys.PrefixByteCluster:
-		f = nkeys.CreateCluster
-	case nkeys.PrefixByteOperator:
-		f = nkeys.CreateOperator
-	case nkeys.PrefixByteServer:
-		f = nkeys.CreateServer
-	case nkeys.PrefixByteUser:
-		f = nkeys.CreateUser
-	default:
-		return nil, fmt.Errorf("unexpected kind %d", kind)
-	}
-
-	return f()
-}
-
-type KeyTypeFn func([]byte) bool
+type KeyTypeFn func(string) bool
 
 func KeyPairTypeOk(kind nkeys.PrefixByte, kp nkeys.KeyPair) bool {
 	d, _ := kp.PublicKey()
 	return IsPublicKey(kind, d)
 }
 
-func IsPublicKey(kind nkeys.PrefixByte, key []byte) bool {
+func IsPublicKey(kind nkeys.PrefixByte, key string) bool {
 	var f KeyTypeFn
 	switch kind {
 	case nkeys.PrefixByteAccount:
@@ -266,23 +246,6 @@ func IsPublicKey(kind nkeys.PrefixByte, key []byte) bool {
 		return false
 	}
 	return f(key)
-}
-
-func KeyTypeLabel(kind nkeys.PrefixByte) string {
-	switch kind {
-	case nkeys.PrefixByteAccount:
-		return "account"
-	case nkeys.PrefixByteCluster:
-		return "cluster"
-	case nkeys.PrefixByteOperator:
-		return "operator"
-	case nkeys.PrefixByteServer:
-		return "server"
-	case nkeys.PrefixByteUser:
-		return "user"
-	default:
-		return ""
-	}
 }
 
 func KeyType(kp nkeys.KeyPair) (nkeys.PrefixByte, error) {

@@ -67,7 +67,7 @@ init --interactive
 			for _, c := range p.Containers() {
 				if c.create && c.generated {
 					printed = true
-					table.AddRow(c.name, store.KeyTypeLabel(c.kind), c.keyPath)
+					table.AddRow(c.name, c.kind.String(), c.keyPath)
 				}
 			}
 
@@ -225,7 +225,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		return err
 	}
 
-	p.cluster.create, err = cli.PromptBoolean(fmt.Sprintf("create a %s", store.KeyTypeLabel(nkeys.PrefixByteCluster)), false)
+	p.cluster.create, err = cli.PromptBoolean(fmt.Sprintf("create a %s", nkeys.PrefixByteCluster.String()), false)
 	if err != nil {
 		return err
 	}

@@ -208,7 +208,8 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	p.activation = jwt.NewActivationClaims(p.targetPK)
 	p.activation.NotBefore, _ = p.timeParams.StartDate()
 	p.activation.Expires, _ = p.timeParams.ExpiryDate()
-	p.activation.Export = p.export
+	p.activation.Activation.ImportSubject = p.export.Subject
+	p.activation.Activation.ImportType = p.export.Type
 
 	p.token, err = p.activation.Encode(p.signerKP)
 	if err != nil {

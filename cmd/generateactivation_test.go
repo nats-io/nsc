@@ -112,7 +112,7 @@ func testExternalToken(t *testing.T, tokenpath string) {
 
 	ac, err := jwt.DecodeActivationClaims(s)
 	require.NoError(t, err)
-	require.Equal(t, "foo", string(ac.Export.Subject))
+	require.Equal(t, "foo", string(ac.ImportSubject))
 }
 
 func Test_InteractiveGenerate(t *testing.T) {

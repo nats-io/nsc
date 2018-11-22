@@ -46,11 +46,11 @@ func (c *Entity) Valid() error {
 		}
 
 		if !store.KeyPairTypeOk(c.kind, c.kp) {
-			return fmt.Errorf("invalid %s key", store.KeyTypeLabel(c.kind))
+			return fmt.Errorf("invalid %s key", c.kind.String())
 		}
 
 	} else {
-		c.kp, err = store.CreateNKey(c.kind)
+		c.kp, err = nkeys.CreatePair(c.kind)
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func (c *Entity) Valid() error {
 	}
 
 	if exists {
-		return fmt.Errorf("the %s %q already exists", store.KeyTypeLabel(c.kind), c.name)
+		return fmt.Errorf("the %s %q already exists", c.kind.String(), c.name)
 	}
 
 	return nil
@@ -114,7 +114,7 @@ func (c *Entity) KeySource() string {
 
 func (c *Entity) Edit() error {
 	var err error
-	label := store.KeyTypeLabel(c.kind)
+	label := c.kind.String()
 
 	c.name, err = cli.Prompt(fmt.Sprintf("%s name", label), c.name, true, cli.LengthValidator(1))
 	if err != nil {
@@ -192,7 +192,7 @@ func (c *Entity) ValidateNKey() cli.Validator {
 			return err
 		}
 		if t != c.kind {
-			return fmt.Errorf("specified key is not valid for an %s", store.KeyTypeLabel(c.kind))
+			return fmt.Errorf("specified key is not valid for an %s", c.kind.String())
 		}
 		return nil
 	}

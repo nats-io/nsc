@@ -48,7 +48,7 @@ func (e *NKeyParams) valid(s string) error {
 		return err
 	}
 	if !store.KeyPairTypeOk(e.kind, kp) {
-		return fmt.Errorf("%s has invalid %s nkey", e.flagName, store.KeyTypeLabel(e.kind))
+		return fmt.Errorf("%s has invalid %s nkey", e.flagName, e.kind.String())
 	}
 	if e.private {
 		_, err = kp.Seed()

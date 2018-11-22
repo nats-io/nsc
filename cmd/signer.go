@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 )
 
 type SignerParams struct {
@@ -44,7 +43,7 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		return err
 	}
 	if p.signerKP == nil {
-		label := fmt.Sprintf("%s keypath", store.KeyTypeLabel(p.kind))
+		label := fmt.Sprintf("%s keypath", p.kind.String())
 		err = EditKeyPath(p.kind, label, &KeyPathFlag)
 		if err != nil {
 			return err
