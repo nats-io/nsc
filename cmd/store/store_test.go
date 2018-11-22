@@ -237,4 +237,5 @@ func TestOperatorLessStore(t *testing.T) {
 	ss, err := LoadStore(s.Dir)
 	require.NoError(t, err)
 	require.NotNil(t, ss)
+	require.True(t, s.IsManaged())
 }
