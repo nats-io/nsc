@@ -15,43 +15,35 @@
 
 package cmd
 
-//func AddExport(t *testing.T, ts *TestStore, accountName string, kind jwt.ExportType, subject string) {
-//	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
-//		_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", accountName)
-//		require.NoError(t, err, "account creation for export")
-//	}
-//
-//	if kind == jwt.Stream {
-//		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject)
-//		require.NoError(t, err)
-//	} else {
-//		_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", subject, "--service")
-//		require.NoError(t, err)
-//	}
-//}
-//
-//
-//
-//func Test_AddImport(t *testing.T) {
-//	ts := NewTestStore(t, "add_export")
-//	defer ts.Done(t)
-//
-//	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
-//	require.NoError(t, err, "export creation")
-//
-//	tests := CmdTests{
-//		{createAddExportCmd(), []string{"add", "export"}, nil, []string{"subject is required"}, true},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "foo"}, nil, []string{"added public stream export \"foo\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "bar", "--service"}, nil, []string{"added public service export \"bar\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "bar"}, nil, []string{"export subject \"bar\" already exports \"bar\""}, true},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "foo", "--service"}, nil, []string{"export subject \"foo\" already exports \"foo\""}, true},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>", "--service"}, nil, []string{"services cannot have wildcard subject: \"baz.>\""}, true},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>"}, nil, []string{"added public stream export \"baz.>\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "ar", "--name", "mar"}, nil, []string{"added public stream export \"mar\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "mar", "--name", "ar", "--service"}, nil, []string{"added public service export \"ar\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "pubstream", "--private"}, nil, []string{"added private stream export \"pubstream\""}, false},
-//		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, nil, []string{"added private service export \"pubservice\""}, false},
-//	}
-//
-//	tests.Run(t, "root", "add")
-//}
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/nats-io/jwt"
+	"github.com/stretchr/testify/require"
+)
+
+func Test_AddImport(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	kp, err := ts.KeyStore.GetAccountKey("B")
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+	d, err := kp.PublicKey()
+
+	token := ts.GenerateActivation(t, string(d), "A", jwt.Stream, "foobar.>")
+	fp := filepath.Join(ts.Dir, "token.jwt")
+	require.NoError(t, Write(fp, []byte(token)))
+
+	tests := CmdTests{
+		{createAddImportCmd(), []string{"add", "import"}, nil, []string{"an account is required"}, true},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B"}, nil, []string{"token is required"}, true},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", fp}, nil, []string{"added stream import"}, false},
+	}
+
+	tests.Run(t, "root", "add")
+}

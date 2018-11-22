@@ -78,7 +78,7 @@ func NewTestStoreWithOperator(t *testing.T, name string, operator nkeys.KeyPair)
 		require.NoError(t, err, "store operator key")
 	}
 
-	os.Chdir(ts.Store.Dir)
+	require.NoError(t, os.Chdir(ts.Store.Dir))
 
 	return &ts
 }
@@ -90,7 +90,7 @@ func NewTestStore(t *testing.T, name string) *TestStore {
 
 func (ts *TestStore) Done(t *testing.T) {
 	cli.ResetPromptLib()
-	os.Chdir(ts.StartDir)
+	require.NoError(t, os.Chdir(ts.StartDir))
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
 	}
@@ -117,18 +117,13 @@ func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.Export
 	require.NoError(t, err)
 }
 
-//func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *store.Store {
-//	p := MakeTempDir(t)
-//	err := os.Setenv(store.NKeysPathEnv, filepath.Join(p, "nkeys"))
-//	require.NoError(t, err, "setting environment")
-//	kind, err := store.KeyType(kp)
-//	require.NoError(t, err, "getting key kind")
-//	keyName := fmt.Sprintf("%s_%s", name, store.KeyTypeLabel(kind))
-//	s, err := store.CreateStore(name, p, store.NamedKey{Name: keyName, KP: kp})
-//	require.NoError(t, err, "creating store")
-//	require.NotNil(t, s, "store not nil")
-//	return s
-//}
+func (ts *TestStore) GenerateActivation(t *testing.T, targetAccount string, accountName string, kind jwt.ExportType, subject string) string {
+	ts.AddExport(t, accountName, kind, subject, false)
+	flags := []string{"--account", accountName, "--target-account", targetAccount, "--subject", subject}
+	stdout, _, err := ExecuteCmd(createGenerateActivation(), flags...)
+	require.NoError(t, err)
+	return ExtractToken(stdout)
+}
 
 func MakeTempDir(t *testing.T) string {
 	p, err := ioutil.TempDir("", "store_test")

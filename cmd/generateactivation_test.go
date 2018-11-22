@@ -43,26 +43,26 @@ func Test_GenerateActivation(t *testing.T) {
 	tests.Run(t, "root", "generate")
 }
 
-//func Test_GenerateActivationMultiple(t *testing.T) {
-//	ts := NewTestStore(t, "gen activation")
-//	defer ts.Done(t)
-//
-//	ts.AddAccount(t, "A")
-//	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-//	ts.AddExport(t, "A", jwt.Stream, "bar.>", false)
-//	ts.AddAccount(t, "B")
-//
-//	_, pub, _ := CreateAccountKey(t)
-//
-//	tests := CmdTests{
-//		{createGenerateActivation(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
-//		{createGenerateActivation(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
-//		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
-//		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
-//	}
-//
-//	tests.Run(t, "root", "generate")
-//}
+func Test_GenerateActivationMultiple(t *testing.T) {
+	ts := NewTestStore(t, "gen activation")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "bar.>", false)
+	ts.AddAccount(t, "B")
+
+	_, pub, _ := CreateAccountKey(t)
+
+	tests := CmdTests{
+		{createGenerateActivation(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
+		{createGenerateActivation(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
+		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
+		{createGenerateActivation(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
+	}
+
+	tests.Run(t, "root", "generate")
+}
 
 func Test_GenerateActivationEmptyExports(t *testing.T) {
 	ts := NewTestStore(t, "gen activation")

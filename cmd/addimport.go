@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createImportCmd() *cobra.Command {
+func createAddImportCmd() *cobra.Command {
 	var params AddImportParams
 	cmd := &cobra.Command{
 		Use:   "import",
@@ -56,7 +56,7 @@ nsc add import --url https://some.service.com/path --to import.>`,
 }
 
 func init() {
-	addCmd.AddCommand(createImportCmd())
+	addCmd.AddCommand(createAddImportCmd())
 }
 
 type AddImportParams struct {
@@ -132,7 +132,7 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 
 	if p.src == "" {
 		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("--token is required")
+		return errors.New("token is required")
 	}
 
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
