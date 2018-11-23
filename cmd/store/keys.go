@@ -195,6 +195,10 @@ func Match(pubkey string, kp nkeys.KeyPair) bool {
 }
 
 func keyFromFile(path string) (nkeys.KeyPair, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err

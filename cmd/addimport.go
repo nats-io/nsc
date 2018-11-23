@@ -16,12 +16,9 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 
 	"github.com/nats-io/jwt"
@@ -101,18 +98,7 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 
 func (p *AddImportParams) LoadImport() ([]byte, error) {
 	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {
-		r, err := http.Get(p.src)
-		if err != nil {
-			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
-		}
-		defer r.Body.Close()
-		var buf bytes.Buffer
-		_, err = io.Copy(&buf, r.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error reading response from %q: %v", p.src, err)
-		}
-		data := buf.Bytes()
-		return data, nil
+		return LoadFromURL(p.src)
 	} else {
 		data, err := ioutil.ReadFile(p.src)
 		if err != nil {

@@ -23,77 +23,78 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createDescribeAccountCmd() *cobra.Command {
-	var params DescribeAccountParams
+func createDescribeClusterCmd() *cobra.Command {
+	var params DescribeClusterParams
 	cmd := &cobra.Command{
-		Use:          "account",
-		Short:        "Describes an account",
+		Use:          "cluster",
+		Short:        "Describes a cluster",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 			if !IsStdOut(params.outputFile) {
-				cmd.Printf("Success! - wrote account description to %q\n", params.outputFile)
+				cmd.Printf("Success! - wrote cluster description to %q\n", params.outputFile)
 			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	params.AccountContextParams.BindFlags(cmd)
+
+	params.ClusterContextParams.BindFlags(cmd)
 
 	return cmd
 }
 
 func init() {
-	describeCmd.AddCommand(createDescribeAccountCmd())
+	describeCmd.AddCommand(createDescribeClusterCmd())
 }
 
-type DescribeAccountParams struct {
-	AccountContextParams
-	jwt.AccountClaims
+type DescribeClusterParams struct {
+	ClusterContextParams
+	jwt.ClusterClaims
 	outputFile string
 	token      string
 }
 
-func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
+func (p *DescribeClusterParams) SetDefaults(ctx ActionCtx) error {
+	p.ClusterContextParams.SetDefaults(ctx)
 	return nil
 }
 
-func (p *DescribeAccountParams) PreInteractive(ctx ActionCtx) error {
-	return p.AccountContextParams.Edit(ctx)
+func (p *DescribeClusterParams) PreInteractive(ctx ActionCtx) error {
+	return p.ClusterContextParams.Edit(ctx)
 }
 
-func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
+func (p *DescribeClusterParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if err = p.AccountContextParams.Validate(ctx); err != nil {
+	if err = p.ClusterContextParams.Validate(ctx); err != nil {
 		return err
 	}
 
-	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.JwtName(p.AccountContextParams.Name)) {
-		return fmt.Errorf("account %q is not defined in the current context", p.AccountContextParams.Name)
+	if !ctx.StoreCtx().Store.Has(store.Clusters, p.ClusterContextParams.Name, store.JwtName(p.ClusterContextParams.Name)) {
+		return fmt.Errorf("cluster %q is not defined in the current context", p.ClusterContextParams.Name)
 	}
-	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+	ac, err := ctx.StoreCtx().Store.ReadClusterClaim(p.ClusterContextParams.Name)
 	if err != nil {
 		return err
 	}
 	if ac != nil {
-		p.AccountClaims = *ac
+		p.ClusterClaims = *ac
 	}
 	return nil
 }
 
-func (p *DescribeAccountParams) Validate(ctx ActionCtx) error {
+func (p *DescribeClusterParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) PostInteractive(ctx ActionCtx) error {
+func (p *DescribeClusterParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) Run(ctx ActionCtx) error {
-	v := NewAccountDescriber(p.AccountClaims).Describe()
+func (p *DescribeClusterParams) Run(ctx ActionCtx) error {
+	v := NewClusterDescriber(p.ClusterClaims).Describe()
 	return Write(p.outputFile, []byte(v))
 }

@@ -633,6 +633,12 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if len(accounts) == 0 {
+			return "", fmt.Errorf("no accounts defined - add one first")
+		}
+		if len(accounts) == 1 {
+			name = accounts[0]
+		}
 		if len(accounts) > 1 {
 			i, err := cli.PromptChoices("select account", accounts)
 			if err != nil {
@@ -682,6 +688,41 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 	return "", nil
 }
 
+func (ctx *Context) PickServer(clusterName string) (string, error) {
+	var err error
+	if clusterName == "" {
+		clusterName = ctx.Cluster.Name
+	}
+
+	if clusterName == "" {
+		clusterName, err = ctx.PickCluster(clusterName)
+		if err != nil {
+			return "", err
+		}
+	}
+	// allow downstream use of context to have cluster
+	ctx.Cluster.Name = clusterName
+
+	servers, err := ctx.Store.ListEntries(Clusters, clusterName, Servers)
+	if err != nil {
+		return "", err
+	}
+	if len(servers) == 0 {
+		return "", fmt.Errorf("cluster %q doesn't have any servers - add one first", clusterName)
+	}
+	if len(servers) == 1 {
+		return servers[0], nil
+	}
+	if len(servers) > 1 {
+		i, err := cli.PromptChoices("select server", servers)
+		if err != nil {
+			return "", err
+		}
+		return servers[i], nil
+	}
+	return "", nil
+}
+
 func (ctx *Context) PickCluster(name string) (string, error) {
 	if name == "" {
 		name = ctx.Cluster.Name
@@ -692,6 +733,12 @@ func (ctx *Context) PickCluster(name string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if len(clusters) == 0 {
+			return "", fmt.Errorf("no clusters defined - add one first")
+		}
+		if len(clusters) == 1 {
+			name = clusters[0]
+		}
 		if len(clusters) > 1 {
 			i, err := cli.PromptChoices("select cluster", clusters)
 			if err != nil {
@@ -700,7 +747,7 @@ func (ctx *Context) PickCluster(name string) (string, error) {
 			name = clusters[i]
 		}
 	}
-	// allow downstream use of context to have account
+	// allow downstream use of context to have cluster
 	ctx.Cluster.Name = name
 
 	return name, nil

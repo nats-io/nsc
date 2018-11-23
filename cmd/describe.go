@@ -16,14 +16,137 @@
 package cmd
 
 import (
+	"fmt"
+	"net/url"
+
+	"github.com/nats-io/jwt"
+	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
 )
 
-var describeCmd = &cobra.Command{
-	Use:   "describe",
-	Short: "Describe assets such as accounts, users, activations, services, and streams",
+var describeCmd *cobra.Command
+
+func createDescribeCmd() *cobra.Command {
+	var params DescribeFile
+	var cmd = &cobra.Command{
+		Use:   "describe",
+		Short: "Describe assets such as accounts, users, activations, services, and streams",
+		Example: `nsc describe -f pathorurl
+nsc describe account
+nsc describe account -n foo`,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := RunAction(cmd, args, &params); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
+	cmd.Flags().StringVarP(&params.file, "file", "f", "", "an token file or url to a token file")
+
+	return cmd
 }
 
 func init() {
+	describeCmd = createDescribeCmd()
 	rootCmd.AddCommand(describeCmd)
+}
+
+type DescribeFile struct {
+	file       string
+	kind       jwt.ClaimType
+	outputFile string
+	token      string
+}
+
+func (p *DescribeFile) SetDefaults(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *DescribeFile) PreInteractive(ctx ActionCtx) error {
+	var err error
+	p.file, err = cli.Prompt("token file or url", p.file, true, func(s string) error {
+		return nil
+	})
+	return err
+}
+
+func (p *DescribeFile) Load(ctx ActionCtx) error {
+	if url, err := url.Parse(p.file); err == nil && url.Scheme != "" {
+		d, err := LoadFromURL(p.file)
+		if err != nil {
+			return err
+		}
+		p.token = string(d)
+	} else {
+		d, err := Read(p.file)
+		if err != nil {
+			return err
+		}
+		p.token = ExtractToken(string(d))
+	}
+
+	gc, err := jwt.DecodeGeneric(p.token)
+	if err != nil {
+		return err
+	}
+	p.kind = gc.Type
+	return nil
+}
+
+func (p *DescribeFile) PostInteractive(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *DescribeFile) Validate(ctx ActionCtx) error {
+	return nil
+}
+
+func (p *DescribeFile) Run(ctx ActionCtx) error {
+	var describer Describer
+	switch p.kind {
+	case jwt.AccountClaim:
+		ac, err := jwt.DecodeAccountClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewAccountDescriber(*ac)
+	case jwt.ActivationClaim:
+		ac, err := jwt.DecodeActivationClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewActivationDescriber(*ac)
+	case jwt.ClusterClaim:
+		cc, err := jwt.DecodeClusterClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewClusterDescriber(*cc)
+	case jwt.UserClaim:
+		uc, err := jwt.DecodeUserClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewUserDescriber(*uc)
+	case jwt.ServerClaim:
+		uc, err := jwt.DecodeServerClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewServerDescriber(*uc)
+	case jwt.OperatorClaim:
+		oc, err := jwt.DecodeOperatorClaims(p.token)
+		if err != nil {
+			return err
+		}
+		describer = NewOperatorDescriber(*oc)
+	}
+
+	if describer == nil {
+		return fmt.Errorf("describer for %q is not implemented", p.kind)
+	}
+
+	return Write(p.outputFile, []byte(describer.Describe()))
 }

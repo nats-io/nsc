@@ -18,7 +18,11 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,23 +45,26 @@ func ResolvePath(defaultPath string, varName string) string {
 }
 
 func GetOutput(fp string) (*os.File, error) {
-	var err error
 	var f *os.File
 
 	if fp == "--" {
 		f = os.Stdout
 	} else {
-		_, err = os.Stat(fp)
+		afp, err := filepath.Abs(fp)
+		if err != nil {
+			return nil, fmt.Errorf("error calculating abs %q: %v", fp, err)
+		}
+		_, err = os.Stat(afp)
 		if err == nil {
-			return nil, fmt.Errorf("%q already exists", fp)
+			return nil, fmt.Errorf("%q already exists", afp)
 		}
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
 
-		f, err = os.Create(fp)
+		f, err = os.Create(afp)
 		if err != nil {
-			return nil, fmt.Errorf("error creating output file %q: %v", fp, err)
+			return nil, fmt.Errorf("error creating output file %q: %v", afp, err)
 		}
 	}
 	return f, nil
@@ -89,6 +96,14 @@ func Write(fp string, data []byte) error {
 		}
 	}
 	return nil
+}
+
+func Read(fp string) ([]byte, error) {
+	afp, err := filepath.Abs(fp)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %q: %v", fp, err)
+	}
+	return ioutil.ReadFile(afp)
 }
 
 func FormatKeys(keyType string, publicKey string, privateKey string) []byte {
@@ -277,4 +292,19 @@ func EditKeyPath(kind nkeys.PrefixByte, label string, keypath *string) error {
 		*keypath = v
 	}
 	return nil
+}
+
+func LoadFromURL(url string) ([]byte, error) {
+	r, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error loading %q: %v", url, err)
+	}
+	defer r.Body.Close()
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response from %q: %v", url, err)
+	}
+	data := buf.Bytes()
+	return data, nil
 }
