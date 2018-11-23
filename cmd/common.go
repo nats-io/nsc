@@ -178,7 +178,7 @@ func ExtractToken(s string) string {
 
 	// the token can now look like
 	// -BEGINXXXXPUBKEY-token-ENDXXXXPUBKEY-
-	re = regexp.MustCompile(`(?m)(\-BEGIN.+(JWT|KEY)\-)(?P<token>.+)(\-END.+(JWT|KEY)\-)`)
+	re = regexp.MustCompile(`(?m)(\-BEGIN.+(JWT|KEY|SEED)\-)(?P<token>.+)(\-END.+(JWT|KEY|SEED)\-)`)
 	// find the index of the token
 	m := re.FindStringSubmatch(w)
 	if len(m) > 0 {

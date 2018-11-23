@@ -666,6 +666,12 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(users) == 0 {
+		return "", fmt.Errorf("account %q doesn't have any users - add one first", accountName)
+	}
+	if len(users) == 1 {
+		return users[0], nil
+	}
 	if len(users) > 1 {
 		i, err := cli.PromptChoices("select user", users)
 		if err != nil {
