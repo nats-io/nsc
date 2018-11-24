@@ -22,8 +22,9 @@ import (
 
 // addCmd represents the add command
 var testCmd = &cobra.Command{
-	Use:   "test",
-	Short: "Test commands",
+	Hidden: true,
+	Use:    "test",
+	Short:  "Test commands",
 }
 
 type GenerateNKeysParam struct {
