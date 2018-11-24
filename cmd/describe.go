@@ -43,7 +43,7 @@ nsc describe account -n foo`,
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	cmd.Flags().StringVarP(&params.file, "file", "f", "", "an token file or url to a token file")
+	cmd.Flags().StringVarP(&params.file, "file", "f", "", "a token file or url to a token file")
 
 	return cmd
 }
