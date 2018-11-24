@@ -21,23 +21,24 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
-func createEditAccount() *cobra.Command {
-	var params EditAccountParams
+func createEditServerCmd() *cobra.Command {
+	var params EditServerParams
 	cmd := &cobra.Command{
-		Use:          "account",
-		Short:        "Edit an account",
+		Use:          "server",
+		Short:        "Edit a server",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 
-			cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
+			cmd.Printf("Success! - edited server %q\n", params.name)
 
-			Write("--", FormatJwt("Account", params.token))
+			Write("--", FormatJwt("Server", params.token))
 
 			if params.claim.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",
@@ -53,32 +54,38 @@ func createEditAccount() *cobra.Command {
 			return nil
 		},
 	}
+
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
+	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
 
-	params.AccountContextParams.BindFlags(cmd)
+	params.ClusterContextParams.BindFlags(cmd)
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
 
 func init() {
-	editCmd.AddCommand(createEditAccount())
+	editCmd.AddCommand(createEditServerCmd())
 }
 
-type EditAccountParams struct {
-	AccountContextParams
+type EditServerParams struct {
+	ClusterContextParams
 	SignerParams
 	TimeParams
-	claim  *jwt.AccountClaims
-	token  string
-	tags   []string
-	rmTags []string
+	claim      *jwt.ServerClaims
+	name       string
+	token      string
+	clusterJwt string
+	out        string
+	rmTags     []string
+	tags       []string
 }
 
-func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
-	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+func (p *EditServerParams) SetDefaults(ctx ActionCtx) error {
+	p.ClusterContextParams.SetDefaults(ctx)
+	p.SignerParams.SetDefaults(nkeys.PrefixByteCluster, true, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag") {
 		ctx.CurrentCmd().SilenceUsage = false
@@ -87,41 +94,71 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
+func (p *EditServerParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	if err = p.AccountContextParams.Edit(ctx); err != nil {
+	if err = p.ClusterContextParams.Edit(ctx); err != nil {
 		return err
 	}
+
+	if p.name == "" {
+		p.name, err = ctx.StoreCtx().PickServer(p.ClusterContextParams.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = p.TimeParams.Edit(); err != nil {
+		return err
+	}
+
+	if err = p.SignerParams.Edit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (p *EditAccountParams) Load(ctx ActionCtx) error {
+func (p *EditServerParams) Load(ctx ActionCtx) error {
 	var err error
 
-	if err = p.AccountContextParams.Validate(ctx); err != nil {
+	if err = p.ClusterContextParams.Validate(ctx); err != nil {
 		return err
 	}
 
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+	if p.name == "" {
+		n := ctx.StoreCtx().DefaultServer(p.ClusterContextParams.Name)
+		if n != nil {
+			p.name = *n
+		}
+	}
+
+	if p.name == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("server name is required")
+	}
+
+	if !ctx.StoreCtx().Store.Has(store.Clusters, p.ClusterContextParams.Name, store.Servers, store.JwtName(p.name)) {
+		return fmt.Errorf("server %q not found", p.name)
+	}
+
+	d, err := ctx.StoreCtx().Store.Read(store.Clusters, p.ClusterContextParams.Name, store.JwtName(p.ClusterContextParams.Name))
+	if err != nil {
+		return fmt.Errorf("error loading %q cluster jwt: %v", p.ClusterContextParams.Name, err)
+	}
+	p.clusterJwt = string(d)
+
+	p.claim, err = ctx.StoreCtx().Store.ReadServerClaim(p.ClusterContextParams.Name, p.name)
 	if err != nil {
 		return err
 	}
 	return err
 }
 
-func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
-	var err error
-	if err = p.TimeParams.Edit(); err != nil {
-		return err
-	}
-
-	if err := p.SignerParams.Edit(ctx); err != nil {
-		return err
-	}
+func (p *EditServerParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditAccountParams) Validate(ctx ActionCtx) error {
+func (p *EditServerParams) Validate(ctx ActionCtx) error {
 	var err error
 	if err = p.TimeParams.Validate(); err != nil {
 		return err
@@ -132,8 +169,10 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditAccountParams) Run(ctx ActionCtx) error {
+func (p *EditServerParams) Run(ctx ActionCtx) error {
 	var err error
+	p.claim.Cluster = p.clusterJwt
+
 	if p.TimeParams.IsStartChanged() {
 		p.claim.NotBefore, _ = p.TimeParams.StartDate()
 	}

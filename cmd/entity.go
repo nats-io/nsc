@@ -24,7 +24,7 @@ import (
 	"github.com/nats-io/nsc/cmd/store"
 )
 
-type EntityClaimsEditor func(interface{}) error
+type EntityClaimsEditor func(interface{}, ActionCtx) error
 
 type Entity struct {
 	create    bool
@@ -134,7 +134,7 @@ func (c *Entity) Edit() error {
 	return nil
 }
 
-func (c *Entity) GenerateClaim(signer nkeys.KeyPair) error {
+func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 	if !c.create {
 		return nil
 	}
@@ -165,7 +165,7 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair) error {
 	d.Name = c.name
 
 	if c.editFn != nil {
-		if err = c.editFn(claim); err != nil {
+		if err = c.editFn(claim, ctx); err != nil {
 			return err
 		}
 	}

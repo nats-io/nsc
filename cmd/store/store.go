@@ -653,6 +653,18 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 	return name, nil
 }
 
+// Returns an user name for the account if there's only one user
+func (ctx *Context) DefaultUser(accountName string) *string {
+	users, err := ctx.Store.ListEntries(Accounts, accountName, Users)
+	if err != nil {
+		return nil
+	}
+	if len(users) == 1 {
+		return &users[0]
+	}
+	return nil
+}
+
 func (ctx *Context) PickUser(accountName string) (string, error) {
 	var err error
 	if accountName == "" {
@@ -686,6 +698,18 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 		return users[i], nil
 	}
 	return "", nil
+}
+
+// Returns a server name for the cluster if there's only one user
+func (ctx *Context) DefaultServer(cluster string) *string {
+	servers, err := ctx.Store.ListEntries(Clusters, cluster, Servers)
+	if err != nil {
+		return nil
+	}
+	if len(servers) == 1 {
+		return &servers[0]
+	}
+	return nil
 }
 
 func (ctx *Context) PickServer(clusterName string) (string, error) {

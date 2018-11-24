@@ -59,16 +59,7 @@ type DescribeUserParams struct {
 }
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
-	var err error
 	p.AccountContextParams.SetDefaults(ctx)
-
-	if p.user == "" {
-		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -92,6 +83,13 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
+	}
+
+	if p.user == "" {
+		n := ctx.StoreCtx().DefaultUser(p.AccountContextParams.Name)
+		if n != nil {
+			p.user = *n
+		}
 	}
 
 	if p.user == "" {

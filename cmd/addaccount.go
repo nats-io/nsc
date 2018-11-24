@@ -115,13 +115,13 @@ func (p *AddAccountParams) Run(ctx ActionCtx) error {
 	if err := p.Entity.StoreKeys(ctx.StoreCtx().Store.GetName()); err != nil {
 		return err
 	}
-	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *AddAccountParams) editAccount(c interface{}) error {
+func (p *AddAccountParams) editAccount(c interface{}, ctx ActionCtx) error {
 	ac, ok := c.(*jwt.AccountClaims)
 	if !ok {
 		return errors.New("unable to cast to account claim")

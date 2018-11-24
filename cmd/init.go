@@ -342,7 +342,7 @@ func (p *InitParams) Run() error {
 		if !c.create || i == 0 {
 			continue
 		}
-		c.GenerateClaim(containers[i-1].kp)
+		c.GenerateClaim(containers[i-1].kp, nil)
 	}
 
 	return nil

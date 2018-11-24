@@ -47,7 +47,7 @@ func createAddServerCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "server name")
-	cmd.Flags().StringVarP(&params.clusterName, "cluster", "", "", "cluster name")
+	cmd.Flags().StringVarP(&params.clusterName, "cluster", "c", "", "cluster name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the server")
 	params.TimeParams.BindFlags(cmd)
 
@@ -62,6 +62,7 @@ type AddServerParams struct {
 	SignerParams
 	TimeParams
 	Entity
+	clusterJwt  string
 	clusterName string
 }
 
@@ -105,6 +106,15 @@ func (p *AddServerParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddServerParams) Load(ctx ActionCtx) error {
+	if p.clusterName == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("cluster is required")
+	}
+	d, err := ctx.StoreCtx().Store.Read(store.Clusters, p.clusterName, store.JwtName(p.clusterName))
+	if err != nil {
+		return err
+	}
+	p.clusterJwt = string(d)
 	return nil
 }
 
@@ -150,18 +160,20 @@ func (p *AddServerParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.Entity.GenerateClaim(p.signerKP); err != nil {
+	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *AddServerParams) editServerClaim(c interface{}) error {
+func (p *AddServerParams) editServerClaim(c interface{}, ctx ActionCtx) error {
 	sc, ok := c.(*jwt.ServerClaims)
 	if !ok {
 		return errors.New("unable to cast to server claim")
 	}
+
+	sc.Cluster = p.clusterJwt
 
 	if p.TimeParams.IsStartChanged() {
 		sc.NotBefore, _ = p.TimeParams.StartDate()

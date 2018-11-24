@@ -60,15 +60,7 @@ type DescribeServerParams struct {
 }
 
 func (p *DescribeServerParams) SetDefaults(ctx ActionCtx) error {
-	var err error
 	p.ClusterContextParams.SetDefaults(ctx)
-
-	if p.server == "" {
-		p.server, err = ctx.StoreCtx().PickServer(p.ClusterContextParams.Name)
-		if err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
@@ -93,6 +85,13 @@ func (p *DescribeServerParams) Load(ctx ActionCtx) error {
 
 	if err = p.ClusterContextParams.Validate(ctx); err != nil {
 		return err
+	}
+
+	if p.server == "" {
+		n := ctx.StoreCtx().DefaultServer(p.ClusterContextParams.Name)
+		if n != nil {
+			p.server = *n
+		}
 	}
 
 	if p.server == "" {

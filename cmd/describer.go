@@ -38,17 +38,18 @@ func NewAccountDescriber(ac jwt.AccountClaims) *AccountDescriber {
 	return &AccountDescriber{AccountClaims: ac}
 }
 
-func (ac *AccountDescriber) Describe() string {
+func (a *AccountDescriber) Describe() string {
 	var buf bytes.Buffer
 
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 
 	table.AddTitle("Account Details")
-	AddStandardClaimInfo(table, ac.ClaimsData)
+	table.AddRow("Name", a.Name)
+	AddStandardClaimInfo(table, a.ClaimsData)
 
-	if ac.Subject != ac.Issuer {
-		lim := ac.Limits
+	if a.Subject != a.Issuer {
+		lim := a.Limits
 		if lim.Conn > 0 {
 			table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
 		} else {
@@ -86,24 +87,25 @@ func (ac *AccountDescriber) Describe() string {
 		}
 	}
 
-	if len(ac.Imports) == 0 {
+	if len(a.Imports) == 0 {
 		table.AddRow("Imports", "No services or streams imported")
 	}
 
-	if len(ac.Exports) == 0 {
+	if len(a.Exports) == 0 {
 		table.AddRow("Exports", "No services or streams exported")
 	}
+	AddListValues(table, "Tags", a.Tags)
 
 	buf.WriteString(table.Render())
 
-	if len(ac.Exports) > 0 {
+	if len(a.Exports) > 0 {
 		buf.WriteString("\n")
-		buf.WriteString(NewExportsDescriber(ac.Exports).Describe())
+		buf.WriteString(NewExportsDescriber(a.Exports).Describe())
 	}
 
-	if len(ac.Imports) > 0 {
+	if len(a.Imports) > 0 {
 		buf.WriteString("\n")
-		buf.WriteString(NewImportsDescriber(ac.Imports).Describe())
+		buf.WriteString(NewImportsDescriber(a.Imports).Describe())
 	}
 
 	return buf.String()
@@ -119,13 +121,13 @@ func NewExportsDescriber(exports jwt.Exports) *ExportsDescriber {
 	return &e
 }
 
-func (d *ExportsDescriber) Describe() string {
+func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 
 	table.AddTitle("Exports")
 	table.AddHeaders("Type", "Subject", "Public")
-	for _, v := range d.Exports {
+	for _, v := range e.Exports {
 		public := "Yes"
 		if v.TokenReq {
 			public = "No"
@@ -145,12 +147,12 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 	return &d
 }
 
-func (d *ImportsDescriber) Describe() string {
+func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
 	table.AddHeaders("Type", "Subject", "To", "Expires")
 
-	for _, v := range d.Imports {
+	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
 	}
 
@@ -221,7 +223,6 @@ func (c *ActivationDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Activation")
-
 	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
 
@@ -288,6 +289,7 @@ func (u *UserDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("User")
+	table.AddRow("Name", u.Name)
 	table.AddRow("User ID", u.Subject)
 	AddListValues(table, "Pub Allow", u.Pub.Allow)
 	AddListValues(table, "Pub Deny", u.Pub.Deny)
@@ -302,6 +304,7 @@ func (u *UserDescriber) Describe() string {
 	} else {
 		table.AddRow("Expires", "No expiration")
 	}
+	AddListValues(table, "Tags", u.Tags)
 
 	return table.Render()
 }
@@ -314,27 +317,31 @@ func NewClusterDescriber(c jwt.ClusterClaims) *ClusterDescriber {
 	return &ClusterDescriber{ClusterClaims: c}
 }
 
-func (u *ClusterDescriber) Describe() string {
+func (c *ClusterDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Cluster")
-	table.AddRow("Cluster ID", u.Subject)
-	if u.OperatorURL != "" {
-		table.AddRow("Operator URL", u.OperatorURL)
+	table.AddRow("Name", c.Name)
+	table.AddRow("Cluster ID", c.Subject)
+
+	AddListValues(table, "Trusted Operators", c.Trust)
+	if c.OperatorURL != "" {
+		table.AddRow("Operator Srv", c.OperatorURL)
 	}
 
-	AddListValues(table, "Trusted Identity", u.Trust)
-	AddListValues(table, "Accounts", u.Accounts)
-	if u.AccountURL != "" {
-		table.AddRow("Account URL", u.AccountURL)
+	AddListValues(table, "Trusted Accounts", c.Accounts)
+	if c.AccountURL != "" {
+		table.AddRow("Account Srv", c.AccountURL)
 	}
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(u.IssuedAt), HumanizedDate(u.IssuedAt)))
-	if u.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(u.Expires), HumanizedDate(u.Expires)))
+	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(c.IssuedAt), HumanizedDate(c.IssuedAt)))
+	if c.Expires > 0 {
+		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(c.Expires), HumanizedDate(c.Expires)))
 	} else {
 		table.AddRow("Expires", "No expiration")
 	}
+
+	AddListValues(table, "Tags", c.Tags)
 
 	return table.Render()
 }
@@ -347,18 +354,20 @@ func NewServerDescriber(u jwt.ServerClaims) *ServerDescriber {
 	return &ServerDescriber{ServerClaims: u}
 }
 
-func (u *ServerDescriber) Describe() string {
+func (s *ServerDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Server")
-	table.AddRow("Server ID", u.Subject)
+	table.AddRow("Name", s.Name)
+	table.AddRow("Server ID", s.Subject)
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(u.IssuedAt), HumanizedDate(u.IssuedAt)))
-	if u.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(u.Expires), HumanizedDate(u.Expires)))
+	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(s.IssuedAt), HumanizedDate(s.IssuedAt)))
+	if s.Expires > 0 {
+		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(s.Expires), HumanizedDate(s.Expires)))
 	} else {
 		table.AddRow("Expires", "No expiration")
 	}
+	AddListValues(table, "Tags", s.Tags)
 
 	return table.Render()
 }
@@ -371,26 +380,28 @@ func NewOperatorDescriber(o jwt.OperatorClaims) *OperatorDescriber {
 	return &OperatorDescriber{OperatorClaims: o}
 }
 
-func (u *OperatorDescriber) Describe() string {
+func (o *OperatorDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Operator")
-	table.AddRow("Operator ID", u.Subject)
+	table.AddRow("Name", o.Name)
+	table.AddRow("Operator ID", o.Subject)
 
-	if len(u.Identities) > 0 {
-		for _, v := range u.Identities {
+	if len(o.Identities) > 0 {
+		for _, v := range o.Identities {
 			table.AddRow(fmt.Sprintf("ID %s", v.ID), v.Proof)
 		}
 	}
 
-	AddListValues(table, "Signing Keys", u.SigningKeys)
+	AddListValues(table, "Signing Keys", o.SigningKeys)
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(u.IssuedAt), HumanizedDate(u.IssuedAt)))
-	if u.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(u.Expires), HumanizedDate(u.Expires)))
+	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(o.IssuedAt), HumanizedDate(o.IssuedAt)))
+	if o.Expires > 0 {
+		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(o.Expires), HumanizedDate(o.Expires)))
 	} else {
 		table.AddRow("Expires", "No expiration")
 	}
+	AddListValues(table, "Tags", o.Tags)
 
 	return table.Render()
 }
