@@ -58,10 +58,10 @@ func init() {
 
 type AddImportParams struct {
 	AccountContextParams
+	SignerParams
 	claim      *jwt.AccountClaims
 	activation *jwt.ActivationClaims
 	im         jwt.Import
-	operatorKP nkeys.KeyPair
 	to         string
 	token      []byte
 	src        string
@@ -69,6 +69,7 @@ type AddImportParams struct {
 
 func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	p.im.To = jwt.Subject(p.to)
 
 	return nil
@@ -177,15 +178,8 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	}
 	p.im.To = jwt.Subject(p.to)
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
-	}
-	if p.operatorKP == nil {
-		err = EditKeyPath(nkeys.PrefixByteOperator, "operator keypath", &KeyPathFlag)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -219,8 +213,7 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 		p.im.Token = string(p.token)
 	}
 
-	p.operatorKP, err = ctx.StoreCtx().ResolveKey(nkeys.PrefixByteOperator, KeyPathFlag)
-	if err != nil {
+	if p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -229,7 +222,7 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 func (p *AddImportParams) Run(ctx ActionCtx) error {
 	var err error
 	p.claim.Imports.Add(&p.im)
-	token, err := p.claim.Encode(p.operatorKP)
+	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}

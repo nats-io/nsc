@@ -103,6 +103,13 @@ func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	}
 }
 
+func (ts *TestStore) AddCluster(t *testing.T, clusterName string) {
+	if !ts.Store.Has(store.Clusters, clusterName, store.JwtName(clusterName)) {
+		_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", clusterName)
+		require.NoError(t, err, "cluster creation for export")
+	}
+}
+
 func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {
 	flags := []string{"--account", accountName, "--subject", subject}
 	if !public {
@@ -117,9 +124,27 @@ func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.Export
 	require.NoError(t, err)
 }
 
-func (ts *TestStore) GenerateActivation(t *testing.T, targetAccount string, accountName string, kind jwt.ExportType, subject string) string {
-	ts.AddExport(t, accountName, kind, subject, false)
-	flags := []string{"--account", accountName, "--target-account", targetAccount, "--subject", subject}
+func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, targetAccountName string) {
+	token := ts.GenerateActivation(t, srcAccount, subject, targetAccountName)
+
+	f, err := ioutil.TempFile(ts.Dir, "token")
+	require.NoError(t, err)
+	_, err = f.WriteString(token)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	flags := []string{"--account", targetAccountName, "--token", f.Name()}
+	_, _, err = ExecuteCmd(createAddImportCmd(), flags...)
+	require.NoError(t, err)
+}
+
+func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
+	tkp, err := ts.KeyStore.GetAccountKey(targetAccount)
+	require.NoError(t, err)
+	tpub, err := tkp.PublicKey()
+	require.NoError(t, err)
+
+	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
 	return ExtractToken(stdout)

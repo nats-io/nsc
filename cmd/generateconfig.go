@@ -23,11 +23,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// FIXME - Generate cluster
-// FIXME - Generate server
-// FIXME - Generate account
-// FIXME - Generate operator
-
 func createGenerateConfigCmd() *cobra.Command {
 	var params GenerateConfigParams
 	cmd := &cobra.Command{

@@ -295,7 +295,8 @@ func EditKeyPath(kind nkeys.PrefixByte, label string, keypath *string) error {
 }
 
 func LoadFromURL(url string) ([]byte, error) {
-	r, err := http.Get(url)
+	c := &http.Client{Timeout: time.Second * 5}
+	r, err := c.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("error loading %q: %v", url, err)
 	}

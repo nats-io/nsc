@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func deleteImportCmd() *cobra.Command {
+func createDeleteImportCmd() *cobra.Command {
 	var params DeleteImportParams
 	cmd := &cobra.Command{
 		Use:   "import",
@@ -47,7 +47,7 @@ nsc delete import -s "bar.>"`,
 }
 
 func init() {
-	deleteCmd.AddCommand(deleteImportCmd())
+	deleteCmd.AddCommand(createDeleteImportCmd())
 }
 
 type DeleteImportParams struct {
@@ -90,12 +90,16 @@ func (p *DeleteImportParams) Load(ctx ActionCtx) error {
 	switch len(p.claim.Imports) {
 	case 0:
 		return fmt.Errorf("account %q doesn't have imports", p.AccountContextParams.Name)
-	default:
-		for i, e := range p.claim.Imports {
-			if string(e.Subject) == p.subject {
-				p.index = i
-				break
-			}
+	case 1:
+		if p.subject == "" {
+			p.subject = string(p.claim.Imports[0].Subject)
+		}
+	}
+
+	for i, e := range p.claim.Imports {
+		if string(e.Subject) == p.subject {
+			p.index = i
+			break
 		}
 	}
 
@@ -106,7 +110,7 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
 	var choices []string
-	for _, c := range p.claim.Exports {
+	for _, c := range p.claim.Imports {
 		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
 	}
 	p.index, err = cli.PromptChoices("select import to delete", choices)
@@ -123,8 +127,11 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 	var err error
+	if p.subject == "" && p.index == -1 {
+		return fmt.Errorf("subject is required")
+	}
 	if p.index == -1 {
-		return fmt.Errorf("no matching import found")
+		return fmt.Errorf("no import matching %q found", p.subject)
 	}
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err

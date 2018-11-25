@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func deleteExportCmd() *cobra.Command {
+func createDeleteExportCmd() *cobra.Command {
 	var params DeleteExportParams
 	cmd := &cobra.Command{
 		Use:          "export",
@@ -45,16 +45,16 @@ func deleteExportCmd() *cobra.Command {
 }
 
 func init() {
-	deleteCmd.AddCommand(deleteExportCmd())
+	deleteCmd.AddCommand(createDeleteExportCmd())
 }
 
 type DeleteExportParams struct {
 	AccountContextParams
+	SignerParams
 	claim         *jwt.AccountClaims
 	deletedExport *jwt.Export
 	index         int
-	SignerParams
-	subject string
+	subject       string
 }
 
 func (p *DeleteExportParams) SetDefaults(ctx ActionCtx) error {
@@ -87,12 +87,16 @@ func (p *DeleteExportParams) Load(ctx ActionCtx) error {
 	switch len(p.claim.Exports) {
 	case 0:
 		return fmt.Errorf("account %q doesn't have exports", p.AccountContextParams.Name)
-	default:
-		for i, e := range p.claim.Exports {
-			if string(e.Subject) == p.subject {
-				p.index = i
-				break
-			}
+	case 1:
+		if p.subject == "" {
+			p.subject = string(p.claim.Exports[0].Subject)
+		}
+	}
+
+	for i, e := range p.claim.Exports {
+		if string(e.Subject) == p.subject {
+			p.index = i
+			break
 		}
 	}
 
@@ -120,8 +124,11 @@ func (p *DeleteExportParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *DeleteExportParams) Validate(ctx ActionCtx) error {
 	var err error
+	if p.subject == "" && p.index == -1 {
+		return fmt.Errorf("subject is required")
+	}
 	if p.index == -1 {
-		return fmt.Errorf("no matching export found")
+		return fmt.Errorf("no export matching %q found", p.subject)
 	}
 	if p.SignerParams.Resolve(ctx); err != nil {
 		return err

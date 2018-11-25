@@ -31,14 +31,11 @@ func Test_AddImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+
 	ts.AddAccount(t, "B")
 
-	kp, err := ts.KeyStore.GetAccountKey("B")
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-	pub, err := kp.PublicKey()
-
-	token := ts.GenerateActivation(t, pub, "A", jwt.Stream, "foobar.>")
+	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 	fp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(fp, []byte(token)))
 
@@ -56,17 +53,13 @@ func Test_AddImportSelfImportsRejected(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
 
-	kp, err := ts.KeyStore.GetAccountKey("A")
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-	d, err := kp.PublicKey()
-
-	token := ts.GenerateActivation(t, d, "A", jwt.Stream, "foobar.>")
+	token := ts.GenerateActivation(t, "A", "foobar.>", "A")
 	fp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(fp, []byte(token)))
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--token", fp)
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--token", fp)
 	require.Error(t, err)
 	require.Equal(t, "activation issuer is this account", err.Error())
 }
@@ -76,21 +69,18 @@ func Test_AddImportFromURL(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
 
 	ts.AddAccount(t, "B")
-	kp, err := ts.KeyStore.GetAccountKey("B")
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-	d, err := kp.PublicKey()
 
-	token := ts.GenerateActivation(t, d, "A", jwt.Stream, "foobar.>")
+	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 
 	ht := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, token)
 	}))
 	defer ht.Close()
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ht.URL)
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ht.URL)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -105,18 +95,16 @@ func Test_AddImportInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+
 	akp, err := ts.KeyStore.GetAccountKey("A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 
 	ts.AddAccount(t, "B")
-	bkp, err := ts.KeyStore.GetAccountKey("B")
-	require.NoError(t, err)
-	require.NotNil(t, bkp)
-	bpub, err := bkp.PublicKey()
 
-	token := ts.GenerateActivation(t, bpub, "A", jwt.Stream, "foobar.>")
+	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 	fp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(fp, []byte(token)))
 

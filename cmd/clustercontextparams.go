@@ -49,7 +49,7 @@ func (p *ClusterContextParams) Edit(ctx ActionCtx) error {
 }
 
 func (p *ClusterContextParams) Validate(ctx ActionCtx) error {
-	// default account was not found by get context, so we either we have none or many
+	// default cluster was not found by get context, so we either we have none or many
 	if p.Name == "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("a cluster is required")

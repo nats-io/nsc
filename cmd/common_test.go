@@ -16,10 +16,16 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/stretchr/testify/require"
 )
@@ -153,4 +159,50 @@ func TestParseNumber(t *testing.T) {
 			t.Errorf("%s expected %d but got %d", d.input, d.output, v)
 		}
 	}
+}
+
+func Test_NKeyValidatorActualKey(t *testing.T) {
+	as, _, _ := CreateAccountKey(t)
+	fn := NKeyValidator(nkeys.PrefixByteAccount)
+	require.NoError(t, fn(string(as)))
+
+	os, _, _ := CreateOperatorKey(t)
+	require.Error(t, fn(string(os)))
+}
+
+func Test_NKeyValidatorKeyInFile(t *testing.T) {
+	dir := MakeTempDir(t)
+	as, _, _ := CreateAccountKey(t)
+	os, _, _ := CreateOperatorKey(t)
+
+	require.NoError(t, Write(filepath.Join(dir, "as.nk"), as))
+	require.NoError(t, Write(filepath.Join(dir, "os.nk"), os))
+
+	fn := NKeyValidator(nkeys.PrefixByteAccount)
+	require.NoError(t, fn(filepath.Join(dir, "as.nk")))
+
+	require.Error(t, fn(filepath.Join(dir, "os.nk")))
+}
+
+func Test_LoadFromURL(t *testing.T) {
+	v := "1,2,3"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, v)
+	}))
+	defer ts.Close()
+
+	d, err := LoadFromURL(ts.URL)
+	require.NoError(t, err)
+	require.Equal(t, v, string(d))
+}
+
+func Test_LoadFromURLTimeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(time.Second * 6)
+	}))
+	defer ts.Close()
+
+	_, err := LoadFromURL(ts.URL)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Timeout exceeded")
 }
