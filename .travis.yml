@@ -5,6 +5,9 @@ go:
 git:
   depth: false
 
+env:
+  - GO111MODULE=on
+
 install:
   - go get github.com/mattn/goveralls
   - go get github.com/wadey/gocovmerge
@@ -15,8 +18,6 @@ install:
 #  - go get -u github.com/client9/misspell/cmd/misspell
 
 before_script:
-- env GO111MODULE=on go build
-- env GO111MODULE=on go test
 - EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/")
 - go build
 - $(exit $(go fmt $EXCLUDE_VENDOR | wc -l))
