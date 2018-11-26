@@ -7,11 +7,12 @@ release:
   draft: true
 builds:
 - main: ./main.go
-  ldflags: "-X github.com/nats-io/nsc/cmd.VERSION={{.Tag}}_{{.Commit}}"
+  ldflags: "-X main.version={{.Tag}}_{{.Commit}}"
   binary: nsc
   goos:
   - darwin
   - linux
+  - windows
   goarch:
   - amd64
 

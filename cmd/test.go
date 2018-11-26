@@ -84,6 +84,6 @@ func createGenerateNkey() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(testCmd)
+	GetRootCmd().AddCommand(testCmd)
 	testCmd.AddCommand(createGenerateNkey())
 }

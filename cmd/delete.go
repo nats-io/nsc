@@ -24,5 +24,5 @@ var deleteCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(deleteCmd)
+	GetRootCmd().AddCommand(deleteCmd)
 }

@@ -50,7 +50,7 @@ nsc describe account -n foo`,
 
 func init() {
 	describeCmd = createDescribeCmd()
-	rootCmd.AddCommand(describeCmd)
+	GetRootCmd().AddCommand(describeCmd)
 }
 
 type DescribeFile struct {
