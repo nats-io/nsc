@@ -6,16 +6,6 @@ git:
   depth: false
 
 install:
-  - go get github.com/nats-io/nkeys
-  - go get github.com/nats-io/jwt
-  - go get github.com/AlecAivazis/survey
-  - go get github.com/dustin/go-humanize
-  - go get github.com/mitchellh/go-homedir
-  - go get github.com/mitchellh/go-wordwrap
-  - go get github.com/spf13/cobra
-  - go get github.com/stretchr/testify/assert
-  - go get github.com/xlab/tablewriter
-  - go get github.com/spf13/viper
   - go get github.com/mattn/goveralls
   - go get github.com/wadey/gocovmerge
 
@@ -25,6 +15,8 @@ install:
 #  - go get -u github.com/client9/misspell/cmd/misspell
 
 before_script:
+- env GO111MODULE=on go build
+- env GO111MODULE=on go test
 - EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/")
 - go build
 - $(exit $(go fmt $EXCLUDE_VENDOR | wc -l))
