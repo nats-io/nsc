@@ -118,7 +118,7 @@ init --interactive
 }
 
 func init() {
-	rootCmd.AddCommand(CreateInitCmd())
+	GetRootCmd().AddCommand(CreateInitCmd())
 }
 
 type InitParams struct {

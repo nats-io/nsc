@@ -91,7 +91,6 @@ func GetRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
 	Short: "NSC enables you to create and manage NATS account and user configurations",
@@ -99,21 +98,20 @@ var rootCmd = &cobra.Command{
 
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
-	Version: Version,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	cli.SetOutput(rootCmd.OutOrStderr())
-	if err := rootCmd.Execute(); err != nil {
+	if err := GetRootCmd().Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	HoistRootFlags(rootCmd)
+	HoistRootFlags(GetRootCmd())
 }
 
 // hostFlags adds persistent flags that would be added by the cobra framework
