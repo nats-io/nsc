@@ -1,8 +1,6 @@
 language: go
 go:
-#  - 1.9.x
-#  - 1.10.x
-  - 1.11.x
+- 1.11.x
 
 git:
   depth: false
@@ -35,7 +33,7 @@ before_script:
 #- megacheck $EXCLUDE_VENDOR
 
 script:
-- if [[ "$TRAVIS_GO_VERSION" == 1.11.* ]] ; then ./scripts/cov.sh TRAVIS; else go test -v -race ./...; fi
+- ./scripts/cov.sh TRAVIS
 
 after_success:
 - go clean

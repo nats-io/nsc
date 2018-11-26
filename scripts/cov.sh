@@ -7,7 +7,7 @@ mkdir cov
 go test -covermode=atomic -coverprofile=./cov/cli.out ./cli
 go test -covermode=atomic -coverprofile=./cov/cmd.out ./cmd
 go test -covermode=atomic -coverprofile=./cov/cmdstore.out ./cmd/store
-gocovmerge ./cov/*.out > build/coverage.out
+gocovmerge ./cov/*.out > ./coverage.out
 rm -rf ./cov
 
 # If we have an arg, assume travis run and push to coveralls. Otherwise launch browser results

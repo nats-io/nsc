@@ -75,7 +75,7 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
-	ac, err := ts.Store.ReadAccountClaim("a")
+	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err, "reading account claim")
 
 	pub, err := kp.PublicKey()
