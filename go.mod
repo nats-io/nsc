@@ -2,7 +2,10 @@ module github.com/nats-io/nsc
 
 require (
 	github.com/AlecAivazis/survey v1.7.0
+	github.com/blang/semver v3.5.1+incompatible
+	github.com/briandowns/spinner v0.0.0-20181029155426-195c31b675a7
 	github.com/dustin/go-humanize v1.0.0
+	github.com/fatih/color v1.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
@@ -13,7 +16,7 @@ require (
 	github.com/nats-io/jwt v0.0.0-20181124173452-b4c212c5231a
 	github.com/nats-io/nkeys v0.0.0-20181122131151-819e1865e1f6
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rhysd/go-github-selfupdate v1.1.0 // indirect
+	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/viper v1.2.1
 	github.com/stretchr/testify v1.2.2
