@@ -99,15 +99,27 @@ func (ts *TestStore) Done(t *testing.T) {
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
 		_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", accountName)
-		require.NoError(t, err, "account creation for export")
+		require.NoError(t, err, "account creation")
 	}
+}
+
+func (ts *TestStore) AddUser(t *testing.T, accountName string, userName string) {
+	ts.AddAccount(t, accountName)
+	_, _, err := ExecuteCmd(createAddUserCmd(), "--account", accountName, "--name", userName)
+	require.NoError(t, err, "user creation")
 }
 
 func (ts *TestStore) AddCluster(t *testing.T, clusterName string) {
 	if !ts.Store.Has(store.Clusters, clusterName, store.JwtName(clusterName)) {
 		_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", clusterName)
-		require.NoError(t, err, "cluster creation for export")
+		require.NoError(t, err, "cluster creation")
 	}
+}
+
+func (ts *TestStore) AddServer(t *testing.T, clusterName string, serverName string) {
+	ts.AddCluster(t, clusterName)
+	_, _, err := ExecuteCmd(createAddServerCmd(), "--cluster", clusterName, "--name", serverName)
+	require.NoError(t, err, "server creation")
 }
 
 func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {

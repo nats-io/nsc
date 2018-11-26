@@ -31,8 +31,7 @@ func createAddServerCmd() *cobra.Command {
 		Use:          "server",
 		Short:        "Add a server to a cluster (operator only)",
 		SilenceUsage: true,
-		Example: `nsc add server -i
-`,
+		Example:      `nsc add server -i`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
@@ -47,9 +46,9 @@ func createAddServerCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "server name")
-	cmd.Flags().StringVarP(&params.clusterName, "cluster", "c", "", "cluster name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the server")
 	params.TimeParams.BindFlags(cmd)
+	params.ClusterContextParams.BindFlags(cmd)
 
 	return cmd
 }
@@ -59,38 +58,33 @@ func init() {
 }
 
 type AddServerParams struct {
+	ClusterContextParams
 	SignerParams
 	TimeParams
 	Entity
-	clusterJwt  string
-	clusterName string
+	clusterJwt string
 }
 
 func (p *AddServerParams) SetDefaults(ctx ActionCtx) error {
 	if ctx.StoreCtx().Store.IsManaged() {
 		return fmt.Errorf("servers cannot be created on managed configurations")
 	}
+	p.ClusterContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteCluster, false, ctx)
 	p.create = true
 	p.Entity.kind = nkeys.PrefixByteServer
 	p.editFn = p.editServerClaim
-
-	if p.clusterName == "" {
-		p.clusterName = ctx.StoreCtx().Cluster.Name
-	}
 
 	return nil
 }
 
 func (p *AddServerParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-
-	if err := p.Entity.Edit(); err != nil {
+	if err = p.ClusterContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
-	p.clusterName, err = ctx.StoreCtx().PickCluster(p.clusterName)
-	if err != nil {
+	if err := p.Entity.Edit(); err != nil {
 		return err
 	}
 
@@ -106,11 +100,13 @@ func (p *AddServerParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddServerParams) Load(ctx ActionCtx) error {
-	if p.clusterName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("cluster is required")
+	var err error
+
+	if err = p.ClusterContextParams.Validate(ctx); err != nil {
+		return err
 	}
-	d, err := ctx.StoreCtx().Store.Read(store.Clusters, p.clusterName, store.JwtName(p.clusterName))
+
+	d, err := ctx.StoreCtx().Store.Read(store.Clusters, p.ClusterContextParams.Name, store.JwtName(p.ClusterContextParams.Name))
 	if err != nil {
 		return err
 	}
@@ -129,20 +125,6 @@ func (p *AddServerParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("server name is required")
 	}
 
-	if p.clusterName == "" {
-		// default account was not found by get context, so we either we have none or many
-		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Clusters)
-		if err != nil {
-			return err
-		}
-		c := len(accounts)
-		if c == 0 {
-			return errors.New("no clusters defined - add cluster first")
-		} else {
-			return errors.New("multiple clusters found - specify --cluster or navigate to a cluster directory")
-		}
-	}
-
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
@@ -156,7 +138,7 @@ func (p *AddServerParams) Validate(ctx ActionCtx) error {
 
 func (p *AddServerParams) Run(ctx ActionCtx) error {
 
-	if err := p.Entity.StoreKeys(p.clusterName); err != nil {
+	if err := p.Entity.StoreKeys(p.ClusterContextParams.Name); err != nil {
 		return err
 	}
 

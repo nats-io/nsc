@@ -37,7 +37,7 @@ func createEditUserCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - edited cluster %q\n", params.AccountContextParams.Name)
+			cmd.Printf("Success! - edited user %q in account %q\n", params.name, params.AccountContextParams.Name)
 
 			Write("--", FormatJwt("Account", params.token))
 
