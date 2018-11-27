@@ -26,8 +26,67 @@ import (
 	"github.com/blang/semver"
 	"github.com/briandowns/spinner"
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nsc/cli"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/spf13/cobra"
 )
+
+func createUpdateCommand() *cobra.Command {
+	var printReleaseNotes bool
+	var cmd = &cobra.Command{
+		Example: `update
+update --release-notes
+`,
+		Use:   "update",
+		Short: "update this tool to latest version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			v := semver.MustParse(GetRootCmd().Version)
+
+			su, err := NewSelfUpdate()
+			if err != nil {
+				return err
+			}
+			nvs, err := su.doCheck()
+			if err != nil {
+				return err
+			}
+			if nvs == nil {
+				cmd.Println("Current version", v, "is the latest")
+				return nil
+			}
+
+			wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			defer wait.Stop()
+
+			wait.Prefix = "Downloading latest version "
+			_ = wait.Color("italic")
+			wait.Start()
+			latest, err := selfupdate.UpdateSelf(v, repository)
+			if err != nil {
+				cmd.SilenceErrors = false
+				return err
+			}
+
+			cmd.Printf("Successfully updated to version %s\n", latest.Version.String())
+			if printReleaseNotes {
+				cmd.Println()
+				cmd.Println("Release Notes:")
+				cmd.Println()
+				cmd.Println(cli.Wrap(80, latest.ReleaseNotes))
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVarP(&printReleaseNotes, "release-notes", "r", false, "prints the release notes")
+
+	return cmd
+}
+
+func init() {
+	GetRootCmd().AddCommand(createUpdateCommand())
+}
 
 var repository string
 
@@ -60,13 +119,13 @@ func NewSelfUpdate() (*SelfUpdate, error) {
 	return &u, nil
 }
 
-func (u *SelfUpdate) Run() (string, error) {
+func (u *SelfUpdate) Run() (*semver.Version, error) {
 	if !u.shouldCheck() {
-		return "", nil
+		return nil, nil
 	}
 	version, err := u.doCheck()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	err = u.updateLastChecked()
 	return version, err
@@ -74,7 +133,7 @@ func (u *SelfUpdate) Run() (string, error) {
 
 func (u *SelfUpdate) shouldCheck() bool {
 	now := time.Now().Unix()
-	return u.LastCheck == 0 || now-u.LastCheck < int64(time.Hour*24)
+	return u.LastCheck == 0 || now-u.LastCheck > int64(time.Hour*24)
 }
 
 func (u *SelfUpdate) updateLastChecked() error {
@@ -99,26 +158,23 @@ func (u *SelfUpdate) infoFile() (string, error) {
 		// shouldn't prevent if there's an error
 		return "", fmt.Errorf("error getting homedir: %v", err.Error())
 	}
-	fn := filepath.Join(dir, fmt.Sprintf(".%s", filepath.Base(os.Args[0])))
+	fn := filepath.Join(dir, fmt.Sprintf(".%s_cli", filepath.Base(os.Args[0])))
 	return fn, nil
 }
 
-func (u *SelfUpdate) doCheck() (string, error) {
+func (u *SelfUpdate) doCheck() (*semver.Version, error) {
+	have := semver.MustParse(GetRootCmd().Version)
 	wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	wait.Prefix = "Checking for latest version "
-	wait.Color("italic")
+	_ = wait.Color("italic")
 	wait.Start()
 	defer wait.Stop()
 
 	latest, found, err := selfupdate.DetectLatest(repository)
-
 	if err != nil {
-		return fmt.Sprintf("error occurred while detecting version: %v", err), err
-	} else if found {
-		v := semver.MustParse(Version)
-		if found && latest.Version.GT(v) {
-			return latest.Version.String(), nil
-		}
+		return nil, fmt.Errorf("error checking version: %v", err)
+	} else if found && latest.Version.GT(have) {
+		return &latest.Version, nil
 	}
-	return "", nil
+	return nil, nil
 }
