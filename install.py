@@ -113,7 +113,6 @@ def main():
     print("NSC: " + exe_fn)
     print("Now manually add %s to your $PATH" % bin_dir)
     print("Bash Example:")
-    print()
     print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bash_profile" % bin_dir)
     print("  source $HOME/.bash_profile")
     print()

@@ -7,3 +7,20 @@
 [![Coverage Status](https://coveralls.io/repos/github/nats-io/nsc/badge.svg?branch=master&service=github)](https://coveralls.io/github/nats-io/nsc?branch=master)
 
 A tool for creating NATS account and user access configurations
+
+
+## Install
+
+With Python:
+
+```python
+curl -L https://raw.githubusercontent.com/nats-io/nsc/master/install.py | python
+```
+
+Direct Download:
+
+Download your platform binary from [here.](https://github.com/nats-io/nsc/releases/latest)
+
+## Updates are easy
+
+`nsc update` will download and install the latest version.
