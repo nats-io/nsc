@@ -22,7 +22,7 @@ before_script:
 - go build
 - $(exit $(go fmt $EXCLUDE_VENDOR | wc -l))
 - go vet $EXCLUDE_VENDOR
-#- misspell -error -locale US .
+#- misspell -erruor -locale US .
 #- megacheck $EXCLUDE_VENDOR
 
 script:

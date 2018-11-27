@@ -39,6 +39,7 @@ type SelfUpdate struct {
 	LastCheck int64 `json:"last_check"`
 }
 
+// NewSelfUpdate
 func NewSelfUpdate() (*SelfUpdate, error) {
 	if repository == "" {
 		return nil, fmt.Errorf("unable to check for updates - repository not set")
