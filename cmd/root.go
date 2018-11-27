@@ -32,8 +32,6 @@ import (
 const SeedKeyEnv = "NSC_SEED_KEY"
 const TestEnv = "NSC_TEST"
 
-var Version = "DEVELOPMENT"
-
 var KeyPathFlag string
 var InteractiveFlag bool
 
