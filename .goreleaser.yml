@@ -7,7 +7,7 @@ release:
   draft: true
 builds:
 - main: ./main.go
-  ldflags: "-X main.version={{.Tag}}_{{.Commit}}"
+  ldflags: "-X main.version={{.Tag}}"
   binary: nsc
   goos:
   - darwin

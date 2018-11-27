@@ -5,7 +5,7 @@ import (
 )
 
 // the cli injects the version
-var version = "0.0.0.dev"
+var version = "0.0.0"
 
 func main() {
 	cmd.GetRootCmd().Version = version

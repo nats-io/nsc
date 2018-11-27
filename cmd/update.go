@@ -74,7 +74,7 @@ func (u *SelfUpdate) Run() (string, error) {
 
 func (u *SelfUpdate) shouldCheck() bool {
 	now := time.Now().Unix()
-	return u.LastCheck == 0 || u.LastCheck-now < int64(time.Hour*24)
+	return u.LastCheck == 0 || now-u.LastCheck < int64(time.Hour*24)
 }
 
 func (u *SelfUpdate) updateLastChecked() error {
