@@ -112,11 +112,15 @@ def main():
 
     print("NSC: " + exe_fn)
     print("Now manually add %s to your $PATH" % bin_dir)
-    print("Example:")
+    print("Bash Example:")
     print()
-    print("  echo export PATH=\"%s\":\\$PATH >> $HOME/.bash_profile" % bin_dir)
+    print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bash_profile" % bin_dir)
+    print("  source $HOME/.bash_profile")
     print()
-
+    print("Zsh Example:")
+    print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.zshrc" % bin_dir)
+    print("  source $HOME/.zshrc")
+    print()
 
 def mkdir(d):
     if not os.path.exists(d):

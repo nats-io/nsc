@@ -146,6 +146,11 @@ func (u *SelfUpdate) updateLastChecked() error {
 	if err != nil {
 		return fmt.Errorf("error getting path for selfupdate info file: %v", err)
 	}
+	dir := filepath.Dir(fp)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("error creating dir %q: %v", dir, err)
+
+	}
 	if err := ioutil.WriteFile(fp, d, 0600); err != nil {
 		return fmt.Errorf("error writing %q: %v", fp, err)
 	}
@@ -158,7 +163,8 @@ func (u *SelfUpdate) infoFile() (string, error) {
 		// shouldn't prevent if there's an error
 		return "", fmt.Errorf("error getting homedir: %v", err.Error())
 	}
-	fn := filepath.Join(dir, fmt.Sprintf(".%s_cli", filepath.Base(os.Args[0])))
+	exeName := filepath.Base(os.Args[0])
+	fn := filepath.Join(dir, fmt.Sprintf(".%scli/%s.ini", exeName, exeName))
 	return fn, nil
 }
 

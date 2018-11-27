@@ -15,7 +15,6 @@ func main() {
 		version = version[1:]
 	}
 	cmd.GetRootCmd().Version = version
-
 	cmd.SetUpdateRespository("nats-io/nsc")
 
 	u, err := cmd.NewSelfUpdate()
