@@ -36,7 +36,7 @@ func createGenerateActivationCmd() *cobra.Command {
 				return err
 			}
 
-			if err := Write(params.out, FormatJwt("Activation", params.token)); err != nil {
+			if err := Write(params.out, FormatJwt("Activation", params.Token)); err != nil {
 				return err
 			}
 
@@ -82,7 +82,7 @@ type GenerateActivationParams struct {
 	targetKey  NKeyParams
 	targetPK   string
 	timeParams TimeParams
-	token      string
+	Token      string
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
@@ -211,7 +211,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	p.activation.Activation.ImportSubject = p.export.Subject
 	p.activation.Activation.ImportType = p.export.Type
 
-	p.token, err = p.activation.Encode(p.signerKP)
+	p.Token, err = p.activation.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}
