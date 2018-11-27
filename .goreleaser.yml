@@ -19,14 +19,16 @@ builds:
 dist: build
 
 archive:
-  wrap_in_directory: true
-  name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}{{ if .Arm
-    }}v{{ .Arm }}{{ end }}'
+  wrap_in_directory: false
+  name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   format: zip
+  files:
+    - none*
 
 checksum:
   name_template: '{{ .ProjectName }}-checksums.txt'
 
 snapshot:
   name_template: 'dev'
+
 
