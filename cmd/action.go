@@ -65,12 +65,27 @@ func NewActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
 	return &Actx{cmd: cmd, ctx: ctx, args: args}, nil
 }
 
+func NewStoreLessActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
+	return &Actx{cmd: cmd, ctx: nil, args: args}, nil
+}
+
+func RunStoreLessAction(cmd *cobra.Command, args []string, action interface{}) error {
+	ctx, err := NewStoreLessActx(cmd, args)
+	if err != nil {
+		return err
+	}
+	return run(ctx, action)
+}
+
 func RunAction(cmd *cobra.Command, args []string, action interface{}) error {
 	ctx, err := NewActx(cmd, args)
 	if err != nil {
 		return err
 	}
+	return run(ctx, action)
+}
 
+func run(ctx ActionCtx, action interface{}) error {
 	e, ok := action.(Action)
 	if !ok {
 		return fmt.Errorf("action provided is not an Action")
@@ -104,7 +119,6 @@ func RunAction(cmd *cobra.Command, args []string, action interface{}) error {
 	}
 
 	return RunInterceptor(ctx, action)
-
 }
 
 func (c *Actx) StoreCtx() *store.Context {

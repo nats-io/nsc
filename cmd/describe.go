@@ -36,7 +36,7 @@ nsc describe account
 nsc describe account -n foo`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunStoreLessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return nil
