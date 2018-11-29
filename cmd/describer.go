@@ -168,6 +168,9 @@ func NewImportDescriber(im jwt.Import) *ImportDescriber {
 }
 
 func (i *ImportDescriber) Brief(table *tablewriter.Table) {
+	if i.Token == "" {
+		table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), "")
+	}
 	expiration := ""
 	ac, err := i.LoadActivation()
 	if err != nil {
@@ -179,7 +182,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
-	if url, err := url.Parse(i.Token); err == nil && url.Scheme != "" {
+	if u, err := url.Parse(i.Token); err == nil && u.Scheme != "" {
 		return true
 	}
 	return false
