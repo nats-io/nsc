@@ -2,13 +2,8 @@
 # this script is intended for travis - `make cover`
 # Run from directory above via ./scripts/cov.sh
 
-rm -rf ./cov
-mkdir cov
-go test -covermode=atomic -coverprofile=./cov/cli.out ./cli
-go test -covermode=atomic -coverprofile=./cov/cmd.out ./cmd
-go test -covermode=atomic -coverprofile=./cov/cmdstore.out ./cmd/store
-gocovmerge ./cov/*.out > ./coverage.out
-rm -rf ./cov
+rm -rf ./coverage.out
+go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
 # If we have an arg, assume travis run and push to coveralls. Otherwise launch browser results
 if [[ -n $1 ]]; then
