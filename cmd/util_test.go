@@ -59,9 +59,10 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
 	require.NoError(t, err, "nkeys env")
 
-	var nk *store.NamedKey
+	var nk = &store.NamedKey{}
+	nk.Name = operatorName
 	if ts.OperatorKey != nil {
-		nk = &store.NamedKey{Name: operatorName, KP: ts.OperatorKey}
+		nk.KP = ts.OperatorKey
 	}
 
 	SetStoreRoot(storeRoot)
@@ -71,7 +72,7 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	require.NoError(t, err, "getting context")
 
 	ts.KeyStore = ctx.KeyStore
-	if nk != nil {
+	if ts.OperatorKey != nil {
 		ts.OperatorKeyPath, err = ts.KeyStore.Store(operatorName, ts.OperatorKey, "")
 		require.NoError(t, err, "store operator key")
 	}

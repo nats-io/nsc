@@ -81,7 +81,7 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	pub, err := kp.PublicKey()
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
-	okp, err := ts.KeyStore.GetOperatorKey("operator")
+	okp, err := ts.KeyStore.GetOperatorKey("test")
 	require.NoError(t, err)
 
 	if okp == nil {
