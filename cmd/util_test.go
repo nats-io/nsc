@@ -30,8 +30,7 @@ import (
 )
 
 type TestStore struct {
-	Dir      string
-	StartDir string
+	Dir string
 
 	Store    *store.Store
 	KeyStore store.KeyStore
@@ -40,7 +39,7 @@ type TestStore struct {
 	OperatorKeyPath string
 }
 
-func NewTestStoreWithOperator(t *testing.T, name string, operator nkeys.KeyPair) *TestStore {
+func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	var ts TestStore
 	var err error
 
@@ -49,13 +48,11 @@ func NewTestStoreWithOperator(t *testing.T, name string, operator nkeys.KeyPair)
 
 	ts.OperatorKey = operator
 
-	ts.StartDir, err = os.Getwd()
-	require.NoError(t, err)
 	ts.Dir = MakeTempDir(t)
-
-	storeDir := filepath.Join(ts.Dir, "store")
-	err = os.Mkdir(storeDir, 0700)
-	require.NoError(t, err, "error creating %q", storeDir)
+	storeRoot := filepath.Join(ts.Dir, "store")
+	operatorRoot := filepath.Join(storeRoot, operatorName)
+	err = os.MkdirAll(operatorRoot, 0700)
+	require.NoError(t, err, "error creating %q", operatorRoot)
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
 	err = os.Mkdir(nkeysDir, 0700)
@@ -65,32 +62,44 @@ func NewTestStoreWithOperator(t *testing.T, name string, operator nkeys.KeyPair)
 
 	var nk *store.NamedKey
 	if ts.OperatorKey != nil {
-		nk = &store.NamedKey{Name: "operator", KP: ts.OperatorKey}
+		nk = &store.NamedKey{Name: operatorName, KP: ts.OperatorKey}
 	}
 
-	ts.Store, err = store.CreateStore(name, storeDir, nk)
+	SetStoreRoot(storeRoot)
+	SetOperator(operatorName)
+	ts.Store, err = store.CreateStore(operatorName, storeRoot, nk)
 	ctx, err := ts.Store.GetContext()
 	require.NoError(t, err, "getting context")
 
 	ts.KeyStore = ctx.KeyStore
 	if nk != nil {
-		ts.OperatorKeyPath, err = ts.KeyStore.Store("operator", ts.OperatorKey, "")
+		ts.OperatorKeyPath, err = ts.KeyStore.Store(operatorName, ts.OperatorKey, "")
 		require.NoError(t, err, "store operator key")
 	}
-
-	require.NoError(t, os.Chdir(ts.Store.Dir))
 
 	return &ts
 }
 
-func NewTestStore(t *testing.T, name string) *TestStore {
+func NewTestStore(t *testing.T, operatorName string) *TestStore {
 	_, _, kp := CreateOperatorKey(t)
-	return NewTestStoreWithOperator(t, name, kp)
+	return NewTestStoreWithOperator(t, operatorName, kp)
+}
+
+func TestStoreTree(t *testing.T) {
+	ts := NewTestStore(t, "foo")
+	t.Log(ts.Dir)
+	t.Log("operatorName", GetConfig().Operator)
+
+	ts.AddAccount(t, "bar")
+	ts.AddAccount(t, "foo")
+
+	v, err := store.LoadStore(filepath.Join(config.StoreRoot, config.Operator))
+	require.NoError(t, err)
+	require.NotNil(t, v)
 }
 
 func (ts *TestStore) Done(t *testing.T) {
 	cli.ResetPromptLib()
-	require.NoError(t, os.Chdir(ts.StartDir))
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
 	}

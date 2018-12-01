@@ -12,4 +12,5 @@ build/
 cov/
 .idea/
 .vscode/
+coverage.out
 

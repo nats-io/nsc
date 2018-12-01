@@ -57,8 +57,6 @@ func CreateTestStoreForOperator(t *testing.T, name string, operator nkeys.KeyPai
 		tokenName := fmt.Sprintf("%s.jwt", SafeName(name))
 		require.FileExists(t, filepath.Join(s.Dir, tokenName))
 		require.True(t, s.Has("", tokenName))
-	} else {
-		require.True(t, s.Info.Managed)
 	}
 
 	for _, d := range standardDirs {
@@ -229,15 +227,6 @@ func TestStoreUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "bar")
-}
-
-func TestOperatorLessStore(t *testing.T) {
-	s := CreateTestStoreForOperator(t, "test", nil)
-	require.NotNil(t, s)
-	ss, err := LoadStore(s.Dir)
-	require.NoError(t, err)
-	require.NotNil(t, ss)
-	require.True(t, s.IsManaged())
 }
 
 func TestStore_ListSubContainers(t *testing.T) {

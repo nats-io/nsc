@@ -28,11 +28,6 @@ type SignerParams struct {
 
 func (p *SignerParams) SetDefaults(kind nkeys.PrefixByte, allowManaged bool, ctx ActionCtx) {
 	p.kind = kind
-	if allowManaged {
-		if ctx.StoreCtx().Store.IsManaged() && p.kind == nkeys.PrefixByteOperator {
-			p.kind = nkeys.PrefixByteAccount
-		}
-	}
 }
 
 func (p *SignerParams) Edit(ctx ActionCtx) error {

@@ -25,6 +25,9 @@ compile:
 install: build
 	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
 
+install-no-test:
+	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
+
 cover: test
 	go tool cover -html=./coverage.out
 

@@ -309,3 +309,14 @@ func LoadFromURL(url string) ([]byte, error) {
 	data := buf.Bytes()
 	return data, nil
 }
+
+func IsValidDir(dir string) error {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("not a directory")
+	}
+	return nil
+}

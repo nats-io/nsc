@@ -71,39 +71,35 @@ func SafeName(n string) string {
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(env string, dir string, root *NamedKey) (*Store, error) {
+func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, error) {
 	var err error
 
+	root := filepath.Join(operatorsDir, operator.Name)
 	s := &Store{
-		Dir: dir,
+		Dir: root,
 		Info: Info{
-			EnvironmentName: env,
+			EnvironmentName: operator.Name,
 			Version:         Version,
 		},
 	}
-	if root != nil {
-		s.Info.EntityName = root.Name
-	} else {
-		s.Info.Managed = true
-	}
 
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		if err := os.MkdirAll(root, 0700); err != nil {
 			return nil, err
 		}
 	}
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(files) != 0 {
-		return nil, fmt.Errorf("%q is not empty, only an empty folder can be used for a new project", dir)
+		return nil, fmt.Errorf("operator %q already exists in %q", operator.Name, operatorsDir)
 	}
 
-	if !s.Info.Managed {
-		token, err := s.createOperatorToken(root)
+	if operator.KP != nil {
+		token, err := s.createOperatorToken(operator)
 		if err != nil {
 			return nil, err
 		}
@@ -168,10 +164,6 @@ func LoadStore(dir string) (*Store, error) {
 	}
 
 	return s, nil
-}
-
-func (s *Store) IsManaged() bool {
-	return s.Info.Managed
 }
 
 func (s *Store) resolve(name ...string) string {

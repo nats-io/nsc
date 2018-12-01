@@ -66,9 +66,6 @@ type AddServerParams struct {
 }
 
 func (p *AddServerParams) SetDefaults(ctx ActionCtx) error {
-	if ctx.StoreCtx().Store.IsManaged() {
-		return fmt.Errorf("servers cannot be created on managed configurations")
-	}
 	p.ClusterContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteCluster, false, ctx)
 	p.create = true

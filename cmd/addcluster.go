@@ -71,10 +71,6 @@ type AddClusterParams struct {
 }
 
 func (p *AddClusterParams) SetDefaults(ctx ActionCtx) error {
-	if ctx.StoreCtx().Store.IsManaged() {
-		return fmt.Errorf("clusters cannot be created on managed configurations")
-	}
-
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 	p.create = true
 	p.Entity.kind = nkeys.PrefixByteCluster

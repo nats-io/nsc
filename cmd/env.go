@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ func createEnvCmd() *cobra.Command {
 				table.AddRow("Project Dir", "", "not in a configuration directory")
 			} else {
 				table.AddRow("Name", "", s.Info.EnvironmentName)
-				table.AddRow("Project Dir", "", s.Dir)
+				table.AddRow("Project Dir", "", filepath.Dir(s.Dir))
 
 				var ctx *store.Context
 				if s != nil {
