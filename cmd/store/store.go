@@ -78,6 +78,7 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 	s := &Store{
 		Dir: root,
 		Info: Info{
+			EntityName:      operator.Name,
 			EnvironmentName: operator.Name,
 			Version:         Version,
 		},

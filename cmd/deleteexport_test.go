@@ -18,9 +18,8 @@ package cmd
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/nats-io/jwt"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_DeleteExport(t *testing.T) {

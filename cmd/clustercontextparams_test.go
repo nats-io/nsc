@@ -20,11 +20,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
-
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
