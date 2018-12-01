@@ -47,9 +47,6 @@ func GetConfig() *ToolConfig {
 }
 
 func SetStoreRoot(fp string) error {
-	if err := IsValidDir(fp); err != nil {
-		return err
-	}
 	config.StoreRoot = fp
 	return nil
 }

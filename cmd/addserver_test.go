@@ -48,8 +48,9 @@ func Test_AddServer(t *testing.T) {
 func Test_AddServerNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
+	SetStoreRoot("")
 	_, _, err := ExecuteCmd(createAddServerCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddServerOutput(t *testing.T) {

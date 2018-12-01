@@ -16,12 +16,9 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/nsc/cli"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -75,14 +72,12 @@ func TestCCP_DefaultsPath(t *testing.T) {
 	ts.AddCluster(t, "foo")
 	ts.AddCluster(t, "bar")
 
-	require.NoError(t, os.Chdir(filepath.Join(ts.Dir, "store", store.Clusters, "foo")))
-
 	ctx, err := NewActx(nil, nil)
 	require.NoError(t, err)
 
 	ccp := ClusterContextParams{}
 	ccp.SetDefaults(ctx)
-	require.Equal(t, "foo", ccp.Name)
+	require.Equal(t, "", ccp.Name)
 }
 
 func TestCCP_Edit(t *testing.T) {

@@ -48,8 +48,9 @@ func Test_AddUser(t *testing.T) {
 func Test_AddUserNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
+	SetStoreRoot("")
 	_, _, err := ExecuteCmd(CreateAddUserCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddUserrOutput(t *testing.T) {

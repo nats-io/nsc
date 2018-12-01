@@ -4,7 +4,7 @@ BUILD_OS:=`go env GOOS`
 BUILD_OS_ARCH:=`go env GOARCH`
 BUILD_OS_GOPATH=`go env GOPATH`
 
-.PHONY: build
+.PHONY: build test
 
 build: fmt compile test
 

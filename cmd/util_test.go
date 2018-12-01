@@ -48,6 +48,8 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	ts.OperatorKey = operator
 
 	ts.Dir = MakeTempDir(t)
+	// debug the test that created the store
+	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 	storeRoot := filepath.Join(ts.Dir, "store")
 	operatorRoot := filepath.Join(storeRoot, operatorName)
 	err = os.MkdirAll(operatorRoot, 0700)

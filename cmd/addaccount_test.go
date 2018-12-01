@@ -43,13 +43,15 @@ func Test_AddAccount(t *testing.T) {
 
 func Test_AddAccountNoStore(t *testing.T) {
 	// reset the store
+	SetStoreRoot("")
 	ngsStore = nil
 	_, _, err := ExecuteCmd(CreateAddAccountCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	t.Log(GetConfig().StoreRoot)
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddAccountValidateOutput(t *testing.T) {
-	ts := NewTestStore(t, "Test_AddAccountValidateOutput")
+	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")

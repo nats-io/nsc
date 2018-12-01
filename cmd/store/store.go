@@ -105,10 +105,11 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 		if err != nil {
 			return nil, err
 		}
-
 		if err := s.StoreClaim([]byte(token)); err != nil {
 			return nil, fmt.Errorf("error writing operator jwt: %v", err)
 		}
+	} else {
+		s.Info.Managed = true
 	}
 
 	d, err := json.Marshal(s.Info)
@@ -166,6 +167,10 @@ func LoadStore(dir string) (*Store, error) {
 	}
 
 	return s, nil
+}
+
+func (s *Store) IsManaged() bool {
+	return s.Info.Managed
 }
 
 func (s *Store) resolve(name ...string) string {
