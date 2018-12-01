@@ -43,8 +43,9 @@ var standardDirs = []string{Accounts}
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
-	Dir  string
-	Info Info
+	Dir            string
+	Info           Info
+	DefaultAccount string
 }
 
 type Info struct {
@@ -568,14 +569,23 @@ func (s *Store) GetContext() (*Context, error) {
 			return nil, err
 		}
 	}
+
 	// try to set a default account
-	ac, err := s.LoadDefaultEntity(Accounts)
+	var ac *jwt.GenericClaims
+
+	if s.DefaultAccount != "" {
+		ac, err = s.LoadClaim(Accounts, s.DefaultAccount, JwtName(s.DefaultAccount))
+	} else {
+		ac, err = s.LoadDefaultEntity(Accounts)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	if ac != nil {
 		c.SetContext(ac.Name, ac.Subject)
 	}
+
 	// try to set a default cluster
 	cc, err := s.LoadDefaultEntity(Clusters)
 	if err != nil {

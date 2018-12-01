@@ -81,6 +81,10 @@ func GetStore() (*store.Store, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.Account != "" {
+		ngsStore.DefaultAccount = config.Account
+	}
 	return ngsStore, nil
 }
 

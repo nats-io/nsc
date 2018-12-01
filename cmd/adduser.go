@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createAddUserCmd() *cobra.Command {
+func CreateAddUserCmd() *cobra.Command {
 	var params AddUserParams
 	cmd := &cobra.Command{
 		Use:          "user",
@@ -71,7 +71,7 @@ nsc add user --name u --tag test,service_a`,
 }
 
 func init() {
-	addCmd.AddCommand(createAddUserCmd())
+	addCmd.AddCommand(CreateAddUserCmd())
 }
 
 type AddUserParams struct {

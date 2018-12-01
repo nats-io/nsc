@@ -26,8 +26,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-//NgsHomeEnv the folder for the config file
-const NgsHomeEnv = "NSCHOME"
+//NscHomeEnv the folder for the config file
+const NscHomeEnv = "NSCHOME"
 
 type ToolConfig struct {
 	StoreRoot     string `json:"store_root"` // where the projects are

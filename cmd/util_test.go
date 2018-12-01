@@ -107,14 +107,14 @@ func (ts *TestStore) Done(t *testing.T) {
 
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
-		_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", accountName)
+		_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", accountName)
 		require.NoError(t, err, "account creation")
 	}
 }
 
 func (ts *TestStore) AddUser(t *testing.T, accountName string, userName string) {
 	ts.AddAccount(t, accountName)
-	_, _, err := ExecuteCmd(createAddUserCmd(), "--account", accountName, "--name", userName)
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "--account", accountName, "--name", userName)
 	require.NoError(t, err, "user creation")
 }
 

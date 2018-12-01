@@ -75,7 +75,9 @@ init --interactive
 				cmd.Println(table.Render())
 			}
 
-			cmd.Println("Success! - initialized project directory")
+			if p.operator.create {
+				cmd.Println("Success! - initialized project directory")
+			}
 
 			return nil
 		},
@@ -298,7 +300,10 @@ func (p *InitParams) Run() error {
 	var operator *store.NamedKey
 	if p.operator.create {
 		operator = &store.NamedKey{Name: p.operator.name, KP: p.operator.kp}
+	} else {
+		operator = &store.NamedKey{Name: p.environmentName}
 	}
+
 	_, err := store.CreateStore(p.environmentName, p.storeRoot, operator)
 	if err != nil {
 		return err

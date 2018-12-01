@@ -18,7 +18,7 @@ func main() {
 	cmd.GetRootCmd().Version = version
 	//cmd.SetUpdateRespository("nats-io/nsc")
 
-	if err := cmd.LoadOrInit("nats-io/nsc", cmd.NgsHomeEnv); err != nil {
+	if err := cmd.LoadOrInit("nats-io/nsc", cmd.NscHomeEnv); err != nil {
 		log.Fatal(err)
 	}
 
