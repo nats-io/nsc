@@ -124,7 +124,7 @@ func (ts *TestStore) Done(t *testing.T) {
 }
 
 func (ts *TestStore) GetStoresRoot() string {
-	return filepath.Join(ts.Dir, "store")
+	return filepath.Join(ts.Dir, "nats")
 }
 
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {

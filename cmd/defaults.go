@@ -52,14 +52,17 @@ func SetStoreRoot(fp string) error {
 
 func SetOperator(operator string) {
 	config.Operator = operator
+	config.Save()
 }
 
 func SetAccount(account string) {
 	config.Account = account
+	config.Save()
 }
 
 func SetCluster(cluster string) {
 	config.Cluster = cluster
+	config.Save()
 }
 
 func LoadOrInit(github string, toolHomeEnv string) error {
