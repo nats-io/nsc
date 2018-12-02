@@ -45,7 +45,7 @@ func Test_AddCluster(t *testing.T) {
 func Test_AddClusterNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
-	SetStoreRoot("")
+	ForceStoreRoot(t, "")
 	_, _, err := ExecuteCmd(createAddClusterCmd())
 	require.Equal(t, "no stores available", err.Error())
 }
@@ -59,7 +59,6 @@ func Test_AddClusterOutput(t *testing.T) {
 	validateClusterClaims(t, ts)
 }
 
-
 func Test_AddClusterFailsOnManagedStores(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
@@ -68,7 +67,6 @@ func Test_AddClusterFailsOnManagedStores(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "clusters cannot be created on managed configurations", err.Error())
 }
-
 
 func Test_AddClusterInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")

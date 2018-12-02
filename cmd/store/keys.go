@@ -111,20 +111,47 @@ func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, k.keyName(name)))
 }
 
+func (k *KeyStore) GetOperatorPublicKey(name string) (string, error) {
+	return k.getPublicKey(k.GetOperatorKey(name))
+}
+
 func (k *KeyStore) GetAccountKey(name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)))
+}
+
+func (k *KeyStore) GetAccountPublicKey(name string) (string, error) {
+	return k.getPublicKey(k.GetAccountKey(name))
 }
 
 func (k *KeyStore) GetUserKey(account string, name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.keyName(name)))
 }
 
+func (k *KeyStore) GetUserPublicKey(account string, name string) (string, error) {
+	return k.getPublicKey(k.GetUserKey(account, name))
+}
+
 func (k *KeyStore) GetClusterKey(name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
 }
 
+func (k *KeyStore) GetClusterPublicKey(name string) (string, error) {
+	return k.getPublicKey(k.GetClusterKey(name))
+}
+
 func (k *KeyStore) GetServerKey(cluster string, name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, cluster, Servers, k.keyName(name)))
+}
+
+func (k *KeyStore) GetServerPublicKey(cluster string, name string) (string, error) {
+	return k.getPublicKey(k.GetServerKey(cluster, name))
+}
+
+func (k *KeyStore) getPublicKey(kp nkeys.KeyPair, err error) (string, error) {
+	if err != nil {
+		return "", err
+	}
+	return kp.PublicKey()
 }
 
 func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, error) {

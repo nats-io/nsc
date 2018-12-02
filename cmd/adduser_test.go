@@ -48,7 +48,7 @@ func Test_AddUser(t *testing.T) {
 func Test_AddUserNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
-	SetStoreRoot("")
+	ForceStoreRoot(t, "")
 	_, _, err := ExecuteCmd(CreateAddUserCmd())
 	require.Equal(t, "no stores available", err.Error())
 }
@@ -71,7 +71,6 @@ func Test_AddUserInteractive(t *testing.T) {
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
-
 
 	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01"}
 

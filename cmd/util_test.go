@@ -39,6 +39,7 @@ type TestStore struct {
 }
 
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
+	ResetConfigForTests()
 	var ts TestStore
 
 	// ngsStore is a global - so first test to get it initializes it
@@ -50,8 +51,8 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
-	SetStoreRoot(ts.GetStoresRoot())
-	SetOperator(operatorName)
+	ForceStoreRoot(t, ts.GetStoresRoot())
+	ForceOperator(t, operatorName)
 	ts.AddOperatorWithKey(t, operatorName, operator)
 
 	return &ts
@@ -243,4 +244,21 @@ func CreateNkey(t *testing.T, kind nkeys.PrefixByte) ([]byte, string, nkeys.KeyP
 	require.NoError(t, err)
 
 	return seed, pub, kp
+}
+
+func ForceStoreRoot(t *testing.T, fp string) error {
+	config.StoreRoot = fp
+	return nil
+}
+
+func ForceOperator(t *testing.T, operator string) {
+	config.Operator = operator
+}
+
+func ForceAccount(t *testing.T, account string) {
+	config.Account = account
+}
+
+func ForceCluster(t *testing.T, cluster string) {
+	config.Cluster = cluster
 }

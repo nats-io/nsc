@@ -45,23 +45,6 @@ func ResetConfigForTests() {
 	config = ToolConfig{}
 }
 
-func SetStoreRoot(fp string) error {
-	config.StoreRoot = fp
-	return nil
-}
-
-func SetOperator(operator string) {
-	config.Operator = operator
-}
-
-func SetAccount(account string) {
-	config.Account = account
-}
-
-func SetCluster(cluster string) {
-	config.Cluster = cluster
-}
-
 func LoadOrInit(github string, toolHomeEnv string) error {
 	var err error
 	if toolHomeEnv == "" {
@@ -120,7 +103,6 @@ func initToolHome(envVarName string) (string, error) {
 		exeName := filepath.Base(os.Args[0])
 		dir, err := homedir.Dir()
 		if err != nil {
-			// shouldn't prevent if there's an error
 			return "", fmt.Errorf("error getting homedir: %v", err.Error())
 		}
 		toolHome = filepath.Join(dir, fmt.Sprintf(".%scli", exeName))

@@ -30,6 +30,10 @@ func (p *ClusterContextParams) BindFlags(cmd *cobra.Command) {
 }
 
 func (p *ClusterContextParams) SetDefaults(ctx ActionCtx) {
+	config := GetConfig()
+	if p.Name == "" {
+		p.Name = config.Cluster
+	}
 	if p.Name != "" && ctx.StoreCtx().Cluster.Name == "" {
 		ctx.StoreCtx().Cluster.Name = p.Name
 	}

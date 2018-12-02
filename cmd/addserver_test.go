@@ -48,7 +48,7 @@ func Test_AddServer(t *testing.T) {
 func Test_AddServerNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
-	SetStoreRoot("")
+	ForceStoreRoot(t, "")
 	_, _, err := ExecuteCmd(createAddServerCmd())
 	require.Equal(t, "no stores available", err.Error())
 }
@@ -71,7 +71,6 @@ func Test_AddServerInteractive(t *testing.T) {
 
 	_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", "c")
 	require.NoError(t, err, "cluster creation")
-
 
 	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01"}
 

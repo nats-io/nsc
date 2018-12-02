@@ -47,7 +47,7 @@ func NewContextConfig(storeRoot string) (*ContextConfig, error) {
 // deduce as much context as possible
 func (c *ContextConfig) SetDefaults() {
 	if err := IsValidDir(c.StoreRoot); err == nil {
-		operators := c.listOperators()
+		operators := c.ListOperators()
 		if len(operators) == 1 {
 			s, err := store.LoadStore(filepath.Join(c.StoreRoot, operators[0]))
 			if err != nil {
@@ -66,7 +66,7 @@ func (c *ContextConfig) SetDefaults() {
 	}
 }
 
-func (c *ContextConfig) listOperators() []string {
+func (c *ContextConfig) ListOperators() []string {
 	infos, err := ioutil.ReadDir(c.StoreRoot)
 	if err != nil {
 		return nil
@@ -84,7 +84,7 @@ func (c *ContextConfig) listOperators() []string {
 }
 
 func (c *ContextConfig) SetOperator(operator string) error {
-	for _, v := range c.listOperators() {
+	for _, v := range c.ListOperators() {
 		op := filepath.Base(v)
 		if op == operator {
 			c.Operator = operator

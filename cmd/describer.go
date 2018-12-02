@@ -327,6 +327,7 @@ func (c *ClusterDescriber) Describe() string {
 	table.AddTitle("Cluster")
 	table.AddRow("Name", c.Name)
 	table.AddRow("Cluster ID", c.Subject)
+	table.AddRow("Issuer ID", c.Issuer)
 
 	AddListValues(table, "Trusted Operators", c.Trust)
 	if c.OperatorURL != "" {

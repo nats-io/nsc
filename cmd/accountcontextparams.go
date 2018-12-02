@@ -30,6 +30,10 @@ func (p *AccountContextParams) BindFlags(cmd *cobra.Command) {
 }
 
 func (p *AccountContextParams) SetDefaults(ctx ActionCtx) {
+	config := GetConfig()
+	if p.Name == "" {
+		p.Name = config.Account
+	}
 	if p.Name != "" && ctx.StoreCtx().Account.Name == "" {
 		ctx.StoreCtx().Account.Name = p.Name
 	}
