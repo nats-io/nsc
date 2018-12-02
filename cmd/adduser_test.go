@@ -53,7 +53,7 @@ func Test_AddUserNoStore(t *testing.T) {
 	require.Equal(t, "no stores available", err.Error())
 }
 
-func Test_AddUserrOutput(t *testing.T) {
+func Test_AddUserOutput(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
@@ -61,6 +61,23 @@ func Test_AddUserrOutput(t *testing.T) {
 	require.NoError(t, err, "account creation")
 
 	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+	validateAddUserClaims(t, ts)
+}
+
+func Test_AddUserInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err, "account creation")
+
+
+	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01"}
+
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
 	require.NoError(t, err)
 	validateAddUserClaims(t, ts)
 }

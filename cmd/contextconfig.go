@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -41,7 +42,6 @@ func NewContextConfig(storeRoot string) (*ContextConfig, error) {
 		ctx.SetDefaults()
 	}
 	return &ctx, nil
-
 }
 
 // deduce as much context as possible
@@ -81,4 +81,48 @@ func (c *ContextConfig) listOperators() []string {
 		}
 	}
 	return operators
+}
+
+func (c *ContextConfig) SetOperator(operator string) error {
+	for _, v := range c.listOperators() {
+		op := filepath.Base(v)
+		if op == operator {
+			c.Operator = operator
+			return nil
+		}
+	}
+	return fmt.Errorf("operator %q not in %q", operator, c.StoreRoot)
+}
+
+func (c *ContextConfig) SetAccount(account string) error {
+	if err := c.hasSubContainer(store.Accounts, account); err != nil {
+		return err
+	}
+	c.Account = account
+	return nil
+}
+
+func (c *ContextConfig) SetCluster(cluster string) error {
+	if err := c.hasSubContainer(store.Clusters, cluster); err != nil {
+		return err
+	}
+	c.Cluster = cluster
+	return nil
+}
+
+func (c *ContextConfig) hasSubContainer(kind string, name string) error {
+	s, err := store.LoadStore(filepath.Join(c.StoreRoot, c.Operator))
+	if err != nil {
+		return err
+	}
+	accounts, err := s.ListSubContainers(kind)
+	if err != nil {
+		return err
+	}
+	for _, v := range accounts {
+		if name == v {
+			return nil
+		}
+	}
+	return fmt.Errorf("%q not in %s for operator %q in %q", name, kind, c.Operator, c.StoreRoot)
 }

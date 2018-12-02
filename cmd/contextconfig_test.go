@@ -37,7 +37,7 @@ func TestContextConfig_BadDir(t *testing.T) {
 	require.Equal(t, fp, c.StoreRoot)
 }
 
-func TestContextConfig_DefaultOperator(t *testing.T) {
+func TestContextConfig_LoadDefaultOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
@@ -49,7 +49,7 @@ func TestContextConfig_DefaultOperator(t *testing.T) {
 	require.Equal(t, "operator", c.Operator)
 }
 
-func TestContextConfig_Multiple(t *testing.T) {
+func TestContextConfig_LoadMultipleOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
@@ -62,6 +62,42 @@ func TestContextConfig_Multiple(t *testing.T) {
 	require.NotNil(t, c)
 	require.Equal(t, storesDir, c.StoreRoot)
 	require.Equal(t, "", c.Operator)
+}
+
+func TestContextConfig_SetValidOperator(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddOperator(t, "operator2")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+	err = c.SetOperator("operator2")
+	require.NoError(t, err)
+	require.Equal(t, "operator2", c.Operator)
+}
+
+func TestContextConfig_SetInvalidOperator(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+	err = c.SetOperator("bar")
+	require.Error(t, err)
+}
+
+func TestContextConfig_SetEptyOperator(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+	err = c.SetOperator("")
+	require.Error(t, err)
 }
 
 func TestContextConfig_Account(t *testing.T) {
@@ -78,7 +114,7 @@ func TestContextConfig_Account(t *testing.T) {
 	require.Equal(t, "A", c.Account)
 }
 
-func TestContextConfig_MultipleAccount(t *testing.T) {
+func TestContextConfig_LoadMultipleAccount(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
@@ -93,7 +129,48 @@ func TestContextConfig_MultipleAccount(t *testing.T) {
 	require.Equal(t, "", c.Account)
 }
 
-func TestContextConfig_Cluster(t *testing.T) {
+func TestContextConfig_SetValidAccount(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "B")
+	err = c.SetAccount("B")
+	require.NoError(t, err)
+	require.Equal(t, "B", c.Account)
+}
+
+func TestContextConfig_SetInvalidAccount(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	err = c.SetAccount("B")
+	require.Error(t, err)
+}
+
+func TestContextConfig_SetEmptyAccount(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	err = c.SetAccount("")
+	require.Error(t, err)
+}
+
+func TestContextConfig_LoadCluster(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 	ts.AddCluster(t, "C")
@@ -108,7 +185,7 @@ func TestContextConfig_Cluster(t *testing.T) {
 	require.Equal(t, "C", c.Cluster)
 }
 
-func TestContextConfig_MultipleCluster(t *testing.T) {
+func TestContextConfig_LoadMultipleCluster(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 	ts.AddCluster(t, "C")
@@ -122,4 +199,44 @@ func TestContextConfig_MultipleCluster(t *testing.T) {
 	require.Equal(t, "operator", c.Operator)
 	require.Equal(t, "", c.Account)
 	require.Equal(t, "", c.Cluster)
+}
+
+func TestContextConfig_SetValidCluster(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddCluster(t, "C")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	ts.AddCluster(t, "D")
+	err = c.SetCluster("D")
+	require.NoError(t, err)
+}
+
+func TestContextConfig_SetInvalidCluster(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddCluster(t, "C")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	err = c.SetCluster("X")
+	require.Error(t, err)
+}
+
+func TestContextConfig_SetEmptyCluster(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	ts.AddCluster(t, "C")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+
+	err = c.SetCluster("")
+	require.Error(t, err)
 }

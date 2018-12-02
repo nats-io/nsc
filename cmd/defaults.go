@@ -95,6 +95,7 @@ func LoadOrInit(github string, toolHomeEnv string) error {
 		}
 	}
 	// trigger updating defaults
+	config.SetDefaults()
 
 	return nil
 }

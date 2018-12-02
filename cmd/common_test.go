@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolvePath(t *testing.T) {
+func TestCommon_ResolvePath(t *testing.T) {
 	v := ResolvePath("bar", "foo")
 	require.Equal(t, v, "bar", "non defined variable")
 
@@ -41,7 +41,7 @@ func TestResolvePath(t *testing.T) {
 	require.Equal(t, v, "foobar", "env set")
 }
 
-func TestGetOutput(t *testing.T) {
+func TestCommon_GetOutput(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatal("error creating tmpdir", err)
@@ -78,12 +78,12 @@ func TestGetOutput(t *testing.T) {
 	}
 }
 
-func TestIsStdOut(t *testing.T) {
+func TestCommon_IsStdOut(t *testing.T) {
 	require.True(t, IsStdOut("--"))
 	require.False(t, IsStdOut("/tmp/foo.txt"))
 }
 
-func TestResolveKeyEmpty(t *testing.T) {
+func TestCommon_ResolveKeyEmpty(t *testing.T) {
 	old := KeyPathFlag
 	KeyPathFlag = ""
 
@@ -94,7 +94,7 @@ func TestResolveKeyEmpty(t *testing.T) {
 	require.Nil(t, rkp)
 }
 
-func TestResolveKeyFromSeed(t *testing.T) {
+func TestCommon_ResolveKeyFromSeed(t *testing.T) {
 	seed, p, _ := CreateAccountKey(t)
 	old := KeyPathFlag
 	KeyPathFlag = string(seed)
@@ -110,7 +110,7 @@ func TestResolveKeyFromSeed(t *testing.T) {
 	require.Equal(t, pp, p)
 }
 
-func TestResolveKeyFromFile(t *testing.T) {
+func TestCommon_ResolveKeyFromFile(t *testing.T) {
 	dir := MakeTempDir(t)
 	_, p, kp := CreateAccountKey(t)
 	old := KeyPathFlag
@@ -126,7 +126,7 @@ func TestResolveKeyFromFile(t *testing.T) {
 	require.Equal(t, pp, p)
 }
 
-func TestParseNumber(t *testing.T) {
+func TestCommon_ParseNumber(t *testing.T) {
 	type testd struct {
 		input   string
 		output  int64
@@ -160,7 +160,7 @@ func TestParseNumber(t *testing.T) {
 	}
 }
 
-func Test_NKeyValidatorActualKey(t *testing.T) {
+func TestCommon_NKeyValidatorActualKey(t *testing.T) {
 	as, _, _ := CreateAccountKey(t)
 	fn := NKeyValidator(nkeys.PrefixByteAccount)
 	require.NoError(t, fn(string(as)))
@@ -169,7 +169,7 @@ func Test_NKeyValidatorActualKey(t *testing.T) {
 	require.Error(t, fn(string(os)))
 }
 
-func Test_NKeyValidatorKeyInFile(t *testing.T) {
+func TestCommon_NKeyValidatorKeyInFile(t *testing.T) {
 	dir := MakeTempDir(t)
 	as, _, _ := CreateAccountKey(t)
 	os, _, _ := CreateOperatorKey(t)
@@ -183,7 +183,7 @@ func Test_NKeyValidatorKeyInFile(t *testing.T) {
 	require.Error(t, fn(filepath.Join(dir, "os.nk")))
 }
 
-func Test_LoadFromURL(t *testing.T) {
+func TestCommon_LoadFromURL(t *testing.T) {
 	v := "1,2,3"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, v)
@@ -195,7 +195,7 @@ func Test_LoadFromURL(t *testing.T) {
 	require.Equal(t, v, string(d))
 }
 
-func Test_LoadFromURLTimeout(t *testing.T) {
+func TestCommon_LoadFromURLTimeout(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(time.Second * 6)
 	}))
@@ -206,7 +206,7 @@ func Test_LoadFromURLTimeout(t *testing.T) {
 	require.Contains(t, err.Error(), "Timeout exceeded")
 }
 
-func TestIsValidDir(t *testing.T) {
+func TestCommon_IsValidDir(t *testing.T) {
 	d := MakeTempDir(t)
 	require.NoError(t, IsValidDir(d))
 
@@ -220,4 +220,111 @@ func TestIsValidDir(t *testing.T) {
 	err = IsValidDir(tp)
 	require.Error(t, err)
 	require.Equal(t, "not a directory", err.Error())
+}
+
+func TestCommon_FormatConfig(t *testing.T) {
+	d := FormatConfig("test_type", "A_sTring_JWT", "sEEdString")
+
+	expected :=
+`-----BEGIN NATS TEST_TYPE JWT-----
+A_sTring_JWT
+------END NATS TEST_TYPE JWT------
+
+************************* IMPORTANT *************************
+NKEY Seed printed below can be used to sign and prove identity.
+NKEYs are sensitive and should be treated as secrets.
+
+-----BEGIN TEST_TYPE NKEY SEED-----
+sEEdString
+------END TEST_TYPE NKEY SEED------
+
+*************************************************************
+`
+  require.Equal(t, expected, string(d))
+}
+
+func TestCommon_FormatJwt(t *testing.T) {
+	d := FormatJwt("test_type", "A_sTring_JWT")
+
+	expected :=
+		`-----BEGIN NATS TEST_TYPE JWT-----
+A_sTring_JWT
+------END NATS TEST_TYPE JWT------
+
+`
+	require.Equal(t, expected, string(d))
+}
+
+func TestCommon_MaybeMakeDir(t *testing.T) {
+	d := MakeTempDir(t)
+	dir := filepath.Join(d, "foo")
+	_, err := os.Stat(dir)
+	require.True(t, os.IsNotExist(err))
+	err = MaybeMakeDir(dir)
+	require.NoError(t, err)
+	require.DirExists(t, dir)
+
+	// test no fail if exists
+	err = MaybeMakeDir(dir)
+	require.NoError(t, err)
+}
+
+func TestCommon_MaybeMakeDir_FileExists(t *testing.T) {
+	d := MakeTempDir(t)
+	fp := filepath.Join(d, "foo")
+	err := Write(fp, []byte("hello"))
+	require.NoError(t, err)
+
+	err = MaybeMakeDir(fp)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "is not a dir")
+}
+
+func TestCommon_Read(t *testing.T) {
+	d := MakeTempDir(t)
+	dir := filepath.Join(d, "foo", "bar", "baz")
+	err := MaybeMakeDir(dir)
+	require.NoError(t, err)
+
+	fp := filepath.Join(dir, "..", "..", "foo.txt")
+	err = Write(fp, []byte("hello"))
+	require.NoError(t, err)
+
+	require.DirExists(t, dir)
+	require.FileExists(t, filepath.Join(d, "foo", "foo.txt"))
+	data, err := Read(fp)
+	require.NoError(t, err)
+	require.Equal(t, "hello", string(data))
+}
+
+func TestCommon_WriteJSON(t *testing.T) {
+	d := MakeTempDir(t)
+	fp := filepath.Join(d, "foo")
+
+	n := struct {
+		Name string `json:"name"`
+	}{}
+	n.Name = "test"
+
+	err := WriteJson(fp, n)
+	require.NoError(t, err)
+
+	v, err := Read(fp)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"name": "test"}`, string(v))
+}
+
+func TestCommon_ReadJSON(t *testing.T) {
+	d := MakeTempDir(t)
+	fp := filepath.Join(d, "foo")
+	err := Write(fp, []byte(`{"name": "test"}`))
+	require.NoError(t, err)
+
+	n := struct {
+		Name string `json:"name"`
+	}{}
+
+	err = ReadJson(fp, &n)
+	require.NoError(t, err)
+	require.Equal(t, "test", n.Name)
 }

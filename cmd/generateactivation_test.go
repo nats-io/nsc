@@ -36,7 +36,7 @@ func Test_GenerateActivation(t *testing.T) {
 
 	tests := CmdTests{
 		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"target-account cannot be empty"}, true},
-		{createGenerateActivationCmd(), []string{"generate", "activation", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--target-account", pub}, []string{"-----BEGIN NATS ACTIVATION JWT-----"}, nil, false},
 	}
 
 	tests.Run(t, "root", "generate")
@@ -57,7 +57,7 @@ func Test_GenerateActivationMultiple(t *testing.T) {
 		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
 		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
 		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
-		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN ACTIVATION JWT-----"}, nil, false},
+		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN NATS ACTIVATION JWT-----"}, nil, false},
 	}
 
 	tests.Run(t, "root", "generate")

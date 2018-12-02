@@ -62,7 +62,27 @@ func Test_AddServerOutput(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createAddServerCmd(), "--name", "a", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
+	validateServerClaim(t, ts)
+}
 
+func Test_AddServerInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", "c")
+	require.NoError(t, err, "cluster creation")
+
+
+	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01"}
+
+	cmd := createAddServerCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+	validateServerClaim(t, ts)
+}
+
+func validateServerClaim(t *testing.T, ts *TestStore) {
 	skp, err := ts.KeyStore.GetServerKey("c", "a")
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")

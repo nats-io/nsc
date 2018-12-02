@@ -132,80 +132,37 @@ func Read(fp string) ([]byte, error) {
 	return ioutil.ReadFile(afp)
 }
 
-func FormatKeys(keyType string, publicKey string, privateKey string) []byte {
-	w := bytes.NewBuffer(nil)
-	label := strings.ToUpper(keyType)
-
-	if privateKey != "" {
-		fmt.Fprintln(w, "************************* IMPORTANT *************************")
-		fmt.Fprintln(w, "Your options generated NKEYs which can be used to create")
-		fmt.Fprintln(w, "entities or prove identity.")
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Generated keys printed below are sensitive and should be")
-		fmt.Fprintln(w, "treated as secrets to prevent unauthorized access.")
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "The private key is not saved by the tool. Please save")
-		fmt.Fprintln(w, "it now as it will be required by the user to connect to NATS.")
-		fmt.Fprintln(w, "The public key is saved and uniquely identifies the user.")
-		fmt.Fprintln(w)
-
-		fmt.Fprintf(w, "-----BEGIN %s PRIVATE KEY-----\n", label)
-		fmt.Fprintln(w, privateKey)
-		fmt.Fprintf(w, "------END %s PRIVATE KEY------\n", label)
-		fmt.Fprintln(w)
-
-		fmt.Fprintln(w, "*************************************************************")
-		fmt.Fprintln(w)
-	}
-
-	if publicKey != "" {
-		fmt.Fprintf(w, "-----BEGIN %s PUB KEY-----\n", label)
-		fmt.Fprintln(w, publicKey)
-		fmt.Fprintf(w, "------END %s PUB KEY------\n", label)
-		fmt.Fprintln(w)
-	}
-
-	fmt.Fprintln(w)
-
-	return w.Bytes()
-}
 
 func FormatConfig(jwtType string, jwtString string, seed string) []byte {
 	w := bytes.NewBuffer(nil)
+
+	w.Write(FormatJwt(jwtType, jwtString))
+
+	_, _ = fmt.Fprintln(w, "************************* IMPORTANT *************************")
+	_, _ = fmt.Fprintln(w, "NKEY Seed printed below can be used to sign and prove identity.")
+	_, _ = fmt.Fprintln(w, "NKEYs are sensitive and should be treated as secrets.")
+	_, _ = fmt.Fprintln(w)
+
 	label := strings.ToUpper(jwtType)
+	_, _ = fmt.Fprintf(w, "-----BEGIN %s NKEY SEED-----\n", label)
+	_, _ = fmt.Fprintln(w, seed)
+	_, _ = fmt.Fprintf(w, "------END %s NKEY SEED------\n", label)
+	_, _ = fmt.Fprintln(w)
 
-	fmt.Fprintf(w, "-----BEGIN NATS %s JWT-----\n", label)
-	fmt.Fprintln(w, jwtString)
-	fmt.Fprintf(w, "------END NATS %s JWT------\n", label)
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "*************************************************************")
 
-	fmt.Fprintln(w, "************************* IMPORTANT *************************")
-	fmt.Fprintln(w, "NKEY Seed printed below can be used to sign and prove identity.")
-	fmt.Fprintln(w, "NKEYs are sensitive and should be treated as secrets.")
-	fmt.Fprintln(w)
-
-	fmt.Fprintf(w, "-----BEGIN %s NKEY SEED-----\n", label)
-	fmt.Fprintln(w, seed)
-	fmt.Fprintf(w, "------END %s NKEY SEED------\n", label)
-	fmt.Fprintln(w)
-
-	fmt.Fprintln(w, "*************************************************************")
-	fmt.Fprintln(w)
-
-	fmt.Fprintln(w)
 
 	return w.Bytes()
 }
 
-func FormatJwt(jwtType string, jwt string) []byte {
+func FormatJwt(jwtType string, jwtString string) []byte {
 	w := bytes.NewBuffer(nil)
 
 	label := strings.ToUpper(jwtType)
-	fmt.Fprintf(w, "-----BEGIN %s JWT-----\n", label)
-	fmt.Fprintln(w, jwt)
-	fmt.Fprintf(w, "------END %s JWT------\n", label)
-	fmt.Fprintln(w)
-
+	_, _ = fmt.Fprintf(w, "-----BEGIN NATS %s JWT-----\n", label)
+	_, _ = fmt.Fprintln(w, jwtString)
+	_, _ = fmt.Fprintf(w, "------END NATS %s JWT------\n", label)
+	_, _ = fmt.Fprintln(w)
 	return w.Bytes()
 }
 
@@ -350,7 +307,7 @@ func IsValidDir(dir string) error {
 func MaybeMakeDir(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil && os.IsNotExist(err) {
-		if err := os.Mkdir(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return fmt.Errorf("error creating %q: %v", dir, err)
 		}
 	} else if err != nil {
