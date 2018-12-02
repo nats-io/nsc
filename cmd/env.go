@@ -66,6 +66,13 @@ func createEnvCmd() *cobra.Command {
 				}
 			}
 
+			table.AddSeparator()
+			conf := GetConfig()
+			table.AddRow("Stores Dir", "", conf.StoreRoot)
+			table.AddRow("Default Operator", "", conf.Operator)
+			table.AddRow("Default Account", "", conf.Account)
+			table.AddRow("Default Cluster", "", conf.Cluster)
+
 			cmd.Println(table.Render())
 
 			return nil

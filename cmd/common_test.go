@@ -205,3 +205,19 @@ func Test_LoadFromURLTimeout(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Timeout exceeded")
 }
+
+func TestIsValidDir(t *testing.T) {
+	d := MakeTempDir(t)
+	require.NoError(t, IsValidDir(d))
+
+	tp := filepath.Join(d, "foo")
+	err := IsValidDir(tp)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err))
+
+	err = ioutil.WriteFile(tp, []byte("hello"), 0600)
+	require.NoError(t, err)
+	err = IsValidDir(tp)
+	require.Error(t, err)
+	require.Equal(t, "not a directory", err.Error())
+}

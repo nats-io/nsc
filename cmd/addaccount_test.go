@@ -46,7 +46,6 @@ func Test_AddAccountNoStore(t *testing.T) {
 	SetStoreRoot("")
 	ngsStore = nil
 	_, _, err := ExecuteCmd(CreateAddAccountCmd())
-	t.Log(GetConfig().StoreRoot)
 	require.Equal(t, "no stores available", err.Error())
 }
 

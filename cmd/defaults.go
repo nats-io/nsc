@@ -16,10 +16,8 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -27,13 +25,10 @@ import (
 )
 
 //NscHomeEnv the folder for the config file
-const NscHomeEnv = "NSCHOME"
+const NscHomeEnv = "NSC_HOME"
 
 type ToolConfig struct {
-	StoreRoot     string `json:"store_root"` // where the projects are
-	Operator      string `json:"operator"`
-	Account       string `json:"account"`
-	Cluster       string `json:"cluster"`
+	ContextConfig
 	GithubUpdates string `json:"github_updates"` // git hub repo
 	LastUpdate    int64  `json:"last_update"`
 }
@@ -44,6 +39,10 @@ var toolHome string
 // GetConfig returns the global config
 func GetConfig() *ToolConfig {
 	return &config
+}
+
+func ResetConfigForTests() {
+	config = ToolConfig{}
 }
 
 func SetStoreRoot(fp string) error {
@@ -65,13 +64,11 @@ func SetCluster(cluster string) {
 
 func LoadOrInit(github string, toolHomeEnv string) error {
 	var err error
-
 	if toolHomeEnv == "" {
 		return errors.New("toolHomeEnv is required")
 	}
 
 	toolHome, err = initToolHome(toolHomeEnv)
-
 	if err != nil {
 		return err
 	}
@@ -80,54 +77,38 @@ func LoadOrInit(github string, toolHomeEnv string) error {
 		return err
 	}
 
-	// do we have preferences?
-
+	// is the struct modified from the file
 	if (ToolConfig{}) == config {
 		config.GithubUpdates = github
 
 		// ~/.ngs_cli/nats
 		config.StoreRoot = filepath.Join(toolHome, "nats")
-
-		if err := os.Mkdir(config.StoreRoot, 0700); err != nil {
-			return fmt.Errorf("error creating store root %q: %v", config.StoreRoot, err)
+		if err := MaybeMakeDir(config.StoreRoot); err != nil {
+			return fmt.Errorf("error creating store root: %v", err)
 		}
+
+		// load any default entries if there are any
+		config.SetDefaults()
 
 		if err := config.Save(); err != nil {
 			return err
 		}
 	}
+	// trigger updating defaults
 
 	return nil
 }
 
 func (d *ToolConfig) load() error {
-	fn := d.configFile()
-	data, err := ioutil.ReadFile(fn)
+	err := ReadJson(d.configFile(), &config)
 	if err != nil && os.IsNotExist(err) {
-		// go check
-	} else if err != nil {
-		return fmt.Errorf("error reading: %v", err.Error())
-	} else {
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("error parsing %q: %v", fn, err.Error())
-		}
+		return nil
 	}
-	return nil
+	return err
 }
 
 func (d *ToolConfig) Save() error {
-	data, err := json.Marshal(d)
-	if err != nil {
-		return fmt.Errorf("error serialzing selfupdate info: %v", err)
-	}
-
-	fn := d.configFile()
-
-	if err := ioutil.WriteFile(fn, data, 0600); err != nil {
-		return fmt.Errorf("error writing %q: %v", fn, err)
-	}
-
-	return nil
+	return WriteJson(d.configFile(), d)
 }
 
 // GetToolHome returns the . folder used fro this CLIs config and optionally the projects
@@ -144,18 +125,8 @@ func initToolHome(envVarName string) (string, error) {
 		toolHome = filepath.Join(dir, fmt.Sprintf(".%scli", exeName))
 	}
 
-	fi, err := os.Stat(toolHome)
-
-	if err != nil && os.IsNotExist(err) {
-		if err := os.Mkdir(toolHome, 0700); err != nil {
-			return "", fmt.Errorf("error creating homedir %q: %v", toolHome, err)
-		}
-	} else if err != nil {
-		return "", fmt.Errorf("error stating homedir %q: %v", toolHome, err)
-	}
-
-	if !fi.IsDir() {
-		return "", fmt.Errorf("error stating homedir path %q exists but it is not a directory", toolHome)
+	if err := MaybeMakeDir(toolHome); err != nil {
+		return "", fmt.Errorf("error creating tool home %q: %v", toolHome, err)
 	}
 
 	return toolHome, nil

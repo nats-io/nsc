@@ -40,7 +40,6 @@ type TestStore struct {
 
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	var ts TestStore
-	var err error
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
@@ -50,14 +49,33 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	ts.Dir = MakeTempDir(t)
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
-	storeRoot := filepath.Join(ts.Dir, "store")
+
+	SetStoreRoot(ts.GetStoresRoot())
+	SetOperator(operatorName)
+	ts.AddOperatorWithKey(t, operatorName, operator)
+
+	return &ts
+}
+
+func (ts *TestStore) AddOperator(t *testing.T, operatorName string) *store.Store {
+	_, _, kp := CreateOperatorKey(t)
+	return ts.AddOperatorWithKey(t, operatorName, kp)
+}
+
+func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, operator nkeys.KeyPair) *store.Store {
+	storeRoot := ts.GetStoresRoot()
 	operatorRoot := filepath.Join(storeRoot, operatorName)
-	err = os.MkdirAll(operatorRoot, 0700)
+	err := os.MkdirAll(operatorRoot, 0700)
 	require.NoError(t, err, "error creating %q", operatorRoot)
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
-	err = os.Mkdir(nkeysDir, 0700)
-	require.NoError(t, err, "error creating %q", nkeysDir)
+	_, err = os.Stat(nkeysDir)
+	if err != nil && os.IsNotExist(err) {
+		err = os.Mkdir(nkeysDir, 0700)
+		require.NoError(t, err, "error creating %q", nkeysDir)
+	}
+	require.NoError(t, err)
+
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
 	require.NoError(t, err, "nkeys env")
 
@@ -67,9 +85,11 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 		nk.KP = ts.OperatorKey
 	}
 
-	SetStoreRoot(storeRoot)
-	SetOperator(operatorName)
-	ts.Store, err = store.CreateStore(operatorName, storeRoot, nk)
+	s, err := store.CreateStore(operatorName, storeRoot, nk)
+	require.NoError(t, err)
+	if ts.Store == nil {
+		ts.Store = s
+	}
 	ctx, err := ts.Store.GetContext()
 	require.NoError(t, err, "getting context")
 
@@ -78,8 +98,7 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 		ts.OperatorKeyPath, err = ts.KeyStore.Store(operatorName, ts.OperatorKey, "")
 		require.NoError(t, err, "store operator key")
 	}
-
-	return &ts
+	return s
 }
 
 func NewTestStore(t *testing.T, operatorName string) *TestStore {
@@ -89,9 +108,6 @@ func NewTestStore(t *testing.T, operatorName string) *TestStore {
 
 func TestStoreTree(t *testing.T) {
 	ts := NewTestStore(t, "foo")
-	t.Log(ts.Dir)
-	t.Log("operatorName", GetConfig().Operator)
-
 	ts.AddAccount(t, "bar")
 	ts.AddAccount(t, "foo")
 
@@ -105,6 +121,10 @@ func (ts *TestStore) Done(t *testing.T) {
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
 	}
+}
+
+func (ts *TestStore) GetStoresRoot() string {
+	return filepath.Join(ts.Dir, "store")
 }
 
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {

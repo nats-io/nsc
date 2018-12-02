@@ -262,7 +262,6 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 		for _, v := range infos {
 			if !v.IsDir() && IsJwtName(v.Name()) {
 				entries = append(entries, PlainName(v.Name()))
-
 			}
 		}
 	}

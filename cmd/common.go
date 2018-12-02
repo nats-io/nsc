@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -74,6 +75,19 @@ func IsStdOut(fp string) bool {
 	return fp == "--"
 }
 
+func WriteJson(fp string, v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("error marshalling: %v", err)
+	}
+
+	if err := ioutil.WriteFile(fp, data, 0600); err != nil {
+		return fmt.Errorf("error writing %q: %v", fp, err)
+	}
+
+	return nil
+}
+
 func Write(fp string, data []byte) error {
 	var err error
 	var f *os.File
@@ -98,10 +112,22 @@ func Write(fp string, data []byte) error {
 	return nil
 }
 
+func ReadJson(fp string, v interface{}) error {
+	data, err := Read(fp)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func Read(fp string) ([]byte, error) {
 	afp, err := filepath.Abs(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q: %v", fp, err)
+		return nil, fmt.Errorf("error converting abs %q: %v", fp, err)
 	}
 	return ioutil.ReadFile(afp)
 }
@@ -317,6 +343,20 @@ func IsValidDir(dir string) error {
 	}
 	if !fi.IsDir() {
 		return fmt.Errorf("not a directory")
+	}
+	return nil
+}
+
+func MaybeMakeDir(dir string) error {
+	fi, err := os.Stat(dir)
+	if err != nil && os.IsNotExist(err) {
+		if err := os.Mkdir(dir, 0700); err != nil {
+			return fmt.Errorf("error creating %q: %v", dir, err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("error stat'ing %q: %v", dir, err)
+	} else if !fi.IsDir() {
+		return fmt.Errorf("%q already exists and it is not a dir", dir)
 	}
 	return nil
 }
