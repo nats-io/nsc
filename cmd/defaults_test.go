@@ -25,6 +25,7 @@ import (
 )
 
 func TestDefault_LoadOrInit(t *testing.T) {
+	t.Skip(t.Name())
 	d := MakeTempDir(t)
 	dir := filepath.Join(d, "a")
 	require.NoError(t, os.Setenv("TEST_NAME", dir))
@@ -42,6 +43,7 @@ func TestDefault_LoadOrInit(t *testing.T) {
 }
 
 func TestDefault_LoadNewOnExisting(t *testing.T) {
+	t.Skip(t.Name())
 	ts := NewTestStore(t, "operator")
 	require.NoError(t, os.Setenv("TEST_NAME", ts.Dir))
 	ts.AddAccount(t, "A")
