@@ -18,25 +18,25 @@ package store
 import (
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"testing"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
 
 func TestResolveLocal(t *testing.T) {
 	old := os.Getenv(NKeysPathEnv)
-	os.Setenv(NKeysPathEnv, "")
+	require.NoError(t, os.Setenv(NKeysPathEnv, ""))
 
 	dir := GetKeysDir()
 
-	os.Setenv(NKeysPathEnv, old)
+	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 
-	u, err := user.Current()
+	u, err := homedir.Dir()
 	require.NoError(t, err)
-	fp := filepath.Join(u.HomeDir, DEfaultNKeysPath)
+	fp := filepath.Join(u, DEfaultNKeysPath)
 
 	require.Equal(t, dir, fp)
 }
@@ -45,11 +45,11 @@ func TestResolveEnv(t *testing.T) {
 	old := os.Getenv(NKeysPathEnv)
 
 	p := filepath.Join("foo", "bar")
-	os.Setenv(NKeysPathEnv, p)
+	require.NoError(t, os.Setenv(NKeysPathEnv, p))
 
 	dir := GetKeysDir()
 
-	os.Setenv(NKeysPathEnv, old)
+	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 	require.Equal(t, dir, p)
 }
 
@@ -64,7 +64,7 @@ func TestMatchKeys(t *testing.T) {
 func TestGetKeys(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)
-	os.Setenv(NKeysPathEnv, dir)
+	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
 
 	ks := NewKeyStore("test_get_keys")
 
@@ -86,20 +86,21 @@ func TestGetKeys(t *testing.T) {
 	require.True(t, Match(opk, ookp))
 	require.True(t, Match(apk, aakp))
 
-	os.Setenv(NKeysPathEnv, old)
+	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 }
 
 func TestGetPrivateKey(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)
-	os.Setenv(NKeysPathEnv, dir)
+	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
 
 	_, _, okp := CreateOperatorKey(t)
 	_, _, akp := CreateAccountKey(t)
 
 	ks := NewKeyStore("test_get_private_key")
-	ks.Store("o", okp, "o")
-	ks.Store("a", akp, "o")
+	_, _ = ks.Store("o", okp, "o")
+	_, _ = ks.Store("a", akp, "o")
+
 	ckp, err := ks.GetClusterKey("c")
 	require.Nil(t, err)
 	require.Nil(t, ckp)

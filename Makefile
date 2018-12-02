@@ -4,7 +4,7 @@ BUILD_OS:=`go env GOOS`
 BUILD_OS_ARCH:=`go env GOARCH`
 BUILD_OS_GOPATH=`go env GOPATH`
 
-.PHONY: build
+.PHONY: build test
 
 build: fmt compile test
 
@@ -25,15 +25,14 @@ compile:
 install: build
 	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
 
+install-no-test:
+	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
+
 cover: test
-	gocovmerge ./cov/*.out > build/coverage.out
-	go tool cover -html=build/coverage.out
+	go tool cover -html=./coverage.out
 
 test: fmt
 	go vet ./...
-	rm -rf ./cov
-	mkdir cov
-	go test -covermode=atomic -coverprofile=./cov/cli.out ./cli
-	go test -covermode=atomic -coverprofile=./cov/cmd.out ./cmd
-	go test -covermode=atomic -coverprofile=./cov/cmdstore.out ./cmd/store
+	rm -rf ./coverage.out
+	go test -coverpkg=./... -coverprofile=./coverage.out ./...
 

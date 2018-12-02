@@ -25,21 +25,21 @@ func Test_AddUser(t *testing.T) {
 	ts := NewTestStore(t, "add_server")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "c")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "c")
 	require.NoError(t, err, "cluster creation")
 
 	_, bar, _ := CreateUserKey(t)
 	_, badBar, _ := CreateAccountKey(t)
 
 	tests := CmdTests{
-		{createAddUserCmd(), []string{"add", "user"}, nil, []string{"user name is required"}, true},
-		{createAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"Generated user key", "added user"}, false},
-		{createAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
-		{createAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
-		{createAddUserCmd(), []string{"add", "user", "--name", "bar", "--public-key", bar}, nil, nil, false},
-		{createAddUserCmd(), []string{"add", "user", "--name", "badbar", "--public-key", badBar}, nil, []string{"invalid user key"}, true},
-		{createAddUserCmd(), []string{"add", "user", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
-		{createAddUserCmd(), []string{"add", "user", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
+		{CreateAddUserCmd(), []string{"add", "user"}, nil, []string{"user name is required"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"Generated user key", "added user"}, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "bar", "--public-key", bar}, nil, nil, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "badbar", "--public-key", badBar}, nil, []string{"invalid user key"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
 
 	tests.Run(t, "root", "add")
@@ -48,18 +48,19 @@ func Test_AddUser(t *testing.T) {
 func Test_AddUserNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
-	_, _, err := ExecuteCmd(createAddUserCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	SetStoreRoot("")
+	_, _, err := ExecuteCmd(CreateAddUserCmd())
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddUserrOutput(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	_, _, err = ExecuteCmd(createAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddUserClaims(t, ts)
 }
@@ -95,10 +96,10 @@ func Test_AddUserOperatorLessStore(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--name", "U", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 
 	validateAddUserClaims(t, ts)

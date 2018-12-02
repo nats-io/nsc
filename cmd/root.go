@@ -16,7 +16,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +31,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-const SeedKeyEnv = "NSC_SEED_KEY"
 const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
@@ -45,15 +46,44 @@ var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
 
 func GetStore() (*store.Store, error) {
-	if ngsStore == nil {
-		storeDir, err := FindCurrentStoreDir()
+	config := GetConfig()
+	if config.StoreRoot == "" {
+		return nil, errors.New("no stores available")
+	}
+	if err := IsValidDir(config.StoreRoot); err != nil {
+		return nil, err
+	}
+
+	if config.Operator == "" {
+		infos, err := ioutil.ReadDir(config.StoreRoot)
 		if err != nil {
 			return nil, err
 		}
-		ngsStore, err = store.LoadStore(storeDir)
-		if err != nil {
-			return nil, err
+		var operators []string
+		for _, v := range infos {
+			if v.IsDir() {
+				s, _ := store.LoadStore(v.Name())
+				if s != nil {
+					operators = append(operators, filepath.Dir(v.Name()))
+				}
+			}
 		}
+
+		if len(operators) == 1 {
+			config.Operator = operators[0]
+		} else {
+			return nil, fmt.Errorf("set an operator")
+		}
+	}
+
+	fp := filepath.Join(config.StoreRoot, config.Operator)
+	ngsStore, err := store.LoadStore(fp)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.Account != "" {
+		ngsStore.DefaultAccount = config.Account
 	}
 	return ngsStore, nil
 }
@@ -145,35 +175,4 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
-}
-
-// FindCurrentStoreDir tries to find a store director
-// starting with the current working dir
-func FindCurrentStoreDir() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return FindStoreDir(wd)
-}
-
-// FindStore starts at the directory provided and tries to
-// find a directory containing the public key. This function
-// checks dir and then works its way up the folder path.
-func FindStoreDir(dir string) (string, error) {
-	var err error
-
-	pkp := filepath.Join(dir, store.NSCFile)
-
-	if _, err := os.Stat(pkp); os.IsNotExist(err) {
-		parent := filepath.Dir(dir)
-
-		if parent == dir {
-			return "", fmt.Errorf("no store directory found")
-		}
-
-		return FindStoreDir(parent)
-	}
-
-	return dir, err
 }

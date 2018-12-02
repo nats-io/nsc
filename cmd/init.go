@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/nats-io/nkeys"
@@ -32,16 +31,11 @@ func CreateInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Init a configuration directory",
-		Example: `init --name project
+		Example: `init --name operatorname
 init --interactive
 `,
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, _ := GetStore()
-			if s != nil {
-				return fmt.Errorf("%q is already a store", s.Dir)
-			}
 
 			p.SetDefaults()
 
@@ -54,6 +48,7 @@ init --interactive
 			}
 
 			if err := p.Run(); err != nil {
+				fmt.Printf("%v\n", err)
 				return err
 			}
 
@@ -80,15 +75,15 @@ init --interactive
 				cmd.Println(table.Render())
 			}
 
-			cmd.Println("Success! - initialized project directory")
+			if p.operator.create {
+				cmd.Println("Success! - initialized project directory")
+			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&p.projectRoot, "dir", "d", ".", "project directory")
-
-	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "", "name for the configuration environment, if not specified uses <dirname>")
+	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "test", "name for the configuration environment")
 
 	cmd.Flags().StringVarP(&p.operator.name, "operator-name", "", "", "operator name (default '<name>_operator')")
 	cmd.Flags().StringVarP(&p.operator.keyPath, "operator-key", "", "", "operator keypath (default generated)")
@@ -122,7 +117,7 @@ func init() {
 }
 
 type InitParams struct {
-	projectRoot     string
+	storeRoot       string
 	environmentName string
 	operator        Entity
 	account         Entity
@@ -143,15 +138,14 @@ func (p *InitParams) SetDefaults() error {
 	p.user.kind = nkeys.PrefixByteUser
 
 	var err error
-	d := p.projectRoot
-	p.projectRoot, err = filepath.Abs(p.projectRoot)
+	p.storeRoot, err = filepath.Abs(GetConfig().StoreRoot)
 	if err != nil {
-		return fmt.Errorf("error calculating the absolute filepath for %q: %v", d, err)
+		return fmt.Errorf("error calculating the absolute filepath for %q: %v", p.storeRoot, err)
 	}
 
 	// if defaults are set we are not prompting
 	if p.environmentName == "" {
-		p.environmentName = filepath.Base(p.projectRoot)
+		p.environmentName = "test"
 	}
 	if !InteractiveFlag {
 		p.SetDefaultNames()
@@ -159,7 +153,7 @@ func (p *InitParams) SetDefaults() error {
 	return nil
 }
 
-func (p *InitParams) SetDefaultNames() error {
+func (p *InitParams) SetDefaultNames() {
 	// set the operator name
 	if p.operator.name == "" {
 		p.operator.name = fmt.Sprintf("%s_operator", p.environmentName)
@@ -180,7 +174,6 @@ func (p *InitParams) SetDefaultNames() error {
 	if p.server.name == "" {
 		p.server.name = "localhost"
 	}
-	return nil
 }
 
 func (p *InitParams) Interactive(cmd *cobra.Command) error {
@@ -209,9 +202,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		return err
 	}
 
-	if err = p.SetDefaultNames(); err != nil {
-		return err
-	}
+	p.SetDefaultNames()
 
 	if err := p.operator.Edit(); err != nil {
 		return err
@@ -309,14 +300,18 @@ func (p *InitParams) Run() error {
 	var operator *store.NamedKey
 	if p.operator.create {
 		operator = &store.NamedKey{Name: p.operator.name, KP: p.operator.kp}
+	} else {
+		operator = &store.NamedKey{Name: p.environmentName}
 	}
-	_, err := store.CreateStore(p.environmentName, p.projectRoot, operator)
+
+	_, err := store.CreateStore(p.environmentName, p.storeRoot, operator)
 	if err != nil {
 		return err
 	}
 
-	if err = os.Chdir(p.projectRoot); err != nil {
-		return fmt.Errorf("error changing dir to %q: %v", p.projectRoot, err)
+	GetConfig().Operator = operator.Name
+	if err := GetConfig().Save(); err != nil {
+		return err
 	}
 
 	containers := p.Containers()

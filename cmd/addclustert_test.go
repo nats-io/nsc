@@ -45,8 +45,9 @@ func Test_AddCluster(t *testing.T) {
 func Test_AddClusterNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
+	SetStoreRoot("")
 	_, _, err := ExecuteCmd(createAddClusterCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddClusterOutput(t *testing.T) {
@@ -66,7 +67,7 @@ func Test_AddClusterOutput(t *testing.T) {
 	pub, err := kp.PublicKey()
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
-	okp, err := ts.KeyStore.GetOperatorKey("operator")
+	okp, err := ts.KeyStore.GetOperatorKey("test")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()

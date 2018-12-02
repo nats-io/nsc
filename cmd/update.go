@@ -16,16 +16,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/blang/semver"
 	"github.com/briandowns/spinner"
-	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cli"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
@@ -61,7 +56,7 @@ update --release-notes
 			wait.Prefix = "Downloading latest version "
 			_ = wait.Color("italic")
 			wait.Start()
-			latest, err := selfupdate.UpdateSelf(v, repository)
+			latest, err := selfupdate.UpdateSelf(v, GetConfig().GithubUpdates)
 			if err != nil {
 				cmd.SilenceErrors = false
 				return err
@@ -88,35 +83,19 @@ func init() {
 	GetRootCmd().AddCommand(createUpdateCommand())
 }
 
-var repository string
-
-func SetUpdateRespository(githubrepo string) {
-	repository = githubrepo
-}
-
 type SelfUpdate struct {
-	LastCheck int64 `json:"last_check"`
 }
 
-// NewSelfUpdate
+// NewSelfUpdate creates a new self update object
 func NewSelfUpdate() (*SelfUpdate, error) {
-	if repository == "" {
+
+	if GetConfig().GithubUpdates == "" {
 		return nil, fmt.Errorf("unable to check for updates - repository not set")
 	}
 
-	var u SelfUpdate
-	fn, err := u.infoFile()
-	d, err := ioutil.ReadFile(fn)
-	if err != nil && os.IsNotExist(err) {
-		// go check
-	} else if err != nil {
-		return nil, fmt.Errorf("error checking self update: %v", err.Error())
-	} else {
-		if err := json.Unmarshal(d, &u); err != nil {
-			return nil, fmt.Errorf("error reading %q: %v", fn, err.Error())
-		}
-	}
-	return &u, nil
+	u := &SelfUpdate{}
+
+	return u, nil
 }
 
 func (u *SelfUpdate) Run() (*semver.Version, error) {
@@ -132,43 +111,20 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 }
 
 func (u *SelfUpdate) shouldCheck() bool {
+	config := GetConfig()
 	now := time.Now().Unix()
-	return u.LastCheck == 0 || now-u.LastCheck > int64(time.Hour*24)
+	return config.LastUpdate == 0 || now-config.LastUpdate > int64(time.Hour*24)
 }
 
 func (u *SelfUpdate) updateLastChecked() error {
-	u.LastCheck = time.Now().Unix()
-	d, err := json.Marshal(u)
-	if err != nil {
-		return fmt.Errorf("error serialzing selfupdate info: %v", err)
-	}
-	fp, err := u.infoFile()
-	if err != nil {
-		return fmt.Errorf("error getting path for selfupdate info file: %v", err)
-	}
-	dir := filepath.Dir(fp)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("error creating dir %q: %v", dir, err)
-
-	}
-	if err := ioutil.WriteFile(fp, d, 0600); err != nil {
-		return fmt.Errorf("error writing %q: %v", fp, err)
-	}
+	config := GetConfig()
+	config.LastUpdate = time.Now().Unix()
+	config.Save()
 	return nil
 }
 
-func (u *SelfUpdate) infoFile() (string, error) {
-	dir, err := homedir.Dir()
-	if err != nil {
-		// shouldn't prevent if there's an error
-		return "", fmt.Errorf("error getting homedir: %v", err.Error())
-	}
-	exeName := filepath.Base(os.Args[0])
-	fn := filepath.Join(dir, fmt.Sprintf(".%scli/%s.ini", exeName, exeName))
-	return fn, nil
-}
-
 func (u *SelfUpdate) doCheck() (*semver.Version, error) {
+	config := GetConfig()
 	have := semver.MustParse(GetRootCmd().Version)
 	wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	wait.Prefix = "Checking for latest version "
@@ -176,7 +132,7 @@ func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 	wait.Start()
 	defer wait.Stop()
 
-	latest, found, err := selfupdate.DetectLatest(repository)
+	latest, found, err := selfupdate.DetectLatest(config.GithubUpdates)
 	if err != nil {
 		return nil, fmt.Errorf("error checking version: %v", err)
 	} else if found && latest.Version.GT(have) {

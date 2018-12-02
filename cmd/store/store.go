@@ -43,8 +43,9 @@ var standardDirs = []string{Accounts}
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
-	Dir  string
-	Info Info
+	Dir            string
+	Info           Info
+	DefaultAccount string
 }
 
 type Info struct {
@@ -71,46 +72,44 @@ func SafeName(n string) string {
 
 // CreateStore creates a new Store in the specified directory.
 // CreateStore will create the necessary directories and store the public key.
-func CreateStore(env string, dir string, root *NamedKey) (*Store, error) {
+func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, error) {
 	var err error
 
+	root := filepath.Join(operatorsDir, operator.Name)
 	s := &Store{
-		Dir: dir,
+		Dir: root,
 		Info: Info{
-			EnvironmentName: env,
+			EntityName:      operator.Name,
+			EnvironmentName: operator.Name,
 			Version:         Version,
 		},
 	}
-	if root != nil {
-		s.Info.EntityName = root.Name
-	} else {
-		s.Info.Managed = true
-	}
 
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		if err := os.MkdirAll(root, 0700); err != nil {
 			return nil, err
 		}
 	}
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(files) != 0 {
-		return nil, fmt.Errorf("%q is not empty, only an empty folder can be used for a new project", dir)
+		return nil, fmt.Errorf("operator %q already exists in %q", operator.Name, operatorsDir)
 	}
 
-	if !s.Info.Managed {
-		token, err := s.createOperatorToken(root)
+	if operator.KP != nil {
+		token, err := s.createOperatorToken(operator)
 		if err != nil {
 			return nil, err
 		}
-
 		if err := s.StoreClaim([]byte(token)); err != nil {
 			return nil, fmt.Errorf("error writing operator jwt: %v", err)
 		}
+	} else {
+		s.Info.Managed = true
 	}
 
 	d, err := json.Marshal(s.Info)
@@ -263,7 +262,6 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 		for _, v := range infos {
 			if !v.IsDir() && IsJwtName(v.Name()) {
 				entries = append(entries, PlainName(v.Name()))
-
 			}
 		}
 	}
@@ -575,14 +573,23 @@ func (s *Store) GetContext() (*Context, error) {
 			return nil, err
 		}
 	}
+
 	// try to set a default account
-	ac, err := s.LoadDefaultEntity(Accounts)
+	var ac *jwt.GenericClaims
+
+	if s.DefaultAccount != "" {
+		ac, err = s.LoadClaim(Accounts, s.DefaultAccount, JwtName(s.DefaultAccount))
+	} else {
+		ac, err = s.LoadDefaultEntity(Accounts)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	if ac != nil {
 		c.SetContext(ac.Name, ac.Subject)
 	}
+
 	// try to set a default cluster
 	cc, err := s.LoadDefaultEntity(Clusters)
 	if err != nil {

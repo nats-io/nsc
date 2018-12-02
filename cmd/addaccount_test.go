@@ -29,13 +29,13 @@ func Test_AddAccount(t *testing.T) {
 	_, badBar, _ := CreateClusterKey(t)
 
 	tests := CmdTests{
-		{createAddAccountCmd(), []string{"add", "account"}, nil, []string{"account name is required"}, true},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"Generated account key", "added account"}, false},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", badBar}, nil, []string{"invalid account key"}, true},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
-		{createAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
+		{CreateAddAccountCmd(), []string{"add", "account"}, nil, []string{"account name is required"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"Generated account key", "added account"}, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", badBar}, nil, []string{"invalid account key"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
 
 	tests.Run(t, "root", "add")
@@ -43,16 +43,17 @@ func Test_AddAccount(t *testing.T) {
 
 func Test_AddAccountNoStore(t *testing.T) {
 	// reset the store
+	SetStoreRoot("")
 	ngsStore = nil
-	_, _, err := ExecuteCmd(createAddAccountCmd())
-	require.Equal(t, "no store directory found", err.Error())
+	_, _, err := ExecuteCmd(CreateAddAccountCmd())
+	require.Equal(t, "no stores available", err.Error())
 }
 
 func Test_AddAccountValidateOutput(t *testing.T) {
-	ts := NewTestStore(t, "Test_AddAccountValidateOutput")
+	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
 }
@@ -63,7 +64,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 
 	inputs := []interface{}{"A", true, "2018-01-01", "2050-01-01"}
 
-	cmd := createAddAccountCmd()
+	cmd := CreateAddAccountCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs)
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	pub, err := kp.PublicKey()
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
-	okp, err := ts.KeyStore.GetOperatorKey("operator")
+	okp, err := ts.KeyStore.GetOperatorKey("test")
 	require.NoError(t, err)
 
 	if okp == nil {
@@ -105,7 +106,7 @@ func Test_AddAccountOperatorLessStore(t *testing.T) {
 	ts := NewTestStoreWithOperator(t, "test", nil)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
 }
