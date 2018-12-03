@@ -56,8 +56,12 @@ github.com/mitchellh/mapstructure v1.0.0 h1:vVpGvMXJPqSDh2VYHF7gsfQj8Ncx+Xw5Y1KH
 github.com/mitchellh/mapstructure v1.0.0/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/nats-io/jwt v0.0.0-20181124173452-b4c212c5231a h1:C9fdEgfkGSv6Q5ARp9YOjgEGbWUcUNnAN3lrX/+xwcY=
 github.com/nats-io/jwt v0.0.0-20181124173452-b4c212c5231a/go.mod h1:Zz0yk+BmWnLzEXz85TpyVuPCIzHNNAaQVZ3EiSlfhcs=
+github.com/nats-io/jwt v0.0.0-20181203003102-cd3b5f12b7dc h1:FZgpXRWcNSvtJ6okrIQPUkEmMo3xkuZZiEaFslZ+o2A=
+github.com/nats-io/jwt v0.0.0-20181203003102-cd3b5f12b7dc/go.mod h1:Zz0yk+BmWnLzEXz85TpyVuPCIzHNNAaQVZ3EiSlfhcs=
 github.com/nats-io/nkeys v0.0.0-20181122131151-819e1865e1f6 h1:DSJdx3SJYK8PTpZA4C5e38Oq48nRIH0JrQVsxPijy3Q=
 github.com/nats-io/nkeys v0.0.0-20181122131151-819e1865e1f6/go.mod h1:/5AG7AMgoe6jJRxS8l8qz974c6zxp5ApcV7VkXwSciY=
+github.com/nats-io/nkeys v0.0.0-20181127220512-19bb5d3cc179 h1:58TazpocHkvOa4RjlC6Wy+uVEEg7staH/54Nh1OvZm0=
+github.com/nats-io/nkeys v0.0.0-20181127220512-19bb5d3cc179/go.mod h1:/5AG7AMgoe6jJRxS8l8qz974c6zxp5ApcV7VkXwSciY=
 github.com/onsi/ginkgo v1.6.0 h1:Ix8l273rp3QzYgXSR+c8d1fTG7UPgYkOSELPhiY/YGw=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/gomega v1.4.2 h1:3mYCb7aPxS/RU7TI1y4rkEn1oKmPRjNJLNEXgw7MH2I=
