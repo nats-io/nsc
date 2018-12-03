@@ -240,3 +240,20 @@ func TestContextConfig_SetEmptyCluster(t *testing.T) {
 	err = c.SetCluster("")
 	require.Error(t, err)
 }
+
+func TestContextConfig_ListOperators(t *testing.T) {
+	ts := NewTestStore(t, "op")
+	defer ts.Done(t)
+
+	ts.AddOperator(t, "op2")
+
+	storesDir := filepath.Dir(ts.Store.Dir)
+	c, err := NewContextConfig(storesDir)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+
+	ops := c.ListOperators()
+	require.NotNil(t, ops)
+
+	require.ElementsMatch(t, ops, []string{"op", "op2"})
+}

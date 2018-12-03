@@ -16,8 +16,9 @@
 package cmd
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDescribeAccount_Single(t *testing.T) {

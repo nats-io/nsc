@@ -295,6 +295,7 @@ func (u *UserDescriber) Describe() string {
 	table.AddTitle("User")
 	table.AddRow("Name", u.Name)
 	table.AddRow("User ID", u.Subject)
+	table.AddRow("Issuer ID", u.Issuer)
 	AddListValues(table, "Pub Allow", u.Pub.Allow)
 	AddListValues(table, "Pub Deny", u.Pub.Deny)
 	AddListValues(table, "Sub Allow", u.Sub.Allow)
@@ -365,6 +366,7 @@ func (s *ServerDescriber) Describe() string {
 	table.AddTitle("Server")
 	table.AddRow("Name", s.Name)
 	table.AddRow("Server ID", s.Subject)
+	table.AddRow("Issuer ID", s.Issuer)
 
 	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(s.IssuedAt), HumanizedDate(s.IssuedAt)))
 	if s.Expires > 0 {

@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/nats-io/jwt"
@@ -40,6 +41,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
+	cmd.Flags().StringVarP(&params.Name, "operator", "r", "", "operator name")
 
 	return cmd
 }
@@ -49,11 +51,28 @@ func init() {
 }
 
 type DescribeOperatorParams struct {
+	Name string
 	jwt.OperatorClaims
 	outputFile string
 }
 
 func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
+	if p.Name != "" {
+		actx, ok := ctx.(*Actx)
+		if !ok {
+			return errors.New("unable to cast to actx")
+		}
+		s, err := GetStoreForOperator(p.Name)
+		if err != nil {
+			return err
+		}
+		cc, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+		actx.ctx.Store = s
+		actx.ctx = cc
+	}
 	return nil
 }
 

@@ -132,7 +132,6 @@ func Read(fp string) ([]byte, error) {
 	return ioutil.ReadFile(afp)
 }
 
-
 func FormatConfig(jwtType string, jwtString string, seed string) []byte {
 	w := bytes.NewBuffer(nil)
 
@@ -150,7 +149,6 @@ func FormatConfig(jwtType string, jwtString string, seed string) []byte {
 	_, _ = fmt.Fprintln(w)
 
 	_, _ = fmt.Fprintln(w, "*************************************************************")
-
 
 	return w.Bytes()
 }

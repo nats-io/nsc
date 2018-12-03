@@ -49,7 +49,7 @@ func (c *ContextConfig) SetDefaults() {
 	if err := IsValidDir(c.StoreRoot); err == nil {
 		operators := c.ListOperators()
 		if len(operators) == 1 {
-			s, err := store.LoadStore(filepath.Join(c.StoreRoot, operators[0]))
+			s, err := c.LoadStore(operators[0])
 			if err != nil {
 				return
 			}
@@ -64,6 +64,10 @@ func (c *ContextConfig) SetDefaults() {
 			}
 		}
 	}
+}
+
+func (c *ContextConfig) LoadStore(operatorName string) (*store.Store, error) {
+	return store.LoadStore(filepath.Join(c.StoreRoot, operatorName))
 }
 
 func (c *ContextConfig) ListOperators() []string {
@@ -110,16 +114,32 @@ func (c *ContextConfig) SetCluster(cluster string) error {
 	return nil
 }
 
-func (c *ContextConfig) hasSubContainer(kind string, name string) error {
+func (c *ContextConfig) ListAccounts() ([]string, error) {
+	return c.getSubContainers(store.Accounts)
+}
+
+func (c *ContextConfig) ListClusters() ([]string, error) {
+	return c.getSubContainers(store.Clusters)
+}
+
+func (c *ContextConfig) getSubContainers(kind string) ([]string, error) {
 	s, err := store.LoadStore(filepath.Join(c.StoreRoot, c.Operator))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	accounts, err := s.ListSubContainers(kind)
+	names, err := s.ListSubContainers(kind)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func (c *ContextConfig) hasSubContainer(kind string, name string) error {
+	names, err := c.getSubContainers(kind)
 	if err != nil {
 		return err
 	}
-	for _, v := range accounts {
+	for _, v := range names {
 		if name == v {
 			return nil
 		}

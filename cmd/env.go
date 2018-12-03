@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -32,56 +33,94 @@ func envSet(varName string) string {
 }
 
 func createEnvCmd() *cobra.Command {
+	var params SetContextParams
 	cmd := &cobra.Command{
 		Use:           "env",
-		Short:         "Prints the nsc environment",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Short:         fmt.Sprintf("Prints and manage the %s environment", filepath.Base(os.Args[0])),
+		SilenceErrors: false,
+		SilenceUsage:  false,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := GetStore()
-
-			table := tablewriter.CreateTable()
-			table.UTF8Box()
-			table.AddTitle("NSC Environment")
-			table.AddHeaders("Setting", "Set", "Effective Value")
-
-			table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
-			if s == nil {
-				table.AddRow("Project Dir", "", "not in a configuration directory")
-			} else {
-				table.AddRow("Name", "", s.Info.EnvironmentName)
-				table.AddRow("Project Dir", "", filepath.Dir(s.Dir))
-
-				var ctx *store.Context
-				if s != nil {
-					ctx, err = s.GetContext()
-				}
-				if err != nil {
-					table.AddRow("Store Context", "", err.Error())
-				} else {
-					table.AddRow("Operator Name", "", ctx.Operator.Name)
-					table.AddRow("Account Name", "", ctx.Account.Name)
-					table.AddRow("Cluster Name", "", ctx.Cluster.Name)
-				}
-			}
-
-			table.AddSeparator()
-			conf := GetConfig()
-			table.AddRow("Stores Dir", "", conf.StoreRoot)
-			table.AddRow("Default Operator", "", conf.Operator)
-			table.AddRow("Default Account", "", conf.Account)
-			table.AddRow("Default Cluster", "", conf.Cluster)
-
-			cmd.Println(table.Render())
-
+			params.Run()
+			params.PrintEnv(cmd)
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&params.StoreRoot, "store", "s", "", "set store directory")
+	cmd.Flags().StringVarP(&params.Operator, "operator", "o", "", "set operator name")
+	cmd.Flags().StringVarP(&params.Account, "account", "a", "", "set account name")
+	cmd.Flags().StringVarP(&params.Cluster, "cluster", "c", "", "set cluster name")
 
 	return cmd
 }
 
 func init() {
 	GetRootCmd().AddCommand(createEnvCmd())
+}
+
+type SetContextParams struct {
+	StoreRoot string
+	Operator  string
+	Account   string
+	Cluster   string
+}
+
+func (p *SetContextParams) Run() error {
+	if *p == (SetContextParams{}) {
+		// no edits
+		return nil
+	}
+
+	current := GetConfig()
+
+	root := current.StoreRoot
+	if p.StoreRoot != "" {
+		root = p.StoreRoot
+	}
+
+	c, err := NewContextConfig(root)
+	if err != nil {
+		return err
+	}
+	if p.Operator != "" {
+		if err := c.SetOperator(p.Operator); err != nil {
+			return err
+		}
+	}
+	if p.Account != "" {
+		if err := c.SetAccount(p.Account); err != nil {
+			return err
+		}
+	}
+	if p.Cluster != "" {
+		if err := c.SetCluster(p.Cluster); err != nil {
+			return err
+		}
+	}
+	current.ContextConfig = *c
+
+	return current.Save()
+}
+
+func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
+
+	s, _ := GetStore()
+	conf := GetConfig()
+	table := tablewriter.CreateTable()
+	table.UTF8Box()
+	table.AddTitle("NSC Environment")
+	table.AddHeaders("Setting", "Set", "Effective Value")
+	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
+	table.AddRow("$"+homeEnv, envSet(homeEnv), toolHome)
+	table.AddSeparator()
+	if s == nil {
+		table.AddRow("Stores Dir", "", "not set")
+	} else {
+		table.AddRow("Stores Dir", "", conf.StoreRoot)
+		table.AddRow("Default Operator", "", conf.Operator)
+		table.AddRow("Default Account", "", conf.Account)
+		table.AddRow("Default Cluster", "", conf.Cluster)
+	}
+	cmd.Println(table.Render())
 }

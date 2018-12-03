@@ -21,90 +21,78 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDescribeCluster_Single(t *testing.T) {
+func TestDescribeOperator_Single(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
 	opub, err := ts.KeyStore.GetOperatorPublicKey("operator")
 	require.NoError(t, err)
 
-	ts.AddCluster(t, "A")
-
-	pub, err := ts.KeyStore.GetClusterPublicKey("A")
+	pub, err := ts.KeyStore.GetOperatorPublicKey("operator")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createDescribeClusterCmd())
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, opub)
-	require.Contains(t, stdout, " A ")
+	require.Contains(t, stdout, " operator ")
 }
 
-func TestDescribeCluster_Multiple(t *testing.T) {
+func TestDescribeOperator_Multiple(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	ts.AddCluster(t, "A")
-	ts.AddCluster(t, "B")
+	ts.AddOperator(t, "A")
 
-	_, stderr, err := ExecuteCmd(createDescribeClusterCmd())
-	require.Error(t, err)
-	require.Contains(t, stderr, "a cluster is required")
+	_, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	require.NoError(t, err)
 }
 
-func TestDescribeCluster_MultipleWithContext(t *testing.T) {
+func TestDescribeOperator_MultipleWithContext(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	ts.AddCluster(t, "A")
-	ts.AddCluster(t, "B")
+	ts.AddOperator(t, "A")
+	ts.AddOperator(t, "B")
 
-	err := GetConfig().SetCluster("B")
+	err := GetConfig().SetOperator("B")
 	require.NoError(t, err)
 
-	pub, err := ts.KeyStore.GetClusterPublicKey("B")
+	pub, err := ts.KeyStore.GetOperatorPublicKey("B")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createDescribeClusterCmd())
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " B ")
 }
 
-func TestDescribeCluster_MultipleWithFlag(t *testing.T) {
+func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	ts.AddCluster(t, "A")
-	ts.AddCluster(t, "B")
+	ts.AddOperator(t, "A")
+	ts.AddOperator(t, "B")
 
-	pub, err := ts.KeyStore.GetClusterPublicKey("B")
+	err := GetConfig().SetOperator("B")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createDescribeClusterCmd(), "--cluster", "B")
+	pub, err := ts.KeyStore.GetOperatorPublicKey("B")
+	require.NoError(t, err)
+
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "B")
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " B ")
 }
 
-func TestDescribeCluster_MultipleWithBadAccount(t *testing.T) {
+func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
 	ts.AddCluster(t, "A")
 	ts.AddCluster(t, "B")
 
-	_, _, err := ExecuteCmd(createDescribeClusterCmd(), "--cluster", "C")
+	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "C")
 	require.Error(t, err)
-}
-
-func TestDescribeCluster_Interactive(t *testing.T) {
-	ts := NewTestStore(t, "operator")
-	defer ts.Done(t)
-
-	ts.AddCluster(t, "A")
-	ts.AddCluster(t, "B")
-
-	_, _, err := ExecuteInteractiveCmd(createDescribeClusterCmd(), []interface{}{0})
-	require.NoError(t, err)
 }

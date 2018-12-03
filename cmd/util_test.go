@@ -19,6 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -44,9 +46,9 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
+	homeEnv = NscHomeEnv
 
 	ts.OperatorKey = operator
-
 	ts.Dir = MakeTempDir(t)
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
@@ -183,9 +185,7 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 }
 
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
-	tkp, err := ts.KeyStore.GetAccountKey(targetAccount)
-	require.NoError(t, err)
-	tpub, err := tkp.PublicKey()
+	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
 	require.NoError(t, err)
 
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
@@ -261,4 +261,14 @@ func ForceAccount(t *testing.T, account string) {
 
 func ForceCluster(t *testing.T, cluster string) {
 	config.Cluster = cluster
+}
+
+func StripTableDecorations(s string) string {
+	decorations := []string{"╭", "─", "┬", "╮", "├", "│", "┤", "┼", "╰", "┴", "╯"}
+	for _, c := range decorations {
+		s = strings.Replace(s, c, "", -1)
+	}
+	// replace multiple spaces with just one
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(s, " ")
 }

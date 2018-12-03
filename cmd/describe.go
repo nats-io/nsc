@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -73,6 +74,11 @@ func (p *DescribeFile) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeFile) Load(ctx ActionCtx) error {
+	if p.file == "" {
+		ctx.CurrentCmd().SilenceErrors = false
+		ctx.CurrentCmd().SilenceUsage = false
+		return errors.New("file is required")
+	}
 	if url, err := url.Parse(p.file); err == nil && url.Scheme != "" {
 		d, err := LoadFromURL(p.file)
 		if err != nil {

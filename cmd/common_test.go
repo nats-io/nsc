@@ -226,7 +226,7 @@ func TestCommon_FormatConfig(t *testing.T) {
 	d := FormatConfig("test_type", "A_sTring_JWT", "sEEdString")
 
 	expected :=
-`-----BEGIN NATS TEST_TYPE JWT-----
+		`-----BEGIN NATS TEST_TYPE JWT-----
 A_sTring_JWT
 ------END NATS TEST_TYPE JWT------
 
@@ -240,7 +240,7 @@ sEEdString
 
 *************************************************************
 `
-  require.Equal(t, expected, string(d))
+	require.Equal(t, expected, string(d))
 }
 
 func TestCommon_FormatJwt(t *testing.T) {

@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -45,7 +44,7 @@ var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
 
-func GetStore() (*store.Store, error) {
+func GetStoreForOperator(operator string) (*store.Store, error) {
 	config := GetConfig()
 	if config.StoreRoot == "" {
 		return nil, errors.New("no stores available")
@@ -54,24 +53,13 @@ func GetStore() (*store.Store, error) {
 		return nil, err
 	}
 
-	if config.Operator == "" {
-		infos, err := ioutil.ReadDir(config.StoreRoot)
-		if err != nil {
-			return nil, err
-		}
-		var operators []string
-		for _, v := range infos {
-			if v.IsDir() {
-				s, _ := store.LoadStore(v.Name())
-				if s != nil {
-					operators = append(operators, filepath.Dir(v.Name()))
-				}
-			}
-		}
+	if operator != "" {
+		config.Operator = operator
+	}
 
-		if len(operators) == 1 {
-			config.Operator = operators[0]
-		} else {
+	if config.Operator == "" {
+		config.SetDefaults()
+		if config.Operator == "" {
 			return nil, fmt.Errorf("set an operator")
 		}
 	}
@@ -86,6 +74,10 @@ func GetStore() (*store.Store, error) {
 		ngsStore.DefaultAccount = config.Account
 	}
 	return ngsStore, nil
+}
+
+func GetStore() (*store.Store, error) {
+	return GetStoreForOperator("")
 }
 
 // ResetStore to nil for tests

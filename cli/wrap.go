@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/mitchellh/go-wordwrap"
@@ -15,7 +16,7 @@ func WrapSprintf(lim uint, format string, a ...interface{}) string {
 }
 
 func Wrap(lim uint, args ...interface{}) string {
-	var buf buffer
+	var buf bytes.Buffer
 	for i, arg := range args {
 		if i > 0 {
 			buf.WriteByte(' ')
@@ -23,16 +24,5 @@ func Wrap(lim uint, args ...interface{}) string {
 		buf.WriteString(fmt.Sprintf("%v", arg))
 	}
 
-	return WrapString(lim, string(buf))
-}
-
-type buffer []byte
-
-func (b *buffer) WriteString(s string) {
-	*b = append(*b, s...)
-}
-
-func (b *buffer) WriteByte(c byte) error {
-	*b = append(*b, c)
-	return nil
+	return WrapString(lim, buf.String())
 }

@@ -35,6 +35,7 @@ type ToolConfig struct {
 
 var config ToolConfig
 var toolHome string
+var homeEnv string
 
 // GetConfig returns the global config
 func GetConfig() *ToolConfig {
@@ -45,13 +46,14 @@ func ResetConfigForTests() {
 	config = ToolConfig{}
 }
 
-func LoadOrInit(github string, toolHomeEnv string) error {
+func LoadOrInit(github string, toolHomeEnvName string) error {
 	var err error
-	if toolHomeEnv == "" {
+	if toolHomeEnvName == "" {
 		return errors.New("toolHomeEnv is required")
 	}
+	homeEnv = toolHomeEnvName
 
-	toolHome, err = initToolHome(toolHomeEnv)
+	toolHome, err = initToolHome(toolHomeEnvName)
 	if err != nil {
 		return err
 	}
