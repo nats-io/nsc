@@ -105,9 +105,9 @@ init --interactive
 	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.server.create, "create-server", "", false, "create a server")
 
-	cmd.Flags().MarkHidden("create-account")
-	cmd.Flags().MarkHidden("create-operator")
-	cmd.Flags().MarkHidden("create-user")
+	_ = cmd.Flags().MarkHidden("create-account")
+	_ = cmd.Flags().MarkHidden("create-operator")
+	_ = cmd.Flags().MarkHidden("create-user")
 
 	return cmd
 }

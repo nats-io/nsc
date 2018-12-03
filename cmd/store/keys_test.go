@@ -69,22 +69,28 @@ func TestGetKeys(t *testing.T) {
 	ks := NewKeyStore("test_get_keys")
 
 	_, opk, okp := CreateOperatorKey(t)
-	_, apk, akp := CreateAccountKey(t)
 
 	_, err := ks.Store("operator", okp, "operator")
 	require.NoError(t, err)
+	ookp, err := ks.GetOperatorKey("operator")
+	require.NoError(t, err)
+	oopk, err := ks.GetOperatorPublicKey("operator")
+	require.NoError(t, err)
+	require.True(t, Match(opk, ookp))
+	require.Equal(t, opk, oopk)
 
+	_, apk, akp := CreateAccountKey(t)
 	_, err = ks.Store("account", akp, "operator")
 	require.NoError(t, err)
 
-	ookp, err := ks.GetOperatorKey("operator")
+	aapk, err := ks.GetAccountPublicKey("account")
 	require.NoError(t, err)
 
 	aakp, err := ks.GetAccountKey("account")
 	require.NoError(t, err)
 
-	require.True(t, Match(opk, ookp))
 	require.True(t, Match(apk, aakp))
+	require.Equal(t, apk, aapk)
 
 	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 }

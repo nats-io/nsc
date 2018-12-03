@@ -131,6 +131,10 @@ func (k *KeyStore) GetUserPublicKey(account string, name string) (string, error)
 	return k.getPublicKey(k.GetUserKey(account, name))
 }
 
+func (k *KeyStore) GetUserSeed(account string, name string) (string, error) {
+	return k.getSeed(k.GetUserKey(account, name))
+}
+
 func (k *KeyStore) GetClusterKey(name string) (nkeys.KeyPair, error) {
 	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
 }
@@ -152,6 +156,17 @@ func (k *KeyStore) getPublicKey(kp nkeys.KeyPair, err error) (string, error) {
 		return "", err
 	}
 	return kp.PublicKey()
+}
+
+func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
+	if err != nil {
+		return "", err
+	}
+	d, err := kp.Seed()
+	if err != nil {
+		return "", err
+	}
+	return string(d), nil
 }
 
 func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, error) {
