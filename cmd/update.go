@@ -33,7 +33,7 @@ func createUpdateCommand() *cobra.Command {
 update --release-notes
 `,
 		Use:   "update",
-		Short: "update this tool to latest version",
+		Short: "Update this tool to latest version",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v := semver.MustParse(GetRootCmd().Version)
 
