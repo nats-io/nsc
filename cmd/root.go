@@ -113,8 +113,8 @@ func GetRootCmd() *cobra.Command {
 
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
-	Short: "NSC enables you to create and manage NATS account and user configurations",
-	Long: `The ncs tool allows you to create NATS account, users and manage their permissions.
+	Short: "NSC enables you to create and manage NATS accounts and user configurations",
+	Long: `The nsc tool allows you to create NATS accounts, users and manage their permissions.
 
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
