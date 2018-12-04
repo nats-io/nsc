@@ -93,3 +93,18 @@ func Test_EditAccount_Times(t *testing.T) {
 	require.Equal(t, start, ac.NotBefore)
 	require.Equal(t, expiry, ac.Expires)
 }
+
+func Test_EditAccountMaxConns(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "10")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.Equal(t, int64(10), ac.Limits.Conn)
+}
