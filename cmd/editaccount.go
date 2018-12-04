@@ -49,12 +49,17 @@ func createEditAccount() *cobra.Command {
 					UnixToDate(params.claim.Expires),
 					HumanizedDate(params.claim.Expires))
 			}
+			if params.claim.Limits.Conn > 0 {
+				cmd.Printf("Maximum active connections set to %d\n",
+					params.claim.Limits.Conn)
+			}
 
 			return nil
 		},
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
+	cmd.Flags().Int64VarP(&params.conns, "conns", "", 0, "set maximum active connections for the account")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -74,13 +79,14 @@ type EditAccountParams struct {
 	token  string
 	tags   []string
 	rmTags []string
+	conns  int64
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag") {
+	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -145,6 +151,10 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 	p.claim.Tags.Add(p.tags...)
 	p.claim.Tags.Remove(p.rmTags...)
 	sort.Strings(p.claim.Tags)
+
+	if p.conns > 0 {
+		p.claim.Limits.Conn = p.conns
+	}
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
