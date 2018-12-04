@@ -16,7 +16,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/go-wordwrap v1.0.0
-	github.com/nats-io/jwt v0.0.3
+	github.com/nats-io/jwt v0.0.4
 	github.com/nats-io/nkeys v0.0.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0

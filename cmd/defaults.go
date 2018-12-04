@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 )
@@ -46,20 +47,20 @@ func ResetConfigForTests() {
 	config = ToolConfig{}
 }
 
-func LoadOrInit(github string, toolHomeEnvName string) error {
+func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 	var err error
 	if toolHomeEnvName == "" {
-		return errors.New("toolHomeEnv is required")
+		return nil, errors.New("toolHomeEnv is required")
 	}
 	homeEnv = toolHomeEnvName
 
 	toolHome, err = initToolHome(toolHomeEnvName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := config.load(); err != nil {
-		return err
+		return nil, err
 	}
 
 	// is the struct modified from the file
@@ -69,20 +70,28 @@ func LoadOrInit(github string, toolHomeEnvName string) error {
 		// ~/.ngs_cli/nats
 		config.StoreRoot = filepath.Join(toolHome, "nats")
 		if err := MaybeMakeDir(config.StoreRoot); err != nil {
-			return fmt.Errorf("error creating store root: %v", err)
+			return nil, fmt.Errorf("error creating store root: %v", err)
 		}
 
 		// load any default entries if there are any
 		config.SetDefaults()
 
 		if err := config.Save(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	// trigger updating defaults
 	config.SetDefaults()
 
-	return nil
+	return &config, nil
+}
+
+func (d *ToolConfig) SetVersion(version string) {
+	// sem version gets very angry if there's a v in the release
+	if strings.HasPrefix(version, "v") || strings.HasPrefix(version, "V") {
+		version = version[1:]
+	}
+	GetRootCmd().Version = version
 }
 
 func (d *ToolConfig) load() error {
@@ -107,7 +116,7 @@ func initToolHome(envVarName string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("error getting homedir: %v", err.Error())
 		}
-		toolHome = filepath.Join(dir, fmt.Sprintf(".%scli", exeName))
+		toolHome = filepath.Join(dir, fmt.Sprintf(".%s", exeName))
 	}
 
 	if err := MaybeMakeDir(toolHome); err != nil {

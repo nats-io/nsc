@@ -50,13 +50,19 @@ update --release-notes
 				return nil
 			}
 
-			wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			wait := spinner.New(spinner.CharSets[14], 250*time.Millisecond)
 			defer wait.Stop()
 
 			wait.Prefix = "Downloading latest version "
 			_ = wait.Color("italic")
 			wait.Start()
-			latest, err := selfupdate.UpdateSelf(v, GetConfig().GithubUpdates)
+
+			var latest *selfupdate.Release
+			if updateFn == nil {
+				latest, err = selfupdate.UpdateSelf(v, GetConfig().GithubUpdates)
+			} else {
+				latest, err = updateFn(v, GetConfig().GithubUpdates)
+			}
 			if err != nil {
 				cmd.SilenceErrors = false
 				return err
@@ -83,18 +89,21 @@ func init() {
 	GetRootCmd().AddCommand(createUpdateCommand())
 }
 
+type UpdateCheckFn func(slug string) (*selfupdate.Release, bool, error)
+type UpdateFn func(current semver.Version, slug string) (*selfupdate.Release, error)
+
+var updateCheckFn UpdateCheckFn
+var updateFn UpdateFn
+
 type SelfUpdate struct {
 }
 
 // NewSelfUpdate creates a new self update object
 func NewSelfUpdate() (*SelfUpdate, error) {
-
 	if GetConfig().GithubUpdates == "" {
 		return nil, fmt.Errorf("unable to check for updates - repository not set")
 	}
-
 	u := &SelfUpdate{}
-
 	return u, nil
 }
 
@@ -113,14 +122,19 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 func (u *SelfUpdate) shouldCheck() bool {
 	config := GetConfig()
 	now := time.Now().Unix()
-	return config.LastUpdate == 0 || now-config.LastUpdate > int64(time.Hour*24)
+	diff := now - config.LastUpdate
+
+	return config.LastUpdate == 0 || diff > int64(60*60*24)
 }
 
 func (u *SelfUpdate) updateLastChecked() error {
 	config := GetConfig()
 	config.LastUpdate = time.Now().Unix()
-	config.Save()
-	return nil
+	return config.Save()
+}
+
+func (u *SelfUpdate) updateCheckFn() (*selfupdate.Release, bool, error) {
+	return selfupdate.DetectLatest(config.GithubUpdates)
 }
 
 func (u *SelfUpdate) doCheck() (*semver.Version, error) {
@@ -132,7 +146,14 @@ func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 	wait.Start()
 	defer wait.Stop()
 
-	latest, found, err := selfupdate.DetectLatest(config.GithubUpdates)
+	var latest *selfupdate.Release
+	var found bool
+	var err error
+	if updateCheckFn == nil {
+		latest, found, err = selfupdate.DetectLatest(config.GithubUpdates)
+	} else {
+		latest, found, err = updateCheckFn(config.GithubUpdates)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error checking version: %v", err)
 	} else if found && latest.Version.GT(have) {

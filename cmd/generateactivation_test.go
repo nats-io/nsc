@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -110,6 +111,11 @@ func testExternalToken(t *testing.T, tokenpath string) {
 	s := ExtractToken(string(d))
 
 	ac, err := jwt.DecodeActivationClaims(s)
+	if err != nil && strings.Contains(err.Error(), "illegal base64") {
+		t.Log("failed decoding a claim")
+		t.Log("Extracted token\n", s)
+		t.Log("Token file", tokenpath)
+	}
 	require.NoError(t, err)
 	require.Equal(t, "foo", string(ac.ImportSubject))
 }
