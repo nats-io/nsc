@@ -37,7 +37,7 @@ func createEditAccount() *cobra.Command {
 
 			cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
 
-			Write("--", FormatJwt("Account", params.token))
+			_ = Write("--", FormatJwt("Account", params.token))
 
 			if params.claim.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",
@@ -59,7 +59,7 @@ func createEditAccount() *cobra.Command {
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
-	cmd.Flags().Int64VarP(&params.conns, "conns", "", 0, "set maximum active connections for the account")
+	cmd.Flags().Int64VarP(&params.conns.NumberValue, "conns", "", 0, "set maximum active connections for the account")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -79,7 +79,7 @@ type EditAccountParams struct {
 	token  string
 	tags   []string
 	rmTags []string
-	conns  int64
+	conns  NumberParams
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -117,6 +117,10 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 
 func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	var err error
+	if err = p.conns.Edit("max connections"); err != nil {
+		return err
+	}
+
 	if err = p.TimeParams.Edit(); err != nil {
 		return err
 	}
@@ -152,8 +156,8 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 	p.claim.Tags.Remove(p.rmTags...)
 	sort.Strings(p.claim.Tags)
 
-	if p.conns > 0 {
-		p.claim.Limits.Conn = p.conns
+	if p.conns.NumberValue > 0 {
+		p.claim.Limits.Conn = p.conns.NumberValue
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)
