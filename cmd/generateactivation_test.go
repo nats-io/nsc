@@ -108,7 +108,8 @@ func testExternalToken(t *testing.T, tokenpath string) {
 	d, err := ioutil.ReadFile(tokenpath)
 	require.NoError(t, err)
 
-	s := ExtractToken(string(d))
+	s, err := ExtractToken(string(d))
+	require.NoError(t, err)
 
 	ac, err := jwt.DecodeActivationClaims(s)
 	if err != nil && strings.Contains(err.Error(), "illegal base64") {

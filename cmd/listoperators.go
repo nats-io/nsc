@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/nats-io/nsc/cli"
-
 	"github.com/nats-io/jwt"
-
+	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
 )

@@ -164,27 +164,51 @@ func FormatJwt(jwtType string, jwtString string) []byte {
 	return w.Bytes()
 }
 
-func ExtractToken(s string) string {
-	// remove all the spaces
-	re := regexp.MustCompile(`\s+`)
-	w := re.ReplaceAllString(s, "")
-	// remove multiple dashes
-	re = regexp.MustCompile(`\-+`)
-	w = re.ReplaceAllString(w, "-")
+var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:\n\s*[-]{3,}[^\n]*[-]{3,}\n))`)
 
-	// the token can now look like
-	// -BEGINXXXXPUBKEY-token-ENDXXXXPUBKEY-
-	re = regexp.MustCompile(`(?m)(\-BEGIN.+(JWT|KEY|SEED)\-)(?P<token>.+)(\-END.+(JWT|KEY|SEED)\-)`)
-	// find the index of the token
-	m := re.FindStringSubmatch(w)
-	if len(m) > 0 {
-		for i, name := range re.SubexpNames() {
-			if name == "token" {
-				return m[i]
+// ExtractToken pulls a JWT out of a string containing begin/end markers
+func ExtractToken(data string) (string, error) {
+	// Fixme - update to wipe data on each extract/use
+	contents := []byte(data)
+	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
+	if len(items) == 0 {
+		return string(contents), nil
+	}
+	// First result should be the user JWT.
+	raw := items[0][1]
+	tmp := make([]byte, len(raw))
+	copy(tmp, raw)
+	return string(tmp), nil
+}
+
+// ExtractSeed pulls a seed out of a string containing begin/end markers, including a chain file
+func ExtractSeed(data string) (nkeys.KeyPair, error) {
+	// Fixme - update to wipe data on each extract/use
+	contents := []byte(data)
+	var seed []byte
+
+	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
+	if len(items) > 1 {
+		seed = items[1][1]
+	} else {
+		lines := bytes.Split(contents, []byte("\n"))
+		for _, line := range lines {
+			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("SU")) {
+				seed = line
+				break
 			}
 		}
 	}
-	return s
+
+	if seed == nil {
+		return nil, fmt.Errorf("nats: No nkey user seed found")
+	}
+
+	kp, err := nkeys.FromSeed(seed)
+	if err != nil {
+		return nil, err
+	}
+	return kp, nil
 }
 
 func ParseNumber(s string) (int64, error) {

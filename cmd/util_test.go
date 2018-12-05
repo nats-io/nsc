@@ -191,7 +191,9 @@ func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
-	return ExtractToken(stdout)
+	token, err := ExtractToken(stdout)
+	require.NoError(t, err)
+	return token
 }
 
 func MakeTempDir(t *testing.T) string {

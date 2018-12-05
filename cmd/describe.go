@@ -91,7 +91,10 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.token = ExtractToken(string(d))
+		p.token, err = ExtractToken(string(d))
+		if err != nil {
+			return err
+		}
 	}
 
 	gc, err := jwt.DecodeGeneric(p.token)
