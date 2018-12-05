@@ -91,6 +91,9 @@ func (c *CmdTest) RunTest(t *testing.T, chain []string, index int) {
 func ExecuteCmd(root *cobra.Command, args ...string) (stdout string, stderr string, err error) {
 	var stderrBuf, stdoutBuf bytes.Buffer
 	root.SetOutput(&stderrBuf)
+	if len(args) == 0 {
+		args = make([]string, 0, 0)
+	}
 	root.SetArgs(args)
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -98,9 +101,9 @@ func ExecuteCmd(root *cobra.Command, args ...string) (stdout string, stderr stri
 
 	_, err = root.ExecuteC()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
-	io.Copy(&stdoutBuf, r)
+	_, _ = io.Copy(&stdoutBuf, r)
 
 	return stdoutBuf.String(), stderrBuf.String(), err
 }
@@ -119,9 +122,9 @@ func ExecuteInteractiveCmd(root *cobra.Command, inputs []interface{}, args ...st
 	cli.ResetPromptLib()
 	InteractiveFlag = false
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
-	io.Copy(&stdoutBuf, r)
+	_, _ = io.Copy(&stdoutBuf, r)
 
 	return stdoutBuf.String(), stderrBuf.String(), err
 }

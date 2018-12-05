@@ -42,7 +42,7 @@ func createEnvCmd() *cobra.Command {
 		SilenceUsage:  false,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params.Run()
+			_ = params.Run()
 			params.PrintEnv(cmd)
 			return nil
 		},
@@ -72,7 +72,6 @@ func (p *SetContextParams) Run() error {
 		// no edits
 		return nil
 	}
-
 	current := GetConfig()
 
 	root := current.StoreRoot
@@ -105,8 +104,6 @@ func (p *SetContextParams) Run() error {
 }
 
 func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
-
-	s, _ := GetStore()
 	conf := GetConfig()
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
@@ -115,13 +112,13 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
 	table.AddRow("$"+homeEnv, envSet(homeEnv), toolHome)
 	table.AddSeparator()
-	if s == nil {
-		table.AddRow("Stores Dir", "", "not set")
-	} else {
-		table.AddRow("Stores Dir", "", conf.StoreRoot)
-		table.AddRow("Default Operator", "", conf.Operator)
-		table.AddRow("Default Account", "", conf.Account)
-		table.AddRow("Default Cluster", "", conf.Cluster)
+	r := conf.StoreRoot
+	if r == "" {
+		r = "Not Set"
 	}
+	table.AddRow("Stores Dir", "", r)
+	table.AddRow("Default Operator", "", conf.Operator)
+	table.AddRow("Default Account", "", conf.Account)
+	table.AddRow("Default Cluster", "", conf.Cluster)
 	cmd.Println(table.Render())
 }

@@ -66,8 +66,25 @@ func NewActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
 }
 
 func NewStoreLessActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
-	return &Actx{cmd: cmd, ctx: nil, args: args}, nil
+	var ctx Actx
+	ctx.cmd = cmd
+	ctx.args = args
+	ctx.ctx = &store.Context{}
+	return &ctx, nil
 }
+
+func RunMaybeStorelessAction(cmd *cobra.Command, args []string, action interface{}) error {
+	ctx, err := NewActx(cmd, args)
+	if err != nil {
+		ctx, err = NewStoreLessActx(cmd, args)
+		if err != nil {
+			return err
+		}
+	}
+	return run(ctx, action)
+
+}
+
 
 func RunStoreLessAction(cmd *cobra.Command, args []string, action interface{}) error {
 	ctx, err := NewStoreLessActx(cmd, args)
