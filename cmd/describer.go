@@ -57,7 +57,7 @@ func (a *AccountDescriber) Describe() string {
 		}
 
 		if lim.Data > 0 {
-			table.AddRow("Max Data", humanize.Bytes(uint64(lim.Data)))
+			table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
 		} else {
 			table.AddRow("Max Data", "Unlimited")
 		}
@@ -75,7 +75,7 @@ func (a *AccountDescriber) Describe() string {
 		}
 
 		if lim.Payload > 0 {
-			table.AddRow("Max Msg Payload", humanize.Bytes(uint64(lim.Payload)))
+			table.AddRow("Max Msg Payload", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Payload)), lim.Payload))
 		} else {
 			table.AddRow("Max Msg Payload", "Unlimited")
 		}

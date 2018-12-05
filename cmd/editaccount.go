@@ -60,7 +60,12 @@ func createEditAccount() *cobra.Command {
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
-	cmd.Flags().Int64VarP(&params.conns.NumberValue, "conns", "", 0, "set maximum active connections for the account")
+	cmd.Flags().Int64VarP(&params.conns.NumberValue, "conns", "", -1, "set maximum active connections for the account (-1 is unlimited)")
+	cmd.Flags().StringVarP(&params.data.Value, "data", "", "-1", "set maximum data in bytes for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.exports.NumberValue, "exports", "", -1, "set maximum number of exports for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
+	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.subscriptions.NumberValue, "subscriptions", "", -1, "set maximum subscription for the account (-1 is unlimited)")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -76,18 +81,23 @@ type EditAccountParams struct {
 	AccountContextParams
 	SignerParams
 	TimeParams
-	claim  *jwt.AccountClaims
-	token  string
-	tags   []string
-	rmTags []string
-	conns  NumberParams
+	claim         *jwt.AccountClaims
+	token         string
+	tags          []string
+	rmTags        []string
+	conns         NumberParams
+	exports       NumberParams
+	imports       NumberParams
+	subscriptions NumberParams
+	payload       DataParams
+	data          DataParams
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns") {
+	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "exports", "imports", "subscriptions", "payload", "data") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -113,12 +123,57 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
+
+	if !ctx.CurrentCmd().Flags().Changed("conns") {
+		p.conns.NumberValue = p.claim.Limits.Conn
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("data") {
+		p.data.Value = fmt.Sprintf("%d", p.claim.Limits.Data)
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("exports") {
+		p.exports.NumberValue = p.claim.Limits.Exports
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("imports") {
+		p.imports.NumberValue = p.claim.Limits.Imports
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("payload") {
+		p.payload.Value = fmt.Sprintf("%d", p.claim.Limits.Payload)
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("subscriptions") {
+		p.subscriptions.NumberValue = p.claim.Limits.Subs
+	}
+
 	return err
 }
 
 func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 	if err = p.conns.Edit("max connections"); err != nil {
+		return err
+	}
+
+	if err = p.data.Edit("max data"); err != nil {
+		return err
+	}
+
+	if err = p.exports.Edit("max exports (-1 unlimited)"); err != nil {
+		return err
+	}
+
+	if err = p.imports.Edit("max imports (-1 unlimited)"); err != nil {
+		return err
+	}
+
+	if err = p.payload.Edit("max payload (-1 unlimited)"); err != nil {
+		return err
+	}
+
+	if err = p.subscriptions.Edit("max subscriptions (-1 unlimited)"); err != nil {
 		return err
 	}
 
@@ -157,9 +212,18 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 	p.claim.Tags.Remove(p.rmTags...)
 	sort.Strings(p.claim.Tags)
 
-	if p.conns.NumberValue > 0 {
-		p.claim.Limits.Conn = p.conns.NumberValue
+	p.claim.Limits.Conn = p.conns.NumberValue
+	p.claim.Limits.Data, err = p.data.NumberValue()
+	if err != nil {
+		return fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
 	}
+	p.claim.Limits.Exports = p.exports.NumberValue
+	p.claim.Limits.Imports = p.imports.NumberValue
+	p.claim.Limits.Payload, err = p.payload.NumberValue()
+	if err != nil {
+		return fmt.Errorf("error parsing %s: %s", "payload", p.data.Value)
+	}
+	p.claim.Limits.Subs = p.subscriptions.NumberValue
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {

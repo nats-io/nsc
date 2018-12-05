@@ -216,7 +216,7 @@ func ParseNumber(s string) (int64, error) {
 		return 0, nil
 	}
 	s = strings.ToUpper(s)
-	re := regexp.MustCompile(`(\d+$)`)
+	re := regexp.MustCompile(`(-?\d+$)`)
 	m := re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[0], 10, 64)
@@ -225,12 +225,18 @@ func ParseNumber(s string) (int64, error) {
 		}
 		return v, nil
 	}
-	re = regexp.MustCompile(`(\d+)([K|M|G])`)
+	re = regexp.MustCompile(`(-?\d+)([B|K|M|G])`)
 	m = re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
 			return 0, err
+		}
+		if v < 0 {
+			return -1, nil
+		}
+		if m[2] == "B" {
+			return v, nil
 		}
 		if m[2] == "K" {
 			return v * 1000, nil

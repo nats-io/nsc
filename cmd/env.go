@@ -83,6 +83,7 @@ func (p *SetContextParams) Run() error {
 	if err != nil {
 		return err
 	}
+
 	if p.Operator != "" {
 		if err := c.SetOperator(p.Operator); err != nil {
 			return err
@@ -98,6 +99,8 @@ func (p *SetContextParams) Run() error {
 			return err
 		}
 	}
+	c.SetDefaults()
+
 	current.ContextConfig = *c
 
 	return current.Save()
