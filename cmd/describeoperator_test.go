@@ -25,16 +25,12 @@ func TestDescribeOperator_Single(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	opub, err := ts.KeyStore.GetOperatorPublicKey("operator")
-	require.NoError(t, err)
-
 	pub, err := ts.KeyStore.GetOperatorPublicKey("operator")
 	require.NoError(t, err)
 
 	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, opub)
 	require.Contains(t, stdout, " operator ")
 }
 

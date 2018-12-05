@@ -26,6 +26,12 @@ import (
 	"github.com/xlab/tablewriter"
 )
 
+type listEntry struct {
+	name   string
+	claims jwt.Claims
+	err    error
+}
+
 func createListOperatorsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "operators",
@@ -43,19 +49,24 @@ func createListOperatorsCmd() *cobra.Command {
 				fmt.Println("no operators defined - init an environment")
 			} else {
 				sort.Strings(operators)
-				var claims []jwt.Claims
+				var infos []*listEntry
 				for _, v := range operators {
+					var i listEntry
+					infos = append(infos, &i)
+					i.name = v
 					s, err := config.LoadStore(v)
 					if err != nil {
-						return err
+						i.err = err
+						continue
 					}
 					c, err := s.LoadRootClaim()
 					if err != nil {
-						return err
+						i.err = err
+						continue
 					}
-					claims = append(claims, c)
+					i.claims = c
 				}
-				cmd.Println(listEntities("Operators", claims, config.Operator))
+				cmd.Println(listEntities("Operators", infos, config.Operator))
 			}
 
 			return nil
@@ -87,15 +98,19 @@ func createListAccountsCmd() *cobra.Command {
 				return err
 			}
 
-			var claims []jwt.Claims
+			var infos []*listEntry
 			for _, v := range containers {
+				var i listEntry
+				i.name = v
+				infos = append(infos, &i)
 				ac, err := s.ReadAccountClaim(v)
 				if err != nil {
-					return err
+					i.err = err
+					continue
 				}
-				claims = append(claims, ac)
+				i.claims = ac
 			}
-			cmd.Println(listEntities("Accounts", claims, config.Account))
+			cmd.Println(listEntities("Accounts", infos, config.Account))
 			return nil
 		},
 	}
@@ -126,41 +141,52 @@ func createListClustersCmd() *cobra.Command {
 				return err
 			}
 			sort.Strings(containers)
-			var claims []jwt.Claims
+			var infos []*listEntry
 			for _, v := range containers {
+				var i listEntry
+				i.name = v
+				infos = append(infos, &i)
 				ac, err := s.ReadClusterClaim(v)
 				if err != nil {
-					return err
+					i.err = err
+					continue
 				}
-				claims = append(claims, ac)
+				i.claims = ac
 			}
-			cmd.Println(listEntities("Clusters", claims, config.Operator))
+			cmd.Println(listEntities("Clusters", infos, config.Operator))
 			return nil
 		},
 	}
 	return cmd
 }
 
-func listEntities(title string, claims []jwt.Claims, current string) string {
+func listEntities(title string, infos []*listEntry, current string) string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle(title)
-	if len(claims) == 0 {
+	if len(infos) == 0 {
 		table.AddRow("No entries defined")
 	} else {
 		table.AddHeaders("Name", "Public Key")
-		for _, v := range claims {
-			if v == nil {
-				continue
+		for _, v := range infos {
+			n := v.name
+			var p string
+			if v.err != nil || v.claims == nil {
+				p = fmt.Sprintf("error loading jwt - %v", v.err)
+			} else {
+				c := v.claims.Claims()
+				if c != nil {
+					tn := c.Name
+					if n != tn {
+						n = fmt.Sprintf("%s (%s)", n, c.Name)
+					}
+					p = c.Subject
+				}
 			}
-			n := v.Claims().Name
-			p := v.Claims().Subject
-
 			if n == current {
 				n = cli.Bold(n)
 				p = cli.Bold(p)
 			}
-
 			table.AddRow(n, p)
 		}
 	}
