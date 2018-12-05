@@ -39,10 +39,13 @@ nsc add user --name u --tag test,service_a`,
 				return err
 			}
 
-			if params.generated {
+			if params.generated && !QuietMode() {
 				cmd.Printf("Generated user key - private key stored %q\n", params.keyPath)
 			}
-			cmd.Printf("Success! - added user %q to %q\n", params.name, params.AccountContextParams.Name)
+
+			if !QuietMode() {
+				cmd.Printf("Success! - added user %q to %q\n", params.name, params.AccountContextParams.Name)
+			}
 
 			return nil
 		},

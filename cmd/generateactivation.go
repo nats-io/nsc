@@ -40,8 +40,13 @@ func createGenerateActivationCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-				params.export.Name, params.targetPK, params.activation.ID)
+			if QuietMode() {
+				cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
+					params.export.Name, params.targetPK, params.activation.ID)
+			} else {
+				cmd.Printf("generated %q activation for account %q.\nJTI is %q\n",
+					params.export.Name, params.targetPK, params.activation.ID)
+			}
 
 			if params.activation.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",
