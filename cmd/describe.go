@@ -32,6 +32,7 @@ func createDescribeCmd() *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "describe",
 		Short: "Describe assets such as accounts, users, activations, services, and streams",
+		Args:  cobra.MaximumNArgs(0),
 		Example: `nsc describe -f pathorurl
 nsc describe account
 nsc describe account -n foo`,

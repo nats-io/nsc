@@ -32,6 +32,7 @@ func createAddImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Add an import",
+		Args:  cobra.MaximumNArgs(0),
 		Example: `nsc add import -i
 nsc add import --token-file path --to import.>
 nsc add import --url https://some.service.com/path --to import.>`,

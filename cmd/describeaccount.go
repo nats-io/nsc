@@ -28,6 +28,7 @@ func createDescribeAccountCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Describes an account",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

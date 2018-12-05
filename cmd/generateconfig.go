@@ -28,6 +28,7 @@ func createGenerateConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "config",
 		Short:        "Generate a config file for an user",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		Example:      `nsc generate config --account a --user u`,
 		RunE: func(cmd *cobra.Command, args []string) error {

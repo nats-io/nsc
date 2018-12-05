@@ -29,6 +29,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "operator",
 		Short:        "Describes the operator",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
