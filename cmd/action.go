@@ -85,7 +85,6 @@ func RunMaybeStorelessAction(cmd *cobra.Command, args []string, action interface
 
 }
 
-
 func RunStoreLessAction(cmd *cobra.Command, args []string, action interface{}) error {
 	ctx, err := NewStoreLessActx(cmd, args)
 	if err != nil {

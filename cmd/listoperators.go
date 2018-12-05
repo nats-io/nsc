@@ -29,9 +29,9 @@ import (
 )
 
 type listEntry struct {
-	name string
+	name   string
 	claims jwt.Claims
-	err error
+	err    error
 }
 
 func createListOperatorsCmd() *cobra.Command {
