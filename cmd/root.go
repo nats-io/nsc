@@ -34,6 +34,7 @@ const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
 var InteractiveFlag bool
+var quietMode bool
 
 var cfgFile string
 var ngsStore *store.Store
@@ -109,6 +110,14 @@ func RunInterceptor(ctx ActionCtx, params interface{}) error {
 
 func GetRootCmd() *cobra.Command {
 	return rootCmd
+}
+
+func EnterQuietMode() {
+	quietMode = true
+}
+
+func QuietMode() bool {
+	return quietMode
 }
 
 var rootCmd = &cobra.Command{

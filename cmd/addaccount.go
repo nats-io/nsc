@@ -35,10 +35,13 @@ func CreateAddAccountCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if params.generated {
+			if params.generated && !QuietMode() {
 				cmd.Printf("Generated account key - private key stored %q\n", params.keyPath)
 			}
-			cmd.Printf("Success! - added account %q\n", params.name)
+
+			if !QuietMode() {
+				cmd.Printf("Success! - added account %q\n", params.name)
+			}
 
 			return nil
 		},
