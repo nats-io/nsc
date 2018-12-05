@@ -4,9 +4,9 @@ BUILD_OS:=`go env GOOS`
 BUILD_OS_ARCH:=`go env GOARCH`
 BUILD_OS_GOPATH=`go env GOPATH`
 
-.PHONY: build test
+.PHONY: build test release
 
-build: fmt compile test
+build: compile
 
 fmt:
 	gofmt -s -w *.go
@@ -20,19 +20,17 @@ fmt:
 	goimports -w cmd/store/*.go
 
 compile:
-	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 8
+	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 12
 
-install: build
-	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
-
-install-no-test:
+install: compile build
 	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
 
 cover: test
 	go tool cover -html=./coverage.out
 
-test: fmt
+test:
 	go vet ./...
 	rm -rf ./coverage.out
 	go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
+release: fmt test compile

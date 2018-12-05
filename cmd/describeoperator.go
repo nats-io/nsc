@@ -32,7 +32,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			if !IsStdOut(params.outputFile) {
@@ -42,7 +42,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	cmd.Flags().StringVarP(&params.Name, "operator", "r", "", "operator name")
+	cmd.Flags().StringVarP(&params.name, "operator", "r", "", "operator name")
 
 	return cmd
 }
@@ -52,18 +52,18 @@ func init() {
 }
 
 type DescribeOperatorParams struct {
-	Name string
-	jwt.OperatorClaims
+	name       string
 	outputFile string
+	claim      jwt.OperatorClaims
 }
 
 func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
-	if p.Name != "" {
+	if p.name != "" {
 		actx, ok := ctx.(*Actx)
 		if !ok {
 			return errors.New("unable to cast to actx")
 		}
-		s, err := GetStoreForOperator(p.Name)
+		s, err := GetStoreForOperator(p.name)
 		if err != nil {
 			return err
 		}
@@ -73,6 +73,9 @@ func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
 		}
 		actx.ctx.Store = s
 		actx.ctx = cc
+	} else if ctx.StoreCtx().Store == nil {
+		return fmt.Errorf("set an operator")
+
 	}
 	return nil
 }
@@ -99,7 +102,7 @@ func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	p.OperatorClaims = *oc
+	p.claim = *oc
 	return nil
 }
 
@@ -112,6 +115,6 @@ func (p *DescribeOperatorParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeOperatorParams) Run(ctx ActionCtx) error {
-	v := NewOperatorDescriber(p.OperatorClaims).Describe()
+	v := NewOperatorDescriber(p.claim).Describe()
 	return Write(p.outputFile, []byte(v))
 }
