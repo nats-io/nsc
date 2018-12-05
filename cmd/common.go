@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -344,4 +345,15 @@ func MaybeMakeDir(dir string) error {
 		return fmt.Errorf("%q already exists and it is not a dir", dir)
 	}
 	return nil
+}
+
+func AbbrevHomePaths(fp string) string {
+	h, err := homedir.Dir()
+	if err != nil {
+		return fp
+	}
+	if strings.HasPrefix(fp, h) {
+		return strings.Replace(fp, h, "~", 1)
+	}
+	return fp
 }
