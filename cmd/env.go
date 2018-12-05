@@ -37,6 +37,7 @@ func createEnvCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "env",
 		Short:         fmt.Sprintf("Prints and manage the %s environment", filepath.Base(os.Args[0])),
+		Args:          cobra.MaximumNArgs(0),
 		SilenceErrors: false,
 		SilenceUsage:  false,
 		Example:       "env",

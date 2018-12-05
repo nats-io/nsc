@@ -28,6 +28,7 @@ func createDescribeUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Describes an user",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

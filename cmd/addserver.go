@@ -30,6 +30,7 @@ func createAddServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "server",
 		Short:        "Add a server to a cluster (operator only)",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		Example:      `nsc add server -i`,
 		RunE: func(cmd *cobra.Command, args []string) error {

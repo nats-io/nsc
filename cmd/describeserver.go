@@ -28,6 +28,7 @@ func createDescribeServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "server",
 		Short:        "Describes a server",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

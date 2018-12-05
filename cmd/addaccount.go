@@ -29,6 +29,7 @@ func CreateAddAccountCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Add an account",
+		Args:         cobra.MaximumNArgs(0),
 		SilenceUsage: true,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
