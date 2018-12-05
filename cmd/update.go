@@ -113,6 +113,8 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 	}
 	version, err := u.doCheck()
 	if err != nil {
+		// stop checking for a bit
+		_ = u.updateLastChecked()
 		return nil, err
 	}
 	err = u.updateLastChecked()
