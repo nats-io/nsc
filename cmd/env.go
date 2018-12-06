@@ -88,17 +88,26 @@ func (p *SetContextParams) Run() error {
 		if err := c.SetOperator(p.Operator); err != nil {
 			return err
 		}
+	} else {
+		_ = c.SetOperator(current.Operator)
 	}
+
 	if p.Account != "" {
 		if err := c.SetAccount(p.Account); err != nil {
 			return err
 		}
+	} else {
+		_ = c.SetAccount(current.Account)
 	}
 	if p.Cluster != "" {
 		if err := c.SetCluster(p.Cluster); err != nil {
 			return err
 		}
+	} else {
+		_ = c.SetCluster(current.Cluster)
 	}
+
+	fmt.Println(p)
 	c.SetDefaults()
 
 	current.ContextConfig = *c
