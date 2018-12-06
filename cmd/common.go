@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -216,7 +217,7 @@ func ParseNumber(s string) (int64, error) {
 		return 0, nil
 	}
 	s = strings.ToUpper(s)
-	re := regexp.MustCompile(`(\d+$)`)
+	re := regexp.MustCompile(`(-?\d+$)`)
 	m := re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[0], 10, 64)
@@ -225,12 +226,18 @@ func ParseNumber(s string) (int64, error) {
 		}
 		return v, nil
 	}
-	re = regexp.MustCompile(`(\d+)([K|M|G])`)
+	re = regexp.MustCompile(`(-?\d+)([B|K|M|G])`)
 	m = re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
 			return 0, err
+		}
+		if v < 0 {
+			return -1, nil
+		}
+		if m[2] == "B" {
+			return v, nil
 		}
 		if m[2] == "K" {
 			return v * 1000, nil
@@ -338,4 +345,15 @@ func MaybeMakeDir(dir string) error {
 		return fmt.Errorf("%q already exists and it is not a dir", dir)
 	}
 	return nil
+}
+
+func AbbrevHomePaths(fp string) string {
+	h, err := homedir.Dir()
+	if err != nil {
+		return fp
+	}
+	if strings.HasPrefix(fp, h) {
+		return strings.Replace(fp, h, "~", 1)
+	}
+	return fp
 }

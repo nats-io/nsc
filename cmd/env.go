@@ -83,6 +83,7 @@ func (p *SetContextParams) Run() error {
 	if err != nil {
 		return err
 	}
+
 	if p.Operator != "" {
 		if err := c.SetOperator(p.Operator); err != nil {
 			return err
@@ -98,6 +99,8 @@ func (p *SetContextParams) Run() error {
 			return err
 		}
 	}
+	c.SetDefaults()
+
 	current.ContextConfig = *c
 
 	return current.Save()
@@ -109,14 +112,14 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.UTF8Box()
 	table.AddTitle("NSC Environment")
 	table.AddHeaders("Setting", "Set", "Effective Value")
-	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), store.GetKeysDir())
-	table.AddRow("$"+homeEnv, envSet(homeEnv), toolHome)
+	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
+	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
 	table.AddSeparator()
 	r := conf.StoreRoot
 	if r == "" {
 		r = "Not Set"
 	}
-	table.AddRow("Stores Dir", "", r)
+	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
 	table.AddRow("Default Operator", "", conf.Operator)
 	table.AddRow("Default Account", "", conf.Account)
 	table.AddRow("Default Cluster", "", conf.Cluster)

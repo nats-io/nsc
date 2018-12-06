@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/blang/semver"
@@ -60,6 +61,8 @@ update --release-notes
 
 			var latest *selfupdate.Release
 			if updateFn == nil {
+				// the library freak out if GITHUB_TOKEN is set - don't break travis :)
+				_ = os.Setenv("GITHUB_TOKEN", "")
 				latest, err = selfupdate.UpdateSelf(v, GetConfig().GithubUpdates)
 			} else {
 				latest, err = updateFn(v, GetConfig().GithubUpdates)
@@ -153,6 +156,8 @@ func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 	var found bool
 	var err error
 	if updateCheckFn == nil {
+		// the library freak out if GITHUB_TOKEN is set - don't break travis :)
+		_ = os.Setenv("GITHUB_TOKEN", "")
 		latest, found, err = selfupdate.DetectLatest(config.GithubUpdates)
 	} else {
 		latest, found, err = updateCheckFn(config.GithubUpdates)
