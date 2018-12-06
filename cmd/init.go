@@ -67,7 +67,7 @@ init --interactive
 				}
 			}
 
-			if printed {
+			if printed && !QuietMode() {
 				cmd.Println(cli.Wrap(70, "Project initialization generated NKeys.",
 					"These keys should be treated as secrets.", "You can move the directory,",
 					"and reference them from the", fmt.Sprintf("`$%s`", store.NKeysPathEnv),
