@@ -83,7 +83,7 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "name is required", err.Error())
 
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A", "--name", "u")
+	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A", "--user", "u")
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
