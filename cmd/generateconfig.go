@@ -35,7 +35,8 @@ func createGenerateConfigCmd() *cobra.Command {
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name of the account")
+	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "name of the account")
+	cmd.Flags().StringVarP(&params.user, "user", "u", "", "name of the user")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -49,17 +50,15 @@ func init() {
 type GenerateConfigParams struct {
 	AccountContextParams
 	kind      string
-	name      string
+	user      string
 	out       string
-	account   bool
-	user      bool
 	entityKP  nkeys.KeyPair
 	entityJwt []byte
 }
 
 func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
-	if p.name == "" {
+	if p.user == "" {
 		if p.AccountContextParams.Name != "" {
 			entries, err := ctx.StoreCtx().Store.ListEntries(store.Accounts, p.AccountContextParams.Name, store.Users)
 			if err != nil {
@@ -69,7 +68,7 @@ func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
 			case 0:
 				return fmt.Errorf("account %q has no users", p.AccountContextParams.Name)
 			case 1:
-				p.name = entries[0]
+				p.user = entries[0]
 			default:
 				// if interactive they select there
 			}
@@ -85,8 +84,8 @@ func (p *GenerateConfigParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	if p.name == "" {
-		p.name, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
+	if p.user == "" {
+		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
 		if err != nil {
 			return err
 		}
@@ -108,20 +107,20 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 	if p.AccountContextParams.Name == "" {
 		return fmt.Errorf("account is required")
 	}
-	if p.name == "" {
+	if p.user == "" {
 		return fmt.Errorf("name is required")
 	}
 
-	p.entityKP, err = ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.name)
+	p.entityKP, err = ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.user)
 	if err != nil {
 		return err
 	}
 
-	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.name)) {
-		return fmt.Errorf("user %q not found", p.name)
+	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user)) {
+		return fmt.Errorf("user %q not found", p.user)
 	}
 
-	p.entityJwt, err = ctx.StoreCtx().Store.Read(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.name))
+	p.entityJwt, err = ctx.StoreCtx().Store.Read(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user))
 	if err != nil {
 		return err
 	}
@@ -132,7 +131,7 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 func (p *GenerateConfigParams) Run(ctx ActionCtx) error {
 	seed, err := p.entityKP.Seed()
 	if err != nil {
-		return fmt.Errorf("error getting seed for user %q: %v", p.name, err)
+		return fmt.Errorf("error getting seed for user %q: %v", p.user, err)
 	}
 
 	v := FormatConfig("User", string(p.entityJwt), string(seed))
