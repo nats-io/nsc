@@ -35,7 +35,6 @@ func createGenerateConfigCmd() *cobra.Command {
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "name of the account")
 	cmd.Flags().StringVarP(&params.user, "user", "u", "", "name of the user")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
 	params.AccountContextParams.BindFlags(cmd)

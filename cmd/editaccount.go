@@ -66,6 +66,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
 	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
 	cmd.Flags().Int64VarP(&params.subscriptions.NumberValue, "subscriptions", "", -1, "set maximum subscription for the account (-1 is unlimited)")
+	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -87,6 +88,7 @@ type EditAccountParams struct {
 	rmTags        []string
 	conns         NumberParams
 	exports       NumberParams
+	exportsWc     bool
 	imports       NumberParams
 	subscriptions NumberParams
 	payload       DataParams
@@ -97,7 +99,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "exports", "imports", "subscriptions", "payload", "data") {
+	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "exports", "imports", "subscriptions", "payload", "data", "wildcard-exports") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -218,6 +220,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 		return fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
 	}
 	p.claim.Limits.Exports = p.exports.NumberValue
+	p.claim.Limits.WildcardExports = p.exportsWc
 	p.claim.Limits.Imports = p.imports.NumberValue
 	p.claim.Limits.Payload, err = p.payload.NumberValue()
 	if err != nil {

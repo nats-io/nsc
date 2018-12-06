@@ -85,6 +85,12 @@ func (a *AccountDescriber) Describe() string {
 		} else {
 			table.AddRow("Max Subscriptions", "Unlimited")
 		}
+
+		we := "False"
+		if lim.WildcardExports {
+			we = "True"
+		}
+		table.AddRow("Exports Allows Wildcards", we)
 	}
 
 	if len(a.Imports) == 0 {
