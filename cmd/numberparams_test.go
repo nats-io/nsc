@@ -17,8 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -28,7 +26,7 @@ import (
 func numberEditorCmd(params *NumberParams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "env",
-		Short:         fmt.Sprintf("Prints and manage the %s environment", filepath.Base(os.Args[0])),
+		Short:         fmt.Sprintf("Prints and manage the %s environment", GetToolName()),
 		SilenceErrors: false,
 		SilenceUsage:  false,
 		Example:       "env",

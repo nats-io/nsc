@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -36,7 +35,7 @@ func createEnvCmd() *cobra.Command {
 	var params SetContextParams
 	cmd := &cobra.Command{
 		Use:           "env",
-		Short:         fmt.Sprintf("Prints and manage the %s environment", filepath.Base(os.Args[0])),
+		Short:         fmt.Sprintf("Prints and manage the %s environment", GetToolName()),
 		Args:          cobra.MaximumNArgs(0),
 		SilenceErrors: false,
 		SilenceUsage:  false,
@@ -99,6 +98,7 @@ func (p *SetContextParams) Run() error {
 	} else {
 		_ = c.SetAccount(current.Account)
 	}
+
 	if p.Cluster != "" {
 		if err := c.SetCluster(p.Cluster); err != nil {
 			return err
@@ -107,9 +107,7 @@ func (p *SetContextParams) Run() error {
 		_ = c.SetCluster(current.Cluster)
 	}
 
-	fmt.Println(p)
 	c.SetDefaults()
-
 	current.ContextConfig = *c
 
 	return current.Save()
@@ -123,6 +121,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddHeaders("Setting", "Set", "Effective Value")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
 	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
+	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
 	table.AddSeparator()
 	r := conf.StoreRoot
 	if r == "" {

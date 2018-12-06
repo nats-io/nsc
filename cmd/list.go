@@ -18,8 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/nats-io/jwt"
@@ -61,8 +59,6 @@ func createListOperatorsCmd() *cobra.Command {
 				return errors.New("no store set - `env --store <dir>`")
 			}
 			operators := config.ListOperators()
-			sort.Strings(operators)
-
 			if len(operators) == 0 {
 				fmt.Println("no operators defined - init an environment")
 			} else {
@@ -80,6 +76,10 @@ func createListOperatorsCmd() *cobra.Command {
 					c, err := s.LoadRootClaim()
 					if err != nil {
 						i.err = err
+						continue
+					}
+					if c == nil {
+						i.err = fmt.Errorf("%q jwt not found", v)
 						continue
 					}
 					i.claims = c
@@ -126,6 +126,10 @@ func createListAccountsCmd() *cobra.Command {
 					i.err = err
 					continue
 				}
+				if ac == nil {
+					i.err = fmt.Errorf("%q jwt not found", v)
+					continue
+				}
 				i.claims = ac
 			}
 			cmd.Println(listEntities("Accounts", infos, config.Account))
@@ -143,13 +147,13 @@ func createListUsersCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
-				return fmt.Errorf("no store set - `%s env --store <dir>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no store set - `%s env --store <dir>`", GetToolName())
 			}
 			if config.Operator == "" {
-				return fmt.Errorf("no operator set - `%s env --operator <name>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no operator set - `%s env --operator <name>`", GetToolName())
 			}
 			if config.Account == "" {
-				return fmt.Errorf("no account set - `%s env --account <name>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no account set - `%s env --account <name>`", GetToolName())
 			}
 
 			s, err := config.LoadStore(config.Operator)
@@ -165,12 +169,16 @@ func createListUsersCmd() *cobra.Command {
 				var i listEntry
 				i.name = v
 				infos = append(infos, &i)
-				ac, err := s.ReadUserClaim(config.Account, v)
+				uc, err := s.ReadUserClaim(config.Account, v)
 				if err != nil {
 					i.err = err
 					continue
 				}
-				i.claims = ac
+				if uc == nil {
+					i.err = fmt.Errorf("%q jwt not found", v)
+					continue
+				}
+				i.claims = uc
 			}
 			cmd.Println(listEntities("Users", infos, config.Account))
 			return nil
@@ -208,12 +216,16 @@ func createListClustersCmd() *cobra.Command {
 				var i listEntry
 				i.name = v
 				infos = append(infos, &i)
-				ac, err := s.ReadClusterClaim(v)
+				cc, err := s.ReadClusterClaim(v)
 				if err != nil {
 					i.err = err
 					continue
 				}
-				i.claims = ac
+				if cc == nil {
+					i.err = fmt.Errorf("%q jwt not found", v)
+					continue
+				}
+				i.claims = cc
 			}
 			cmd.Println(listEntities("Clusters", infos, config.Operator))
 			return nil
@@ -230,13 +242,13 @@ func createListServersCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
-				return fmt.Errorf("no store set - `%s env --store <dir>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no store set - `%s env --store <dir>`", GetToolName())
 			}
 			if config.Operator == "" {
-				return fmt.Errorf("no operator set - `%s env --operator <name>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no operator set - `%s env --operator <name>`", GetToolName())
 			}
 			if config.Cluster == "" {
-				return fmt.Errorf("no cluster set - `%s env --cluster <name>`", filepath.Base(os.Args[0]))
+				return fmt.Errorf("no cluster set - `%s env --cluster <name>`", GetToolName())
 			}
 
 			s, err := config.LoadStore(config.Operator)
@@ -252,12 +264,16 @@ func createListServersCmd() *cobra.Command {
 				var i listEntry
 				i.name = v
 				infos = append(infos, &i)
-				ac, err := s.ReadServerClaim(config.Cluster, v)
+				sc, err := s.ReadServerClaim(config.Cluster, v)
 				if err != nil {
 					i.err = err
 					continue
 				}
-				i.claims = ac
+				if sc == nil {
+					i.err = fmt.Errorf("%q jwt was not found", v)
+					continue
+				}
+				i.claims = sc
 			}
 			cmd.Println(listEntities("Servers", infos, config.Account))
 			return nil

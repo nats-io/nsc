@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/nats-io/nsc/cmd/store"
 )
@@ -48,21 +49,43 @@ func NewContextConfig(storeRoot string) (*ContextConfig, error) {
 func (c *ContextConfig) SetDefaults() {
 	if err := IsValidDir(c.StoreRoot); err == nil {
 		operators := c.ListOperators()
-		if len(operators) == 1 {
-			s, err := c.LoadStore(operators[0])
-			if err != nil {
-				return
-			}
-			c.Operator = filepath.Base(operators[0])
-			accounts, err := s.ListSubContainers(store.Accounts)
-			if err == nil && len(accounts) == 1 {
-				c.Account = accounts[0]
-			}
-			clusters, err := s.ListSubContainers(store.Clusters)
-			if err == nil && len(clusters) == 1 {
-				c.Cluster = clusters[0]
+		c.Operator = c.saneDefault(c.Operator, operators)
+		if c.Operator == "" {
+			// reset everything
+			c.Account = ""
+			c.Cluster = ""
+			return
+		}
+
+		s, err := c.LoadStore(c.Operator)
+		if err != nil {
+			return
+		}
+		accounts, err := s.ListSubContainers(store.Accounts)
+		if err == nil {
+			c.Account = c.saneDefault(c.Account, accounts)
+		}
+		clusters, err := s.ListSubContainers(store.Clusters)
+		if err == nil {
+			c.Cluster = c.saneDefault(c.Cluster, clusters)
+		}
+	}
+}
+
+// saneDefault keeps the current choice if it exists, or returns ""
+func (c *ContextConfig) saneDefault(current string, choices []string) string {
+	switch len(choices) {
+	case 0:
+		return ""
+	case 1:
+		return choices[0]
+	default:
+		for _, v := range choices {
+			if v == current {
+				return current
 			}
 		}
+		return ""
 	}
 }
 
@@ -84,13 +107,13 @@ func (c *ContextConfig) ListOperators() []string {
 			operators = append(operators, v.Name())
 		}
 	}
+	sort.Strings(operators)
 	return operators
 }
 
 func (c *ContextConfig) SetOperator(operator string) error {
 	for _, v := range c.ListOperators() {
-		op := filepath.Base(v)
-		if op == operator {
+		if v == operator {
 			c.Operator = operator
 			return nil
 		}

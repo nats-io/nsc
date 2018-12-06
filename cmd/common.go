@@ -169,7 +169,6 @@ var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:
 
 // ExtractToken pulls a JWT out of a string containing begin/end markers
 func ExtractToken(data string) (string, error) {
-	// Fixme - update to wipe data on each extract/use
 	contents := []byte(data)
 	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
 	if len(items) == 0 {
@@ -184,7 +183,6 @@ func ExtractToken(data string) (string, error) {
 
 // ExtractSeed pulls a seed out of a string containing begin/end markers, including a chain file
 func ExtractSeed(data string) (nkeys.KeyPair, error) {
-	// Fixme - update to wipe data on each extract/use
 	contents := []byte(data)
 	var seed []byte
 
@@ -194,17 +192,19 @@ func ExtractSeed(data string) (nkeys.KeyPair, error) {
 	} else {
 		lines := bytes.Split(contents, []byte("\n"))
 		for _, line := range lines {
-			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("SU")) {
+			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("SA")) ||
+				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SC")) ||
+				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SN")) ||
+				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SO")) ||
+				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SU")) {
 				seed = line
 				break
 			}
 		}
 	}
-
 	if seed == nil {
-		return nil, fmt.Errorf("nats: No nkey user seed found")
+		return nil, fmt.Errorf("nats: No nkey seed found")
 	}
-
 	kp, err := nkeys.FromSeed(seed)
 	if err != nil {
 		return nil, err

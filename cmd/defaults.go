@@ -35,9 +35,19 @@ type ToolConfig struct {
 	LastUpdate    int64  `json:"last_update"`
 }
 
+var toolName = filepath.Base(os.Args[0])
+
 var config ToolConfig
 var toolHome string
 var homeEnv string
+
+func SetToolName(name string) {
+	toolName = name
+}
+
+func GetToolName() string {
+	return toolName
+}
 
 // GetConfig returns the global config
 func GetConfig() *ToolConfig {
@@ -114,12 +124,11 @@ func initToolHome(envVarName string) (string, error) {
 	toolHome = os.Getenv(envVarName)
 
 	if toolHome == "" {
-		exeName := filepath.Base(os.Args[0])
 		dir, err := homedir.Dir()
 		if err != nil {
 			return "", fmt.Errorf("error getting homedir: %v", err.Error())
 		}
-		toolHome = filepath.Join(dir, fmt.Sprintf(".%s", exeName))
+		toolHome = filepath.Join(dir, fmt.Sprintf(".%s", GetToolName()))
 	}
 
 	if err := MaybeMakeDir(toolHome); err != nil {
@@ -131,6 +140,6 @@ func initToolHome(envVarName string) (string, error) {
 }
 
 func (d *ToolConfig) configFile() string {
-	configFileName := fmt.Sprintf("%s.json", filepath.Base(os.Args[0]))
+	configFileName := fmt.Sprintf("%s.json", GetToolName())
 	return filepath.Join(toolHome, configFileName)
 }

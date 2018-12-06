@@ -32,11 +32,17 @@ func createGenerateConfigCmd() *cobra.Command {
 		SilenceUsage: true,
 		Example:      `nsc generate config --account a --user u`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunAction(cmd, args, &params)
+			if err := RunAction(cmd, args, &params); err != nil {
+				return err
+			}
+			if !QuietMode() && params.out != "--" {
+				cmd.Printf("Success!! - generated %q\n", params.out)
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.user, "user", "u", "", "name of the user")
-	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
+	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -68,8 +74,6 @@ func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
 				return fmt.Errorf("account %q has no users", p.AccountContextParams.Name)
 			case 1:
 				p.user = entries[0]
-			default:
-				// if interactive they select there
 			}
 		}
 	}
@@ -134,7 +138,5 @@ func (p *GenerateConfigParams) Run(ctx ActionCtx) error {
 	}
 
 	v := FormatConfig("User", string(p.entityJwt), string(seed))
-	fmt.Println(string(v))
-
-	return nil
+	return Write(p.out, v)
 }

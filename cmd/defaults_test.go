@@ -48,7 +48,7 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 
 	var cc ContextConfig
 	cc.StoreRoot = ts.GetStoresRoot()
-	fp := filepath.Join(ts.Dir, fmt.Sprintf("%s.json", filepath.Base(os.Args[0])))
+	fp := filepath.Join(ts.Dir, fmt.Sprintf("%s.json", GetToolName()))
 	require.NoError(t, WriteJson(fp, cc))
 
 	ResetConfigForTests()
@@ -60,8 +60,4 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.Equal(t, "operator", tc.Operator)
 	require.Equal(t, "A", tc.Account)
 	require.Equal(t, "C", tc.Cluster)
-}
-
-func TestDefault_SetGithub(t *testing.T) {
-
 }

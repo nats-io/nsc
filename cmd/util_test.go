@@ -46,10 +46,11 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
-	homeEnv = NscHomeEnv
+	homeEnv = t.Name()
 
 	ts.OperatorKey = operator
 	ts.Dir = MakeTempDir(t)
+	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "cli_home")))
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
