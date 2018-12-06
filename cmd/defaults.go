@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/go-homedir"
 )
@@ -66,6 +67,8 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 	// is the struct modified from the file
 	if (ToolConfig{}) == config {
 		config.GithubUpdates = github
+
+		config.LastUpdate = time.Now().UTC().Unix() // this is not "true" but avoids the initial check
 
 		// ~/.ngs_cli/nats
 		config.StoreRoot = filepath.Join(toolHome, "nats")
