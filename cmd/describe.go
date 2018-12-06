@@ -91,7 +91,7 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.token, err = ExtractToken(string(d))
+		p.token, _ = ExtractToken(string(d))
 		if err != nil {
 			return err
 		}

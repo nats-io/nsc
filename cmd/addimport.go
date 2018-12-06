@@ -106,7 +106,7 @@ func (p *AddImportParams) LoadImport() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
 		}
-		v, err := ExtractToken(string(data))
+		v, _ := ExtractToken(string(data))
 		if err != nil {
 			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
 		}

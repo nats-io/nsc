@@ -165,51 +165,48 @@ func FormatJwt(jwtType string, jwtString string) []byte {
 	return w.Bytes()
 }
 
-var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:\n\s*[-]{3,}[^\n]*[-]{3,}\n))`)
-
-// ExtractToken pulls a JWT out of a string containing begin/end markers
-func ExtractToken(data string) (string, error) {
-	contents := []byte(data)
-	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
-	if len(items) == 0 {
-		return string(contents), nil
-	}
-	// First result should be the user JWT.
-	raw := items[0][1]
-	tmp := make([]byte, len(raw))
-	copy(tmp, raw)
-	return string(tmp), nil
-}
-
-// ExtractSeed pulls a seed out of a string containing begin/end markers, including a chain file
-func ExtractSeed(data string) (nkeys.KeyPair, error) {
-	contents := []byte(data)
-	var seed []byte
-
-	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
-	if len(items) > 1 {
-		seed = items[1][1]
-	} else {
-		lines := bytes.Split(contents, []byte("\n"))
-		for _, line := range lines {
-			if bytes.HasPrefix(bytes.TrimSpace(line), []byte("SA")) ||
-				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SC")) ||
-				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SN")) ||
-				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SO")) ||
-				bytes.HasPrefix(bytes.TrimSpace(line), []byte("SU")) {
-				seed = line
-				break
-			}
+func ExtractToken(s string) (string, bool) {
+	lines := strings.Split(s, "\n")
+	start := -1
+	end := -1
+	for i, v := range lines {
+		if strings.HasPrefix(v, "-----BEGIN ") && strings.HasSuffix(v, " JWT-----") {
+			start = i + 1
+			continue
+		}
+		if strings.HasPrefix(v, "------END ") && strings.HasSuffix(v, " JWT------") {
+			end = i
+			break
 		}
 	}
-	if seed == nil {
-		return nil, fmt.Errorf("nats: No nkey seed found")
+
+	if start != -1 && end != -1 {
+		lines := append(lines[start:end])
+		return strings.Join(lines, ""), true
 	}
-	kp, err := nkeys.FromSeed(seed)
-	if err != nil {
-		return nil, err
+	return s, false
+}
+
+func ExtractSeed(s string) (nkeys.KeyPair, error) {
+	lines := strings.Split(s, "\n")
+	start := -1
+	end := -1
+	for i, v := range lines {
+		if strings.HasPrefix(v, "-----BEGIN ") && strings.HasSuffix(v, " SEED-----") {
+			start = i + 1
+			continue
+		}
+		if strings.HasPrefix(v, "------END ") && strings.HasSuffix(v, " SEED------") {
+			end = i
+			break
+		}
 	}
-	return kp, nil
+
+	if start != -1 && end != -1 {
+		lines := append(lines[start:end])
+		s = strings.Join(lines, "")
+	}
+	return nkeys.FromSeed([]byte(s))
 }
 
 func ParseNumber(s string) (int64, error) {
