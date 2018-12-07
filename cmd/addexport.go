@@ -40,11 +40,13 @@ ncc add export --name myexport --subject a.b --service`,
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			visibility := "public"
-			if params.export.TokenReq {
-				visibility = "private"
+			if !QuietMode() {
+				visibility := "public"
+				if params.export.TokenReq {
+					visibility = "private"
+				}
+				cmd.Printf("Success! - added %s %s export %q\n", visibility, params.export.Type, params.export.Name)
 			}
-			cmd.Printf("Success! - added %s %s export %q\n", visibility, params.export.Type, params.export.Name)
 			return nil
 		},
 	}
