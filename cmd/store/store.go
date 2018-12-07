@@ -158,7 +158,7 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 func LoadStore(dir string) (*Store, error) {
 	sf := filepath.Join(dir, NSCFile)
 	if _, err := os.Stat(sf); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%q is not a valid configuration directory", sf)
+		return nil, fmt.Errorf("%q is not a valid configuration directory", dir)
 	}
 
 	s := &Store{Dir: dir}
