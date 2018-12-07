@@ -132,6 +132,10 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *GenerateConfigParams) Run(ctx ActionCtx) error {
+	if p.entityKP == nil {
+		return fmt.Errorf("user was not found - please specify it")
+	}
+
 	seed, err := p.entityKP.Seed()
 	if err != nil {
 		return fmt.Errorf("error getting seed for user %q: %v", p.user, err)
