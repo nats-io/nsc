@@ -31,13 +31,24 @@ func Test_EditServer(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditServerCmd(), []string{"edit", "server"}, nil, []string{"specify an edit option"}, true},
-		{createEditServerCmd(), []string{"edit", "server", "--tag", "A"}, nil, []string{"a cluster is required"}, true},
 		{createEditServerCmd(), []string{"edit", "server", "--tag", "A", "--cluster", "A"}, nil, []string{"edited server \"a\""}, false},
 		{createEditServerCmd(), []string{"edit", "server", "--tag", "B", "--cluster", "B"}, nil, []string{"server name is required"}, true},
 		{createEditServerCmd(), []string{"edit", "server", "--tag", "B", "--cluster", "B", "--name", "bb"}, nil, []string{"edited server \"bb\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func Test_EditServerClusterRequired(t *testing.T) {
+	ts := NewTestStore(t, "edit server")
+	defer ts.Done(t)
+	ts.AddServer(t, "A", "a")
+	ts.AddServer(t, "B", "b")
+	GetConfig().SetCluster("")
+
+	_, _, err := ExecuteCmd(createEditServerCmd(), "--tag", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster is required")
 }
 
 func Test_EditServer_Tag(t *testing.T) {

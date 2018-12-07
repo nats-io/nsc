@@ -29,17 +29,22 @@ func (p *AccountContextParams) BindFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&p.Name, "account", "a", "", "account name")
 }
 
-func (p *AccountContextParams) SetDefaults(ctx ActionCtx) {
+func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 	config := GetConfig()
-	if p.Name == "" {
-		p.Name = config.Account
-	}
-	if p.Name != "" && ctx.StoreCtx().Account.Name == "" {
+	if p.Name != "" {
+		err := config.SetAccountTemp(p.Name)
+		if err != nil {
+			return err
+		}
 		ctx.StoreCtx().Account.Name = p.Name
+		return nil
+	} else {
+		if config.Account != "" {
+			ctx.StoreCtx().Account.Name = config.Account
+			p.Name = config.Account
+		}
 	}
-	if ctx.StoreCtx().Account.Name != "" && p.Name == "" {
-		p.Name = ctx.StoreCtx().Account.Name
-	}
+	return nil
 }
 
 func (p *AccountContextParams) Edit(ctx ActionCtx) error {

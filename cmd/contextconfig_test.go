@@ -97,7 +97,7 @@ func TestContextConfig_SetEptyOperator(t *testing.T) {
 	c, err := NewContextConfig(storesDir)
 	require.NoError(t, err)
 	err = c.SetOperator("")
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestContextConfig_Account(t *testing.T) {
@@ -167,7 +167,7 @@ func TestContextConfig_SetEmptyAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	err = c.SetAccount("")
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestContextConfig_LoadCluster(t *testing.T) {
@@ -238,7 +238,7 @@ func TestContextConfig_SetEmptyCluster(t *testing.T) {
 	require.NoError(t, err)
 
 	err = c.SetCluster("")
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestContextConfig_ListOperators(t *testing.T) {

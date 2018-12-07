@@ -149,7 +149,8 @@ func (p *AddClusterParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	return nil
+	// if we added an cluster - make this the current cluster
+	return GetConfig().SetCluster(p.Entity.name)
 }
 
 func (p *AddClusterParams) editClusterClaim(c interface{}, ctx ActionCtx) error {

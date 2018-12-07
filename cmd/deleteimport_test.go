@@ -35,7 +35,6 @@ func Test_DeleteImport(t *testing.T) {
 	ts.AddImport(t, "A", "bar", "B")
 
 	tests := CmdTests{
-		{createDeleteImportCmd(), []string{"delete", "import"}, nil, []string{"account is required"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "A"}, nil, []string{"account \"A\" doesn't have imports"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B"}, nil, []string{"subject is required"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no import matching \"baz\" found"}, true},
@@ -43,6 +42,21 @@ func Test_DeleteImport(t *testing.T) {
 	}
 
 	tests.Run(t, "root", "delete")
+}
+
+func Test_DeleteImportAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "delete import")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo", false)
+	ts.AddAccount(t, "B")
+	ts.AddImport(t, "A", "foo", "B")
+
+	GetConfig().SetAccount("")
+	_, _, err := ExecuteCmd(createDeleteImportCmd(), "--subject", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func Test_DeleteImportInteractive(t *testing.T) {

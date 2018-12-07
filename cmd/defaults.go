@@ -116,6 +116,7 @@ func (d *ToolConfig) load() error {
 }
 
 func (d *ToolConfig) Save() error {
+	d.SetDefaults()
 	return WriteJson(d.configFile(), d)
 }
 

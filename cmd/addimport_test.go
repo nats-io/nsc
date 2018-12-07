@@ -40,12 +40,20 @@ func Test_AddImport(t *testing.T) {
 	require.NoError(t, Write(fp, []byte(token)))
 
 	tests := CmdTests{
-		{createAddImportCmd(), []string{"add", "import"}, nil, []string{"an account is required"}, true},
 		{createAddImportCmd(), []string{"add", "import", "--account", "B"}, nil, []string{"token is required"}, true},
 		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", fp}, nil, []string{"added stream import"}, false},
 	}
 
 	tests.Run(t, "root", "add")
+}
+
+func Test_AddImportNoDefaultAccount(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
 }
 
 func Test_AddImportSelfImportsRejected(t *testing.T) {

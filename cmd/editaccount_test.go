@@ -30,11 +30,22 @@ func Test_EditAccount(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditAccount(), []string{"edit", "account"}, nil, []string{"specify an edit option"}, true},
-		{createEditAccount(), []string{"edit", "account", "--tag", "A"}, nil, []string{"an account is required"}, true},
 		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--account", "A"}, nil, []string{"edited account \"A\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func Test_EditAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	require.NoError(t, GetConfig().SetAccount(""))
+	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A")
+	require.Error(t, err)
+	require.Contains(t, "an account is required", err.Error())
 }
 
 func Test_EditAccount_Tag(t *testing.T) {

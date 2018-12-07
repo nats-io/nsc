@@ -45,8 +45,9 @@ func TestGenerateConfig_MultipleAccounts(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
+	ts.AddUser(t, "B", "u")
+	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "u")
 
 	accountJwt, err := ts.Store.Read(store.Accounts, "A", store.Users, "u.jwt")
@@ -55,14 +56,25 @@ func TestGenerateConfig_MultipleAccounts(t *testing.T) {
 	seed, err := ts.KeyStore.GetUserSeed("A", "u")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createGenerateConfigCmd())
-	require.Error(t, err)
-	require.Equal(t, "account is required", err.Error())
-
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A")
+	stdout, _, err := ExecuteCmd(createGenerateConfigCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
+}
+
+func TestGenerateConfig_MultipleAccountsAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "A", "u")
+	ts.AddUser(t, "B", "u")
+
+	GetConfig().SetAccount("")
+	_, _, err := ExecuteCmd(createGenerateConfigCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func TestGenerateConfig_MultipleUsers(t *testing.T) {

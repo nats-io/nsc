@@ -635,25 +635,24 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 		name = ctx.Account.Name
 	}
 
-	if name == "" {
-		accounts, err := ctx.Store.ListSubContainers(Accounts)
+	accounts, err := ctx.Store.ListSubContainers(Accounts)
+	if err != nil {
+		return "", err
+	}
+	if len(accounts) == 0 {
+		return "", fmt.Errorf("no accounts defined - add one first")
+	}
+	if len(accounts) == 1 {
+		name = accounts[0]
+	}
+	if len(accounts) > 1 {
+		i, err := cli.PromptChoices("select account", accounts)
 		if err != nil {
 			return "", err
 		}
-		if len(accounts) == 0 {
-			return "", fmt.Errorf("no accounts defined - add one first")
-		}
-		if len(accounts) == 1 {
-			name = accounts[0]
-		}
-		if len(accounts) > 1 {
-			i, err := cli.PromptChoices("select account", accounts)
-			if err != nil {
-				return "", err
-			}
-			name = accounts[i]
-		}
+		name = accounts[i]
 	}
+
 	// allow downstream use of context to have account
 	ctx.Account.Name = name
 
@@ -759,25 +758,24 @@ func (ctx *Context) PickCluster(name string) (string, error) {
 		name = ctx.Cluster.Name
 	}
 
-	if name == "" {
-		clusters, err := ctx.Store.ListSubContainers(Clusters)
+	clusters, err := ctx.Store.ListSubContainers(Clusters)
+	if err != nil {
+		return "", err
+	}
+	if len(clusters) == 0 {
+		return "", fmt.Errorf("no clusters defined - add one first")
+	}
+	if len(clusters) == 1 {
+		name = clusters[0]
+	}
+	if len(clusters) > 1 {
+		i, err := cli.PromptChoices("select cluster", clusters)
 		if err != nil {
 			return "", err
 		}
-		if len(clusters) == 0 {
-			return "", fmt.Errorf("no clusters defined - add one first")
-		}
-		if len(clusters) == 1 {
-			name = clusters[0]
-		}
-		if len(clusters) > 1 {
-			i, err := cli.PromptChoices("select cluster", clusters)
-			if err != nil {
-				return "", err
-			}
-			name = clusters[i]
-		}
+		name = clusters[i]
 	}
+
 	// allow downstream use of context to have cluster
 	ctx.Cluster.Name = name
 

@@ -115,9 +115,14 @@ func Test_AddExportAccountNameRequired(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
-	require.Error(t, err)
-	require.Equal(t, "an account is required", err.Error())
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "bbbb")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "bbbb", ac.Exports[0].Name)
 }
 
 func TestAddExportInteractive(t *testing.T) {
