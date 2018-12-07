@@ -148,12 +148,29 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 		return err
 	}
 
+	s, err := GetStore()
+	if err != nil {
+		return err
+	}
+
 	var claim jwt.Claims
 	switch c.kind {
 	case nkeys.PrefixByteOperator:
 		claim = jwt.NewOperatorClaims(pub)
 	case nkeys.PrefixByteAccount:
-		claim = jwt.NewAccountClaims(pub)
+		ac := jwt.NewAccountClaims(pub)
+		if !s.IsManaged() {
+			ac.Limits.Data = jwt.NoLimit
+			ac.Limits.Payload = jwt.NoLimit
+			ac.Limits.Subs = jwt.NoLimit
+			ac.Limits.Imports = jwt.NoLimit
+			ac.Limits.Exports = jwt.NoLimit
+			ac.Limits.Conn = jwt.NoLimit
+			ac.Limits.WildcardExports = true
+		} else {
+			ac.Limits = jwt.OperatorLimits{}
+		}
+		claim = ac
 	case nkeys.PrefixByteUser:
 		claim = jwt.NewUserClaims(pub)
 	case nkeys.PrefixByteCluster:
@@ -174,10 +191,7 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	s, err := GetStore()
-	if err != nil {
-		return err
-	}
+
 	return s.StoreClaim([]byte(token))
 }
 
