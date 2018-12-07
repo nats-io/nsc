@@ -28,7 +28,7 @@ func TestDescribe(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, serr, err := ExecuteCmd(createDescribeCmd())
+	_, serr, err := ExecuteCmd(createDescribeJwtCmd())
 	require.Error(t, err)
 	require.Contains(t, serr, "file is required")
 }
@@ -40,7 +40,7 @@ func TestDescribe_Operator(t *testing.T) {
 	pub, err := ts.KeyStore.GetOperatorPublicKey("O")
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", "O.jwt")
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", fp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -55,7 +55,7 @@ func TestDescribe_Interactive(t *testing.T) {
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")
 
-	out, _, err := ExecuteInteractiveCmd(createDescribeCmd(), []interface{}{fp})
+	out, _, err := ExecuteInteractiveCmd(createDescribeJwtCmd(), []interface{}{fp})
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -69,7 +69,7 @@ func TestDescribe_Account(t *testing.T) {
 	require.NoError(t, err)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", fp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -84,7 +84,7 @@ func TestDescribe_User(t *testing.T) {
 	require.NoError(t, err)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", store.Users, "a.jwt")
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", fp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -98,7 +98,7 @@ func TestDescribe_Cluster(t *testing.T) {
 	require.NoError(t, err)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Clusters, "C", "C.jwt")
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", fp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -113,7 +113,7 @@ func TestDescribe_Server(t *testing.T) {
 	require.NoError(t, err)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Clusters, "C", store.Servers, "s.jwt")
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", fp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)
 }
@@ -131,7 +131,7 @@ func TestDescribe_Activation(t *testing.T) {
 	tp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(tp, []byte(token)))
 
-	out, _, err := ExecuteCmd(createDescribeCmd(), "--file", tp)
+	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", tp)
 	require.NoError(t, err)
 	require.Contains(t, out, "AA.>")
 }
