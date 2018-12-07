@@ -36,23 +36,25 @@ func createEditAccount() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
+			if !QuietMode() {
+				cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
 
-			_ = Write("--", FormatJwt("Account", params.token))
+				_ = Write("--", FormatJwt("Account", params.token))
 
-			if params.claim.NotBefore > 0 {
-				cmd.Printf("Token valid on %s - %s\n",
-					UnixToDate(params.claim.NotBefore),
-					HumanizedDate(params.claim.NotBefore))
-			}
-			if params.claim.Expires > 0 {
-				cmd.Printf("Token expires on %s - %s\n",
-					UnixToDate(params.claim.Expires),
-					HumanizedDate(params.claim.Expires))
-			}
-			if params.claim.Limits.Conn > 0 {
-				cmd.Printf("Maximum active connections set to %d\n",
-					params.claim.Limits.Conn)
+				if params.claim.NotBefore > 0 {
+					cmd.Printf("Token valid on %s - %s\n",
+						UnixToDate(params.claim.NotBefore),
+						HumanizedDate(params.claim.NotBefore))
+				}
+				if params.claim.Expires > 0 {
+					cmd.Printf("Token expires on %s - %s\n",
+						UnixToDate(params.claim.Expires),
+						HumanizedDate(params.claim.Expires))
+				}
+				if params.claim.Limits.Conn > 0 {
+					cmd.Printf("Maximum active connections set to %d\n",
+						params.claim.Limits.Conn)
+				}
 			}
 
 			return nil
