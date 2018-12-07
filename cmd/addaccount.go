@@ -122,7 +122,9 @@ func (p *AddAccountParams) Run(ctx ActionCtx) error {
 	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
 		return err
 	}
-	return nil
+
+	// if we added an account - make this the current account
+	return GetConfig().SetAccount(p.Entity.name)
 }
 
 func (p *AddAccountParams) editAccount(c interface{}, ctx ActionCtx) error {

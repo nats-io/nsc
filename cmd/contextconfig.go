@@ -112,26 +112,53 @@ func (c *ContextConfig) ListOperators() []string {
 }
 
 func (c *ContextConfig) SetOperator(operator string) error {
-	for _, v := range c.ListOperators() {
-		if v == operator {
-			c.Operator = operator
-			return nil
+	ok := true
+	if operator != "" {
+		ok = false
+		for _, v := range c.ListOperators() {
+			if v == operator {
+				ok = true
+				break
+			}
 		}
 	}
-	return fmt.Errorf("operator %q not in %q", operator, c.StoreRoot)
+	if !ok {
+		return fmt.Errorf("operator %q not in %q", operator, c.StoreRoot)
+	}
+
+	c.Operator = operator
+	return GetConfig().Save()
 }
 
 func (c *ContextConfig) SetAccount(account string) error {
-	if err := c.hasSubContainer(store.Accounts, account); err != nil {
+	if err := c.SetAccountTemp(account); err != nil {
 		return err
+	}
+	return GetConfig().Save()
+}
+
+func (c *ContextConfig) SetAccountTemp(account string) error {
+	if account != "" {
+		if err := c.hasSubContainer(store.Accounts, account); err != nil {
+			return err
+		}
 	}
 	c.Account = account
 	return nil
 }
 
 func (c *ContextConfig) SetCluster(cluster string) error {
-	if err := c.hasSubContainer(store.Clusters, cluster); err != nil {
+	if err := c.SetClusterTemp(cluster); err != nil {
 		return err
+	}
+	return GetConfig().Save()
+}
+
+func (c *ContextConfig) SetClusterTemp(cluster string) error {
+	if cluster != "" {
+		if err := c.hasSubContainer(store.Clusters, cluster); err != nil {
+			return err
+		}
 	}
 	c.Cluster = cluster
 	return nil

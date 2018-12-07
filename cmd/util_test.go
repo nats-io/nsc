@@ -50,7 +50,8 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 
 	ts.OperatorKey = operator
 	ts.Dir = MakeTempDir(t)
-	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "cli_home")))
+	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
+	initToolHome(t.Name())
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
@@ -59,6 +60,20 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	ts.AddOperatorWithKey(t, operatorName, operator)
 
 	return &ts
+}
+
+func (ts *TestStore) Reload(t *testing.T) {
+	s, err := store.LoadStore(ts.Store.Dir)
+	require.NoError(t, err)
+	if ts.Store == nil {
+		ts.Store = s
+	}
+	ctx, err := ts.Store.GetContext()
+	require.NoError(t, err, "getting context")
+
+	ts.KeyStore = ctx.KeyStore
+
+	GetConfig().SetDefaults()
 }
 
 func (ts *TestStore) AddOperator(t *testing.T, operatorName string) *store.Store {

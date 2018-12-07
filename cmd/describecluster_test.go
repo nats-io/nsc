@@ -47,9 +47,22 @@ func TestDescribeCluster_Multiple(t *testing.T) {
 	ts.AddCluster(t, "A")
 	ts.AddCluster(t, "B")
 
-	_, stderr, err := ExecuteCmd(createDescribeClusterCmd())
+	out, _, err := ExecuteCmd(createDescribeClusterCmd())
+	require.NoError(t, err)
+	require.Contains(t, StripTableDecorations(out), "Name B")
+}
+
+func TestDescribeCluster_MultipleAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddCluster(t, "A")
+	ts.AddCluster(t, "B")
+	GetConfig().SetCluster("")
+
+	_, _, err := ExecuteCmd(createDescribeClusterCmd())
 	require.Error(t, err)
-	require.Contains(t, stderr, "a cluster is required")
+	require.Contains(t, err.Error(), "cluster is required")
 }
 
 func TestDescribeCluster_MultipleWithContext(t *testing.T) {

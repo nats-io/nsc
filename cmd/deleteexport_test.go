@@ -31,7 +31,6 @@ func Test_DeleteExport(t *testing.T) {
 	ts.AddExport(t, "B", jwt.Service, "bar", true)
 
 	tests := CmdTests{
-		{createDeleteExportCmd(), []string{"delete", "export"}, nil, []string{"account is required"}, true},
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A"}, nil, []string{"subject is required"}, true},
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "a"}, nil, []string{"no export matching \"a\" found"}, true},
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "foo"}, nil, []string{"deleted export of \"foo\""}, false},
@@ -39,6 +38,18 @@ func Test_DeleteExport(t *testing.T) {
 	}
 
 	tests.Run(t, "root", "delete")
+}
+
+func Test_DeleteExportAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "add_server")
+	defer ts.Done(t)
+
+	ts.AddExport(t, "A", jwt.Stream, "foo", true)
+	ts.AddExport(t, "B", jwt.Service, "bar", true)
+	GetConfig().SetAccount("")
+	_, _, err := ExecuteCmd(createDeleteExportCmd(), "--subject", "foo")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func Test_DeleteExportInteractive(t *testing.T) {

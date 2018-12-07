@@ -30,11 +30,22 @@ func Test_EditCluster(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditClusterCmd(), []string{"edit", "cluster"}, nil, []string{"specify an edit option"}, true},
-		{createEditClusterCmd(), []string{"edit", "cluster", "--tag", "A"}, nil, []string{"a cluster is required"}, true},
 		{createEditClusterCmd(), []string{"edit", "cluster", "--tag", "A", "--cluster", "A"}, nil, []string{"edited cluster \"A\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func Test_EditClusterClusterRequired(t *testing.T) {
+	ts := NewTestStore(t, "edit cluster")
+	defer ts.Done(t)
+
+	ts.AddCluster(t, "A")
+	ts.AddCluster(t, "B")
+	GetConfig().SetCluster("")
+	_, _, err := ExecuteCmd(createEditClusterCmd(), "--tag", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster is required")
 }
 
 func Test_EditCluster_Tag(t *testing.T) {

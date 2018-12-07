@@ -29,17 +29,21 @@ func (p *ClusterContextParams) BindFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&p.Name, "cluster", "c", "", "cluster name")
 }
 
-func (p *ClusterContextParams) SetDefaults(ctx ActionCtx) {
+func (p *ClusterContextParams) SetDefaults(ctx ActionCtx) error {
 	config := GetConfig()
-	if p.Name == "" {
-		p.Name = config.Cluster
+	if p.Name != "" {
+		err := config.SetClusterTemp(p.Name)
+		if err != nil {
+			return err
+		}
+		ctx.StoreCtx().Cluster.Name = config.Cluster
+	} else {
+		if config.Cluster != "" {
+			ctx.StoreCtx().Cluster.Name = config.Cluster
+			p.Name = config.Cluster
+		}
 	}
-	if p.Name != "" && ctx.StoreCtx().Cluster.Name == "" {
-		ctx.StoreCtx().Cluster.Name = p.Name
-	}
-	if ctx.StoreCtx().Cluster.Name != "" && p.Name == "" {
-		p.Name = ctx.StoreCtx().Cluster.Name
-	}
+	return nil
 }
 
 func (p *ClusterContextParams) Edit(ctx ActionCtx) error {

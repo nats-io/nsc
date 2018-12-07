@@ -41,7 +41,7 @@ func createEnvCmd() *cobra.Command {
 		SilenceUsage:  false,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = params.Run()
+			_ = params.Run(cmd)
 			params.PrintEnv(cmd)
 			return nil
 		},
@@ -66,7 +66,7 @@ type SetContextParams struct {
 	Cluster   string
 }
 
-func (p *SetContextParams) Run() error {
+func (p *SetContextParams) Run(cmd *cobra.Command) error {
 	if *p == (SetContextParams{}) {
 		// no edits
 		return nil

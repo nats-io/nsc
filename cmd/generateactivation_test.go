@@ -55,13 +55,26 @@ func Test_GenerateActivationMultiple(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	tests := CmdTests{
-		{createGenerateActivationCmd(), []string{"generate", "activation"}, nil, []string{"an account is required"}, true},
 		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A"}, nil, []string{"a subject is required"}, true},
 		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>"}, nil, []string{"target-account cannot be empty"}, true},
 		{createGenerateActivationCmd(), []string{"generate", "activation", "--account", "A", "--subject", "bar.>", "--target-account", pub}, []string{"-----BEGIN NATS ACTIVATION JWT-----"}, nil, false},
 	}
 
 	tests.Run(t, "root", "generate")
+}
+
+func Test_GenerateActivationMultipleAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "gen activation")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "bar.>", false)
+	ts.AddAccount(t, "B")
+	GetConfig().SetAccount("")
+	_, _, err := ExecuteCmd(createGenerateActivationCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func Test_GenerateActivationEmptyExports(t *testing.T) {

@@ -120,3 +120,25 @@ func Test_AddUserOperatorLessStore(t *testing.T) {
 
 	validateAddUserClaims(t, ts)
 }
+
+func Test_AddUser_Account(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "B", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	require.NoError(t, err)
+
+	config := GetConfig()
+	err = config.SetAccount("A")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--name", "bb", "--account", "B")
+	require.NoError(t, err)
+
+	u, err := ts.Store.ReadUserClaim("B", "bb")
+	require.NoError(t, err)
+	require.NotNil(t, u)
+}

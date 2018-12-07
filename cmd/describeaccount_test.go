@@ -50,9 +50,23 @@ func TestDescribeAccount_Multiple(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, stderr, err := ExecuteCmd(createDescribeAccountCmd())
+	out, _, err := ExecuteCmd(createDescribeAccountCmd())
+	require.NoError(t, err)
+	out = StripTableDecorations(out)
+	require.Contains(t, out, "Name B")
+}
+
+func TestDescribeAccount_MultipleAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	GetConfig().SetAccount("")
+
+	_, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.Error(t, err)
-	require.Contains(t, stderr, "an account is required")
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func TestDescribeAccount_MultipleWithContext(t *testing.T) {

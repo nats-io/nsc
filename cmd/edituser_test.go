@@ -32,13 +32,24 @@ func Test_EditUser(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditUserCmd(), []string{"edit", "user"}, nil, []string{"specify an edit option"}, true},
-		{createEditUserCmd(), []string{"edit", "user", "--tag", "A"}, nil, []string{"account is required"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "A", "--account", "A"}, nil, []string{"edited user \"a\""}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B"}, nil, []string{"user name is required"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B", "--name", "bb"}, nil, []string{"edited user \"bb\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func Test_EditUserAccountRequired(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	ts.AddUser(t, "A", "a")
+	ts.AddUser(t, "B", "b")
+	GetConfig().SetAccount("")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--tag", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account is required")
 }
 
 func Test_EditUser_Tag(t *testing.T) {

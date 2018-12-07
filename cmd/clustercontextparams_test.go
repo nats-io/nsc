@@ -62,7 +62,7 @@ func TestCCP_DefaultsMultipleNone(t *testing.T) {
 
 	ccp := ClusterContextParams{}
 	ccp.SetDefaults(ctx)
-	require.Equal(t, "", ccp.Name)
+	require.Equal(t, "bar", ccp.Name)
 }
 
 func TestCCP_DefaultsPath(t *testing.T) {
@@ -77,7 +77,7 @@ func TestCCP_DefaultsPath(t *testing.T) {
 
 	ccp := ClusterContextParams{}
 	ccp.SetDefaults(ctx)
-	require.Equal(t, "", ccp.Name)
+	require.Equal(t, "bar", ccp.Name)
 }
 
 func TestCCP_Edit(t *testing.T) {
@@ -95,7 +95,7 @@ func TestCCP_Edit(t *testing.T) {
 
 	ccp := ClusterContextParams{}
 	ccp.SetDefaults(ctx)
-	require.Equal(t, "", ccp.Name)
+	require.Equal(t, "baz", ccp.Name)
 
 	require.NoError(t, ccp.Edit(ctx))
 	require.Contains(t, []string{"foo", "bar", "baz"}, ccp.Name)
