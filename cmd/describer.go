@@ -48,50 +48,48 @@ func (a *AccountDescriber) Describe() string {
 	table.AddRow("Name", a.Name)
 	AddStandardClaimInfo(table, a.ClaimsData)
 
-	if a.Subject != a.Issuer {
-		lim := a.Limits
-		if lim.Conn > 0 {
-			table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
-		} else {
-			table.AddRow("Max Connections", "Unlimited")
-		}
-
-		if lim.Data > 0 {
-			table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
-		} else {
-			table.AddRow("Max Data", "Unlimited")
-		}
-
-		if lim.Exports > 0 {
-			table.AddRow("Max Exports", fmt.Sprintf("%d", lim.Exports))
-		} else {
-			table.AddRow("Max Exports", "Unlimited")
-		}
-
-		if lim.Imports > 0 {
-			table.AddRow("Max Imports", fmt.Sprintf("%d", lim.Imports))
-		} else {
-			table.AddRow("Max Imports", "Unlimited")
-		}
-
-		if lim.Payload > 0 {
-			table.AddRow("Max Msg Payload", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Payload)), lim.Payload))
-		} else {
-			table.AddRow("Max Msg Payload", "Unlimited")
-		}
-
-		if lim.Subs > 0 {
-			table.AddRow("Max Subscriptions", fmt.Sprintf("%d", lim.Subs))
-		} else {
-			table.AddRow("Max Subscriptions", "Unlimited")
-		}
-
-		we := "False"
-		if lim.WildcardExports {
-			we = "True"
-		}
-		table.AddRow("Exports Allows Wildcards", we)
+	lim := a.Limits
+	if lim.Conn > -1 {
+		table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
+	} else {
+		table.AddRow("Max Connections", "Unlimited")
 	}
+
+	if lim.Data > -1 {
+		table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
+	} else {
+		table.AddRow("Max Data", "Unlimited")
+	}
+
+	if lim.Exports > -1 {
+		table.AddRow("Max Exports", fmt.Sprintf("%d", lim.Exports))
+	} else {
+		table.AddRow("Max Exports", "Unlimited")
+	}
+
+	if lim.Imports > -1 {
+		table.AddRow("Max Imports", fmt.Sprintf("%d", lim.Imports))
+	} else {
+		table.AddRow("Max Imports", "Unlimited")
+	}
+
+	if lim.Payload > -1 {
+		table.AddRow("Max Msg Payload", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Payload)), lim.Payload))
+	} else {
+		table.AddRow("Max Msg Payload", "Unlimited")
+	}
+
+	if lim.Subs > -1 {
+		table.AddRow("Max Subscriptions", fmt.Sprintf("%d", lim.Subs))
+	} else {
+		table.AddRow("Max Subscriptions", "Unlimited")
+	}
+
+	we := "False"
+	if lim.WildcardExports {
+		we = "True"
+	}
+	table.AddRow("Exports Allows Wildcards", we)
 
 	if len(a.Imports) == 0 {
 		table.AddRow("Imports", "No services or streams imported")
