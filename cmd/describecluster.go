@@ -28,7 +28,7 @@ func createDescribeClusterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "cluster",
 		Short:        "Describes a cluster",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

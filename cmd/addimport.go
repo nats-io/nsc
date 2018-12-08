@@ -33,7 +33,7 @@ func createAddImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "import",
 		Short:        "Add an import",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

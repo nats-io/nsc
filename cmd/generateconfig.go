@@ -28,7 +28,7 @@ func createGenerateConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "config",
 		Short:        "Generate a config file for an user",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		Example:      `nsc generate config --account a --user u`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,15 +83,12 @@ func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *GenerateConfigParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	if p.user == "" {
-		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
-		if err != nil {
-			return err
-		}
+	p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -111,7 +108,7 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("account is required")
 	}
 	if p.user == "" {
-		return fmt.Errorf("name is required")
+		return fmt.Errorf("user is required")
 	}
 
 	p.entityKP, err = ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.user)
@@ -120,7 +117,7 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 	}
 
 	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user)) {
-		return fmt.Errorf("user %q not found", p.user)
+		return fmt.Errorf("user %q not found in %q", p.user, p.AccountContextParams.Name)
 	}
 
 	p.entityJwt, err = ctx.StoreCtx().Store.Read(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user))

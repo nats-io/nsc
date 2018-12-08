@@ -29,7 +29,7 @@ func createGenerateOperatorConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "operator",
 		Short:        "Generate an operator config",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		Example:      `nsc generate operator --n a`,
 		RunE: func(cmd *cobra.Command, args []string) error {

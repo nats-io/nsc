@@ -35,7 +35,7 @@ update --release-notes
 `,
 		Use:   "update",
 		Short: "Update this tool to latest version",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v := semver.MustParse(GetRootCmd().Version)
 

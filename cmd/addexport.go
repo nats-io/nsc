@@ -30,7 +30,7 @@ func createAddExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
 		Short: "Add an export",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		Example: `nsc add export -i
 nsc add export --subject "a.b.c.>"
 nsc add export --service --subject a.b

@@ -29,7 +29,7 @@ func createAddClusterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "cluster",
 		Short:        "Add a cluster (operator only)",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		Example:      `nsc add cluster --name mycluster --trusted-accounts actkey1,actkey2 --trusted-operators opkey1,opkey2`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
