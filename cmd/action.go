@@ -27,6 +27,9 @@ type ActionCtx interface {
 	CurrentCmd() *cobra.Command
 	Args() []string
 	NothingToDo(flagNames ...string) bool
+	AllSet(flagNames ...string) bool
+	AnySet(flagNames ...string) bool
+	CountSet(flagNames ...string) int
 }
 
 type ActionFn func(ctx ActionCtx) error
@@ -156,4 +159,35 @@ func (c *Actx) NothingToDo(flagNames ...string) bool {
 		}
 	}
 	return true
+}
+
+// AnySet returns true if any of the flags are set
+func (c *Actx) AnySet(flagNames ...string) bool {
+	for _, n := range flagNames {
+		if c.cmd.Flag(n).Changed {
+			return true
+		}
+	}
+	return false
+}
+
+// AllSet returns true if all flags are set
+func (c *Actx) AllSet(flagNames ...string) bool {
+	count := 0
+	for _, n := range flagNames {
+		if c.cmd.Flag(n).Changed {
+			count++
+		}
+	}
+	return len(flagNames) == count
+}
+
+func (c *Actx) CountSet(flagNames ...string) int {
+	count := 0
+	for _, n := range flagNames {
+		if c.cmd.Flag(n).Changed {
+			count++
+		}
+	}
+	return count
 }

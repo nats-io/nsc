@@ -159,15 +159,7 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 		claim = jwt.NewOperatorClaims(pub)
 	case nkeys.PrefixByteAccount:
 		ac := jwt.NewAccountClaims(pub)
-		if !s.IsManaged() {
-			ac.Limits.Data = jwt.NoLimit
-			ac.Limits.Payload = jwt.NoLimit
-			ac.Limits.Subs = jwt.NoLimit
-			ac.Limits.Imports = jwt.NoLimit
-			ac.Limits.Exports = jwt.NoLimit
-			ac.Limits.Conn = jwt.NoLimit
-			ac.Limits.WildcardExports = true
-		} else {
+		if s.IsManaged() {
 			ac.Limits = jwt.OperatorLimits{}
 		}
 		claim = ac

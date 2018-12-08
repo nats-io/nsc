@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -30,24 +31,33 @@ import (
 func createAddImportCmd() *cobra.Command {
 	var params AddImportParams
 	cmd := &cobra.Command{
-		Use:   "import",
-		Short: "Add an import",
-		Args:  cobra.MaximumNArgs(0),
-		Example: `nsc add import -i
-nsc add import --token-file path --to import.>
-nsc add import --url https://some.service.com/path --to import.>`,
+		Use:          "import",
+		Short:        "Add an import",
+		Args:         cobra.MaximumNArgs(0),
+		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			cmd.Printf("Success! - added %s import %q\n", params.activation.Activation.ImportType, params.activation.Activation.ImportSubject)
+			if !QuietMode() {
+				kind := jwt.Stream
+				if params.service {
+					kind = jwt.Service
+				}
+				cmd.Printf("Success! - added %s import %q\n", kind, params.srcSubject)
+			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.im.Name, "name", "n", "", "import name")
+	cmd.Flags().StringVarP(&params.src, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
+
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "import name")
 	cmd.Flags().StringVarP(&params.to, "to", "t", "", "target subject")
-	cmd.Flags().StringVarP(&params.src, "token", "u", "", "path to token file can be a local path or an url")
+
+	cmd.Flags().StringVarP(&params.srcAccount, "src-account", "", "", "source account (only public imports)")
+	cmd.Flags().StringVarP(&params.srcSubject, "src-subject", "", "", "source subject (only public imports)")
+	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -61,38 +71,98 @@ type AddImportParams struct {
 	AccountContextParams
 	SignerParams
 	claim      *jwt.AccountClaims
-	activation *jwt.ActivationClaims
-	im         jwt.Import
 	to         string
 	token      []byte
 	src        string
+	srcAccount string
+	srcSubject string
+	service    bool
+	name       string
+}
+
+func (p *AddImportParams) longHelp() string {
+	v := `toolname add import -i
+toolname add import --token-file path --to <sub>
+toolname add import --token https://some.service.com/path --to <sub>
+toolname add import --src-account <account_pubkey> --src-subject <src_subject> --to <sub>`
+
+	return strings.Replace(v, "toolname", GetToolName(), -1)
 }
 
 func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
+	if !InteractiveFlag {
+		tokenSet := ctx.AllSet("token")
+		set := ctx.CountSet("token", "src-subject", "src-account")
+		if tokenSet && set > 1 {
+			ctx.CurrentCmd().SilenceErrors = false
+			ctx.CurrentCmd().SilenceUsage = false
+			return errors.New("private imports require src-account, src-subject and service to be unset")
+		}
+		if !tokenSet && set != 2 {
+			ctx.CurrentCmd().SilenceErrors = false
+			ctx.CurrentCmd().SilenceUsage = false
+			return errors.New("public imports require src-account, src-subject")
+		}
+	}
+
+	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
+		return err
+	}
+
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
-	p.im.To = jwt.Subject(p.to)
+
+	if p.name == "" {
+		p.name = p.srcSubject
+	}
 
 	return nil
 }
 
 func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
-	p.src, err = cli.Prompt("token path or url", p.src, true, func(s string) error {
-		p.src = s
-		p.token, err = p.LoadImport()
+	p.service, err = cli.PromptYN("is the export public?")
+	if err != nil {
+		return err
+	}
+	if p.service {
+		p.srcAccount, err = cli.Prompt("source account", p.srcAccount, true, func(s string) error {
+			if !nkeys.IsValidPublicAccountKey(s) {
+				return errors.New("not a valid account public key")
+			}
+			return nil
+		})
 		if err != nil {
 			return err
 		}
-		return nil
-	})
-	if err != nil {
-		return err
+		p.srcSubject, err = cli.Prompt("source subject", p.srcSubject, true, func(v string) error {
+			t := jwt.Subject(v)
+			var vr jwt.ValidationResults
+			t.Validate(&vr)
+			if len(vr.Issues) > 0 {
+				return errors.New(vr.Issues[0].Description)
+			}
+			return nil
+		})
+		p.service, err = cli.PromptYN("is import a stream")
+		if err != nil {
+			return err
+		}
+	} else {
+		p.src, err = cli.Prompt("token path or url", p.src, true, func(s string) error {
+			p.src = s
+			p.token, err = p.LoadImport()
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -121,16 +191,22 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.src == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return errors.New("token is required")
-	}
-
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
 
+	if p.src != "" {
+		if err := p.initFromExport(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *AddImportParams) initFromExport(ctx ActionCtx) error {
+	var err error
 	if p.token == nil {
 		p.token, err = p.LoadImport()
 		if err != nil {
@@ -138,34 +214,43 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		}
 	}
 
-	p.activation, err = jwt.DecodeActivationClaims(string(p.token))
+	ac, err := jwt.DecodeActivationClaims(string(p.token))
 	if err != nil {
 		return err
 	}
 
-	if p.claim.Subject == p.activation.Issuer {
-		return fmt.Errorf("activation issuer is this account")
+	if p.name == "" {
+		p.name = ac.Name
 	}
 
-	if p.activation.Subject != "public" && p.claim.Subject != p.activation.Subject {
-		return fmt.Errorf("activation is not intended for this account - it is for %q", p.activation.Subject)
+	p.srcSubject = string(ac.ImportSubject)
+
+	if p.to == "" {
+		p.to = p.srcSubject
 	}
 
-	// FIXME: validation issues on the loaded activation - jwt needs to return some sort of error we can render
+	if ac.ImportType == jwt.Service {
+		p.service = true
+	}
 
+	p.srcAccount = ac.Issuer
+
+	if ac.Subject != "public" && p.claim.Subject != ac.Subject {
+		return fmt.Errorf("activation is not intended for this account - it is for %q", ac.Subject)
+	}
 	return nil
 }
 
 func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	p.im.Name, err = cli.Prompt("import name", p.activation.Name, true, cli.LengthValidator(1))
+	p.name, err = cli.Prompt("import name", p.name, true, cli.LengthValidator(1))
 	if err != nil {
 		return err
 	}
 
 	if p.to == "" {
-		p.to = string(p.activation.Activation.ImportSubject)
+		p.to = p.srcSubject
 	}
 
 	p.to, err = cli.Prompt("subject mapping", p.to, true, func(s string) error {
@@ -180,7 +265,6 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	p.im.To = jwt.Subject(p.to)
 
 	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
@@ -189,46 +273,79 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *AddImportParams) createImport() *jwt.Import {
+	var im jwt.Import
+	im.Name = p.name
+	im.Subject = jwt.Subject(p.srcSubject)
+	im.Account = p.srcAccount
+
+	if p.src != "" {
+		if u, err := url.Parse(p.src); err == nil && u.Scheme != "" {
+			im.Token = p.src
+		} else {
+			im.Token = string(p.token)
+		}
+	}
+	im.To = jwt.Subject(p.to)
+
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+	im.Type = kind
+
+	return &im
+}
+
 func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	var err error
+
+	if p.claim.Subject == p.srcAccount {
+		return fmt.Errorf("export issuer is this account")
+	}
 
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
 
-	var export = p.activation.Activation
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
 
 	for _, im := range p.claim.Imports {
-		if im.Account == p.activation.Issuer && string(im.Subject) == string(export.ImportSubject) {
-			return fmt.Errorf("account %s already imports %q from %s", p.AccountContextParams.Name, im.Subject, p.activation.Issuer)
+		if im.Account == p.srcAccount &&
+			string(im.Subject) == string(p.srcSubject) &&
+			im.Type == kind {
+			return fmt.Errorf("account already imports %s %q from %s", kind, im.Subject, p.srcAccount)
 		}
 	}
 
-	if p.im.Name == "" {
-		p.im.Name = string(p.im.Subject)
-	}
-	p.im.Subject = export.ImportSubject
-	p.im.Type = export.ImportType
-	p.im.Account = p.activation.Issuer
-	p.im.To = jwt.Subject(p.to)
-	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {
-		p.im.Token = p.src
-	} else {
-		p.im.Token = string(p.token)
-	}
-
-	if p.SignerParams.Resolve(ctx); err != nil {
+	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (p *AddImportParams) Run(ctx ActionCtx) error {
 	var err error
-	p.claim.Imports.Add(&p.im)
+	p.claim.Imports.Add(p.createImport())
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}
+
+	ac, err := jwt.DecodeAccountClaims(token)
+	if err != nil {
+		return err
+	}
+	var vr jwt.ValidationResults
+	ac.Validate(&vr)
+	errs := vr.Errors()
+	if len(errs) > 0 {
+		return errs[0]
+	}
+
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

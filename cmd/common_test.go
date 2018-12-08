@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -337,4 +338,13 @@ func TestCommon_ReadJSON(t *testing.T) {
 	err = ReadJson(fp, &n)
 	require.NoError(t, err)
 	require.Equal(t, "test", n.Name)
+}
+
+func TestCommon_AbbrevHomePaths(t *testing.T) {
+	require.Equal(t, "", AbbrevHomePaths(""))
+	require.Equal(t, "/foo/bar", AbbrevHomePaths("/foo/bar"))
+	v, err := homedir.Dir()
+	if err != nil {
+		require.Equal(t, "~/bar", AbbrevHomePaths(filepath.Join(v, "bar")))
+	}
 }
