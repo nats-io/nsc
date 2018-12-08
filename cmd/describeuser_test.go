@@ -100,7 +100,7 @@ func TestDescribeUser_MultipleWithFlag(t *testing.T) {
 	pub, err := ts.KeyStore.GetUserPublicKey("B", "bb")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--user", "bb")
+	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "bb")
 	require.NoError(t, err)
 	require.Contains(t, stdout, apub)
 	require.Contains(t, stdout, pub)
@@ -118,10 +118,10 @@ func TestDescribeUser_MultipleWithBadUser(t *testing.T) {
 	_, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A")
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--user", "a")
+	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "a")
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--user", "b")
+	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "b")
 	require.NoError(t, err)
 }
 

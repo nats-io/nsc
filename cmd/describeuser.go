@@ -41,7 +41,7 @@ func createDescribeUserCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	cmd.Flags().StringVarP(&params.user, "user", "u", "", "user name")
+	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
