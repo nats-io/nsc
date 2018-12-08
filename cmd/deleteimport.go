@@ -37,11 +37,12 @@ nsc delete import -s "bar.>"`,
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			cmd.Printf("Success! - deleted import of %q\n", params.deletedImport.Subject)
+			cmd.Printf("Success! - deleted %s import %q\n", params.importKind(), params.deletedImport.Subject)
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
+	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -53,15 +54,18 @@ func init() {
 
 type DeleteImportParams struct {
 	AccountContextParams
+	SignerParams
 	claim         *jwt.AccountClaims
 	deletedImport *jwt.Import
 	index         int
-	SignerParams
-	subject string
+	subject       string
+	service       bool
 }
 
 func (p *DeleteImportParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
+	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
+		return err
+	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	p.index = -1
 
@@ -73,7 +77,19 @@ func (p *DeleteImportParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
+	p.service, err = cli.PromptYN("is service")
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (p *DeleteImportParams) importKind() jwt.ExportType {
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+	return kind
 }
 
 func (p *DeleteImportParams) Load(ctx ActionCtx) error {
@@ -98,7 +114,7 @@ func (p *DeleteImportParams) Load(ctx ActionCtx) error {
 	}
 
 	for i, e := range p.claim.Imports {
-		if string(e.Subject) == p.subject {
+		if string(e.Subject) == p.subject && e.Type == p.importKind() {
 			p.index = i
 			break
 		}
@@ -114,7 +130,13 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	for _, c := range p.claim.Imports {
 		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
 	}
-	p.index, err = cli.PromptChoices("select import to delete", "", choices)
+
+	v := ""
+	if p.index != -1 {
+		v = choices[p.index]
+	}
+
+	p.index, err = cli.PromptChoices("select import to delete", v, choices)
 	if err != nil {
 		return err
 	}
@@ -131,8 +153,10 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 	if p.subject == "" && p.index == -1 {
 		return fmt.Errorf("subject is required")
 	}
+
+	kind := p.importKind()
 	if p.index == -1 {
-		return fmt.Errorf("no import matching %q found", p.subject)
+		return fmt.Errorf("no %s import matching %q found", kind, p.subject)
 	}
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
