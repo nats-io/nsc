@@ -147,7 +147,7 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 			}
 			return nil
 		})
-		p.service, err = cli.PromptYN("is import a stream")
+		p.service, err = cli.PromptYN("is import a service")
 		if err != nil {
 			return err
 		}

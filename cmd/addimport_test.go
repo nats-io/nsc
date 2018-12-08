@@ -195,5 +195,6 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.Equal(t, "test", ac.Imports[0].Name)
 	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
+	require.Equal(t, jwt.Service, ac.Imports[0].Type)
 	require.Equal(t, apub, ac.Imports[0].Account)
 }

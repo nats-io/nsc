@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
