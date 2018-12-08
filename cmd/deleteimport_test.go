@@ -37,8 +37,8 @@ func Test_DeleteImport(t *testing.T) {
 	tests := CmdTests{
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "A"}, nil, []string{"account \"A\" doesn't have imports"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B"}, nil, []string{"subject is required"}, true},
-		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no import matching \"baz\" found"}, true},
-		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "foo"}, nil, []string{"deleted import of \"foo\""}, false},
+		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no stream import matching \"baz\" found"}, true},
+		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "foo"}, nil, []string{"deleted stream import \"foo\""}, false},
 	}
 
 	tests.Run(t, "root", "delete")
@@ -71,10 +71,10 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	ts.AddImport(t, "A", "foo", "B")
 	ts.AddImport(t, "A", "bar", "B")
 
-	input := []interface{}{1, 0}
+	input := []interface{}{1, false, 0}
 	cmd := createDeleteImportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, _, err := ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
