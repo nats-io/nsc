@@ -29,7 +29,7 @@ func createDeleteImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Delete an import",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		Example: `nsc delete import -i
 nsc delete import -s "bar.>"`,
 		SilenceUsage: true,

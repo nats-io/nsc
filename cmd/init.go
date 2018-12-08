@@ -31,7 +31,7 @@ func CreateInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Init a configuration directory",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		Example: `init --name operatorname
 init --interactive
 `,

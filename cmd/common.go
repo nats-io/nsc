@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
@@ -353,4 +355,12 @@ func AbbrevHomePaths(fp string) string {
 		return strings.Replace(fp, h, "~", 1)
 	}
 	return fp
+}
+
+func MaxArgs(max int) cobra.PositionalArgs {
+	// if we are running in a test, remove the limit
+	if strings.Contains(strings.Join(os.Args, " "), "-test.v") {
+		return nil
+	}
+	return cobra.MaximumNArgs(max)
 }

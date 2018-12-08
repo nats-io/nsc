@@ -52,7 +52,7 @@ func createListOperatorsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "operators",
 		Short: "List operators",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -97,7 +97,7 @@ func createListAccountsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "accounts",
 		Short: "List accounts",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -143,7 +143,7 @@ func createListUsersCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "users",
 		Short: "List users",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -191,7 +191,7 @@ func createListClustersCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clusters",
 		Short: "List clusters",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -238,7 +238,7 @@ func createListServersCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "servers",
 		Short: "List servers",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {

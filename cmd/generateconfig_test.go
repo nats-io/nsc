@@ -16,7 +16,10 @@
 package cmd
 
 import (
+	"os"
 	"testing"
+
+	"github.com/nats-io/jwt"
 
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -93,7 +96,7 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createGenerateConfigCmd())
 	require.Error(t, err)
-	require.Equal(t, "name is required", err.Error())
+	require.Equal(t, "user is required", err.Error())
 
 	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A", "--user", "u")
 	require.NoError(t, err)
@@ -120,4 +123,59 @@ func TestGenerateConfig_Interactive(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
+}
+
+func TestGenerateConfig_HonorsAccount(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "au")
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "B", "bu")
+
+	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A")
+	require.NoError(t, err)
+	userToken, _ := ExtractToken(stdout)
+
+	uc, err := jwt.DecodeUserClaims(userToken)
+	require.NoError(t, err)
+	require.Equal(t, "au", uc.Name)
+
+	stdout, _, err = ExecuteCmd(createGenerateConfigCmd(), "--account", "B")
+	require.NoError(t, err)
+	userToken, _ = ExtractToken(stdout)
+
+	uc, err = jwt.DecodeUserClaims(userToken)
+	require.NoError(t, err)
+	require.Equal(t, "bu", uc.Name)
+}
+
+func TestGenerateConfig_InteractiveHonorsAccount(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "au")
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "B", "bu")
+
+	t.Log(os.Args[0])
+
+	inputs := []interface{}{0}
+	stdout, _, err := ExecuteInteractiveCmd(createGenerateConfigCmd(), inputs)
+	require.NoError(t, err)
+	userToken, _ := ExtractToken(stdout)
+
+	uc, err := jwt.DecodeUserClaims(userToken)
+	require.NoError(t, err)
+	require.Equal(t, "au", uc.Name)
+
+	//stdout, _, err = ExecuteCmd(createGenerateConfigCmd(), "--account", "B")
+	//require.NoError(t, err)
+	//userToken, _ = ExtractToken(stdout)
+	//
+	//uc, err = jwt.DecodeUserClaims(userToken)
+	//require.NoError(t, err)
+	//require.Equal(t, "bu", uc.Name)
 }

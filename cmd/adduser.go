@@ -30,7 +30,7 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Add an user to the account",
-		Args:         cobra.MaximumNArgs(0),
+		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		Example: `nsc add user -i
 nsc add user --name u --deny-pubsub "bar.>"
