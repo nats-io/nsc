@@ -235,7 +235,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 	for {
 		p.PrintSummary(cmd)
 		choices := []string{"Yes", "Cancel", "Edit operator", "Edit account", "Edit user", "Edit cluster", "Edit server"}
-		c, err := cli.PromptChoices("is this OK", choices)
+		c, err := cli.PromptChoices("is this OK", "Yes", choices)
 		if err != nil {
 			return err
 		}

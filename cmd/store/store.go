@@ -646,7 +646,7 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 		name = accounts[0]
 	}
 	if len(accounts) > 1 {
-		i, err := cli.PromptChoices("select account", accounts)
+		i, err := cli.PromptChoices("select account", name, accounts)
 		if err != nil {
 			return "", err
 		}
@@ -697,7 +697,7 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 		return users[0], nil
 	}
 	if len(users) > 1 {
-		i, err := cli.PromptChoices("select user", users)
+		i, err := cli.PromptChoices("select user", "", users)
 		if err != nil {
 			return "", err
 		}
@@ -744,7 +744,7 @@ func (ctx *Context) PickServer(clusterName string) (string, error) {
 		return servers[0], nil
 	}
 	if len(servers) > 1 {
-		i, err := cli.PromptChoices("select server", servers)
+		i, err := cli.PromptChoices("select server", "", servers)
 		if err != nil {
 			return "", err
 		}
@@ -769,7 +769,7 @@ func (ctx *Context) PickCluster(name string) (string, error) {
 		name = clusters[0]
 	}
 	if len(clusters) > 1 {
-		i, err := cli.PromptChoices("select cluster", clusters)
+		i, err := cli.PromptChoices("select cluster", "", clusters)
 		if err != nil {
 			return "", err
 		}

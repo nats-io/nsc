@@ -52,7 +52,7 @@ func (t *TestPrompts) PromptSecret(m string) (string, error) {
 	return val, nil
 }
 
-func (t *TestPrompts) PromptChoices(m string, choices []string) (int, error) {
+func (t *TestPrompts) PromptChoices(m string, value string, choices []string) (int, error) {
 	val := t.inputs[t.count].(int)
 	t.count = t.count + 1
 	return val, nil
