@@ -18,7 +18,7 @@ type PromptLib interface {
 	Prompt(label string, value string, edit bool, validator Validator) (string, error)
 	PromptYN(m string, defaultValue bool) (bool, error)
 	PromptSecret(m string) (string, error)
-	PromptChoices(m string, choices []string) (int, error)
+	PromptChoices(m string, value string, choices []string) (int, error)
 	PromptMultipleChoices(m string, choices []string) ([]int, error)
 }
 
@@ -66,8 +66,8 @@ func PromptSecret(m string) (string, error) {
 	return cli.PromptSecret(m)
 }
 
-func PromptChoices(m string, choices []string) (int, error) {
-	return cli.PromptChoices(m, choices)
+func PromptChoices(m string, value string, choices []string) (int, error) {
+	return cli.PromptChoices(m, value, choices)
 }
 
 func PromptMultipleChoices(m string, choices []string) ([]int, error) {

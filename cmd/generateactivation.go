@@ -149,7 +149,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 			choices = append(choices, fmt.Sprintf("[%s] %s - %s", v.Type, v.Name, v.Subject))
 		}
 	}
-	i, err := cli.PromptChoices("select export", choices)
+	i, err := cli.PromptChoices("select export", p.subject, choices)
 	if err != nil {
 		return err
 	}

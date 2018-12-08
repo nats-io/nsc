@@ -114,7 +114,7 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	for _, c := range p.claim.Imports {
 		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
 	}
-	p.index, err = cli.PromptChoices("select import to delete", choices)
+	p.index, err = cli.PromptChoices("select import to delete", "", choices)
 	if err != nil {
 		return err
 	}

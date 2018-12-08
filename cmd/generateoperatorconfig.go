@@ -79,7 +79,7 @@ func (p *GenerateOperatorConfigParams) PreInteractive(ctx ActionCtx) error {
 		p.name = names[0]
 	}
 	if len(names) > 1 {
-		i, err := cli.PromptChoices("select operator", names)
+		i, err := cli.PromptChoices("select operator", config.Operator, names)
 		if err != nil {
 			return err
 		}

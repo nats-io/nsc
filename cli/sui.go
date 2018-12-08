@@ -63,11 +63,15 @@ func (sui *SurveyUI) PromptSecret(m string) (string, error) {
 	return v, nil
 }
 
-func (sui *SurveyUI) PromptChoices(m string, choices []string) (int, error) {
+func (sui *SurveyUI) PromptChoices(m string, value string, choices []string) (int, error) {
 	v := ""
 	p := &survey.Select{
 		Message: m,
 		Options: choices,
+	}
+
+	if value != "" {
+		p.Default = value
 	}
 	if err := survey.AskOne(p, &v, nil); err != nil {
 		return -1, err

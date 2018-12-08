@@ -101,7 +101,7 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 	}
 
 	choices := []string{jwt.Stream.String(), jwt.Service.String()}
-	i, err := cli.PromptChoices("export type", choices)
+	i, err := cli.PromptChoices("export type", p.export.Type.String(), choices)
 	if err != nil {
 		return err
 	}
