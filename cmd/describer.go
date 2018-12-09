@@ -101,7 +101,11 @@ func (a *AccountDescriber) Describe() string {
 	if len(a.Exports) == 0 {
 		table.AddRow("Exports", "None")
 	}
-	AddListValues(table, "Tags", a.Tags)
+
+	if len(a.Tags) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Tags", a.Tags)
+	}
 
 	buf.WriteString(table.Render())
 
@@ -157,7 +161,7 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Type", "Subject", "To", "Expires", "Src Acct")
+	table.AddHeaders("Type", "Subject", "To", "Expires", "From Account")
 
 	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
@@ -184,9 +188,9 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	if err != nil {
 		expiration = fmt.Sprintf("error decoding: %v", err.Error())
 	} else {
-		expiration = fmt.Sprintf("%s (%s)", UnixToDate(ac.Expires), HumanizedDate(ac.Expires), ShortCodes(i.Account))
+		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), expiration)
+	table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), expiration, ShortCodes(i.Account))
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
@@ -213,13 +217,8 @@ func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {
 func AddStandardClaimInfo(table *tablewriter.Table, cd jwt.ClaimsData) {
 	table.AddRow("Account ID", ShortCodes(cd.Subject))
 	table.AddRow("Issuer ID", ShortCodes(cd.Issuer))
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(cd.IssuedAt), HumanizedDate(cd.IssuedAt)))
-
-	if cd.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(cd.Expires), HumanizedDate(cd.Expires)))
-	} else {
-		table.AddRow("Expires", "No expiration")
-	}
+	table.AddRow("Issued", RenderDate(cd.IssuedAt))
+	table.AddRow("Expires", RenderDate(cd.Expires))
 }
 
 type ActivationDescriber struct {
@@ -236,8 +235,9 @@ func (c *ActivationDescriber) Describe() string {
 	table.AddTitle("Activation")
 	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
-
 	AddStandardClaimInfo(table, c.ActivationClaims.ClaimsData)
+
+	table.AddSeparator()
 
 	AddLimits(table, c.Limits)
 
@@ -303,20 +303,25 @@ func (u *UserDescriber) Describe() string {
 	table.AddRow("Name", u.Name)
 	table.AddRow("User ID", ShortCodes(u.Subject))
 	table.AddRow("Issuer ID", ShortCodes(u.Issuer))
-	AddListValues(table, "Pub Allow", u.Pub.Allow)
-	AddListValues(table, "Pub Deny", u.Pub.Deny)
-	AddListValues(table, "Sub Allow", u.Sub.Allow)
-	AddListValues(table, "Sub Deny", u.Sub.Deny)
+	table.AddRow("Issued", RenderDate(u.IssuedAt))
+	table.AddRow("Expires", RenderDate(u.Expires))
 
+	if len(u.Pub.Allow) > 0 || len(u.Pub.Deny) > 0 ||
+		len(u.Sub.Allow) > 0 || len(u.Sub.Deny) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Pub Allow", u.Pub.Allow)
+		AddListValues(table, "Pub Deny", u.Pub.Deny)
+		AddListValues(table, "Sub Allow", u.Sub.Allow)
+		AddListValues(table, "Sub Deny", u.Sub.Deny)
+	}
+
+	table.AddSeparator()
 	AddLimits(table, u.Limits)
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(u.IssuedAt), HumanizedDate(u.IssuedAt)))
-	if u.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(u.Expires), HumanizedDate(u.Expires)))
-	} else {
-		table.AddRow("Expires", "No expiration")
+	if len(u.Tags) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Tags", u.Tags)
 	}
-	AddListValues(table, "Tags", u.Tags)
 
 	return table.Render()
 }
@@ -336,24 +341,24 @@ func (c *ClusterDescriber) Describe() string {
 	table.AddRow("Name", c.Name)
 	table.AddRow("Cluster ID", ShortCodes(c.Subject))
 	table.AddRow("Issuer ID", ShortCodes(c.Issuer))
+	table.AddRow("Issued", RenderDate(c.IssuedAt))
+	table.AddRow("Expires", RenderDate(c.Expires))
+
+	table.AddSeparator()
 
 	AddListValues(table, "Trusted Operators", c.Trust)
 	if c.OperatorURL != "" {
 		table.AddRow("Operator Srv", c.OperatorURL)
 	}
 
+	table.AddSeparator()
+
 	AddListValues(table, "Trusted Accounts", c.Accounts)
 	if c.AccountURL != "" {
 		table.AddRow("Account Srv", c.AccountURL)
 	}
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(c.IssuedAt), HumanizedDate(c.IssuedAt)))
-	if c.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(c.Expires), HumanizedDate(c.Expires)))
-	} else {
-		table.AddRow("Expires", "No expiration")
-	}
-
+	table.AddSeparator()
 	AddListValues(table, "Tags", c.Tags)
 
 	return table.Render()
@@ -374,13 +379,11 @@ func (s *ServerDescriber) Describe() string {
 	table.AddRow("Name", s.Name)
 	table.AddRow("Server ID", ShortCodes(s.Subject))
 	table.AddRow("Issuer ID", ShortCodes(s.Issuer))
+	table.AddRow("Issued", RenderDate(s.IssuedAt))
+	table.AddRow("Expires", RenderDate(s.Expires))
 
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(s.IssuedAt), HumanizedDate(s.IssuedAt)))
-	if s.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(s.Expires), HumanizedDate(s.Expires)))
-	} else {
-		table.AddRow("Expires", "No expiration")
-	}
+	table.AddSeparator()
+
 	AddListValues(table, "Tags", s.Tags)
 
 	return table.Render()
@@ -400,22 +403,25 @@ func (o *OperatorDescriber) Describe() string {
 	table.AddTitle("Operator")
 	table.AddRow("Name", o.Name)
 	table.AddRow("Operator ID", ShortCodes(o.Subject))
+	table.AddRow("Issued", RenderDate(o.IssuedAt))
+	table.AddRow("Expires", RenderDate(o.Expires))
 
 	if len(o.Identities) > 0 {
+		table.AddSeparator()
 		for _, v := range o.Identities {
 			table.AddRow(fmt.Sprintf("ID %s", v.ID), v.Proof)
 		}
 	}
 
-	AddListValues(table, "Signing Keys", o.SigningKeys)
-
-	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(o.IssuedAt), HumanizedDate(o.IssuedAt)))
-	if o.Expires > 0 {
-		table.AddRow("Expires", fmt.Sprintf("%s (%s)", UnixToDate(o.Expires), HumanizedDate(o.Expires)))
-	} else {
-		table.AddRow("Expires", "No expiration")
+	if len(o.SigningKeys) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Signing Keys", o.SigningKeys)
 	}
-	AddListValues(table, "Tags", o.Tags)
+
+	if len(o.Tags) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Tags", o.Tags)
+	}
 
 	return table.Render()
 }

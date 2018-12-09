@@ -17,7 +17,6 @@ package store
 
 import (
 	"fmt"
-	"github.com/nats-io/nsc/cmd"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -49,7 +48,6 @@ func MakeTempDir(t *testing.T) string {
 
 func CreateTestStoreForOperator(t *testing.T, name string, operator nkeys.KeyPair) *Store {
 	s := MakeTempStore(t, name, operator)
-	cmd.WideFlag = true
 
 	require.NotNil(t, s)
 	require.FileExists(t, filepath.Join(s.Dir, ".nsc"))

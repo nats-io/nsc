@@ -225,7 +225,7 @@ func ParseNumber(s string) (int64, error) {
 		}
 		return v, nil
 	}
-	re = regexp.MustCompile(`(-?\d+)([B|K|M|G])`)
+	re = regexp.MustCompile(`(-?\d+)([BKMG])`)
 	m = re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[1], 10, 64)
@@ -271,6 +271,14 @@ func HumanizedDate(d int64) string {
 	} else {
 		return strings.TrimSpace(strings.Title("in " + humanize.RelTime(now, when, "", "")))
 	}
+}
+
+func RenderDate(d int64) string {
+	if d == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("%s (%s)", UnixToDate(d), HumanizedDate(d))
 }
 
 func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {

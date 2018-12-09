@@ -43,6 +43,7 @@ type TestStore struct {
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	ResetConfigForTests()
 	var ts TestStore
+	WideFlag = true
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
