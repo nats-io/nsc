@@ -180,7 +180,7 @@ func NewImportDescriber(im jwt.Import) *ImportDescriber {
 
 func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	if i.Token == "" {
-		table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), "")
+		table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), "", ShortCodes(i.Account))
 		return
 	}
 	expiration := ""
