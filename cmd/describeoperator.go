@@ -33,6 +33,9 @@ func createDescribeOperatorCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
+				if err != nil {
+					cmd.Println(err)
+				}
 				return err
 			}
 			if !IsStdOut(params.outputFile) {
@@ -91,6 +94,8 @@ func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 	if !ctx.StoreCtx().Store.Has(store.JwtName(name)) {
 		return fmt.Errorf("no operator %q found", name)
 	}
+
+	fmt.Println("Looking for", store.JwtName(name))
 
 	d, err := ctx.StoreCtx().Store.Read(store.JwtName(name))
 	if err != nil {
