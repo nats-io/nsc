@@ -48,6 +48,7 @@ func (a *AccountDescriber) Describe() string {
 	table.AddRow("Name", a.Name)
 	AddStandardClaimInfo(table, a.ClaimsData)
 
+	table.AddSeparator()
 	lim := a.Limits
 	if lim.Conn > -1 {
 		table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
@@ -91,12 +92,14 @@ func (a *AccountDescriber) Describe() string {
 	}
 	table.AddRow("Exports Allows Wildcards", we)
 
+	table.AddSeparator()
+
 	if len(a.Imports) == 0 {
-		table.AddRow("Imports", "No services or streams imported")
+		table.AddRow("Imports", "None")
 	}
 
 	if len(a.Exports) == 0 {
-		table.AddRow("Exports", "No services or streams exported")
+		table.AddRow("Exports", "None")
 	}
 	AddListValues(table, "Tags", a.Tags)
 
@@ -154,7 +157,7 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Type", "Subject", "To", "Expires")
+	table.AddHeaders("Type", "Subject", "To", "Expires", "Src Acct")
 
 	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
@@ -181,7 +184,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	if err != nil {
 		expiration = fmt.Sprintf("error decoding: %v", err.Error())
 	} else {
-		expiration = fmt.Sprintf("%s (%s)", UnixToDate(ac.Expires), HumanizedDate(ac.Expires))
+		expiration = fmt.Sprintf("%s (%s)", UnixToDate(ac.Expires), HumanizedDate(ac.Expires), ShortCodes(i.Account))
 	}
 	table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), expiration)
 }
@@ -208,8 +211,8 @@ func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {
 }
 
 func AddStandardClaimInfo(table *tablewriter.Table, cd jwt.ClaimsData) {
-	table.AddRow("Account ID", cd.Subject)
-	table.AddRow("Issuer ID", cd.Issuer)
+	table.AddRow("Account ID", ShortCodes(cd.Subject))
+	table.AddRow("Issuer ID", ShortCodes(cd.Issuer))
 	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(cd.IssuedAt), HumanizedDate(cd.IssuedAt)))
 
 	if cd.Expires > 0 {
@@ -298,8 +301,8 @@ func (u *UserDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("User")
 	table.AddRow("Name", u.Name)
-	table.AddRow("User ID", u.Subject)
-	table.AddRow("Issuer ID", u.Issuer)
+	table.AddRow("User ID", ShortCodes(u.Subject))
+	table.AddRow("Issuer ID", ShortCodes(u.Issuer))
 	AddListValues(table, "Pub Allow", u.Pub.Allow)
 	AddListValues(table, "Pub Deny", u.Pub.Deny)
 	AddListValues(table, "Sub Allow", u.Sub.Allow)
@@ -331,8 +334,8 @@ func (c *ClusterDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("Cluster")
 	table.AddRow("Name", c.Name)
-	table.AddRow("Cluster ID", c.Subject)
-	table.AddRow("Issuer ID", c.Issuer)
+	table.AddRow("Cluster ID", ShortCodes(c.Subject))
+	table.AddRow("Issuer ID", ShortCodes(c.Issuer))
 
 	AddListValues(table, "Trusted Operators", c.Trust)
 	if c.OperatorURL != "" {
@@ -369,8 +372,8 @@ func (s *ServerDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("Server")
 	table.AddRow("Name", s.Name)
-	table.AddRow("Server ID", s.Subject)
-	table.AddRow("Issuer ID", s.Issuer)
+	table.AddRow("Server ID", ShortCodes(s.Subject))
+	table.AddRow("Issuer ID", ShortCodes(s.Issuer))
 
 	table.AddRow("Issued", fmt.Sprintf("%s (%s)", UnixToDate(s.IssuedAt), HumanizedDate(s.IssuedAt)))
 	if s.Expires > 0 {
@@ -396,7 +399,7 @@ func (o *OperatorDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("Operator")
 	table.AddRow("Name", o.Name)
-	table.AddRow("Operator ID", o.Subject)
+	table.AddRow("Operator ID", ShortCodes(o.Subject))
 
 	if len(o.Identities) > 0 {
 		for _, v := range o.Identities {

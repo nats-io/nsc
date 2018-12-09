@@ -34,6 +34,7 @@ const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
 var InteractiveFlag bool
+var WideFlag bool
 var quietMode bool
 
 var cfgFile string
@@ -148,6 +149,7 @@ func init() {
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
+	cmd.PersistentFlags().BoolVarP(&WideFlag, "long-ids", "W", false, "display long ids")
 
 	return cmd
 }

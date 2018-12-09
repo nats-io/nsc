@@ -289,7 +289,11 @@ func listEntities(title string, infos []*listEntry, current string) string {
 	if len(infos) == 0 {
 		table.AddRow("No entries defined")
 	} else {
-		table.AddHeaders("Name", "Public Key")
+		if !WideFlag {
+			table.AddHeaders("Name", "Public Key (-W for long)")
+		} else {
+			table.AddHeaders("Name", "Public Key")
+		}
 		for _, v := range infos {
 			n := v.name
 			var p string
@@ -302,7 +306,7 @@ func listEntities(title string, infos []*listEntry, current string) string {
 					if n != tn {
 						n = fmt.Sprintf("%s (%s)", n, c.Name)
 					}
-					p = c.Subject
+					p = ShortCodes(c.Subject)
 				}
 			}
 			if n == current {

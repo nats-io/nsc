@@ -255,7 +255,8 @@ func UnixToDate(d int64) string {
 	if d == 0 {
 		return ""
 	}
-	return time.Unix(d, 0).UTC().String()
+
+	return strings.Replace(time.Unix(d, 0).UTC().String(), " +0000", "", -1)
 }
 
 func HumanizedDate(d int64) string {
@@ -363,4 +364,16 @@ func MaxArgs(max int) cobra.PositionalArgs {
 		return nil
 	}
 	return cobra.MaximumNArgs(max)
+}
+
+// ShortKey returns the first 12 characters of a public key (or the key if it is < 12 long)
+func ShortCodes(s string) string {
+	if WideFlag {
+		return s
+	}
+	if s != "" && len(s) > 12 {
+		s = s[0:12]
+	}
+
+	return s
 }
