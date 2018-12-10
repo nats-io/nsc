@@ -28,9 +28,10 @@ func createAddClusterCmd() *cobra.Command {
 	var params AddClusterParams
 	cmd := &cobra.Command{
 		Use:          "cluster",
+		Hidden:       true,
 		Short:        "Add a cluster (operator only)",
 		Args:         MaxArgs(0),
-		Example:      `nsc add cluster --name mycluster --trusted-accounts actkey1,actkey2 --trusted-operators opkey1,opkey2`,
+		Example:      fmt.Sprintf(`%s add cluster --name mycluster --trusted-accounts actkey1,actkey2 --trusted-operators opkey1,opkey2`, GetToolName()),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

@@ -31,6 +31,7 @@ func createGenerateOperatorConfigCmd() *cobra.Command {
 		Short:        "Generate an operator config",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
+		Hidden:       true,
 		Example:      `nsc generate operator --n a`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {

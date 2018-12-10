@@ -22,7 +22,7 @@ import (
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "Add assets such as accounts, imports, users, clusters, servers",
+	Short: "Add assets such as accounts, imports, users",
 }
 
 func init() {

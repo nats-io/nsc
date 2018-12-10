@@ -22,7 +22,7 @@ import (
 // addCmd represents the add command
 var generateCmd = &cobra.Command{
 	Use:   "generate",
-	Short: "Generate an activation token",
+	Short: "Generate activation tokens or configs",
 }
 
 func init() {

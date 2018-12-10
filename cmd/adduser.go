@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -32,9 +33,7 @@ func CreateAddUserCmd() *cobra.Command {
 		Short:        "Add an user to the account",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example: `nsc add user -i
-nsc add user --name u --deny-pubsub "bar.>"
-nsc add user --name u --tag test,service_a`,
+		Example:      params.longHelp(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
@@ -92,6 +91,14 @@ type AddUserParams struct {
 	out         string
 	src         []string
 	tags        []string
+}
+
+func (p *AddUserParams) longHelp() string {
+	s := `toolName add user -i
+toolName add user --name u --deny-pubsub "bar.>"
+toolName add user --name u --tag test,service_a`
+
+	return strings.Replace(s, "toolName", GetToolName(), -1)
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {

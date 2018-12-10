@@ -21,7 +21,7 @@ import (
 
 var describeCmd = &cobra.Command{
 	Use:   "describe",
-	Short: "Describe assets such as operators, accounts, users, clusters, servers and jwt files",
+	Short: "Describe assets such as operators, accounts, users, and jwt files",
 }
 
 func init() {
