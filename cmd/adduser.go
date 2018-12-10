@@ -165,6 +165,26 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
+	// FIXME: super hack
+	ks := ctx.StoreCtx().KeyStore
+	kp, err := ks.GetUserKey(p.AccountContextParams.Name, p.name)
+	if err != nil {
+		ctx.CurrentCmd().Println("unable to save creds: %v", err)
+	}
+	if kp == nil {
+		ctx.CurrentCmd().Println("unable to save creds - user key not found")
+	}
+
+	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, kp)
+	if err != nil {
+		ctx.CurrentCmd().Println("unable to save creds: %v", err)
+	} else {
+		err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+		if err != nil {
+			ctx.CurrentCmd().Println(err.Error())
+		}
+	}
+
 	return nil
 }
 

@@ -133,11 +133,26 @@ func (p *GenerateConfigParams) Run(ctx ActionCtx) error {
 		return fmt.Errorf("user was not found - please specify it")
 	}
 
-	seed, err := p.entityKP.Seed()
+	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.user, p.entityKP)
 	if err != nil {
-		return fmt.Errorf("error getting seed for user %q: %v", p.user, err)
+		return err
 	}
 
-	v := FormatConfig("User", string(p.entityJwt), string(seed))
-	return Write(p.out, v)
+	return Write(p.out, d)
+}
+
+func GenerateConfig(s *store.Store, account string, user string, userKey nkeys.KeyPair) ([]byte, error) {
+	if s.Has(store.Accounts, account, store.Users, store.JwtName(user)) {
+		d, err := s.Read(store.Accounts, account, store.Users, store.JwtName(user))
+		if err != nil {
+			return nil, err
+		}
+		seed, err := userKey.Seed()
+		if err != nil {
+			return nil, fmt.Errorf("error getting seed: %v", err)
+		}
+
+		return FormatConfig("User", string(d), string(seed)), nil
+	}
+	return nil, fmt.Errorf("unable to find user jwt")
 }
