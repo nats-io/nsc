@@ -352,14 +352,15 @@ func (p *InitParams) Run() error {
 			if kp == nil {
 				fmt.Println("unable to save creds - user key not found")
 			}
-
-			d, err := GenerateConfig(s, ctx.Account.Name, c.name, kp)
-			if err != nil {
-				fmt.Printf("unable to save creds: %v", err)
-			} else {
-				err := ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
+			if kp != nil {
+				d, err := GenerateConfig(s, ctx.Account.Name, c.name, kp)
 				if err != nil {
-					fmt.Println(err.Error())
+					fmt.Printf("unable to save creds: %v", err)
+				} else {
+					err := ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
+					if err != nil {
+						fmt.Println(err.Error())
+					}
 				}
 			}
 		}

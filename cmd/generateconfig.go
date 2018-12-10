@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/nats-io/nkeys"
@@ -146,6 +147,9 @@ func GenerateConfig(s *store.Store, account string, user string, userKey nkeys.K
 		d, err := s.Read(store.Accounts, account, store.Users, store.JwtName(user))
 		if err != nil {
 			return nil, err
+		}
+		if userKey == nil {
+			return nil, errors.New("userKey was not provided")
 		}
 		seed, err := userKey.Seed()
 		if err != nil {

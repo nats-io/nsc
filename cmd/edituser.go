@@ -260,19 +260,20 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	ks := ctx.StoreCtx().KeyStore
 	ukp, err := ks.GetUserKey(p.AccountContextParams.Name, p.name)
 	if err != nil {
-		ctx.CurrentCmd().Println("unable to save creds: %v", err)
+		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
 	}
 	if ukp == nil {
 		ctx.CurrentCmd().Println("unable to save creds - user key not found")
 	}
-
-	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, ukp)
-	if err != nil {
-		ctx.CurrentCmd().Println("unable to save creds: %v", err)
-	} else {
-		err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+	if ukp != nil {
+		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, ukp)
 		if err != nil {
-			ctx.CurrentCmd().Println(err.Error())
+			ctx.CurrentCmd().Printf("unable to save creds: %v", err)
+		} else {
+			err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+			if err != nil {
+				ctx.CurrentCmd().Println(err.Error())
+			}
 		}
 	}
 
