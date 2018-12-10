@@ -225,7 +225,7 @@ func ParseNumber(s string) (int64, error) {
 		}
 		return v, nil
 	}
-	re = regexp.MustCompile(`(-?\d+)([B|K|M|G])`)
+	re = regexp.MustCompile(`(-?\d+)([BKMG])`)
 	m = re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[1], 10, 64)
@@ -255,7 +255,8 @@ func UnixToDate(d int64) string {
 	if d == 0 {
 		return ""
 	}
-	return time.Unix(d, 0).UTC().String()
+
+	return strings.Replace(time.Unix(d, 0).UTC().String(), " +0000", "", -1)
 }
 
 func HumanizedDate(d int64) string {
@@ -270,6 +271,14 @@ func HumanizedDate(d int64) string {
 	} else {
 		return strings.TrimSpace(strings.Title("in " + humanize.RelTime(now, when, "", "")))
 	}
+}
+
+func RenderDate(d int64) string {
+	if d == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("%s (%s)", UnixToDate(d), HumanizedDate(d))
 }
 
 func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
@@ -363,4 +372,16 @@ func MaxArgs(max int) cobra.PositionalArgs {
 		return nil
 	}
 	return cobra.MaximumNArgs(max)
+}
+
+// ShortKey returns the first 12 characters of a public key (or the key if it is < 12 long)
+func ShortCodes(s string) string {
+	if WideFlag {
+		return s
+	}
+	if s != "" && len(s) > 12 {
+		s = s[0:12]
+	}
+
+	return s
 }
