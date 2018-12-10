@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -27,11 +28,10 @@ import (
 func createDeleteImportCmd() *cobra.Command {
 	var params DeleteImportParams
 	cmd := &cobra.Command{
-		Use:   "import",
-		Short: "Delete an import",
-		Args:  MaxArgs(0),
-		Example: `nsc delete import -i
-nsc delete import -s "bar.>"`,
+		Use:          "import",
+		Short:        "Delete an import",
+		Args:         MaxArgs(0),
+		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
@@ -60,6 +60,12 @@ type DeleteImportParams struct {
 	index         int
 	subject       string
 	service       bool
+}
+
+func (p *DeleteImportParams) longHelp() string {
+	v := `toolName delete import -i
+toolName delete import -s "bar.>"`
+	return strings.Replace(v, "toolName", GetToolName(), -1)
 }
 
 func (p *DeleteImportParams) SetDefaults(ctx ActionCtx) error {

@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -28,13 +29,10 @@ import (
 func createAddExportCmd() *cobra.Command {
 	var params AddExportParams
 	cmd := &cobra.Command{
-		Use:   "export",
-		Short: "Add an export",
-		Args:  MaxArgs(0),
-		Example: `nsc add export -i
-nsc add export --subject "a.b.c.>"
-nsc add export --service --subject a.b
-ncc add export --name myexport --subject a.b --service`,
+		Use:          "export",
+		Short:        "Add an export",
+		Args:         MaxArgs(0),
+		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
@@ -72,6 +70,14 @@ type AddExportParams struct {
 	SignerParams
 	stream  bool
 	subject string
+}
+
+func (p *AddExportParams) longHelp() string {
+	s := `toolName add export -i
+toolName add export --subject "a.b.c.>"
+toolName add export --service --subject a.b
+toolName add export --name myexport --subject a.b --service`
+	return strings.Replace(s, "toolName", GetToolName(), -1)
 }
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {

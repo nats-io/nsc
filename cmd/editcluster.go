@@ -31,6 +31,7 @@ func createEditClusterCmd() *cobra.Command {
 		Short:        "Edit a cluster",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
+		Hidden:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err

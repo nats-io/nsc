@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/blang/semver"
@@ -27,15 +28,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func updateHelp() string {
+	v := `toolName update
+toolName update --release-notes`
+	return strings.Replace(v, "toolName", GetToolName(), -1)
+}
+
 func createUpdateCommand() *cobra.Command {
 	var printReleaseNotes bool
 	var cmd = &cobra.Command{
-		Example: `update
-update --release-notes
-`,
-		Use:   "update",
-		Short: "Update this tool to latest version",
-		Args:  MaxArgs(0),
+		Example: updateHelp(),
+		Use:     "update",
+		Short:   "Update this tool to latest version",
+		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v := semver.MustParse(GetRootCmd().Version)
 
