@@ -305,7 +305,7 @@ func (p *InitParams) Run() error {
 		operator = &store.NamedKey{Name: p.environmentName}
 	}
 
-	_, err := store.CreateStore(p.environmentName, p.storeRoot, operator)
+	s, err := store.CreateStore(p.environmentName, p.storeRoot, operator)
 	if err != nil {
 		return err
 	}
@@ -339,6 +339,31 @@ func (p *InitParams) Run() error {
 			continue
 		}
 		c.GenerateClaim(containers[i-1].kp, nil)
+
+		// FIXME: super hack
+		if c.kind == nkeys.PrefixByteUser {
+			ctx, err := s.GetContext()
+
+			ks := ctx.KeyStore
+			kp, err := ks.GetUserKey(ctx.Account.Name, c.name)
+			if err != nil {
+				fmt.Printf("unable to save creds: %v", err)
+			}
+			if kp == nil {
+				fmt.Println("unable to save creds - user key not found")
+			}
+			if kp != nil {
+				d, err := GenerateConfig(s, ctx.Account.Name, c.name, kp)
+				if err != nil {
+					fmt.Printf("unable to save creds: %v", err)
+				} else {
+					err := ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
+					if err != nil {
+						fmt.Println(err.Error())
+					}
+				}
+			}
+		}
 	}
 
 	return nil

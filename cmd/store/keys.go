@@ -28,6 +28,7 @@ import (
 const DEfaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
 const NKeyExtension = "nk"
+const CredsExtension = "creds"
 
 type NamedKey struct {
 	Name string
@@ -76,8 +77,25 @@ func NewKeyStore(environmentName string) KeyStore {
 	return KeyStore{Env: environmentName}
 }
 
+func (k *KeyStore) credsName(n string) string {
+	return fmt.Sprintf("%s.%s", n, CredsExtension)
+}
+
 func (k *KeyStore) keyName(n string) string {
 	return fmt.Sprintf("%s.%s", n, NKeyExtension)
+}
+
+func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte) error {
+	v, err := k.GetUserKey(account, user)
+	if err != nil {
+		return fmt.Errorf("unable to store user creds file - error reading seed key: %v", err)
+	}
+	if v == nil {
+		return fmt.Errorf("unable to store creds file - user's seed file is not in the keystore")
+	}
+
+	fp := filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.credsName(user))
+	return ioutil.WriteFile(fp, data, 0600)
 }
 
 func (k *KeyStore) keypath(name string, kp nkeys.KeyPair, parent string) (string, error) {

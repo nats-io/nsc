@@ -236,5 +236,46 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
+		return err
+	}
+
+	kp, err := ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.name)
+	if err != nil {
+		ctx.CurrentCmd().Printf("unable to create creds file: %v\n", err)
+	} else if kp == nil {
+		ctx.CurrentCmd().Printf("unable to create creds file %s key is not available\n", p.name)
+	} else {
+		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.Name, kp)
+		if err != nil {
+			ctx.CurrentCmd().Printf("unable to generate creds file: %v", err)
+		}
+		err = ctx.StoreCtx().KeyStore.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+		if err != nil {
+			ctx.CurrentCmd().Printf("unable to store creds file: %v", err)
+		}
+	}
+
+	// FIXME: super hack
+	ks := ctx.StoreCtx().KeyStore
+	ukp, err := ks.GetUserKey(p.AccountContextParams.Name, p.name)
+	if err != nil {
+		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
+	}
+	if ukp == nil {
+		ctx.CurrentCmd().Println("unable to save creds - user key not found")
+	}
+	if ukp != nil {
+		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, ukp)
+		if err != nil {
+			ctx.CurrentCmd().Printf("unable to save creds: %v", err)
+		} else {
+			err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+			if err != nil {
+				ctx.CurrentCmd().Println(err.Error())
+			}
+		}
+	}
+
+	return nil
 }
