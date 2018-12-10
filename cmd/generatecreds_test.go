@@ -38,7 +38,7 @@ func TestGenerateConfig_Default(t *testing.T) {
 	seed, err := ts.KeyStore.GetUserSeed("A", "u")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd())
+	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
@@ -59,7 +59,7 @@ func TestGenerateConfig_MultipleAccounts(t *testing.T) {
 	seed, err := ts.KeyStore.GetUserSeed("A", "u")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd())
+	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
@@ -75,7 +75,7 @@ func TestGenerateConfig_MultipleAccountsAccountRequired(t *testing.T) {
 	ts.AddUser(t, "B", "u")
 
 	GetConfig().SetAccount("")
-	_, _, err := ExecuteCmd(createGenerateConfigCmd())
+	_, _, err := ExecuteCmd(createGenerateCredsCmd())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
 }
@@ -94,11 +94,11 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 	seed, err := ts.KeyStore.GetUserSeed("A", "u")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createGenerateConfigCmd())
+	_, _, err = ExecuteCmd(createGenerateCredsCmd())
 	require.Error(t, err)
 	require.Equal(t, "user is required", err.Error())
 
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A", "--user", "u")
+	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A", "--user", "u")
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
@@ -119,7 +119,7 @@ func TestGenerateConfig_Interactive(t *testing.T) {
 	seed, err := ts.KeyStore.GetUserSeed("A", "u")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteInteractiveCmd(createGenerateConfigCmd(), []interface{}{0, 0})
+	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), []interface{}{0, 0})
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)
@@ -134,7 +134,7 @@ func TestGenerateConfig_HonorsAccount(t *testing.T) {
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "bu")
 
-	stdout, _, err := ExecuteCmd(createGenerateConfigCmd(), "--account", "A")
+	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A")
 	require.NoError(t, err)
 	userToken, _ := ExtractToken(stdout)
 
@@ -142,7 +142,7 @@ func TestGenerateConfig_HonorsAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "au", uc.Name)
 
-	stdout, _, err = ExecuteCmd(createGenerateConfigCmd(), "--account", "B")
+	stdout, _, err = ExecuteCmd(createGenerateCredsCmd(), "--account", "B")
 	require.NoError(t, err)
 	userToken, _ = ExtractToken(stdout)
 
@@ -163,7 +163,7 @@ func TestGenerateConfig_InteractiveHonorsAccount(t *testing.T) {
 	t.Log(os.Args[0])
 
 	inputs := []interface{}{0}
-	stdout, _, err := ExecuteInteractiveCmd(createGenerateConfigCmd(), inputs)
+	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), inputs)
 	require.NoError(t, err)
 	userToken, _ := ExtractToken(stdout)
 
@@ -171,7 +171,7 @@ func TestGenerateConfig_InteractiveHonorsAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "au", uc.Name)
 
-	//stdout, _, err = ExecuteCmd(createGenerateConfigCmd(), "--account", "B")
+	//stdout, _, err = ExecuteCmd(createGenerateCredsCmd(), "--account", "B")
 	//require.NoError(t, err)
 	//userToken, _ = ExtractToken(stdout)
 	//

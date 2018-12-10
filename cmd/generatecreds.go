@@ -24,14 +24,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createGenerateConfigCmd() *cobra.Command {
-	var params GenerateConfigParams
+func createGenerateCredsCmd() *cobra.Command {
+	var params GenerateCredsParams
 	cmd := &cobra.Command{
-		Use:          "config",
-		Short:        "Generate a config file for an user",
+		Use:          "creds",
+		Short:        "Generate a credentials file for an user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example:      `nsc generate config --account a --user u`,
+		Example:      `nsc generate creds --account a --user u`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
@@ -50,10 +50,10 @@ func createGenerateConfigCmd() *cobra.Command {
 }
 
 func init() {
-	generateCmd.AddCommand(createGenerateConfigCmd())
+	generateCmd.AddCommand(createGenerateCredsCmd())
 }
 
-type GenerateConfigParams struct {
+type GenerateCredsParams struct {
 	AccountContextParams
 	kind      string
 	user      string
@@ -62,7 +62,7 @@ type GenerateConfigParams struct {
 	entityJwt []byte
 }
 
-func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
+func (p *GenerateCredsParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	if p.user == "" {
 		if p.AccountContextParams.Name != "" {
@@ -82,7 +82,7 @@ func (p *GenerateConfigParams) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateConfigParams) PreInteractive(ctx ActionCtx) error {
+func (p *GenerateCredsParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
@@ -94,15 +94,15 @@ func (p *GenerateConfigParams) PreInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateConfigParams) Load(ctx ActionCtx) error {
+func (p *GenerateCredsParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateConfigParams) PostInteractive(ctx ActionCtx) error {
+func (p *GenerateCredsParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
+func (p *GenerateCredsParams) Validate(ctx ActionCtx) error {
 	var err error
 
 	if p.AccountContextParams.Name == "" {
@@ -129,7 +129,7 @@ func (p *GenerateConfigParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateConfigParams) Run(ctx ActionCtx) error {
+func (p *GenerateCredsParams) Run(ctx ActionCtx) error {
 	if p.entityKP == nil {
 		return fmt.Errorf("user was not found - please specify it")
 	}
