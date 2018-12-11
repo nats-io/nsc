@@ -35,7 +35,6 @@ toolName update --release-notes`
 }
 
 func createUpdateCommand() *cobra.Command {
-	var printReleaseNotes bool
 	var cmd = &cobra.Command{
 		Example: updateHelp(),
 		Use:     "update",
@@ -78,18 +77,14 @@ func createUpdateCommand() *cobra.Command {
 			}
 
 			cmd.Printf("Successfully updated to version %s\n", latest.Version.String())
-			if printReleaseNotes {
-				cmd.Println()
-				cmd.Println("Release Notes:")
-				cmd.Println()
-				cmd.Println(cli.Wrap(80, latest.ReleaseNotes))
-			}
+			cmd.Println()
+			cmd.Println("Release Notes:")
+			cmd.Println()
+			cmd.Println(cli.Wrap(80, latest.ReleaseNotes))
 
 			return nil
 		},
 	}
-
-	cmd.Flags().BoolVarP(&printReleaseNotes, "release-notes", "r", false, "prints the release notes")
 
 	return cmd
 }

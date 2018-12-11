@@ -130,7 +130,7 @@ func TestUpdate_DoUpdate(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, stderr, err := ExecuteCmd(createUpdateCommand(), "--release-notes")
+	_, stderr, err := ExecuteCmd(createUpdateCommand())
 	require.NoError(t, err)
 	require.True(t, checkCalled)
 	require.True(t, updateCalled)
