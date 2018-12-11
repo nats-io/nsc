@@ -94,6 +94,8 @@ func createListOperatorsCmd() *cobra.Command {
 }
 
 func createListAccountsCmd() *cobra.Command {
+	var operator string
+
 	cmd := &cobra.Command{
 		Use:   "accounts",
 		Short: "List accounts",
@@ -102,6 +104,11 @@ func createListAccountsCmd() *cobra.Command {
 			config := GetConfig()
 			if config.StoreRoot == "" {
 				return errors.New("no store set - `env --store <dir>`")
+			}
+			if operator != "" {
+				if err := config.SetOperator(operator); err != nil {
+					return err
+				}
 			}
 			if config.Operator == "" {
 				return errors.New("no operator set - `env --operator <name>`")
@@ -136,10 +143,15 @@ func createListAccountsCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&operator, "operator", "o", "", "operator name")
+
 	return cmd
 }
 
 func createListUsersCmd() *cobra.Command {
+	var operator string
+	var account string
 	cmd := &cobra.Command{
 		Use:   "users",
 		Short: "List users",
@@ -149,8 +161,18 @@ func createListUsersCmd() *cobra.Command {
 			if config.StoreRoot == "" {
 				return fmt.Errorf("no store set - `%s env --store <dir>`", GetToolName())
 			}
+			if operator != "" {
+				if err := config.SetOperator(operator); err != nil {
+					return err
+				}
+			}
 			if config.Operator == "" {
 				return fmt.Errorf("no operator set - `%s env --operator <name>`", GetToolName())
+			}
+			if account != "" {
+				if err := config.SetAccount(account); err != nil {
+					return err
+				}
 			}
 			if config.Account == "" {
 				return fmt.Errorf("no account set - `%s env --account <name>`", GetToolName())
@@ -184,6 +206,10 @@ func createListUsersCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&operator, "operator", "o", "", "operator name")
+	cmd.Flags().StringVarP(&account, "account", "a", "", "account name")
+
 	return cmd
 }
 
