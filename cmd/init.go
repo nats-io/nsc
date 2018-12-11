@@ -63,7 +63,19 @@ init --interactive
 			for _, c := range p.Containers() {
 				if c.create && c.generated {
 					printed = true
-					table.AddRow(c.name, c.kind.String(), c.keyPath)
+					table.AddRow(c.name, c.kind.String(), AbbrevHomePaths(c.keyPath))
+					if c.kind == nkeys.PrefixByteUser {
+						s, err := GetStore()
+						if err == nil {
+							ctx, err := s.GetContext()
+							if err == nil {
+								creds := ctx.KeyStore.GetUserCredsPath(p.account.name, p.user.name)
+								if creds != "" {
+									table.AddRow("", "creds file", AbbrevHomePaths(creds))
+								}
+							}
+						}
+					}
 				}
 			}
 
@@ -77,7 +89,7 @@ init --interactive
 			}
 
 			if p.operator.create {
-				cmd.Println("Success! - initialized project directory")
+				cmd.Println("Success! - initialized environment directory")
 			}
 
 			return nil

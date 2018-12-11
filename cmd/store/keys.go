@@ -85,6 +85,14 @@ func (k *KeyStore) keyName(n string) string {
 	return fmt.Sprintf("%s.%s", n, NKeyExtension)
 }
 
+func (k *KeyStore) GetUserCredsPath(account string, user string) string {
+	fp := filepath.Join(GetKeysDir(), k.Env, Accounts, account, Users, k.credsName(user))
+	if _, err := os.Stat(fp); err != nil {
+		return ""
+	}
+	return fp
+}
+
 func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte) error {
 	v, err := k.GetUserKey(account, user)
 	if err != nil {

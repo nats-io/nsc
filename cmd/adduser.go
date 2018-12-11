@@ -40,7 +40,17 @@ func CreateAddUserCmd() *cobra.Command {
 			}
 
 			if params.generated && !QuietMode() {
-				cmd.Printf("Generated user key - private key stored %q\n", params.keyPath)
+				cmd.Printf("Generated user key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
+				s, err := GetStore()
+				if err == nil {
+					ctx, err := s.GetContext()
+					if err == nil {
+						fp := ctx.KeyStore.GetUserCredsPath(params.AccountContextParams.Name, params.name)
+						if fp != "" {
+							cmd.Printf("Generated user creds file %q\n", AbbrevHomePaths(fp))
+						}
+					}
+				}
 			}
 
 			if !QuietMode() {

@@ -38,7 +38,19 @@ func createEditUserCmd() *cobra.Command {
 				return err
 			}
 
+			s, err := GetStore()
+			if err == nil {
+				ctx, err := s.GetContext()
+				if err == nil {
+					creds := ctx.KeyStore.GetUserCredsPath(params.AccountContextParams.Name, params.name)
+					if creds != "" {
+						fmt.Printf("Updated user creds file %q\n", AbbrevHomePaths(creds))
+					}
+				}
+			}
+
 			cmd.Printf("Success! - edited user %q in account %q\n", params.name, params.AccountContextParams.Name)
+			cmd.Println()
 
 			Write("--", FormatJwt("Account", params.token))
 
@@ -238,22 +250,6 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	}
 	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
 		return err
-	}
-
-	kp, err := ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.name)
-	if err != nil {
-		ctx.CurrentCmd().Printf("unable to create creds file: %v\n", err)
-	} else if kp == nil {
-		ctx.CurrentCmd().Printf("unable to create creds file %s key is not available\n", p.name)
-	} else {
-		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.Name, kp)
-		if err != nil {
-			ctx.CurrentCmd().Printf("unable to generate creds file: %v", err)
-		}
-		err = ctx.StoreCtx().KeyStore.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
-		if err != nil {
-			ctx.CurrentCmd().Printf("unable to store creds file: %v", err)
-		}
 	}
 
 	// FIXME: super hack
