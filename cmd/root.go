@@ -117,6 +117,10 @@ func EnterQuietMode() {
 	quietMode = true
 }
 
+func SetQuietMode(tf bool) {
+	quietMode = tf
+}
+
 func QuietMode() bool {
 	return quietMode
 }
