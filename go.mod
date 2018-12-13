@@ -18,7 +18,7 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/nats-io/jwt v0.0.6
+	github.com/nats-io/jwt v0.0.8
 	github.com/nats-io/nkeys v0.0.2
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect

@@ -34,7 +34,6 @@ func Test_AddExport(t *testing.T) {
 		{createAddExportCmd(), []string{"add", "export", "--subject", "bar", "--service"}, nil, []string{"added public service export \"bar\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "bar"}, nil, []string{"added public stream export \"bar\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "foo", "--service"}, nil, []string{"added public service export \"foo\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>", "--service"}, nil, []string{"services cannot have wildcard subject: \"baz.>\""}, true},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>"}, nil, []string{"added public stream export \"baz.>\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "ar", "--name", "mar"}, nil, []string{"added public stream export \"mar\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "mar", "--name", "ar", "--service"}, nil, []string{"added public service export \"ar\""}, false},
