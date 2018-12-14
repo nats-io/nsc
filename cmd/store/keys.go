@@ -195,6 +195,28 @@ func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
 	return string(d), nil
 }
 
+func (k *KeyStore) addGitIgnore() error {
+	fp := GetKeysDir()
+	if fp != "" {
+		_, err := os.Stat(fp)
+		if err != nil {
+			return nil
+		}
+		ignoreFile := filepath.Join(fp, ".gitignore")
+		_, err = os.Stat(ignoreFile)
+		if os.IsNotExist(err) {
+			d := `# ignore all nk files
+**/*.nk
+
+# ignore all creds files
+**/*.creds
+`
+			return ioutil.WriteFile(ignoreFile, []byte(d), 0600)
+		}
+	}
+	return nil
+}
+
 func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, error) {
 	seed, err := kp.Seed()
 	if err != nil {
@@ -211,6 +233,9 @@ func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, erro
 			return "", err
 		}
 	}
+
+	k.addGitIgnore()
+
 	_, err = os.Stat(fp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -221,6 +246,7 @@ func (k *KeyStore) store(name string, fp string, kp nkeys.KeyPair) (string, erro
 			return fp, nil
 		}
 	}
+
 	d, err := ioutil.ReadFile(fp)
 	if err != nil {
 		return "", fmt.Errorf("error reading %q: %v", fp, err)
