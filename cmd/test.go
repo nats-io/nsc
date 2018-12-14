@@ -16,8 +16,13 @@
 package cmd
 
 import (
+	"bytes"
+	"sort"
+	"strings"
+
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 // addCmd represents the add command
@@ -83,7 +88,139 @@ func createGenerateNkey() *cobra.Command {
 	return cmd
 }
 
+func createFlagTable() *cobra.Command {
+	var cmds flagTable
+	cmd := &cobra.Command{
+		Use:           "flags",
+		Short:         "prints a table with all the flags",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			var buf Stack
+			buf.Push(rootCmd)
+
+			for {
+				v := buf.Pop()
+				if v == nil {
+					break
+				}
+				if v.HasSubCommands() {
+					for _, vv := range v.Commands() {
+						buf.Push(vv)
+					}
+					continue
+				} else {
+					cmds.addCmd(v)
+				}
+			}
+
+			cmd.Println(cmds.render())
+
+			return nil
+		},
+	}
+	return cmd
+}
+
+type Stack struct {
+	data []*cobra.Command
+}
+
+func (s *Stack) Push(v *cobra.Command) {
+	s.data = append([]*cobra.Command{v}, s.data...)
+}
+
+func (s *Stack) Pop() *cobra.Command {
+	var v *cobra.Command
+	if len(s.data) == 0 {
+		return nil
+	}
+	v = s.data[0]
+	s.data = s.data[1:]
+	return v
+}
+
+func reverse(a []string) {
+	for i := len(a)/2 - 1; i >= 0; i-- {
+		opp := len(a) - 1 - i
+		a[i], a[opp] = a[opp], a[i]
+	}
+}
+
+type parsedCommand struct {
+	name    string
+	flagMap map[string]string
+}
+
+type flagTable struct {
+	commands []parsedCommand
+}
+
+func (t *flagTable) addCmd(cmd *cobra.Command) {
+	var c parsedCommand
+	c.flagMap = make(map[string]string)
+	names := []string{cmd.Name()}
+	v := cmd
+	for {
+		p := v.Parent()
+		if p == nil {
+			break
+		}
+		names = append(names, p.Name())
+		v = p
+	}
+	reverse(names)
+	c.name = strings.Join(names, " ")
+
+	flags := cmd.Flags()
+	flags.VisitAll(func(f *flag.Flag) {
+		c.flagMap[f.Name] = f.Shorthand
+	})
+
+	t.commands = append(t.commands, c)
+}
+
+func (t *flagTable) render() string {
+	var buf bytes.Buffer
+
+	allFlags := make(map[string]bool)
+	for _, c := range t.commands {
+		for n := range c.flagMap {
+			allFlags[n] = true
+		}
+	}
+	var cols []string
+	for k := range allFlags {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+	cols = append([]string{"cmd"}, cols...)
+
+	buf.WriteString(strings.Join(cols, ","))
+	buf.WriteString("\n")
+
+	for _, c := range t.commands {
+		sf := []string{c.name}
+		for i := 1; i < len(cols); i++ {
+			v, ok := c.flagMap[cols[i]]
+			if v != "" {
+				sf = append(sf, v)
+			} else if ok {
+				sf = append(sf, "-")
+			} else {
+				sf = append(sf, "")
+			}
+		}
+		buf.WriteString(strings.Join(sf, ","))
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
+
 func init() {
 	GetRootCmd().AddCommand(testCmd)
 	testCmd.AddCommand(createGenerateNkey())
+	testCmd.AddCommand(createFlagTable())
 }
