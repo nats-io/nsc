@@ -126,7 +126,7 @@ func (c *Entity) Edit() error {
 		return err
 	}
 	if !ok {
-		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to the %s nkey", label), "", true, c.ValidateNKey())
+		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to the %s nkey", label), c.keyPath, true, c.ValidateNKey())
 		if err != nil {
 			return err
 		}
@@ -192,6 +192,9 @@ func (c *Entity) ValidateNKey() cli.Validator {
 		nk, err := store.ResolveKey(v)
 		if err != nil {
 			return err
+		}
+		if nk == nil {
+			return fmt.Errorf("a key is required")
 		}
 		t, err := store.KeyType(nk)
 		if err != nil {
