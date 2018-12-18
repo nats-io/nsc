@@ -49,7 +49,7 @@ func (c *Entity) Valid() error {
 			return fmt.Errorf("invalid %s key", c.kind.String())
 		}
 
-	} else {
+	} else if c.create {
 		c.kp, err = nkeys.CreatePair(c.kind)
 		if err != nil {
 			return err
