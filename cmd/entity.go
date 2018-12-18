@@ -126,7 +126,7 @@ func (c *Entity) Edit() error {
 		return err
 	}
 	if !ok {
-		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to the %s nkey", label), c.keyPath, true, c.ValidateNKey())
+		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to an %s nkey or nkey", label), c.keyPath, true, c.ValidateNKey())
 		if err != nil {
 			return err
 		}

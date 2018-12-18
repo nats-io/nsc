@@ -47,6 +47,9 @@ func (e *NKeyParams) valid(s string) error {
 	if err != nil {
 		return err
 	}
+	if kp == nil {
+		return fmt.Errorf("a key is required")
+	}
 	if !store.KeyPairTypeOk(e.kind, kp) {
 		return fmt.Errorf("%s has invalid %s nkey", e.flagName, e.kind.String())
 	}
@@ -88,7 +91,7 @@ func (e *NKeyParams) PublicKey() (string, error) {
 }
 
 func (e *NKeyParams) Edit() error {
-	sv, err := cli.Prompt(fmt.Sprintf("%s nkey", e.flagName), e.path, true, e.valid)
+	sv, err := cli.Prompt(fmt.Sprintf("path to %s nkey or nkey", e.flagName), e.path, true, e.valid)
 	if err != nil {
 		return err
 	}

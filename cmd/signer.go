@@ -43,7 +43,7 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		return err
 	}
 	if p.signerKP == nil {
-		label := fmt.Sprintf("%s keypath", p.kind.String())
+		label := fmt.Sprintf("path to %s nkey or nkey", p.kind.String())
 		err = EditKeyPath(p.kind, label, &KeyPathFlag)
 		if err != nil {
 			return err
