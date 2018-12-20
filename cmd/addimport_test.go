@@ -118,7 +118,7 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, fp, "my import", "barfoo.>"}
+	input := []interface{}{1, false, fp, "my import", "barfoo.>", ts.OperatorKeyPath}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -185,7 +185,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, apub, "foobar.>", true, "test", "test.foobar.>"}
+	input := []interface{}{1, true, apub, "foobar.>", true, "test", "test.foobar.>", ts.OperatorKeyPath}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 

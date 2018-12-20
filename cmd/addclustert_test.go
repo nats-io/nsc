@@ -72,7 +72,7 @@ func Test_AddClusterInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01"}
+	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01", ts.OperatorKeyPath}
 
 	cmd := createAddClusterCmd()
 	HoistRootFlags(cmd)

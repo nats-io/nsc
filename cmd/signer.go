@@ -19,8 +19,11 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 )
 
+// SignerParams is shared UI for a signer (-K flag). The key
+// for a signer is never generated and must be provided
 type SignerParams struct {
 	kind     nkeys.PrefixByte
 	signerKP nkeys.KeyPair
@@ -38,18 +41,29 @@ func (p *SignerParams) SetDefaults(kind nkeys.PrefixByte, allowManaged bool, ctx
 func (p *SignerParams) Edit(ctx ActionCtx) error {
 	var err error
 
-	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+	sctx := ctx.StoreCtx()
+	p.signerKP, err = sctx.ResolveKey(p.kind, KeyPathFlag)
 	if err != nil {
 		return err
 	}
-	if p.signerKP == nil {
-		label := fmt.Sprintf("path to %s nkey or nkey", p.kind.String())
-		err = EditKeyPath(p.kind, label, &KeyPathFlag)
-		if err != nil {
-			return err
-		}
+
+	// skip showing a signer
+	if p.signerKP != nil && ctx.StoreCtx().Store.IsManaged() {
+		return nil
 	}
-	return nil
+	ks := sctx.KeyStore
+	switch p.kind {
+	case nkeys.PrefixByteOperator:
+		KeyPathFlag = ks.GetOperatorKeyPath(sctx.Operator.Name)
+	case nkeys.PrefixByteAccount:
+		KeyPathFlag = ks.GetAccountKeyPath(sctx.Account.Name)
+	case nkeys.PrefixByteCluster:
+		KeyPathFlag = ks.GetClusterKeyPath(sctx.Cluster.Name)
+	}
+
+	label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
+	KeyPathFlag, err = cli.Prompt(label, KeyPathFlag, true, NKeyValidator(p.kind))
+	return err
 }
 
 func (p *SignerParams) Resolve(ctx ActionCtx) error {

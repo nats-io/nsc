@@ -54,10 +54,6 @@ func GetConfig() *ToolConfig {
 	return &config
 }
 
-func ResetConfigForTests() {
-	config = ToolConfig{}
-}
-
 func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 	var err error
 	if toolHomeEnvName == "" {

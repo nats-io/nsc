@@ -29,7 +29,7 @@ func TestDefault_LoadOrInit(t *testing.T) {
 	dir := filepath.Join(d, "a")
 	require.NoError(t, os.Setenv("TEST_NAME", dir))
 
-	ResetConfigForTests()
+	ResetForTests()
 	tc, err := LoadOrInit("my/foo", "TEST_NAME")
 	require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	fp := filepath.Join(ts.Dir, fmt.Sprintf("%s.json", GetToolName()))
 	require.NoError(t, WriteJson(fp, cc))
 
-	ResetConfigForTests()
+	ResetForTests()
 	tc, err := LoadOrInit("my/foo", "TEST_NAME")
 	require.NoError(t, err)
 	require.NotNil(t, tc)
