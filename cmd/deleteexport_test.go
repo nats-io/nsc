@@ -60,7 +60,7 @@ func Test_DeleteExportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "baz", true)
 	ts.AddAccount(t, "B")
 
-	input := []interface{}{0, 0}
+	input := []interface{}{0, 0, ts.KeyStore.GetAccountKeyPath("A")}
 	cmd := createDeleteExportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")

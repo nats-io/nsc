@@ -113,16 +113,16 @@ func (k *KeyStore) keypath(name string, kp nkeys.KeyPair, parent string) (string
 	}
 	switch kt {
 	case nkeys.PrefixByteOperator:
-		return filepath.Join(GetKeysDir(), k.Env, k.keyName(name)), nil
+		return k.GetOperatorKeyPath(name), nil
 	case nkeys.PrefixByteAccount:
-		return filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)), nil
+		return k.GetAccountKeyPath(name), nil
 	case nkeys.PrefixByteUser:
 		if parent == "" {
 			return "", fmt.Errorf("user keys require an account parent")
 		}
 		return filepath.Join(GetKeysDir(), k.Env, Accounts, parent, Users, k.keyName(name)), nil
 	case nkeys.PrefixByteCluster:
-		return filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)), nil
+		return k.GetClusterKeyPath(name), nil
 	case nkeys.PrefixByteServer:
 		if parent == "" {
 			return "", fmt.Errorf("servers keys require a cluster parent")
@@ -133,8 +133,20 @@ func (k *KeyStore) keypath(name string, kp nkeys.KeyPair, parent string) (string
 	}
 }
 
+func (k *KeyStore) GetOperatorKeyPath(name string) string {
+	return filepath.Join(GetKeysDir(), k.Env, k.keyName(name))
+}
+
+func (k *KeyStore) GetAccountKeyPath(name string) string {
+	return filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name))
+}
+
+func (k *KeyStore) GetClusterKeyPath(name string) string {
+	return filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name))
+}
+
 func (k *KeyStore) GetOperatorKey(name string) (nkeys.KeyPair, error) {
-	return k.Read(filepath.Join(GetKeysDir(), k.Env, k.keyName(name)))
+	return k.Read(k.GetOperatorKeyPath(name))
 }
 
 func (k *KeyStore) GetOperatorPublicKey(name string) (string, error) {
@@ -142,7 +154,7 @@ func (k *KeyStore) GetOperatorPublicKey(name string) (string, error) {
 }
 
 func (k *KeyStore) GetAccountKey(name string) (nkeys.KeyPair, error) {
-	return k.Read(filepath.Join(GetKeysDir(), k.Env, Accounts, name, k.keyName(name)))
+	return k.Read(k.GetAccountKeyPath(name))
 }
 
 func (k *KeyStore) GetAccountPublicKey(name string) (string, error) {
@@ -162,7 +174,7 @@ func (k *KeyStore) GetUserSeed(account string, name string) (string, error) {
 }
 
 func (k *KeyStore) GetClusterKey(name string) (nkeys.KeyPair, error) {
-	return k.Read(filepath.Join(GetKeysDir(), k.Env, Clusters, name, k.keyName(name)))
+	return k.Read(k.GetClusterKeyPath(name))
 }
 
 func (k *KeyStore) GetClusterPublicKey(name string) (string, error) {

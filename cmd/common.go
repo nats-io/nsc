@@ -298,22 +298,6 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 	}
 }
 
-func EditKeyPath(kind nkeys.PrefixByte, label string, keypath *string) error {
-	ok, err := cli.PromptYN(fmt.Sprintf("generate an %s nkey", label))
-	if err != nil {
-		return err
-	}
-
-	if !ok {
-		v, err := cli.Prompt(fmt.Sprintf("path to the %s nkey", label), "", true, NKeyValidator(kind))
-		if err != nil {
-			return err
-		}
-		*keypath = v
-	}
-	return nil
-}
-
 func LoadFromURL(url string) ([]byte, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(url)

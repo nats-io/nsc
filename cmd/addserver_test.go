@@ -72,7 +72,7 @@ func Test_AddServerInteractive(t *testing.T) {
 	_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", "c")
 	require.NoError(t, err, "cluster creation")
 
-	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01"}
+	inputs := []interface{}{"a", true, "2018-01-01", "2050-01-01", ts.KeyStore.GetClusterKeyPath("c")}
 
 	cmd := createAddServerCmd()
 	HoistRootFlags(cmd)

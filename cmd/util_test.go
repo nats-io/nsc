@@ -40,8 +40,14 @@ type TestStore struct {
 	OperatorKeyPath string
 }
 
+// Some globals must be reset
+func ResetForTests() {
+	config = ToolConfig{}
+	KeyPathFlag = ""
+}
+
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
-	ResetConfigForTests()
+	ResetForTests()
 	var ts TestStore
 	WideFlag = true
 

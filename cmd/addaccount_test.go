@@ -62,7 +62,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	inputs := []interface{}{"A", true, "2018-01-01", "2050-01-01"}
+	inputs := []interface{}{"A", true, "2018-01-01", "2050-01-01", ts.OperatorKeyPath}
 
 	cmd := CreateAddAccountCmd()
 	HoistRootFlags(cmd)

@@ -71,7 +71,7 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	ts.AddImport(t, "A", "foo", "B")
 	ts.AddImport(t, "A", "bar", "B")
 
-	input := []interface{}{1, false, 0}
+	input := []interface{}{1, false, 0, ts.OperatorKeyPath}
 	cmd := createDeleteImportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input)

@@ -125,13 +125,13 @@ func Test_AddExportAccountNameRequired(t *testing.T) {
 }
 
 func TestAddExportInteractive(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	input := []interface{}{0, 0, "foo.>", "Foo Stream", false}
+	input := []interface{}{0, 0, "foo.>", "Foo Stream", false, ts.OperatorKeyPath}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")

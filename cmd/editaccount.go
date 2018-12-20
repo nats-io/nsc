@@ -157,11 +157,11 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 
 func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	var err error
-	if err = p.conns.Edit("max connections"); err != nil {
+	if err = p.conns.Edit("max connections (-1 unlimited)"); err != nil {
 		return err
 	}
 
-	if err = p.data.Edit("max data"); err != nil {
+	if err = p.data.Edit("max data (-1 unlimited)"); err != nil {
 		return err
 	}
 
