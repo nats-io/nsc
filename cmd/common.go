@@ -128,10 +128,15 @@ func ReadJson(fp string, v interface{}) error {
 }
 
 func Read(fp string) ([]byte, error) {
-	afp, err := filepath.Abs(fp)
+	hfp, err := homedir.Expand(fp)
+	if err != nil {
+		return nil, fmt.Errorf("error expanding path %q: %v", fp, err)
+	}
+	afp, err := filepath.Abs(hfp)
 	if err != nil {
 		return nil, fmt.Errorf("error converting abs %q: %v", fp, err)
 	}
+
 	return ioutil.ReadFile(afp)
 }
 

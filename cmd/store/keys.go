@@ -22,6 +22,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 )
 
@@ -301,11 +302,15 @@ func Match(pubkey string, kp nkeys.KeyPair) bool {
 }
 
 func keyFromFile(path string) (nkeys.KeyPair, error) {
-	path, err := filepath.Abs(path)
+	hfp, err := homedir.Expand(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error expanding path %q: %v", path, err)
 	}
-	d, err := ioutil.ReadFile(path)
+	afp, err := filepath.Abs(hfp)
+	if err != nil {
+		return nil, fmt.Errorf("error converting abs %q: %v", hfp, err)
+	}
+	d, err := ioutil.ReadFile(afp)
 	if err != nil {
 		return nil, err
 	}
