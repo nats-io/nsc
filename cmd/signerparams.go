@@ -42,23 +42,23 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 	var err error
 
 	sctx := ctx.StoreCtx()
-	p.signerKP, err = sctx.ResolveKey(p.kind, KeyPathFlag)
-	if err != nil {
-		return err
-	}
+	p.signerKP, _ = sctx.ResolveKey(p.kind, KeyPathFlag)
 
 	// skip showing a signer
 	if p.signerKP != nil && ctx.StoreCtx().Store.IsManaged() {
 		return nil
 	}
-	ks := sctx.KeyStore
-	switch p.kind {
-	case nkeys.PrefixByteOperator:
-		KeyPathFlag = ks.GetOperatorKeyPath(sctx.Operator.Name)
-	case nkeys.PrefixByteAccount:
-		KeyPathFlag = ks.GetAccountKeyPath(sctx.Account.Name)
-	case nkeys.PrefixByteCluster:
-		KeyPathFlag = ks.GetClusterKeyPath(sctx.Cluster.Name)
+
+	if KeyPathFlag == "" {
+		ks := sctx.KeyStore
+		switch p.kind {
+		case nkeys.PrefixByteOperator:
+			KeyPathFlag = ks.GetOperatorKeyPath(sctx.Operator.Name)
+		case nkeys.PrefixByteAccount:
+			KeyPathFlag = ks.GetAccountKeyPath(sctx.Account.Name)
+		case nkeys.PrefixByteCluster:
+			KeyPathFlag = ks.GetClusterKeyPath(sctx.Cluster.Name)
+		}
 	}
 
 	label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
@@ -73,8 +73,5 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 	var err error
 	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
