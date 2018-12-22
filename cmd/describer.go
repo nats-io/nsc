@@ -21,6 +21,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/nats-io/nsc/cli"
+
 	"github.com/dustin/go-humanize"
 	"github.com/nats-io/jwt"
 	"github.com/xlab/tablewriter"
@@ -116,7 +118,7 @@ func (a *AccountDescriber) Describe() string {
 
 	if len(a.Imports) > 0 {
 		buf.WriteString("\n")
-		buf.WriteString(NewImportsDescriber(a.Imports).Describe())
+		buf.WriteString(NewImportsDescriber(a.Imports, a.Subject).Describe())
 	}
 
 	return buf.String()
@@ -137,34 +139,36 @@ func (e *ExportsDescriber) Describe() string {
 	table.UTF8Box()
 
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public")
+	table.AddHeaders("Type", "Subject", "Public")
 	for _, v := range e.Exports {
 		public := "Yes"
 		if v.TokenReq {
 			public = "No"
 		}
-		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public)
+		table.AddRow(strings.Title(v.Type.String()), v.Subject, public)
 	}
 	return table.Render()
 }
 
 type ImportsDescriber struct {
 	jwt.Imports
+	accountPK string
 }
 
-func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
+func NewImportsDescriber(imports jwt.Imports, accountPK string) *ImportsDescriber {
 	var d ImportsDescriber
 	d.Imports = imports
+	d.accountPK = accountPK
 	return &d
 }
 
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Name", "Type", "Remote", "Local", "Expires", "From Account", "Public")
+	table.AddHeaders("Type", "Remote", "Local", "Expires", "From Account", "Public")
 
 	for _, v := range i.Imports {
-		NewImportDescriber(*v).Brief(table)
+		NewImportDescriber(*v).Brief(table, i.accountPK)
 	}
 
 	return table.Render()
@@ -178,16 +182,21 @@ func NewImportDescriber(im jwt.Import) *ImportDescriber {
 	return &ImportDescriber{im}
 }
 
-func (i *ImportDescriber) Brief(table *tablewriter.Table) {
+func (i *ImportDescriber) Brief(table *tablewriter.Table, myAccount string) {
 	local := string(i.To)
 	remote := string(i.Subject)
 
 	if i.Type == jwt.Service {
 		local, remote = remote, local
 	}
+	shortMyAccount := ShortCodes(myAccount)
+	if !WideFlag {
+		local = strings.Replace(local, myAccount, fmt.Sprintf("%s", cli.Italic(shortMyAccount)), -1)
+		remote = strings.Replace(remote, myAccount, fmt.Sprintf("%s", cli.Italic(shortMyAccount)), -1)
+	}
 
 	if i.Token == "" {
-		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", ShortCodes(i.Account), "Yes")
+		table.AddRow(strings.Title(i.Type.String()), remote, local, "", ShortCodes(i.Account), "Yes")
 		return
 	}
 	expiration := ""
@@ -197,7 +206,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, ShortCodes(i.Account), "No")
+	table.AddRow(strings.Title(i.Type.String()), remote, local, expiration, ShortCodes(i.Account), "No")
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
