@@ -283,7 +283,7 @@ func RenderDate(d int64) string {
 		return ""
 	}
 
-	return fmt.Sprintf("%s (%s)", UnixToDate(d), HumanizedDate(d))
+	return fmt.Sprintf("%s", UnixToDate(d))
 }
 
 func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {

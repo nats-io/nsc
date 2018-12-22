@@ -137,13 +137,13 @@ func (e *ExportsDescriber) Describe() string {
 	table.UTF8Box()
 
 	table.AddTitle("Exports")
-	table.AddHeaders("Type", "Subject", "Public")
+	table.AddHeaders("Name", "Type", "Subject", "Public")
 	for _, v := range e.Exports {
 		public := "Yes"
 		if v.TokenReq {
 			public = "No"
 		}
-		table.AddRow(strings.Title(v.Type.String()), v.Subject, public)
+		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public)
 	}
 	return table.Render()
 }
@@ -161,7 +161,7 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Type", "Subject", "To", "Expires", "From Account")
+	table.AddHeaders("Name", "Type", "Remote", "Local", "Expires", "From Account", "Public")
 
 	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
@@ -179,8 +179,15 @@ func NewImportDescriber(im jwt.Import) *ImportDescriber {
 }
 
 func (i *ImportDescriber) Brief(table *tablewriter.Table) {
+	local := string(i.To)
+	remote := string(i.Subject)
+
+	if i.Type == jwt.Service {
+		local, remote = remote, local
+	}
+
 	if i.Token == "" {
-		table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), "", ShortCodes(i.Account))
+		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", ShortCodes(i.Account), "Yes")
 		return
 	}
 	expiration := ""
@@ -190,7 +197,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(strings.Title(i.Type.String()), string(i.Subject), string(i.To), expiration, ShortCodes(i.Account))
+	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, ShortCodes(i.Account), "No")
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {

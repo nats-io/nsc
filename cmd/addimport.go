@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"strings"
 
@@ -45,18 +44,17 @@ func createAddImportCmd() *cobra.Command {
 				if params.service {
 					kind = jwt.Service
 				}
-				cmd.Printf("Success! - added %s import %q\n", kind, params.srcSubject)
+				cmd.Printf("Success! - added %s import %q\n", kind, params.remote)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.src, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
+	cmd.Flags().StringVarP(&params.tokenSrc, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "import name")
-	cmd.Flags().StringVarP(&params.to, "to", "t", "", "target subject")
-
-	cmd.Flags().StringVarP(&params.srcAccount, "src-account", "", "", "source account (only public imports)")
-	cmd.Flags().StringVarP(&params.srcSubject, "src-subject", "", "", "source subject (only public imports)")
+	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject")
+	params.srcAccount.BindFlags("src-account", "", nkeys.PrefixByteAccount, cmd)
+	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -70,38 +68,39 @@ func init() {
 type AddImportParams struct {
 	AccountContextParams
 	SignerParams
+	srcAccount PubKeyParams
 	claim      *jwt.AccountClaims
-	to         string
+	local      string
 	token      []byte
-	src        string
-	srcAccount string
-	srcSubject string
+	tokenSrc   string
+	remote     string
 	service    bool
 	name       string
+	public     bool
 }
 
 func (p *AddImportParams) longHelp() string {
 	v := `toolname add import -i
-toolname add import --token-file path --to <sub>
-toolname add import --token https://some.service.com/path --to <sub>
-toolname add import --src-account <account_pubkey> --src-subject <src_subject> --to <sub>`
+toolname add import --token-file path --local-subject <sub>
+toolname add import --token https://some.service.com/path --local-subject <sub>
+toolname add import --src-account <account_pubkey> --remote-subject <remote-sub> --local-subject <sub>`
 
 	return strings.Replace(v, "toolname", GetToolName(), -1)
 }
 
 func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 	if !InteractiveFlag {
-		tokenSet := ctx.AllSet("token")
-		set := ctx.CountSet("token", "src-subject", "src-account")
-		if tokenSet && set > 1 {
+		p.public = ctx.AllSet("token")
+		set := ctx.CountSet("token", "remote-subject", "src-account")
+		if p.public && set > 1 {
 			ctx.CurrentCmd().SilenceErrors = false
 			ctx.CurrentCmd().SilenceUsage = false
-			return errors.New("private imports require src-account, src-subject and service to be unset")
+			return errors.New("private imports require src-account, remote-subject and service to be unset")
 		}
-		if !tokenSet && set != 2 {
+		if !p.public && set != 2 {
 			ctx.CurrentCmd().SilenceErrors = false
 			ctx.CurrentCmd().SilenceUsage = false
-			return errors.New("public imports require src-account, src-subject")
+			return errors.New("public imports require src-account, remote-subject")
 		}
 	}
 
@@ -111,8 +110,12 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
+	if p.local == "" {
+		p.local = p.remote
+	}
+
 	if p.name == "" {
-		p.name = p.srcSubject
+		p.name = p.local
 	}
 
 	return nil
@@ -124,21 +127,15 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.service, err = cli.PromptYN("is the export public?")
+	p.public, err = cli.PromptYN("is the export public?")
 	if err != nil {
 		return err
 	}
-	if p.service {
-		p.srcAccount, err = cli.Prompt("source account", p.srcAccount, true, func(s string) error {
-			if !nkeys.IsValidPublicAccountKey(s) {
-				return errors.New("not a valid account public key")
-			}
-			return nil
-		})
-		if err != nil {
+	if p.public {
+		if err := p.srcAccount.Edit(); err != nil {
 			return err
 		}
-		p.srcSubject, err = cli.Prompt("source subject", p.srcSubject, true, func(v string) error {
+		p.remote, err = cli.Prompt("remote subject", p.remote, true, func(v string) error {
 			t := jwt.Subject(v)
 			var vr jwt.ValidationResults
 			t.Validate(&vr)
@@ -152,9 +149,9 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 	} else {
-		p.src, err = cli.Prompt("token path or url", p.src, true, func(s string) error {
-			p.src = s
-			p.token, err = p.LoadImport()
+		p.tokenSrc, err = cli.Prompt("token path or url", p.tokenSrc, true, func(s string) error {
+			p.tokenSrc = s
+			p.token, err = p.loadImport()
 			if err != nil {
 				return err
 			}
@@ -168,20 +165,25 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddImportParams) LoadImport() ([]byte, error) {
-	if url, err := url.Parse(p.src); err == nil && url.Scheme != "" {
-		return LoadFromURL(p.src)
-	} else {
-		data, err := ioutil.ReadFile(p.src)
-		if err != nil {
-			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
-		}
-		v, _ := ExtractToken(string(data))
-		if err != nil {
-			return nil, fmt.Errorf("error loading %q: %v", p.src, err)
-		}
-		return []byte(v), nil
+func (p *AddImportParams) loadImport() ([]byte, error) {
+	ac, err := jwt.DecodeActivationClaims(p.tokenSrc)
+	if ac != nil && err == nil {
+		return []byte(p.tokenSrc), nil
 	}
+
+	if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
+		return LoadFromURL(p.tokenSrc)
+	}
+
+	data, err := Read(p.tokenSrc)
+	if err != nil {
+		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
+	}
+	v, _ := ExtractToken(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
+	}
+	return []byte(v), nil
 }
 
 func (p *AddImportParams) Load(ctx ActionCtx) error {
@@ -196,8 +198,8 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.src != "" {
-		if err := p.initFromExport(ctx); err != nil {
+	if p.tokenSrc != "" {
+		if err := p.initFromActivation(ctx); err != nil {
 			return err
 		}
 	}
@@ -205,10 +207,10 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddImportParams) initFromExport(ctx ActionCtx) error {
+func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
 	var err error
 	if p.token == nil {
-		p.token, err = p.LoadImport()
+		p.token, err = p.loadImport()
 		if err != nil {
 			return err
 		}
@@ -223,17 +225,16 @@ func (p *AddImportParams) initFromExport(ctx ActionCtx) error {
 		p.name = ac.Name
 	}
 
-	p.srcSubject = string(ac.ImportSubject)
-
-	if p.to == "" {
-		p.to = p.srcSubject
+	p.remote = string(ac.ImportSubject)
+	if p.local == "" {
+		p.local = p.remote
 	}
 
 	if ac.ImportType == jwt.Service {
 		p.service = true
 	}
 
-	p.srcAccount = ac.Issuer
+	p.srcAccount.publicKey = ac.Issuer
 
 	if ac.Subject != "public" && p.claim.Subject != ac.Subject {
 		return fmt.Errorf("activation is not intended for this account - it is for %q", ac.Subject)
@@ -244,22 +245,26 @@ func (p *AddImportParams) initFromExport(ctx ActionCtx) error {
 func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	p.name, err = cli.Prompt("import name", p.name, true, cli.LengthValidator(1))
+	p.name, err = cli.Prompt("name", p.name, true, cli.LengthValidator(1))
 	if err != nil {
 		return err
 	}
 
-	if p.to == "" {
-		p.to = p.srcSubject
+	if p.local == "" {
+		p.local = p.remote
 	}
-
-	p.to, err = cli.Prompt("subject mapping", p.to, true, func(s string) error {
+	p.local, err = cli.Prompt("local subject", p.local, true, func(s string) error {
 		vr := jwt.CreateValidationResults()
 		sub := jwt.Subject(s)
 		sub.Validate(vr)
 		if !vr.IsEmpty() {
 			return errors.New(vr.Issues[0].Error())
 		}
+
+		if p.service && sub.HasWildCards() {
+			return errors.New("imported services cannot have wildcards")
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -273,38 +278,18 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddImportParams) createImport() *jwt.Import {
-	var im jwt.Import
-	im.Name = p.name
-	im.Subject = jwt.Subject(p.srcSubject)
-	im.Account = p.srcAccount
-
-	if p.src != "" {
-		if u, err := url.Parse(p.src); err == nil && u.Scheme != "" {
-			im.Token = p.src
-		} else {
-			im.Token = string(p.token)
-		}
-	}
-	im.To = jwt.Subject(p.to)
-
-	kind := jwt.Stream
-	if p.service {
-		kind = jwt.Service
-	}
-	im.Type = kind
-
-	return &im
-}
-
 func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	var err error
 
-	if p.claim.Subject == p.srcAccount {
+	if p.claim.Subject == p.srcAccount.publicKey {
 		return fmt.Errorf("export issuer is this account")
 	}
 
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
+		return err
+	}
+
+	if err = p.srcAccount.Valid(); err != nil {
 		return err
 	}
 
@@ -313,11 +298,24 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 		kind = jwt.Service
 	}
 
-	for _, im := range p.claim.Imports {
-		if im.Account == p.srcAccount &&
-			string(im.Subject) == string(p.srcSubject) &&
-			im.Type == kind {
-			return fmt.Errorf("account already imports %s %q from %s", kind, im.Subject, p.srcAccount)
+	sub := jwt.Subject(p.local)
+	if kind == jwt.Service && sub.HasWildCards() {
+		return errors.New("imported services cannot have wildcards")
+	}
+
+	resub := jwt.Subject(p.remote)
+	if kind == jwt.Service && resub.HasWildCards() {
+		return errors.New("imported services cannot have wildcards")
+	}
+
+	for _, im := range p.filter(kind, p.claim.Imports) {
+		local := string(im.To)
+		remote := string(im.Subject)
+		if im.Type == jwt.Service {
+			local, remote = remote, local
+		}
+		if im.Account == p.srcAccount.publicKey && remote == p.remote {
+			return fmt.Errorf("account already imports %s %q from %s", kind, im.Subject, p.srcAccount.publicKey)
 		}
 	}
 
@@ -326,6 +324,16 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	}
 
 	return nil
+}
+
+func (p *AddImportParams) filter(kind jwt.ExportType, imports jwt.Imports) jwt.Imports {
+	var buf jwt.Imports
+	for _, v := range imports {
+		if v.Type == kind {
+			buf.Add(v)
+		}
+	}
+	return buf
 }
 
 func (p *AddImportParams) Run(ctx ActionCtx) error {
@@ -348,4 +356,28 @@ func (p *AddImportParams) Run(ctx ActionCtx) error {
 	}
 
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+}
+
+func (p *AddImportParams) createImport() *jwt.Import {
+	var im jwt.Import
+	im.Name = p.name
+	im.Subject = jwt.Subject(p.remote)
+	im.To = jwt.Subject(p.local)
+	im.Account = p.srcAccount.publicKey
+	im.Type = jwt.Stream
+
+	if p.service {
+		im.Type = jwt.Service
+		im.Subject, im.To = im.To, im.Subject
+	}
+
+	if p.tokenSrc != "" {
+		if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
+			im.Token = p.tokenSrc
+		} else {
+			im.Token = string(p.token)
+		}
+	}
+
+	return &im
 }
