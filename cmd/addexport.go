@@ -130,7 +130,7 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 	if p.export.Name == "" {
 		p.export.Name = p.subject
 	}
-	p.export.Name, err = cli.Prompt("export name", p.export.Name, true, cli.LengthValidator(1))
+	p.export.Name, err = cli.Prompt("name", p.export.Name, true, cli.LengthValidator(1))
 
 	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
 

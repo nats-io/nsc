@@ -140,7 +140,7 @@ func Test_AddPublicImport(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
 	ts.AddAccount(t, "B")
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", pub, "--src-subject", "foobar.>")
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", pub, "--remote-subject", "foobar.>")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -154,7 +154,7 @@ func Test_AddImport_TokenAndPublic(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--token", "/foo", "--src-subject", "foobar.>")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--token", "/foo", "--remote-subject", "foobar.>")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "private imports require src-account")
 }
@@ -164,9 +164,9 @@ func Test_AddImport_MoreForPublic(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--src-subject", "foobar.>")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--remote-subject", "foobar.>")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "public imports require src-account, src-subject")
+	require.Contains(t, err.Error(), "public imports require src-account, remote-subject")
 }
 
 func Test_AddImport_PublicInteractive(t *testing.T) {
@@ -174,7 +174,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
 
 	akp, err := ts.KeyStore.GetAccountKey("A")
 	require.NoError(t, err)
@@ -185,7 +185,40 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, apub, "foobar.>", true, "test", "test.foobar.>", ts.OperatorKeyPath}
+	// B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
+	input := []interface{}{1, true, apub, "foobar.x", true, "test", "test.foobar.alberto", ts.OperatorKeyPath}
+	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
+	require.Equal(t, "test", ac.Imports[0].Name)
+	// for services remote local is subject, remote is to
+	require.Equal(t, "test.foobar.alberto", string(ac.Imports[0].Subject))
+	require.Equal(t, "foobar.x", string(ac.Imports[0].To))
+	require.Equal(t, jwt.Service, ac.Imports[0].Type)
+	require.Equal(t, apub, ac.Imports[0].Account)
+}
+
+func Test_AddImport_PublicStreamInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
+
+	akp, err := ts.KeyStore.GetAccountKey("A")
+	require.NoError(t, err)
+	require.NotNil(t, akp)
+	apub, err := akp.PublicKey()
+
+	ts.AddAccount(t, "B")
+
+	cmd := createAddImportCmd()
+	HoistRootFlags(cmd)
+	// B, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
+	input := []interface{}{1, true, apub, "foobar.>", false, "test", "test.foobar.>", ts.OperatorKeyPath}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -195,6 +228,6 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.Equal(t, "test", ac.Imports[0].Name)
 	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
-	require.Equal(t, jwt.Service, ac.Imports[0].Type)
+	require.Equal(t, jwt.Stream, ac.Imports[0].Type)
 	require.Equal(t, apub, ac.Imports[0].Account)
 }

@@ -43,10 +43,10 @@ func createGenerateActivationCmd() *cobra.Command {
 
 			if QuietMode() {
 				cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-					params.export.Name, params.targetPK, params.activation.ID)
+					params.export.Name, params.accountKey.publicKey, params.activation.ID)
 			} else {
 				cmd.Printf("generated %q activation for account %q.\nJTI is %q\n",
-					params.export.Name, params.targetPK, params.activation.ID)
+					params.export.Name, params.accountKey.publicKey, params.activation.ID)
 			}
 
 			if params.activation.NotBefore > 0 {
@@ -64,8 +64,9 @@ func createGenerateActivationCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
+	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
-	params.targetKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, false, cmd)
+	params.accountKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, cmd)
 	params.timeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -78,23 +79,22 @@ func init() {
 
 type GenerateActivationParams struct {
 	AccountContextParams
+	SignerParams
 	activation     *jwt.ActivationClaims
 	claims         *jwt.AccountClaims
 	export         jwt.Export
 	out            string
 	privateExports jwt.Exports
-	SignerParams
-	subject    string
-	targetKey  NKeyParams
-	targetPK   string
-	timeParams TimeParams
-	Token      string
+	service        bool
+	subject        string
+	accountKey     PubKeyParams
+	timeParams     TimeParams
+	Token          string
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, false, ctx)
-	p.export.Subject = jwt.Subject(p.subject)
 
 	return nil
 }
@@ -104,6 +104,12 @@ func (p *GenerateActivationParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
+
+	p.service, err = cli.PromptBoolean("is service", p.service)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -123,14 +129,23 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("account %q doesn't have exports", p.AccountContextParams.Name)
 	}
 
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+
 	for _, v := range p.claims.Exports {
+		if v.Type != kind {
+			continue
+		}
 		if v.TokenReq {
 			p.privateExports.Add(v)
 		}
 	}
 
 	if len(p.privateExports) == 0 {
-		return fmt.Errorf("account %q doesn't have exports that require token generation", p.AccountContextParams.Name)
+		return fmt.Errorf("account %q doesn't have %s exports that require token generation",
+			p.AccountContextParams.Name, kind.String())
 	}
 
 	return nil
@@ -139,24 +154,43 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	if p.subject == "" && len(p.privateExports) == 1 {
-		p.subject = string(p.privateExports[0].Subject)
-	}
-
 	var choices []string
 	if p.export.Subject == "" {
 		for _, v := range p.privateExports {
-			choices = append(choices, fmt.Sprintf("[%s] %s - %s", v.Type, v.Name, v.Subject))
+			choices = append(choices, fmt.Sprintf("%s", v.Subject))
 		}
 	}
-	i, err := cli.PromptChoices("select export", p.subject, choices)
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+
+	i, err := cli.PromptChoices(fmt.Sprintf("select %s export", kind.String()), "", choices)
 	if err != nil {
 		return err
 	}
 	p.export = *p.privateExports[i]
-	p.subject = string(p.export.Subject)
+	if p.subject == "" {
+		p.subject = string(p.export.Subject)
+	}
 
-	if err = p.targetKey.Edit(); err != nil {
+	p.subject, err = cli.Prompt("subject", p.subject, true, func(v string) error {
+		t := jwt.Subject(v)
+		var vr jwt.ValidationResults
+		t.Validate(&vr)
+		if len(vr.Issues) > 0 {
+			return errors.New(vr.Issues[0].Description)
+		}
+		if kind == jwt.Service && t.HasWildCards() {
+			return errors.New("services cannot have wildcards")
+		}
+		if t != p.export.Subject && !t.IsContainedIn(p.export.Subject) {
+			return fmt.Errorf("%q doesn't contain %q", string(p.export.Subject), string(t))
+		}
+		return nil
+	})
+
+	if err = p.accountKey.Edit(); err != nil {
 		return err
 	}
 
@@ -174,7 +208,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	var err error
 
-	if len(p.privateExports) == 1 {
+	if len(p.privateExports) == 1 && p.subject == "" {
 		p.subject = string(p.privateExports[0].Subject)
 	}
 
@@ -187,16 +221,27 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.targetPK, err = p.targetKey.PublicKey(); err != nil {
+	if err = p.accountKey.Valid(); err != nil {
 		return err
 	}
 
+	// validate the raw subject
 	sub := jwt.Subject(p.subject)
+	var vr jwt.ValidationResults
+	sub.Validate(&vr)
+	if len(vr.Issues) > 0 {
+		return errors.New(vr.Issues[0].Description)
+	}
+
 	for _, e := range p.privateExports {
 		if sub.IsContainedIn(e.Subject) {
 			p.export = *e
 			break
 		}
+	}
+
+	if p.service && sub.HasWildCards() {
+		return fmt.Errorf("services cannot have wildcards %q", p.subject)
 	}
 
 	if p.export.Subject == "" {
@@ -211,10 +256,12 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 
 func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	var err error
-	p.activation = jwt.NewActivationClaims(p.targetPK)
+	p.activation = jwt.NewActivationClaims(p.accountKey.publicKey)
 	p.activation.NotBefore, _ = p.timeParams.StartDate()
 	p.activation.Expires, _ = p.timeParams.ExpiryDate()
-	p.activation.Activation.ImportSubject = p.export.Subject
+	p.activation.Name = p.subject
+	// p.subject is subset of the export
+	p.activation.Activation.ImportSubject = jwt.Subject(p.subject)
 	p.activation.Activation.ImportType = p.export.Type
 
 	p.Token, err = p.activation.Encode(p.signerKP)

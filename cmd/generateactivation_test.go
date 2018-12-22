@@ -96,7 +96,7 @@ func Test_GenerateActivationNoPrivateExports(t *testing.T) {
 
 	_, _, err := ExecuteCmd(createGenerateActivationCmd())
 	require.Error(t, err)
-	require.Equal(t, "account \"A\" doesn't have exports that require token generation", err.Error())
+	require.Equal(t, "account \"A\" doesn't have stream exports that require token generation", err.Error())
 }
 
 func Test_GenerateActivationOutputsFile(t *testing.T) {
@@ -109,7 +109,7 @@ func Test_GenerateActivationOutputsFile(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "--target-account", pub, "--output-file", outpath)
+	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "--service", "--target-account", pub, "--output-file", outpath)
 	require.NoError(t, err)
 	testExternalToken(t, outpath)
 }
@@ -146,7 +146,7 @@ func Test_InteractiveGenerate(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	inputs := []interface{}{0, pub, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
+	inputs := []interface{}{true, 0, "foo", pub, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -166,12 +166,9 @@ func Test_InteractiveExternalKeyGenerate(t *testing.T) {
 	outpath := filepath.Join(ts.Dir, "token.jwt")
 
 	_, pub, _ := CreateAccountKey(t)
-	keyfile := filepath.Join(ts.Dir, "key")
-	err := ioutil.WriteFile(keyfile, []byte(pub), 0700)
-	require.NoError(t, err)
 
-	inputs := []interface{}{0, keyfile, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
-	_, _, err = ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
+	inputs := []interface{}{true, 0, "foo", pub, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
+	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
 	testExternalToken(t, outpath)
@@ -192,7 +189,7 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	inputs := []interface{}{0, 0, pub, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
+	inputs := []interface{}{0, true, 0, "foo", pub, "0", "0", ts.KeyStore.GetAccountKeyPath("A")}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
