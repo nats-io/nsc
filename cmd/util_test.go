@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -160,9 +162,26 @@ func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	}
 }
 
+func (ts *TestStore) AddAccountWithSigner(t *testing.T, accountName string, sk nkeys.KeyPair) {
+	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
+		seed, err := sk.Seed()
+		require.NoError(t, err)
+		_, _, err = ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "--name", accountName, "-K", string(seed))
+		require.NoError(t, err, "account creation")
+	}
+}
+
 func (ts *TestStore) AddUser(t *testing.T, accountName string, userName string) {
 	ts.AddAccount(t, accountName)
 	_, _, err := ExecuteCmd(CreateAddUserCmd(), "--account", accountName, "--name", userName)
+	require.NoError(t, err, "user creation")
+}
+
+func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userName string, sk nkeys.KeyPair) {
+	ts.AddAccount(t, accountName)
+	seed, err := sk.Seed()
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--account", accountName, "--name", userName, "-K", string(seed))
 	require.NoError(t, err, "user creation")
 }
 
@@ -213,6 +232,19 @@ func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject
 
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
+	require.NoError(t, err)
+	token, _ := ExtractToken(stdout)
+	return token
+}
+
+func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount string, subject string, targetAccount string, sk nkeys.KeyPair) string {
+	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
+	require.NoError(t, err)
+	seed, err := sk.Seed()
+	require.NoError(t, err)
+
+	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject, "-K", string(seed)}
+	stdout, _, err := ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), flags...)
 	require.NoError(t, err)
 	token, _ := ExtractToken(stdout)
 	return token

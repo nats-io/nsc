@@ -48,7 +48,7 @@ func (a *AccountDescriber) Describe() string {
 
 	table.AddTitle("Account Details")
 	table.AddRow("Name", a.Name)
-	AddStandardClaimInfo(table, a.ClaimsData)
+	AddStandardClaimInfo(table, &a.AccountClaims)
 	table.AddSeparator()
 
 	if len(a.SigningKeys) > 0 {
@@ -228,10 +228,35 @@ func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {
 	return jwt.DecodeActivationClaims(token)
 }
 
-func AddStandardClaimInfo(table *tablewriter.Table, cd jwt.ClaimsData) {
+func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
+	label := "Account ID"
+	issuer := ""
+	if ac, ok := claims.(*jwt.ActivationClaims); ok {
+		if ac.IssuerAccount != "" {
+			issuer = ac.IssuerAccount
+		}
+	}
+	if acc, ok := claims.(*jwt.ActivationClaims); ok {
+		if acc.IssuerAccount != "" {
+			issuer = acc.IssuerAccount
+		}
+	}
+	if uc, ok := claims.(*jwt.UserClaims); ok {
+		label = "User ID"
+		if uc.IssuerAccount != "" {
+			issuer = uc.IssuerAccount
+		}
+	}
 
-	table.AddRow("Account ID", ShortCodes(cd.Subject))
+	cd := claims.Claims()
+	if cd.Name != "" {
+		table.AddRow("Name", cd.Name)
+	}
+	table.AddRow(label, ShortCodes(cd.Subject))
 	table.AddRow("Issuer ID", ShortCodes(cd.Issuer))
+	if issuer != "" {
+		table.AddRow("Issuer Account", ShortCodes(issuer))
+	}
 	table.AddRow("Issued", RenderDate(cd.IssuedAt))
 	table.AddRow("Expires", RenderDate(cd.Expires))
 }
@@ -248,10 +273,10 @@ func (c *ActivationDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Activation")
+	AddStandardClaimInfo(table, &c.ActivationClaims)
+	table.AddSeparator()
 	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
-	AddStandardClaimInfo(table, c.ActivationClaims.ClaimsData)
-
 	table.AddSeparator()
 
 	AddLimits(table, c.Limits)
@@ -315,11 +340,7 @@ func (u *UserDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("User")
-	table.AddRow("Name", u.Name)
-	table.AddRow("User ID", ShortCodes(u.Subject))
-	table.AddRow("Issuer ID", ShortCodes(u.Issuer))
-	table.AddRow("Issued", RenderDate(u.IssuedAt))
-	table.AddRow("Expires", RenderDate(u.Expires))
+	AddStandardClaimInfo(table, &u.UserClaims)
 
 	if len(u.Pub.Allow) > 0 || len(u.Pub.Deny) > 0 ||
 		len(u.Sub.Allow) > 0 || len(u.Sub.Deny) > 0 {

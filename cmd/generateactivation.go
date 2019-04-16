@@ -273,7 +273,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if p.claims.Issuer != spub {
+	if p.claims.Subject != spub {
 		p.activation.IssuerAccount = p.claims.Issuer
 	}
 
