@@ -235,3 +235,40 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	require.Equal(t, jwt.Stream, ac.Imports[0].Type)
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
+
+func Test_AddImportWithSigningKeyToken(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, pk, sk := CreateAccountKey(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+
+	ts.AddAccount(t, "B")
+	token := ts.GenerateActivationWithSigner(t, "A", "foobar.>", "B", sk)
+	tp := filepath.Join(ts.Dir, "token.jwt")
+	require.NoError(t, Write(tp, []byte(token)))
+	bc, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+
+	// decode the activation
+	acc, err := jwt.DecodeActivationClaims(token)
+	require.NoError(t, err)
+	// issuer is the signing key
+	require.Equal(t, acc.Issuer, pk)
+	// issuer account is account A
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, acc.IssuerAccount, ac.Subject)
+	// account to import is B
+	require.Equal(t, acc.Subject, bc.Subject)
+
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", tp)
+	require.NoError(t, err)
+	acb, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, acb.Imports, 1)
+	require.Equal(t, acb.Imports[0].Account, ac.Subject)
+}

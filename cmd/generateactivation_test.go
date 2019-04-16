@@ -229,5 +229,5 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, actc.Issuer, pk)
 	require.True(t, ac.DidSign(actc))
-	require.Equal(t, actc.IssuerAccount, ac.Issuer)
+	require.Equal(t, actc.IssuerAccount, ac.Subject)
 }

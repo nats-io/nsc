@@ -274,7 +274,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 		return err
 	}
 	if p.claims.Subject != spub {
-		p.activation.IssuerAccount = p.claims.Issuer
+		p.activation.IssuerAccount = p.claims.Subject
 	}
 
 	p.Token, err = p.activation.Encode(p.signerKP)
