@@ -80,6 +80,7 @@ func TestDescribeAccount_MultipleWithContext(t *testing.T) {
 	require.NoError(t, err)
 
 	opub, err := ts.KeyStore.GetOperatorPublicKey("operator")
+	require.NoError(t, err)
 
 	pub, err := ts.KeyStore.GetAccountPublicKey("B")
 	require.NoError(t, err)

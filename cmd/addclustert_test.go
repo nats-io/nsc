@@ -83,6 +83,7 @@ func Test_AddClusterInteractive(t *testing.T) {
 
 func validateClusterClaims(t *testing.T, ts *TestStore) {
 	kp, err := ts.KeyStore.GetClusterKey("a")
+	require.NoError(t, err)
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -90,6 +91,7 @@ func validateClusterClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err, "reading cluster claim")
 
 	pub, err := kp.PublicKey()
+	require.NoError(t, err)
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetOperatorKey("test")

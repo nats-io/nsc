@@ -38,6 +38,7 @@ func TestDescribe_Operator(t *testing.T) {
 	defer ts.Done(t)
 
 	pub, err := ts.KeyStore.GetOperatorPublicKey("O")
+	require.NoError(t, err)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", "O.jwt")
 	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)

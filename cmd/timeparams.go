@@ -84,6 +84,9 @@ func (p *TimeParams) Edit() error {
 	p.Start, err = cli.Prompt("valid from (0 is always)", p.Start, true, func(s string) error {
 		return p.valid(s, "start", true)
 	})
+	if err != nil {
+		return err
+	}
 
 	p.Expiry, err = cli.Prompt("valid until (0 is always)", p.Expiry, true, func(s string) error {
 		return p.valid(s, "expiry", false)

@@ -105,9 +105,7 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		p.name = op.Name
 		p.signerKP, err = ExtractSeed(s)
 		if err != nil {
-			if err != nil {
-				return fmt.Errorf("error importing seed: %v", err)
-			}
+			return fmt.Errorf("error importing seed: %v", err)
 		}
 	}
 	return nil
@@ -174,6 +172,9 @@ func (p *AddOperatorParams) Run(_ ActionCtx) error {
 	}
 
 	p.keyPath, err = ctx.KeyStore.Store(p.name, p.signerKP, "")
+	if err != nil {
+		return err
+	}
 
 	if p.token != "" {
 		if err := s.StoreClaim([]byte(p.token)); err != nil {

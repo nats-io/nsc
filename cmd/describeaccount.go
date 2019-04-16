@@ -54,7 +54,6 @@ type DescribeAccountParams struct {
 	AccountContextParams
 	jwt.AccountClaims
 	outputFile string
-	token      string
 }
 
 func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {

@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package store
@@ -204,6 +206,40 @@ func TestStoreAccount(t *testing.T) {
 	require.Equal(t, gc.Name, "foo")
 }
 
+func TestStoreAccountWithSigningKey(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, _ := CreateAccountKey(t)
+	s := CreateTestStoreForOperator(t, "x", kp)
+	oc, err := s.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	_, spk1, skp1 := CreateOperatorKey(t)
+	_, spk2, _ := CreateOperatorKey(t)
+	oc.SigningKeys.Add(spk1, spk2)
+	cd, err := oc.Encode(kp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	oc, err = s.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Contains(t, oc.SigningKeys, spk1)
+	require.Contains(t, oc.SigningKeys, spk2)
+
+	c := jwt.NewAccountClaims(apub)
+	c.Name = "foo"
+	cd, err = c.Encode(skp1)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	gc, err := s.LoadClaim(Accounts, "foo", "foo.jwt")
+	require.NoError(t, err)
+	require.NotNil(t, gc)
+	require.Equal(t, gc.Name, "foo")
+	require.True(t, oc.DidSign(gc))
+}
+
 func TestStoreUser(t *testing.T) {
 	_, _, kp := CreateOperatorKey(t)
 	_, apub, akp := CreateAccountKey(t)
@@ -214,11 +250,14 @@ func TestStoreUser(t *testing.T) {
 	ac := jwt.NewAccountClaims(apub)
 	ac.Name = "foo"
 	cd, err := ac.Encode(kp)
+	require.NoError(t, err)
 	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
 
 	uc := jwt.NewUserClaims(upub)
 	uc.Name = "bar"
 	ud, err := uc.Encode(akp)
+	require.NoError(t, err)
 
 	err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)
@@ -227,6 +266,37 @@ func TestStoreUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, gc)
 	require.Equal(t, gc.Name, "bar")
+}
+
+func TestStoreUserWithSigningKeys(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, _ := CreateAccountKey(t)
+	_, spub, sakp := CreateAccountKey(t)
+	_, upub, _ := CreateUserKey(t)
+
+	s := CreateTestStoreForOperator(t, "x", kp)
+
+	ac := jwt.NewAccountClaims(apub)
+	ac.Name = "foo"
+	ac.SigningKeys.Add(spub)
+	cd, err := ac.Encode(kp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	uc := jwt.NewUserClaims(upub)
+	uc.Name = "bar"
+	uc.IssuerAccount = apub
+	ud, err := uc.Encode(sakp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(ud))
+	require.NoError(t, err)
+
+	gc, err := s.LoadClaim(Accounts, "foo", Users, "bar.jwt")
+	require.NoError(t, err)
+	require.NotNil(t, gc)
+	require.Equal(t, gc.Name, "bar")
+	require.True(t, ac.DidSign(uc))
 }
 
 func TestStore_ListSubContainers(t *testing.T) {
@@ -239,11 +309,14 @@ func TestStore_ListSubContainers(t *testing.T) {
 	ac := jwt.NewAccountClaims(apub)
 	ac.Name = "foo"
 	cd, err := ac.Encode(kp)
+	require.NoError(t, err)
 	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
 
 	uc := jwt.NewUserClaims(upub)
 	uc.Name = "bar"
 	ud, err := uc.Encode(akp)
+	require.NoError(t, err)
 
 	err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)

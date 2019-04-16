@@ -68,7 +68,6 @@ type AddExportParams struct {
 	private bool
 	service bool
 	SignerParams
-	stream  bool
 	subject string
 }
 
@@ -126,13 +125,22 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	if p.export.Name == "" {
 		p.export.Name = p.subject
 	}
 	p.export.Name, err = cli.Prompt("name", p.export.Name, true, cli.LengthValidator(1))
+	if err != nil {
+		return err
+	}
 
 	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
+	if err != nil {
+		return err
+	}
 
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err

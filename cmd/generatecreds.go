@@ -55,7 +55,6 @@ func init() {
 
 type GenerateCredsParams struct {
 	AccountContextParams
-	kind      string
 	user      string
 	out       string
 	entityKP  nkeys.KeyPair

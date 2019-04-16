@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -54,11 +53,8 @@ func init() {
 }
 
 type GenerateOperatorConfigParams struct {
-	kind      string
-	name      string
-	out       string
-	entityKP  nkeys.KeyPair
-	entityJwt []byte
+	name string
+	out  string
 }
 
 func (p *GenerateOperatorConfigParams) SetDefaults(ctx ActionCtx) error {
@@ -119,6 +115,9 @@ func (p *GenerateOperatorConfigParams) Run(_ ActionCtx) error {
 	}
 
 	ctx, err := s.GetContext()
+	if err != nil {
+		return err
+	}
 	kp, err := ctx.KeyStore.GetOperatorKey(name)
 	if err != nil {
 		return err

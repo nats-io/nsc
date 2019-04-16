@@ -64,8 +64,6 @@ type AddClusterParams struct {
 	Entity
 	TimeParams
 	SignerParams
-	expiry              int64
-	start               int64
 	accounts            []string
 	operators           []string
 	accountUrlTemplate  string

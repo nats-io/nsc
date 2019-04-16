@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -28,7 +30,6 @@ type EntityClaimsEditor func(interface{}, ActionCtx) error
 
 type Entity struct {
 	create    bool
-	dir       string
 	generated bool
 	keyPath   string
 	kind      nkeys.PrefixByte
@@ -98,6 +99,9 @@ func (c *Entity) StoreKeys(parent string) error {
 			return err
 		}
 		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
 		if c.keyPath, err = ctx.KeyStore.Store(c.name, c.kp, parent); err != nil {
 			return err
 		}
@@ -164,7 +168,19 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 		}
 		claim = ac
 	case nkeys.PrefixByteUser:
-		claim = jwt.NewUserClaims(pub)
+		uc := jwt.NewUserClaims(pub)
+		claim = uc
+		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+		spk, err := signer.PublicKey()
+		if err != nil {
+			return err
+		}
+		if ctx.Account.PublicKey != spk {
+			uc.IssuerAccount = ctx.Account.PublicKey
+		}
 	case nkeys.PrefixByteCluster:
 		claim = jwt.NewClusterClaims(pub)
 	case nkeys.PrefixByteServer:

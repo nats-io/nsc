@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -194,4 +196,38 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 	require.NoError(t, err)
 
 	testExternalToken(t, outpath)
+}
+
+func Test_GenerateActivationUsingSigningKey(t *testing.T) {
+	ts := NewTestStore(t, "gen activation")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	sk, pk, _ := CreateAccountKey(t)
+	ts.AddExport(t, "A", jwt.Stream, "foo", false)
+	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	_, tpk, _ := CreateAccountKey(t)
+
+	cmd := createGenerateActivationCmd()
+	HoistRootFlags(cmd)
+
+	outpath := filepath.Join(ts.Dir, "token.jwt")
+	_, _, err = ExecuteCmd(cmd, "-t", tpk, "-s", "foo", "-o", outpath, "-K", string(sk))
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+
+	d, err := ioutil.ReadFile(outpath)
+	require.NoError(t, err)
+
+	token, _ := ExtractToken(string(d))
+	actc, err := jwt.DecodeActivationClaims(token)
+	require.NoError(t, err)
+	require.Equal(t, actc.Issuer, pk)
+	require.True(t, ac.DidSign(actc))
+	require.Equal(t, actc.IssuerAccount, ac.Issuer)
 }

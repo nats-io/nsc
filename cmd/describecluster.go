@@ -56,7 +56,6 @@ type DescribeClusterParams struct {
 	ClusterContextParams
 	jwt.ClusterClaims
 	outputFile string
-	token      string
 }
 
 func (p *DescribeClusterParams) SetDefaults(ctx ActionCtx) error {

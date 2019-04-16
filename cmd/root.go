@@ -38,6 +38,8 @@ var WideFlag bool
 var quietMode bool
 
 var cfgFile string
+
+//lint:ignore U1000 used by tests
 var ngsStore *store.Store
 var interceptorFn InterceptorFn
 

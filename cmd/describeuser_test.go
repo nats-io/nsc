@@ -29,6 +29,7 @@ func TestDescribeUser_Single(t *testing.T) {
 	ts.AddUser(t, "A", "a")
 
 	pub, err := ts.KeyStore.GetUserPublicKey("A", "a")
+	require.NoError(t, err)
 
 	apub, err := ts.KeyStore.GetAccountPublicKey("A")
 	require.NoError(t, err)

@@ -83,6 +83,7 @@ func Test_AddServerInteractive(t *testing.T) {
 
 func validateServerClaim(t *testing.T, ts *TestStore) {
 	skp, err := ts.KeyStore.GetServerKey("c", "a")
+	require.NoError(t, err)
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -90,6 +91,7 @@ func validateServerClaim(t *testing.T, ts *TestStore) {
 	require.NoError(t, err, "reading server claim")
 
 	pub, err := skp.PublicKey()
+	require.NoError(t, err)
 	require.Equal(t, sc.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetClusterKey("c")
