@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -83,6 +85,7 @@ func Test_AddUserInteractive(t *testing.T) {
 
 func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	skp, err := ts.KeyStore.GetUserKey("A", "U")
+	require.NoError(t, err)
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -90,6 +93,7 @@ func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err, "reading user claim")
 
 	pub, err := skp.PublicKey()
+	require.NoError(t, err)
 	require.Equal(t, sc.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetAccountKey("A")
@@ -141,4 +145,34 @@ func Test_AddUser_Account(t *testing.T) {
 	u, err := ts.Store.ReadUserClaim("B", "bb")
 	require.NoError(t, err)
 	require.NotNil(t, u)
+}
+
+func Test_AddUser_WithSK(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+
+	config := GetConfig()
+	err = config.SetAccount("A")
+	require.NoError(t, err)
+
+	sk, pk, _ := CreateAccountKey(t)
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "bb", "--account", "A", "-K", string(sk))
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+
+	u, err := ts.Store.ReadUserClaim("A", "bb")
+	require.NoError(t, err)
+	require.NotNil(t, u)
+	require.Equal(t, u.Issuer, pk)
+
+	require.True(t, ac.DidSign(u))
 }

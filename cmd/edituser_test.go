@@ -119,6 +119,7 @@ func Test_EditUser_Pubs(t *testing.T) {
 	require.ElementsMatch(t, cc.Sub.Deny, []string{"bar"})
 
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm", "c,bar")
+	require.NoError(t, err)
 	cc, err = ts.Store.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 	require.NotNil(t, cc)

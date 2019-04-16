@@ -109,6 +109,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
+	require.NoError(t, err)
 
 	ts.AddAccount(t, "B")
 
@@ -137,6 +138,7 @@ func Test_AddPublicImport(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	pub, err := ts.KeyStore.GetAccountPublicKey("A")
+	require.NoError(t, err)
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
 	ts.AddAccount(t, "B")
 
@@ -180,6 +182,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
+	require.NoError(t, err)
 
 	ts.AddAccount(t, "B")
 
@@ -212,6 +215,7 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
+	require.NoError(t, err)
 
 	ts.AddAccount(t, "B")
 

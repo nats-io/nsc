@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package store
@@ -282,7 +284,14 @@ func (s *Store) StoreClaim(data []byte) error {
 	case jwt.AccountClaim:
 		path = filepath.Join(Accounts, gc.Name, JwtName(gc.Name))
 	case jwt.UserClaim:
+		uc, err := jwt.DecodeUserClaims(string(data))
+		if err != nil {
+			return err
+		}
 		issuer := gc.Issuer
+		if uc.IssuerAccount != "" {
+			issuer = uc.IssuerAccount
+		}
 		var account string
 		infos, err := s.List(Accounts)
 		if err != nil {
@@ -395,6 +404,22 @@ func (s *Store) LoadClaim(name ...string) (*jwt.GenericClaims, error) {
 			return nil, err
 		}
 		c, err := jwt.DecodeGeneric(string(d))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	return nil, nil
+}
+
+func (s *Store) ReadOperatorClaim() (*jwt.OperatorClaims, error) {
+	fn := JwtName(s.GetName())
+	if s.Has(fn) {
+		d, err := s.Read(fn)
+		if err != nil {
+			return nil, err
+		}
+		c, err := jwt.DecodeOperatorClaims(string(d))
 		if err != nil {
 			return nil, err
 		}
@@ -611,10 +636,19 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 		switch kind {
 		case nkeys.PrefixByteAccount:
 			kp, err = ctx.KeyStore.GetAccountKey(ctx.Account.Name)
+			if err != nil {
+				return nil, err
+			}
 		case nkeys.PrefixByteCluster:
 			kp, err = ctx.KeyStore.GetClusterKey(ctx.Cluster.Name)
+			if err != nil {
+				return nil, err
+			}
 		case nkeys.PrefixByteOperator:
 			kp, err = ctx.KeyStore.GetOperatorKey(ctx.Operator.Name)
+			if err != nil {
+				return nil, err
+			}
 		default:
 			return nil, fmt.Errorf("unsupported key %d resolution", kind)
 		}

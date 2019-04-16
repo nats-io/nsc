@@ -92,7 +92,7 @@ func ExecuteCmd(root *cobra.Command, args ...string) (stdout string, stderr stri
 	var stderrBuf, stdoutBuf bytes.Buffer
 	root.SetOutput(&stderrBuf)
 	if len(args) == 0 {
-		args = make([]string, 0, 0)
+		args = make([]string, 0)
 	}
 	root.SetArgs(args)
 	old := os.Stdout

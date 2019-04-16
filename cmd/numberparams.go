@@ -34,7 +34,7 @@ func (e *NumberParams) Edit(prompt string) error {
 	var err error
 	var nv int64
 	sv := fmt.Sprintf("%d", e.NumberValue)
-	sv, err = cli.Prompt(prompt, sv, true, func(s string) error {
+	_, err = cli.Prompt(prompt, sv, true, func(s string) error {
 		nv, err = ParseNumber(s)
 		return err
 	})

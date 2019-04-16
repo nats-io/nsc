@@ -58,7 +58,6 @@ type DescribeServerParams struct {
 	jwt.ServerClaims
 	server     string
 	outputFile string
-	token      string
 }
 
 func (p *DescribeServerParams) SetDefaults(ctx ActionCtx) error {

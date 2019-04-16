@@ -38,7 +38,9 @@ init --interactive
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			p.SetDefaults()
+			if err := p.SetDefaults(); err != nil {
+				return err
+			}
 
 			if err := p.Interactive(cmd); err != nil {
 				return err
@@ -355,6 +357,9 @@ func (p *InitParams) Run() error {
 		// FIXME: super hack
 		if c.kind == nkeys.PrefixByteUser {
 			ctx, err := s.GetContext()
+			if err != nil {
+				return err
+			}
 
 			ks := ctx.KeyStore
 			kp, err := ks.GetUserKey(ctx.Account.Name, c.name)

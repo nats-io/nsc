@@ -184,6 +184,9 @@ func createListUsersCmd() *cobra.Command {
 			}
 
 			names, err := s.ListEntries(store.Accounts, config.Account, store.Users)
+			if err != nil {
+				return err
+			}
 			sort.Strings(names)
 
 			var infos []*listEntry
@@ -283,6 +286,9 @@ func createListServersCmd() *cobra.Command {
 			}
 
 			names, err := s.ListEntries(store.Clusters, config.Cluster, store.Servers)
+			if err != nil {
+				return err
+			}
 			sort.Strings(names)
 
 			var infos []*listEntry

@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -18,6 +20,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/jwt"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,6 +77,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 
 func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	kp, err := ts.KeyStore.GetAccountKey("A")
+	require.NoError(t, err)
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
@@ -80,6 +85,7 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err, "reading account claim")
 
 	pub, err := kp.PublicKey()
+	require.NoError(t, err)
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
 	okp, err := ts.KeyStore.GetOperatorKey("test")
@@ -109,4 +115,29 @@ func Test_AddAccountOperatorLessStore(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
+}
+
+func Test_AddAccountInteractiveSigningKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	s1, pk1, _ := CreateOperatorKey(t)
+	_, pk2, _ := CreateOperatorKey(t)
+
+	_, _, err := ExecuteCmd(createEditOperator(), "--sk", pk1, "--sk", pk2)
+	require.NoError(t, err)
+
+	inputs := []interface{}{"A", true, "0", "0", string(s1)}
+	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Issuer, pk1)
+
+	d, err := ts.Store.Read(store.JwtName("O"))
+	require.NoError(t, err)
+	oc, err := jwt.DecodeOperatorClaims(string(d))
+	require.NoError(t, err)
+	require.True(t, oc.DidSign(ac))
 }

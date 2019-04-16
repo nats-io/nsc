@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *  * Copyright 2018-2019 The NATS Authors
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  * http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package cmd
@@ -102,7 +104,7 @@ func init() {
 type EditUserParams struct {
 	AccountContextParams
 	SignerParams
-	TimeParams
+	GenericClaimsParams
 	claim *jwt.UserClaims
 	name  string
 	token string
@@ -116,9 +118,7 @@ type EditUserParams struct {
 	denySubs    []string
 	remove      []string
 	rmSrc       []string
-	rmTags      []string
 	src         []string
-	tags        []string
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -146,7 +146,7 @@ func (p *EditUserParams) PreInteractive(ctx ActionCtx) error {
 		}
 	}
 
-	if err = p.TimeParams.Edit(); err != nil {
+	if err = p.GenericClaimsParams.Edit(); err != nil {
 		return err
 	}
 
@@ -193,7 +193,7 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	var err error
-	if err = p.TimeParams.Validate(); err != nil {
+	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
 	if err = p.SignerParams.Resolve(ctx); err != nil {
@@ -204,13 +204,7 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 
 func (p *EditUserParams) Run(ctx ActionCtx) error {
 	var err error
-	if p.TimeParams.IsStartChanged() {
-		p.claim.NotBefore, _ = p.TimeParams.StartDate()
-	}
-
-	if p.TimeParams.IsExpiryChanged() {
-		p.claim.Expires, _ = p.TimeParams.ExpiryDate()
-	}
+	p.GenericClaimsParams.Run(ctx, p.claim)
 
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubs...)
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubsub...)
@@ -232,8 +226,6 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	p.claim.Permissions.Sub.Deny.Remove(p.remove...)
 	sort.Strings(p.claim.Permissions.Sub.Deny)
 
-	p.claim.Tags.Add(p.tags...)
-	p.claim.Tags.Remove(p.rmTags...)
 	sort.Strings(p.claim.Tags)
 
 	src := strings.Split(p.claim.Src, ",")

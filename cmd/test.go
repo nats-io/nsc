@@ -46,9 +46,16 @@ func (p *GenerateNKeysParam) PrintKey(kind nkeys.PrefixByte, cmd *cobra.Command)
 		panic(err)
 	}
 	seed, err := kp.Seed()
+	if err != nil {
+		panic(err)
+	}
+
 	cmd.Println(string(seed))
 
 	pub, err := kp.PublicKey()
+	if err != nil {
+		panic(err)
+	}
 	cmd.Println(pub)
 }
 

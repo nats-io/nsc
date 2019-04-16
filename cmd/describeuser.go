@@ -56,7 +56,6 @@ type DescribeUserParams struct {
 	jwt.UserClaims
 	user       string
 	outputFile string
-	token      string
 }
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {

@@ -29,6 +29,7 @@ func TestDescribeServer_Single(t *testing.T) {
 	ts.AddServer(t, "A", "a")
 
 	pub, err := ts.KeyStore.GetServerPublicKey("A", "a")
+	require.NoError(t, err)
 
 	cpub, err := ts.KeyStore.GetClusterPublicKey("A")
 	require.NoError(t, err)
