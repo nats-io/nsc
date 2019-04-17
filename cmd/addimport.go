@@ -235,6 +235,9 @@ func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
 	}
 
 	p.srcAccount.publicKey = ac.Issuer
+	if ac.IssuerAccount != "" {
+		p.srcAccount.publicKey = ac.IssuerAccount
+	}
 
 	if ac.Subject != "public" && p.claim.Subject != ac.Subject {
 		return fmt.Errorf("activation is not intended for this account - it is for %q", ac.Subject)

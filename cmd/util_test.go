@@ -45,6 +45,10 @@ type TestStore struct {
 // Some globals must be reset
 func ResetForTests() {
 	config = ToolConfig{}
+	ResetSharedFlags()
+}
+
+func ResetSharedFlags() {
 	KeyPathFlag = ""
 }
 

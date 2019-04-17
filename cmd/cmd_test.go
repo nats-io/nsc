@@ -105,6 +105,8 @@ func ExecuteCmd(root *cobra.Command, args ...string) (stdout string, stderr stri
 	os.Stdout = old
 	_, _ = io.Copy(&stdoutBuf, r)
 
+	ResetSharedFlags()
+
 	return stdoutBuf.String(), stderrBuf.String(), err
 }
 
@@ -125,6 +127,8 @@ func ExecuteInteractiveCmd(root *cobra.Command, inputs []interface{}, args ...st
 	_ = w.Close()
 	os.Stdout = old
 	_, _ = io.Copy(&stdoutBuf, r)
+
+	ResetSharedFlags()
 
 	return stdoutBuf.String(), stderrBuf.String(), err
 }
