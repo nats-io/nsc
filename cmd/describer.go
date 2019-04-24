@@ -47,7 +47,6 @@ func (a *AccountDescriber) Describe() string {
 	table.UTF8Box()
 
 	table.AddTitle("Account Details")
-	table.AddRow("Name", a.Name)
 	AddStandardClaimInfo(table, &a.AccountClaims)
 	table.AddSeparator()
 
