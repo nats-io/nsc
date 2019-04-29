@@ -25,6 +25,10 @@ Download your platform binary from [here.](https://github.com/nats-io/nsc/releas
 
 `nsc update` will download and install the latest version.
 
+## Documentation
+
+[Documentation is here.](https://nats-io.github.io/nsc/)
+
 ## Building
 
 NSC uses go modules. If your project source is in `$GOPATH`, you must define set the environment variable `GO111MODULE` to `on`.
