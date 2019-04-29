@@ -17,11 +17,13 @@ package cmd
 
 import (
 	"bytes"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	flag "github.com/spf13/pflag"
 )
 
@@ -133,6 +135,25 @@ func createFlagTable() *cobra.Command {
 	return cmd
 }
 
+func generateDoc() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "doc",
+		Short: "generate markdown documentation in the specified directory",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, err := filepath.Abs(args[0])
+			if err != nil {
+				return err
+			}
+			if err = MaybeMakeDir(dir); err != nil {
+				return err
+			}
+			return doc.GenMarkdownTree(rootCmd, dir)
+		},
+	}
+	return cmd
+}
+
 type Stack struct {
 	data []*cobra.Command
 }
@@ -233,4 +254,5 @@ func init() {
 	GetRootCmd().AddCommand(testCmd)
 	testCmd.AddCommand(createGenerateNkey())
 	testCmd.AddCommand(createFlagTable())
+	testCmd.AddCommand(generateDoc())
 }

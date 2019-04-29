@@ -6,6 +6,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/briandowns/spinner v0.0.0-20181029155426-195c31b675a7
+	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
