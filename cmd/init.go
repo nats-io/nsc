@@ -123,6 +123,12 @@ init --interactive
 	_ = cmd.Flags().MarkHidden("create-account")
 	_ = cmd.Flags().MarkHidden("create-operator")
 	_ = cmd.Flags().MarkHidden("create-user")
+	_ = cmd.Flags().MarkHidden("create-cluster")
+	_ = cmd.Flags().MarkHidden("create-server")
+	_ = cmd.Flags().MarkHidden("server-key")
+	_ = cmd.Flags().MarkHidden("cluster-key")
+	_ = cmd.Flags().MarkHidden("cluster-name")
+	_ = cmd.Flags().MarkHidden("server-name")
 
 	return cmd
 }
