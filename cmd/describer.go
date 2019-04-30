@@ -62,6 +62,14 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Max Connections", "Unlimited")
 	}
 
+	if lim.LeafNodeConn == 0 {
+		table.AddRow("Max Leaf Node Connections", "Not Allowed")
+	} else if lim.LeafNodeConn > 0 {
+		table.AddRow("Max Leaf Node Connections", fmt.Sprintf("%d", lim.LeafNodeConn))
+	} else {
+		table.AddRow("Max Leaf Node Connections", "Unlimited")
+	}
+
 	if lim.Data > -1 {
 		table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
 	} else {
@@ -245,6 +253,9 @@ func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
 		if uc.IssuerAccount != "" {
 			issuer = uc.IssuerAccount
 		}
+	}
+	if _, ok := claims.(*jwt.OperatorClaims); ok {
+		label = "Operator ID"
 	}
 
 	cd := claims.Claims()
@@ -436,10 +447,7 @@ func (o *OperatorDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Operator Details")
-	table.AddRow("Name", o.Name)
-	table.AddRow("Operator ID", ShortCodes(o.Subject))
-	table.AddRow("Issued", RenderDate(o.IssuedAt))
-	table.AddRow("Expires", RenderDate(o.Expires))
+	AddStandardClaimInfo(table, &o.OperatorClaims)
 
 	if len(o.Identities) > 0 {
 		table.AddSeparator()

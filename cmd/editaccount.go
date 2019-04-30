@@ -64,6 +64,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 	cmd.Flags().Int64VarP(&params.conns.NumberValue, "conns", "", -1, "set maximum active connections for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.leafConns.NumberValue, "leaf-conns", "", 0, "set maximum active leaf node connections for the account (-1 is unlimited)")
 	cmd.Flags().StringVarP(&params.data.Value, "data", "", "-1", "set maximum data in bytes for the account (-1 is unlimited)")
 	cmd.Flags().Int64VarP(&params.exports.NumberValue, "exports", "", -1, "set maximum number of exports for the account (-1 is unlimited)")
 	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
@@ -90,6 +91,7 @@ type EditAccountParams struct {
 	claim         *jwt.AccountClaims
 	token         string
 	conns         NumberParams
+	leafConns	  NumberParams
 	exports       NumberParams
 	exportsWc     bool
 	imports       NumberParams
@@ -106,7 +108,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "exports", "imports", "subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk") {
+	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -135,6 +137,10 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 
 	if !ctx.CurrentCmd().Flags().Changed("conns") {
 		p.conns.NumberValue = p.claim.Limits.Conn
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("leaf-conns") {
+		p.leafConns.NumberValue = p.claim.Limits.LeafNodeConn
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("data") {
@@ -167,6 +173,10 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if err = p.conns.Edit("max connections (-1 unlimited)"); err != nil {
+		return err
+	}
+
+	if err = p.leafConns.Edit("max leaf node connections (-1 unlimited)"); err != nil {
 		return err
 	}
 
@@ -227,6 +237,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 	}
 
 	p.claim.Limits.Conn = p.conns.NumberValue
+	p.claim.Limits.LeafNodeConn = p.leafConns.NumberValue
 	p.claim.Limits.Data, err = p.data.NumberValue()
 	if err != nil {
 		return fmt.Errorf("error parsing %s: %s", "data", p.data.Value)

@@ -113,13 +113,14 @@ func Test_EditAccountLimits(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10M", "--exports", "15",
-		"--imports", "20", "--payload", "1K", "--subscriptions", "30")
+		"--imports", "20", "--payload", "1K", "--subscriptions", "30", "--leaf-conns", "31")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotNil(t, ac)
 	require.Equal(t, int64(5), ac.Limits.Conn)
+	require.Equal(t, int64(31), ac.Limits.LeafNodeConn)
 	require.Equal(t, int64(1000*1000*10), ac.Limits.Data)
 	require.Equal(t, int64(15), ac.Limits.Exports)
 	require.Equal(t, int64(20), ac.Limits.Imports)
@@ -127,7 +128,7 @@ func Test_EditAccountLimits(t *testing.T) {
 	require.Equal(t, int64(30), ac.Limits.Subs)
 }
 
-func Test_EditACcountSigningKeys(t *testing.T) {
+func Test_EditAccountSigningKeys(t *testing.T) {
 	ts := NewTestStore(t, "edit account")
 	defer ts.Done(t)
 
