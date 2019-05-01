@@ -82,3 +82,41 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	require.NotNil(t, ac)
 	require.Len(t, ac.Imports, 1)
 }
+
+func Test_DeleteImportInteractiveNoService(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo", false)
+	ts.AddExport(t, "A", jwt.Stream, "bar", false)
+
+	ts.AddAccount(t, "B")
+	ts.AddImport(t, "A", "foo", "B")
+	ts.AddImport(t, "A", "bar", "B")
+
+	input := []interface{}{1, true, 0, ts.OperatorKeyPath}
+	cmd := createDeleteImportCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteInteractiveCmd(cmd, input)
+	require.Contains(t, err.Error(), "no service imports defined")
+}
+
+func Test_DeleteImportInteractiveNoStreams(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "bar", false)
+
+	ts.AddAccount(t, "B")
+	ts.AddImport(t, "A", "foo", "B")
+	ts.AddImport(t, "A", "bar", "B")
+
+	input := []interface{}{1, false, 0, ts.OperatorKeyPath}
+	cmd := createDeleteImportCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteInteractiveCmd(cmd, input)
+	require.Contains(t, err.Error(), "no stream imports defined")
+}

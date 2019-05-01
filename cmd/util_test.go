@@ -216,25 +216,55 @@ func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.Export
 	require.NoError(t, err)
 }
 
+func (ts *TestStore) ImportRequiresToken(t *testing.T, srcAccount string, subject string) bool {
+	ac, err := ts.Store.ReadAccountClaim(srcAccount)
+	require.NoError(t, err)
+	for _, ex := range ac.Exports {
+		if string(ex.Subject) == subject {
+			return ex.TokenReq
+		}
+	}
+	return false
+}
+
 func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, targetAccountName string) {
-	token := ts.GenerateActivation(t, srcAccount, subject, targetAccountName)
+	flags := []string{"--account", targetAccountName}
 
-	f, err := ioutil.TempFile(ts.Dir, "token")
-	require.NoError(t, err)
-	_, err = f.WriteString(token)
-	require.NoError(t, err)
-	require.NoError(t, f.Close())
-
-	flags := []string{"--account", targetAccountName, "--token", f.Name()}
-	_, _, err = ExecuteCmd(createAddImportCmd(), flags...)
+	if ts.ImportRequiresToken(t, srcAccount, subject) {
+		token := ts.GenerateActivation(t, srcAccount, subject, targetAccountName)
+		f, err := ioutil.TempFile(ts.Dir, "token")
+		require.NoError(t, err)
+		_, err = f.WriteString(token)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+		flags = append(flags, "--token", f.Name())
+	} else {
+		flags = append(flags, "--src-account", srcAccount, "--remote-subject", subject)
+	}
+	_, _, err := ExecuteCmd(createAddImportCmd(), flags...)
 	require.NoError(t, err)
 }
+
+
 
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
 	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
 	require.NoError(t, err)
 
+	service := false
+	ac, err := ts.Store.ReadAccountClaim(srcAccount)
+	require.NoError(t, err)
+	for _, i := range ac.Exports {
+		if subject == string(i.Subject) {
+			service = i.Type == jwt.Service
+			break
+		}
+	}
+
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
+	if service {
+		flags = append(flags, "--service")
+	}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
 	token, _ := ExtractToken(stdout)

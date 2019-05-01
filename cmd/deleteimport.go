@@ -133,8 +133,20 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
 	var choices []string
-	for _, c := range p.claim.Imports {
-		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
+	var origidx []int
+
+	// when running interactive filter the list of imports to the right kind
+	// tracking the original index in the import list
+	kind := p.importKind()
+	for i, c := range p.claim.Imports {
+		if c.Type == kind {
+			choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
+			origidx = append(origidx, i)
+		}
+	}
+
+	if len(choices) == 0 {
+		return fmt.Errorf("no %s imports defined in account %s", kind, p.AccountContextParams.Name)
 	}
 
 	v := ""
@@ -146,6 +158,7 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
+	p.index = origidx[p.index]
 
 	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
