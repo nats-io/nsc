@@ -1,25 +1,27 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -73,19 +75,54 @@ type AddOperatorParams struct {
 
 func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
+
+	if p.name != "" && p.jwtPath != "" {
+		return errors.New("specify either name or import")
+	}
+
 	return nil
 }
 
 func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 
-	p.name, err = cli.Prompt("operator name", p.name, true, cli.LengthValidator(1))
+	ok, err := cli.PromptYN("import operator from a JWT")
 	if err != nil {
 		return err
 	}
+	if ok {
+		_, err := cli.Prompt("path to operator jwt", p.jwtPath, true, func(s string) error {
+			p.jwtPath, err = homedir.Expand(s)
+			if err != nil {
+				return err
+			}
+			p.jwtPath, err = filepath.Abs(p.jwtPath)
+			if err != nil {
+				return err
+			}
 
-	if err = p.TimeParams.Edit(); err != nil {
-		return err
+			info, err := os.Lstat(p.jwtPath)
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+
+			if !info.Mode().IsRegular() {
+				return errors.New("path is not a file")
+			}
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+	} else {
+		p.name, err = cli.Prompt("operator name", p.name, true, cli.LengthValidator(1))
+		if err != nil {
+			return err
+		}
+		if err = p.TimeParams.Edit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -105,10 +142,6 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		}
 		p.token = t
 		p.name = op.Name
-		p.signerKP, err = ExtractSeed(s)
-		if err != nil {
-			return fmt.Errorf("error importing seed: %v", err)
-		}
 	}
 	return nil
 }
@@ -116,8 +149,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	if p.signerKP == nil && p.token != "" {
-		ctx.CurrentCmd().Println("the imported file didn't contain a seed")
+	if p.token != "" {
+		// nothing to generate
+		return nil
 	}
 
 	if p.signerKP == nil {
@@ -137,6 +171,10 @@ func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 	var err error
+	if p.token != "" {
+		// validated on load
+		return nil
+	}
 	if p.name == "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("operator name is required")
@@ -163,19 +201,43 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 
 func (p *AddOperatorParams) Run(_ ActionCtx) error {
 	operator := &store.NamedKey{Name: p.name, KP: p.signerKP}
-
 	s, err := store.CreateStore(p.name, GetConfig().StoreRoot, operator)
 	if err != nil {
 		return err
 	}
-	ctx, err := s.GetContext()
-	if err != nil {
-		return err
-	}
 
-	p.keyPath, err = ctx.KeyStore.Store(p.name, p.signerKP, "")
-	if err != nil {
-		return err
+	if p.token == "" {
+		ctx, err := s.GetContext()
+		if err != nil {
+			return err
+		}
+		p.keyPath, err = ctx.KeyStore.Store(p.name, p.signerKP, "")
+		if err != nil {
+			return err
+		}
+
+		if p.Start != "" || p.Expiry != "" {
+			oc, err := ctx.Store.ReadOperatorClaim()
+			if err != nil {
+				return err
+			}
+			if p.Start != "" {
+				oc.NotBefore, err = p.TimeParams.StartDate()
+				if err != nil {
+					return err
+				}
+			}
+			if p.Expiry != "" {
+				oc.Expires, err = p.TimeParams.ExpiryDate()
+				if err != nil {
+					return err
+				}
+			}
+			token, err := oc.Encode(p.signerKP)
+			if err = s.StoreClaim([]byte(token)); err != nil {
+				return err
+			}
+		}
 	}
 
 	if p.token != "" {

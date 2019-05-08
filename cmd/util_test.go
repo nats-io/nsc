@@ -52,6 +52,32 @@ func ResetSharedFlags() {
 	KeyPathFlag = ""
 }
 
+func NewEmptyStore(t *testing.T) *TestStore {
+	ResetForTests()
+	var ts TestStore
+	WideFlag = true
+
+	// ngsStore is a global - so first test to get it initializes it
+	ngsStore = nil
+	homeEnv = t.Name()
+
+	ts.Dir = MakeTempDir(t)
+	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
+	initToolHome(t.Name())
+	// debug the test that created the store
+	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
+
+	ForceStoreRoot(t, ts.GetStoresRoot())
+
+	nkeysDir := filepath.Join(ts.Dir, "keys")
+	err := os.Mkdir(nkeysDir, 0700)
+	require.NoError(t, err, "error creating %q", nkeysDir)
+	require.NoError(t, err)
+	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
+
+	return &ts
+}
+
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	ResetForTests()
 	var ts TestStore
@@ -244,8 +270,6 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 	_, _, err := ExecuteCmd(createAddImportCmd(), flags...)
 	require.NoError(t, err)
 }
-
-
 
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
 	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
