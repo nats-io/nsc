@@ -245,8 +245,6 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 	require.NoError(t, err)
 }
 
-
-
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
 	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
 	require.NoError(t, err)

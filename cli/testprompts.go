@@ -15,6 +15,8 @@
 
 package cli
 
+import "fmt"
+
 type TestPrompts struct {
 	count  int
 	inputs []interface{}
@@ -27,7 +29,15 @@ func NewTestPrompts(inputs []interface{}) PromptLib {
 	}
 }
 
+func (t *TestPrompts) logInputs(kind string, label string, value interface{}) {
+	if LogFn == nil {
+		return
+	}
+	LogFn(fmt.Sprintf("[%s %d] %s = %v\n", kind, t.count, label, value))
+}
+
 func (t *TestPrompts) Prompt(label string, value string, edit bool, validator Validator) (string, error) {
+	t.logInputs("prompt", label, t.inputs[t.count])
 	val := t.inputs[t.count].(string)
 	t.count = t.count + 1
 
@@ -41,24 +51,28 @@ func (t *TestPrompts) Prompt(label string, value string, edit bool, validator Va
 }
 
 func (t *TestPrompts) PromptYN(m string, defaultValue bool) (bool, error) {
+	t.logInputs("yn", m, t.inputs[t.count])
 	val := t.inputs[t.count].(bool)
 	t.count = t.count + 1
 	return val, nil
 }
 
 func (t *TestPrompts) PromptSecret(m string) (string, error) {
+	t.logInputs("secret", m, t.inputs[t.count])
 	val := t.inputs[t.count].(string)
 	t.count = t.count + 1
 	return val, nil
 }
 
 func (t *TestPrompts) PromptChoices(m string, value string, choices []string) (int, error) {
+	t.logInputs("choices", m, t.inputs[t.count])
 	val := t.inputs[t.count].(int)
 	t.count = t.count + 1
 	return val, nil
 }
 
 func (t *TestPrompts) PromptMultipleChoices(m string, choices []string) ([]int, error) {
+	t.logInputs("multiple-choice", m, t.inputs[t.count])
 	val := t.inputs[t.count].([]int)
 	t.count = t.count + 1
 	return val, nil
