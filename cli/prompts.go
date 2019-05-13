@@ -8,9 +8,14 @@ import (
 	"os"
 )
 
+type Logger func(args ...interface{})
+
 type Validator func(string) error
 
 var cli PromptLib
+
+// set a Logger during a test (cli.LogFn = t.Log) to debug interactive prompts
+var LogFn Logger
 
 var output io.Writer = os.Stdout
 
@@ -24,6 +29,7 @@ type PromptLib interface {
 
 func init() {
 	ResetPromptLib()
+	LogFn = nil
 }
 
 func SetPromptLib(p PromptLib) {
@@ -32,6 +38,7 @@ func SetPromptLib(p PromptLib) {
 
 func ResetPromptLib() {
 	SetPromptLib(&SurveyUI{})
+	LogFn = nil
 }
 
 func SetOutput(out io.Writer) {
