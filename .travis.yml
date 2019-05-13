@@ -29,10 +29,10 @@ after_success:
 - go clean
 - git reset --hard
 
-deploy:
-- provider: script
-  skip_cleanup: true
-  script: curl -sL http://git.io/goreleaser | bash
-  on:
-    tags: true
-    condition: $TRAVIS_OS_NAME = linux
+#deploy:
+#- provider: script
+#  skip_cleanup: true
+#  script: curl -sL http://git.io/goreleaser | bash
+#  on:
+#    tags: true
+#    condition: $TRAVIS_OS_NAME = linux
