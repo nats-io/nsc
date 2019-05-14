@@ -170,12 +170,14 @@ func Test_EditUserSK(t *testing.T) {
 	uc, err := ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, ac.Subject)
+	require.Empty(t, uc.IssuerAccount)
 
 	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "-n", "U", "--allow-pub", "foo", "-K", string(s))
 	require.NoError(t, err)
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, p)
+	require.Equal(t, uc.IssuerAccount, ac.Subject)
 }
 
 func Test_EditUserAddedWithSK(t *testing.T) {
@@ -195,10 +197,12 @@ func Test_EditUserAddedWithSK(t *testing.T) {
 	uc, err := ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, p)
+	require.Equal(t, uc.IssuerAccount, ac.Subject)
 
 	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "-n", "U", "--allow-pub", "foo", "-K", string(s))
 	require.NoError(t, err)
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, p)
+	require.Equal(t, uc.IssuerAccount, ac.Subject)
 }
