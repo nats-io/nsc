@@ -146,7 +146,8 @@ func TestDescribeUser_Account(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, pub, kp := CreateAccountKey(t)
-	_, _, err := ExecuteCmd(createEditAccount(), "--account", "A", "-sk", pub)
+	_, _, err := ExecuteCmd(createEditAccount(), "--account", "A", "--sk", pub)
+	require.NoError(t, err)
 
 	// signed with default account key
 	ts.AddUser(t, "A", "aa")
