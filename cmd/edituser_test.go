@@ -152,3 +152,53 @@ func Test_EditUser_Src(t *testing.T) {
 	require.NotNil(t, cc)
 	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.1.0/8"})
 }
+
+func Test_EditUserSK(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	t.Log(ts.Dir)
+
+	s, p, _ := CreateAccountKey(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "-a", "A", "--sk", p)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.SigningKeys, p)
+
+	ts.AddUser(t, "A", "U")
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, ac.Subject)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "-n", "U", "--allow-pub", "foo", "-K", string(s))
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, p)
+}
+
+func Test_EditUserAddedWithSK(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	t.Log(ts.Dir)
+
+	s, p, sk := CreateAccountKey(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "-a", "A", "--sk", p)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.SigningKeys, p)
+
+	ts.AddUserWithSigner(t, "A", "U", sk)
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, p)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "-n", "U", "--allow-pub", "foo", "-K", string(s))
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, p)
+}

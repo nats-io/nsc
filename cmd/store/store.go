@@ -288,7 +288,7 @@ func (s *Store) StoreClaim(data []byte) error {
 		if err != nil {
 			return err
 		}
-		issuer := gc.Issuer
+		issuer := uc.Issuer
 		if uc.IssuerAccount != "" {
 			issuer = uc.IssuerAccount
 		}
@@ -299,15 +299,13 @@ func (s *Store) StoreClaim(data []byte) error {
 		}
 		for _, i := range infos {
 			if i.IsDir() {
-				c, err := s.LoadClaim(Accounts, i.Name(), JwtName(i.Name()))
+				c, err := s.ReadAccountClaim(i.Name())
 				if err != nil {
 					return err
 				}
-				if c != nil {
-					if c.Subject == issuer {
-						account = i.Name()
-						break
-					}
+				if c != nil && c.DidSign(uc) {
+					account = i.Name()
+					break
 				}
 			}
 		}
