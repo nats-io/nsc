@@ -236,10 +236,29 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
+	// get the account JWT - must have since we resolved the user based on it
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+	if err != nil {
+		return err
+	}
+
+	// extract the signer public key
+	pk, err := p.signerKP.PublicKey()
+	if err != nil {
+		return err
+	}
+	// signer doesn't match - so we set IssuerAccount to the account
+	if pk != ac.Subject {
+		p.claim.IssuerAccount = ac.Subject
+	}
+
+	// we sign
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
 		return err
 	}
+
+	// if the signer is not allowed, the store will reject
 	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
 		return err
 	}
