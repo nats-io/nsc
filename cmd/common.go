@@ -81,7 +81,7 @@ func IsStdOut(fp string) bool {
 func WriteJson(fp string, v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Errorf("error marshalling: %v", err)
+		return fmt.Errorf("error marshaling: %v", err)
 	}
 
 	if err := ioutil.WriteFile(fp, data, 0600); err != nil {

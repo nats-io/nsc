@@ -263,7 +263,7 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		case 0:
 			return nil
 		case 1:
-			return fmt.Errorf("cancelled")
+			return fmt.Errorf("canceled")
 		case 2:
 			p.operator.Edit()
 		case 3:

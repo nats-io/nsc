@@ -30,6 +30,7 @@ cover: test
 
 test:
 	go vet ./...
+	misspell -error -locale US .
 	rm -rf ./coverage.out
 	go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
