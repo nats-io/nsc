@@ -1,12 +1,12 @@
 language: go
 go:
-- 1.11.x
+- 1.12.x
 
 git:
   depth: false
 
 env:
-  - GO111MODULE=on
+  - GO111MODULE=off
 
 install:
   - go get github.com/mattn/goveralls
@@ -16,7 +16,6 @@ install:
 
 before_script:
 - EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/")
-- go build
 - $(exit $(go fmt $EXCLUDE_VENDOR | wc -l))
 - go vet $EXCLUDE_VENDOR
 #- misspell -error -locale US .
@@ -26,7 +25,6 @@ script:
 - ./scripts/cov.sh TRAVIS
 
 after_success:
-- go clean -modcache
 - git reset --hard
 
 deploy:

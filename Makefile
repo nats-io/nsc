@@ -29,8 +29,8 @@ cover: test
 	go tool cover -html=./coverage.out
 
 test:
+	go mod vendor
 	go vet ./...
-	misspell -error -locale US .
 	rm -rf ./coverage.out
 	go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
