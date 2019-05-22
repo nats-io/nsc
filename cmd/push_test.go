@@ -76,7 +76,7 @@ func Test_SyncOK(t *testing.T) {
 	require.NoError(t, err)
 
 	// sync the store
-	_, _, err = ExecuteCmd(createSyncCommand(), "--account", "A")
+	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.NoError(t, err)
 
 	// verify the tag was stored
@@ -110,7 +110,7 @@ func Test_SyncNoURL(t *testing.T) {
 	defer hts.Close()
 
 	// sync the store
-	_, _, err := ExecuteCmd(createSyncCommand(), "--account", "A")
+	_, _, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no account server url was provided")
 }
@@ -141,9 +141,9 @@ func Test_SyncNoServer(t *testing.T) {
 	hts.Close()
 
 	// sync the store
-	_, _, err := ExecuteCmd(createSyncCommand(), "--account", "A")
+	_, stderr, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "connect: connection refused")
+	require.Contains(t, stderr, "connect: connection refused")
 }
 
 func Test_SyncManaged(t *testing.T) {
@@ -189,7 +189,7 @@ func Test_SyncManaged(t *testing.T) {
 	require.True(t, ac.IsSelfSigned())
 
 	// sync the store
-	_, _, err = ExecuteCmd(createSyncCommand(), "--account", "A")
+	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
