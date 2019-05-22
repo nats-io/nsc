@@ -101,6 +101,14 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	return &ts
 }
 
+func NewTestStoreWithOperatorJWT(t *testing.T, operator string) *TestStore {
+	oc, err := jwt.DecodeOperatorClaims(operator)
+	require.NoError(t, err)
+	ts := NewTestStoreWithOperator(t, oc.Name, nil)
+	ts.Store.StoreClaim([]byte(operator))
+	return ts
+}
+
 func (ts *TestStore) Reload(t *testing.T) {
 	s, err := store.LoadStore(ts.Store.Dir)
 	require.NoError(t, err)

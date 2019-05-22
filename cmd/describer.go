@@ -448,6 +448,9 @@ func (o *OperatorDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("Operator Details")
 	AddStandardClaimInfo(table, &o.OperatorClaims)
+	if o.AccountServerURL != "" {
+		table.AddRow("Account JWT Server", o.AccountServerURL)
+	}
 
 	if len(o.Identities) > 0 {
 		table.AddSeparator()

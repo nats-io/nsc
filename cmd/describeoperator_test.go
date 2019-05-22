@@ -92,3 +92,24 @@ func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {
 	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "C")
 	require.Error(t, err)
 }
+
+func TestDescribeOperator_AccountServerURL(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	require.NoError(t, err)
+	require.NotContains(t, stdout, "Account JWT Server")
+
+	u := "https://asu.com:1234"
+	oc, err := ts.Store.ReadOperatorClaim()
+	oc.AccountServerURL = u
+	token, err := oc.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+
+	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	require.NoError(t, err)
+	require.Contains(t, stdout, u)
+}

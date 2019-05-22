@@ -19,9 +19,11 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -44,9 +46,9 @@ func createEditOperator() *cobra.Command {
 	}
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteOperator, cmd)
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringVarP(&params.asu, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https urls supported if updating with nsc)")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -59,9 +61,9 @@ func init() {
 type EditOperatorParams struct {
 	SignerParams
 	GenericClaimsParams
-	claim *jwt.OperatorClaims
-	token string
-
+	claim         *jwt.OperatorClaims
+	token         string
+	asu           string
 	signingKeys   SigningKeysParams
 	rmSigningKeys []string
 }
@@ -69,7 +71,7 @@ type EditOperatorParams struct {
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag") {
+	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -98,6 +100,10 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
+	if p.asu == "" {
+		p.asu = oc.AccountServerURL
+	}
+
 	p.claim = oc
 	return nil
 }
@@ -107,6 +113,11 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Edit(); err != nil {
 		return err
 	}
+	p.asu, err = cli.Prompt("account jwt server url", p.asu, true, nil)
+	if err != nil {
+		return err
+	}
+	p.asu = strings.TrimSpace(p.asu)
 	return p.signingKeys.Edit()
 }
 
@@ -134,6 +145,8 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) error {
 		p.claim.SigningKeys.Add(keys...)
 	}
 	p.claim.SigningKeys.Remove(p.rmSigningKeys...)
+
+	p.claim.AccountServerURL = p.asu
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
