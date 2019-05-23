@@ -37,6 +37,7 @@ validate -a <accountName> (current operator/<accountName>/account users)
 validate -A (current operator/all accounts/all users)`,
 		Args: MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = false
 			if err := RunAction(cmd, args, &params); err != nil {
 				// this error was not during the sync operation return as it is
 				return err
@@ -47,6 +48,10 @@ validate -A (current operator/all accounts/all users)`,
 				cmd.Println(params.render(fmt.Sprintf("Account %q", v), params.accountValidations[v]))
 			}
 
+			if params.foundErrors() {
+				cmd.SilenceUsage = true
+				return errors.New("validation found errors")
+			}
 			return nil
 		},
 	}
@@ -73,28 +78,11 @@ func (p *ValidateCmdParams) SetDefaults(ctx ActionCtx) error {
 		return errors.New("specify only one of --account or --all-accounts")
 	}
 
+	// if they specified an account name, this will validate it
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}
 
-	c := GetConfig()
-	accounts, err := c.ListAccounts()
-	if err != nil {
-		return err
-	}
-
-	if !p.allAccounts {
-		found := false
-		for _, v := range accounts {
-			if v == p.Name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("account %q is not under operator %q - nsc env to check your env", p.Name, c.Operator)
-		}
-	}
 	return nil
 }
 
@@ -109,7 +97,7 @@ func (p *ValidateCmdParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *ValidateCmdParams) Load(ctx ActionCtx) error {
-	if !p.allAccounts {
+	if !p.allAccounts && p.Name != "" {
 		if err := p.AccountContextParams.Validate(ctx); err != nil {
 			return err
 		}
@@ -137,6 +125,12 @@ func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	p.operator = p.validateJWT(oc)
+	if !oc.DidSign(oc) {
+		if p.operator == nil {
+			p.operator = &jwt.ValidationResults{}
+		}
+		p.operator.AddError("operator is not issued by operator or operator signing key")
+	}
 
 	p.accounts, err = p.getSelectedAccounts()
 	if err != nil {
@@ -156,7 +150,7 @@ func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
 			if p.accountValidations[v] == nil {
 				p.accountValidations[v] = &jwt.ValidationResults{}
 			}
-			p.accountValidations[v].AddError("Account is not signed by operator or operator signing keys")
+			p.accountValidations[v].AddError("Account is not issued by operator or operator signing keys")
 		}
 		users, err := ctx.StoreCtx().Store.ListEntries(store.Accounts, v, store.Users)
 		if err != nil {
@@ -180,7 +174,7 @@ func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
 				if p.accountValidations[v] == nil {
 					p.accountValidations[v] = &jwt.ValidationResults{}
 				}
-				p.accountValidations[v].AddError("user %q is not signed by account or account signing keys", u)
+				p.accountValidations[v].AddError("user %q is not issued by account or account signing keys", u)
 			}
 		}
 	}
@@ -195,13 +189,35 @@ func (p *ValidateCmdParams) getSelectedAccounts() ([]string, error) {
 			return nil, err
 		}
 		return a, nil
-	} else {
+	} else if p.Name != "" {
 		return []string{p.AccountContextParams.Name}, nil
 	}
+	return nil, nil
 }
 
 func (p *ValidateCmdParams) Run(ctx ActionCtx) error {
 	return nil
+}
+
+func (p *ValidateCmdParams) foundErrors() bool {
+	var reports []*jwt.ValidationResults
+	if p.operator != nil {
+		reports = append(reports, p.operator)
+	}
+	for _, v := range p.accounts {
+		vr := p.accountValidations[v]
+		if vr != nil {
+			reports = append(reports, vr)
+		}
+	}
+	for _, r := range reports {
+		for _, ri := range r.Issues {
+			if ri.Blocking || ri.TimeCheck {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (p *ValidateCmdParams) render(name string, issues *jwt.ValidationResults) string {
