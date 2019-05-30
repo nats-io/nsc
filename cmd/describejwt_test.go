@@ -137,6 +137,13 @@ func TestDescribe_Activation(t *testing.T) {
 	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", tp)
 	require.NoError(t, err)
 	require.Contains(t, out, "AA.>")
+
+	act, err := jwt.DecodeActivationClaims(token)
+	require.NoError(t, err)
+
+	hash, err := act.HashID()
+	require.NoError(t, err)
+	require.Contains(t, out, ShortCodes(hash))
 }
 
 func TestDescribe_ActivationWithSigner(t *testing.T) {
