@@ -280,10 +280,14 @@ func NewActivationDescriber(a jwt.ActivationClaims) *ActivationDescriber {
 }
 
 func (c *ActivationDescriber) Describe() string {
+	hash, _ := c.HashID()
+
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 	table.AddTitle("Activation")
 	AddStandardClaimInfo(table, &c.ActivationClaims)
+	table.AddSeparator()
+	table.AddRow("Hash ID", ShortCodes(hash))
 	table.AddSeparator()
 	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
