@@ -51,8 +51,13 @@ push -A (all accounts)`,
 			ta := len(params.targeted)
 			ok := len(params.succeeded)
 
+			if !params.allAccounts && ok == ta {
+				cmd.Printf("successfully pushed account %q\n", params.succeeded[0])
+				return nil
+			}
+
 			if ok == ta {
-				cmd.Printf("successfully pushed all accounts\n")
+				cmd.Printf("successfully pushed all accounts [%s]\n", strings.Join(params.succeeded, ", "))
 				return nil
 			}
 
