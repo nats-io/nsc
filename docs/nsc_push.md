@@ -1,26 +1,30 @@
-## nsc update
+## nsc push
 
-Update this tool to latest version
+Push an account jwt to an Account JWT Server
 
 ### Synopsis
 
-Update this tool to latest version
+Push an account jwt to an Account JWT Server
 
 ```
-nsc update [flags]
+nsc push (currentAccount)
+push -a <accountName>
+push -A (all accounts) [flags]
 ```
 
 ### Examples
 
 ```
-nsc update
-nsc update --release-notes
+push
 ```
 
 ### Options
 
 ```
-  -h, --help   help for update
+  -a, --account string   account name
+  -A, --all-accounts     push all accounts under the current operator (exclusive of -a)
+  -F, --force            push regardless of validation issues
+  -h, --help             help for push
 ```
 
 ### Options inherited from parent commands
