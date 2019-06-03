@@ -98,7 +98,7 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "user is required", err.Error())
 
-	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A", "--user", "u")
+	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A", "--name", "u")
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))
 	require.Contains(t, stdout, seed)

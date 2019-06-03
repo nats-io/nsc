@@ -42,7 +42,7 @@ func createGenerateCredsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.user, "user", "u", "", "name of the user")
+	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
 	params.AccountContextParams.BindFlags(cmd)
 
