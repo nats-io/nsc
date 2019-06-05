@@ -41,7 +41,9 @@ func createEnvCmd() *cobra.Command {
 		SilenceUsage:  false,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = params.Run(cmd)
+			if err := params.Run(cmd); err != nil {
+				return err
+			}
 			params.PrintEnv(cmd)
 			return nil
 		},
