@@ -39,7 +39,7 @@ func TestEnv_DefaultOutput(t *testing.T) {
 	require.Contains(t, stderr, "Default Operator test")
 }
 
-func TestEnv_SetAccounttOutput(t *testing.T) {
+func TestEnv_SetAccountOutput(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
@@ -55,4 +55,22 @@ func TestEnv_SetAccounttOutput(t *testing.T) {
 	require.Contains(t, stderr, "Default Operator test")
 	require.Contains(t, stderr, "Default Account B")
 	require.Contains(t, stderr, "Default Cluster C")
+}
+
+func TestEnv_FailsBadOperator(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEnvCmd(), "-o", "X")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "operator \"X\" not in")
+}
+
+func TestEnv_FailsBadAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEnvCmd(), "-a", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "\"A\" not in accounts for operator \"O\"")
 }
