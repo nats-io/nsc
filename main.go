@@ -17,18 +17,21 @@ func main() {
 	}
 	conf.SetVersion(version)
 
-	u, err := cmd.NewSelfUpdate()
-	if err != nil {
-		// not fatal
-		cmd.GetRootCmd().Printf("error checking for updates: %v\n", err)
-	}
-	if u != nil {
-		m, err := u.Run()
+	// disable update check if running a locally built version
+	if version != "0.0.0-dev" {
+		u, err := cmd.NewSelfUpdate()
 		if err != nil {
+			// not fatal
 			cmd.GetRootCmd().Printf("error checking for updates: %v\n", err)
 		}
-		if m != nil {
-			cmd.GetRootCmd().Printf("new version available %s - `nsc update` to update.\n", m.String())
+		if u != nil {
+			m, err := u.Run()
+			if err != nil {
+				cmd.GetRootCmd().Printf("error checking for updates: %v\n", err)
+			}
+			if m != nil {
+				cmd.GetRootCmd().Printf("new version available %s - `nsc update` to update.\n", m.String())
+			}
 		}
 	}
 
