@@ -9,7 +9,6 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.7.0 // indirect
-	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
@@ -20,11 +19,9 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/nats-io/gnatsd v1.4.1
 	github.com/nats-io/jwt v0.2.6
-	github.com/nats-io/nats-server v1.4.1 // indirect
+	github.com/nats-io/nats-server/v2 v2.0.0
 	github.com/nats-io/nkeys v0.0.2
-	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0
@@ -34,12 +31,10 @@ require (
 	github.com/spf13/viper v1.2.1
 	github.com/stretchr/testify v1.2.2
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
-	golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529 // indirect
 	golang.org/x/net v0.0.0-20190509222800-a4d6f7feada5 // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
 	golang.org/x/sys v0.0.0-20190509141414-a5b02f93d862 // indirect
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190510151030-63859f3815cb // indirect
 	gopkg.in/AlecAivazis/survey.v1 v1.7.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
