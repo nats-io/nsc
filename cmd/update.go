@@ -126,6 +126,10 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 }
 
 func (u *SelfUpdate) shouldCheck() bool {
+	have := semver.MustParse(GetRootCmd().Version).String()
+	if have == "0.0.0-dev" {
+		return false
+	}
 	config := GetConfig()
 	now := time.Now().Unix()
 	diff := now - config.LastUpdate
