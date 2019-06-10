@@ -101,6 +101,50 @@ func TestUpdate_NeedsUpdate(t *testing.T) {
 	require.False(t, updateCalled)
 }
 
+func TestUpdate_DoUpdateWithV(t *testing.T) {
+	d := MakeTempDir(t)
+	_ = os.Setenv(NscHomeEnv, d)
+	conf := GetConfig()
+	conf.GithubUpdates = "foo/bar"
+	conf.SetVersion("v1.0.0")
+	conf.LastUpdate = time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+
+	var checkCalled bool
+	var updateCalled bool
+	updateCheckFn = func(slug string) (*selfupdate.Release, bool, error) {
+		checkCalled = true
+		var r selfupdate.Release
+		var err error
+		r.Version, err = semver.ParseTolerant("v1.0.1")
+		if err != nil {
+			return nil, true, err
+		}
+		return &r, true, nil
+	}
+	updateFn = func(current semver.Version, slug string) (*selfupdate.Release, error) {
+		updateCalled = true
+		var r selfupdate.Release
+		var err error
+		r.Version, err = semver.ParseTolerant("v1.0.1")
+		if err != nil {
+			return nil, err
+		}
+		r.ReleaseNotes = "f33dfac3"
+		return &r, nil
+	}
+	defer func() {
+		_ = os.Setenv(NscHomeEnv, "")
+		updateCheckFn = nil
+		updateFn = nil
+	}()
+
+	_, stderr, err := ExecuteCmd(createUpdateCommand())
+	require.NoError(t, err)
+	require.True(t, checkCalled)
+	require.True(t, updateCalled)
+	require.Contains(t, stderr, "f33dfac3")
+}
+
 func TestUpdate_DoUpdate(t *testing.T) {
 	d := MakeTempDir(t)
 	_ = os.Setenv(NscHomeEnv, d)
@@ -120,7 +164,11 @@ func TestUpdate_DoUpdate(t *testing.T) {
 	updateFn = func(current semver.Version, slug string) (*selfupdate.Release, error) {
 		updateCalled = true
 		var r selfupdate.Release
-		r.Version = semver.MustParse("1.0.1")
+		var err error
+		r.Version, err = semver.ParseTolerant("1.0.1")
+		if err != nil {
+			return nil, err
+		}
 		r.ReleaseNotes = "f33dfac3"
 		return &r, nil
 	}

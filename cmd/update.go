@@ -41,7 +41,10 @@ func createUpdateCommand() *cobra.Command {
 		Short:   "Update this tool to latest version",
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			v := semver.MustParse(GetRootCmd().Version)
+			v, err := semver.ParseTolerant(GetRootCmd().Version)
+			if err != nil {
+				return err
+			}
 
 			su, err := NewSelfUpdate()
 			if err != nil {
@@ -149,7 +152,10 @@ func (u *SelfUpdate) updateCheckFn() (*selfupdate.Release, bool, error) {
 
 func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 	config := GetConfig()
-	have := semver.MustParse(GetRootCmd().Version)
+	have, err := semver.ParseTolerant(GetRootCmd().Version)
+	if err != nil {
+		return nil, err
+	}
 	wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	wait.Prefix = "Checking for latest version "
 	_ = wait.Color("italic")
@@ -158,7 +164,6 @@ func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 
 	var latest *selfupdate.Release
 	var found bool
-	var err error
 	if updateCheckFn == nil {
 		// the library freak out if GITHUB_TOKEN is set - don't break travis :)
 		_ = os.Setenv("GITHUB_TOKEN", "")
