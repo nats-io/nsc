@@ -30,11 +30,8 @@ func TestDescribeUser_Single(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "a")
 
-	pub, err := ts.KeyStore.GetUserPublicKey("A", "a")
-	require.NoError(t, err)
-
-	apub, err := ts.KeyStore.GetAccountPublicKey("A")
-	require.NoError(t, err)
+	pub := ts.GetUserPublicKey(t, "A", "a")
+	apub := ts.GetAccountPublicKey(t, "A")
 
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
@@ -71,11 +68,9 @@ func TestDescribeUser_MultipleWithContext(t *testing.T) {
 	err := GetConfig().SetAccount("B")
 	require.NoError(t, err)
 
-	apub, err := ts.KeyStore.GetAccountPublicKey("B")
-	require.NoError(t, err)
+	apub := ts.GetAccountPublicKey(t, "B")
 
-	pub, err := ts.KeyStore.GetUserPublicKey("B", "b")
-	require.NoError(t, err)
+	pub := ts.GetUserPublicKey(t, "B", "b")
 
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
@@ -97,11 +92,9 @@ func TestDescribeUser_MultipleWithFlag(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, stderr, "user is required")
 
-	apub, err := ts.KeyStore.GetAccountPublicKey("B")
-	require.NoError(t, err)
+	apub := ts.GetAccountPublicKey(t, "B")
 
-	pub, err := ts.KeyStore.GetUserPublicKey("B", "bb")
-	require.NoError(t, err)
+	pub := ts.GetUserPublicKey(t, "B", "bb")
 
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "bb")
 	require.NoError(t, err)

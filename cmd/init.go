@@ -112,23 +112,9 @@ init --interactive
 	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath (default generated)")
 	cmd.Flags().BoolVarP(&p.user.create, "create-user", "", true, "create an user")
 
-	cmd.Flags().StringVarP(&p.cluster.name, "cluster-name", "", "", "name for the cluster (default '<name>_cluster')")
-	cmd.Flags().StringVarP(&p.cluster.keyPath, "cluster-key", "", "", "cluster keypath (default generated)")
-	cmd.Flags().BoolVarP(&p.cluster.create, "create-cluster", "", false, "create a cluster")
-
-	cmd.Flags().StringVarP(&p.server.name, "server-name", "", "localhost", "name for the server")
-	cmd.Flags().StringVarP(&p.server.keyPath, "server-key", "", "", "server keypath (default generated)")
-	cmd.Flags().BoolVarP(&p.server.create, "create-server", "", false, "create a server")
-
 	_ = cmd.Flags().MarkHidden("create-account")
 	_ = cmd.Flags().MarkHidden("create-operator")
 	_ = cmd.Flags().MarkHidden("create-user")
-	_ = cmd.Flags().MarkHidden("create-cluster")
-	_ = cmd.Flags().MarkHidden("create-server")
-	_ = cmd.Flags().MarkHidden("server-key")
-	_ = cmd.Flags().MarkHidden("cluster-key")
-	_ = cmd.Flags().MarkHidden("cluster-name")
-	_ = cmd.Flags().MarkHidden("server-name")
 
 	return cmd
 }
@@ -142,20 +128,16 @@ type InitParams struct {
 	environmentName string
 	operator        Entity
 	account         Entity
-	cluster         Entity
-	server          Entity
 	user            Entity
 }
 
 func (p *InitParams) Containers() []*Entity {
-	return []*Entity{&p.operator, &p.account, &p.user, &p.cluster, &p.server}
+	return []*Entity{&p.operator, &p.account, &p.user}
 }
 
 func (p *InitParams) SetDefaults() error {
 	p.operator.kind = nkeys.PrefixByteOperator
 	p.account.kind = nkeys.PrefixByteAccount
-	p.cluster.kind = nkeys.PrefixByteCluster
-	p.server.kind = nkeys.PrefixByteServer
 	p.user.kind = nkeys.PrefixByteUser
 
 	var err error
@@ -186,14 +168,6 @@ func (p *InitParams) SetDefaultNames() {
 
 	if p.user.name == "" {
 		p.user.name = fmt.Sprintf("%s_user", p.environmentName)
-	}
-
-	if p.cluster.name == "" {
-		p.cluster.name = fmt.Sprintf("%s_cluster", p.environmentName)
-	}
-
-	if p.server.name == "" {
-		p.server.name = "localhost"
 	}
 }
 
@@ -237,24 +211,9 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 		return err
 	}
 
-	p.cluster.create, err = cli.PromptBoolean(fmt.Sprintf("create a %s", nkeys.PrefixByteCluster.String()), false)
-	if err != nil {
-		return err
-	}
-	if p.cluster.create {
-		if err := p.cluster.Edit(); err != nil {
-			return err
-		}
-	}
-	if p.cluster.create {
-		if err := p.server.Edit(); err != nil {
-			return err
-		}
-	}
-
 	for {
 		p.PrintSummary(cmd)
-		choices := []string{"Yes", "Cancel", "Edit operator", "Edit account", "Edit user", "Edit cluster", "Edit server"}
+		choices := []string{"Yes", "Cancel", "Edit operator", "Edit account", "Edit user"}
 		c, err := cli.PromptChoices("is this OK", "Yes", choices)
 		if err != nil {
 			return err
@@ -270,13 +229,6 @@ func (p *InitParams) Interactive(cmd *cobra.Command) error {
 			p.account.Edit()
 		case 4:
 			p.user.Edit()
-		case 5:
-			p.cluster.Edit()
-			if !p.cluster.create {
-				p.server.create = false
-			}
-		case 6:
-			p.server.Edit()
 		}
 	}
 }
@@ -294,16 +246,6 @@ func (p *InitParams) PrintSummary(cmd *cobra.Command) {
 	}
 	if p.user.create {
 		table.AddRow("User", p.user.name, p.user.KeySource())
-	}
-	if p.cluster.create {
-		table.AddRow("Cluster", p.cluster.name, p.cluster.KeySource())
-	} else {
-		table.AddRow("Cluster - skipped", "", "")
-	}
-	if p.server.create {
-		table.AddRow("Server", p.server.name, p.server.KeySource())
-	} else {
-		table.AddRow("Server - skipped", "", "")
 	}
 	cmd.Println(table.Render())
 }
@@ -344,8 +286,6 @@ func (p *InitParams) Run() error {
 		switch e.kind {
 		case nkeys.PrefixByteUser:
 			parent = p.account.name
-		case nkeys.PrefixByteServer:
-			parent = p.cluster.name
 		}
 
 		if err := e.StoreKeys(parent); err != nil {
@@ -359,31 +299,21 @@ func (p *InitParams) Run() error {
 			continue
 		}
 		c.GenerateClaim(containers[i-1].kp, nil)
-
 		// FIXME: super hack
 		if c.kind == nkeys.PrefixByteUser {
 			ctx, err := s.GetContext()
 			if err != nil {
 				return err
 			}
-
 			ks := ctx.KeyStore
-			kp, err := ks.GetUserKey(ctx.Account.Name, c.name)
+			d, err := GenerateConfig(s, ctx.Account.Name, c.name, c.kp)
 			if err != nil {
 				fmt.Printf("unable to save creds: %v", err)
-			}
-			if kp == nil {
-				fmt.Println("unable to save creds - user key not found")
-			}
-			if kp != nil {
-				d, err := GenerateConfig(s, ctx.Account.Name, c.name, kp)
+			} else {
+				_, err = ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
 				if err != nil {
-					fmt.Printf("unable to save creds: %v", err)
-				} else {
-					err := ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
-					if err != nil {
-						fmt.Println(err.Error())
-					}
+					// cred storage doesn't fail it
+					fmt.Println(err.Error())
 				}
 			}
 		}

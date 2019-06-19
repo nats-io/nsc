@@ -20,6 +20,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/nkeys"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -30,14 +32,17 @@ func Test_AddAccount(t *testing.T) {
 	defer ts.Done(t)
 
 	_, bar, _ := CreateAccountKey(t)
-	_, badBar, _ := CreateClusterKey(t)
+	// a cluster key
+	ckp, err := nkeys.CreateCluster()
+	require.NoError(t, err)
+	cpk, err := ckp.PublicKey()
 
 	tests := CmdTests{
 		{CreateAddAccountCmd(), []string{"add", "account"}, nil, []string{"account name is required"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"Generated account key", "added account"}, false},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", badBar}, nil, []string{"invalid account key"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"invalid account key"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
@@ -76,21 +81,21 @@ func Test_AddAccountInteractive(t *testing.T) {
 }
 
 func validateAddAccountClaims(t *testing.T, ts *TestStore) {
-	kp, err := ts.KeyStore.GetAccountKey("A")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+
+	kp, err := ts.KeyStore.GetKeyPair(ac.Subject)
 	require.NoError(t, err)
 	_, err = kp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
-
-	ac, err := ts.Store.ReadAccountClaim("A")
-	require.NoError(t, err, "reading account claim")
 
 	pub, err := kp.PublicKey()
 	require.NoError(t, err)
 	require.Equal(t, ac.Subject, pub, "public key is subject")
 
-	okp, err := ts.KeyStore.GetOperatorKey("test")
+	okp, err := ts.KeyStore.GetKeyPair(ac.Issuer)
 	require.NoError(t, err)
-
+	// operator stores will not return a keypair
 	if okp == nil {
 		okp = kp
 	}

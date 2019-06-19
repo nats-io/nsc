@@ -374,3 +374,13 @@ func ShortCodes(s string) string {
 
 	return s
 }
+
+// ExpandPath expands the specified path calls. Resolves ~/ and ./.. paths.
+func Expand(s string) (string, error) {
+	var err error
+	s, err = homedir.Expand(s)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(s)
+}

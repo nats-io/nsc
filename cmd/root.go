@@ -131,9 +131,24 @@ var rootCmd = &cobra.Command{
 	Use:   "nsc",
 	Short: "NSC enables you to create and manage NATS accounts and user configurations",
 	Long: `The nsc tool allows you to create NATS accounts, users and manage their permissions.
-
 The nsc cli creates accounts, users, and JWT tokens that provide access
 to your users and services.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
+			return nil
+		}
+		// check if we need to perform any kind of migration
+		needsUpdate, err := store.KeysNeedMigration()
+		if err != nil {
+			return err
+		}
+		if needsUpdate {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("%q needs migration - type `nsc keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()))
+		}
+
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

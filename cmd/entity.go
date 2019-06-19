@@ -102,7 +102,7 @@ func (c *Entity) StoreKeys(parent string) error {
 		if err != nil {
 			return err
 		}
-		if c.keyPath, err = ctx.KeyStore.Store(c.name, c.kp, parent); err != nil {
+		if c.keyPath, err = ctx.KeyStore.Store(c.kp); err != nil {
 			return err
 		}
 	}

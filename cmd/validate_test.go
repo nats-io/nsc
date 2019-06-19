@@ -146,7 +146,7 @@ func Test_ValidateExpiredUser(t *testing.T) {
 	before, err := ParseExpiry("1999-12-01")
 	require.NoError(t, err)
 	uc.Expires = before
-	kp, err := ts.KeyStore.GetAccountKey("A")
+	kp, err := ts.GetAccountKey(t, "A")
 	token, err := uc.Encode(kp)
 	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
 

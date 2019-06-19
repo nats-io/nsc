@@ -29,7 +29,6 @@ type ContextConfig struct {
 	StoreRoot string `json:"store_root"` // where the projects are
 	Operator  string `json:"operator"`
 	Account   string `json:"account"`
-	Cluster   string `json:"cluster"`
 }
 
 func NewContextConfig(storeRoot string) (*ContextConfig, error) {
@@ -53,7 +52,6 @@ func (c *ContextConfig) SetDefaults() {
 		if c.Operator == "" {
 			// reset everything
 			c.Account = ""
-			c.Cluster = ""
 			return
 		}
 
@@ -64,10 +62,6 @@ func (c *ContextConfig) SetDefaults() {
 		accounts, err := s.ListSubContainers(store.Accounts)
 		if err == nil {
 			c.Account = c.saneDefault(c.Account, accounts)
-		}
-		clusters, err := s.ListSubContainers(store.Clusters)
-		if err == nil {
-			c.Cluster = c.saneDefault(c.Cluster, clusters)
 		}
 	}
 }
@@ -145,23 +139,6 @@ func (c *ContextConfig) SetAccountTemp(account string) error {
 	}
 	c.Account = account
 
-	return nil
-}
-
-func (c *ContextConfig) SetCluster(cluster string) error {
-	if err := c.SetClusterTemp(cluster); err != nil {
-		return err
-	}
-	return GetConfig().Save()
-}
-
-func (c *ContextConfig) SetClusterTemp(cluster string) error {
-	if cluster != "" {
-		if err := c.hasSubContainer(store.Clusters, cluster); err != nil {
-			return err
-		}
-	}
-	c.Cluster = cluster
 	return nil
 }
 

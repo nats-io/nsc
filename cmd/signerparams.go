@@ -55,11 +55,11 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		ks := sctx.KeyStore
 		switch p.kind {
 		case nkeys.PrefixByteOperator:
-			KeyPathFlag = ks.GetOperatorKeyPath(sctx.Operator.Name)
+			KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
 		case nkeys.PrefixByteAccount:
-			KeyPathFlag = ks.GetAccountKeyPath(sctx.Account.Name)
+			KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
 		case nkeys.PrefixByteCluster:
-			KeyPathFlag = ks.GetClusterKeyPath(sctx.Cluster.Name)
+			KeyPathFlag = ks.GetKeyPath(sctx.Cluster.PublicKey)
 		}
 	}
 
@@ -80,6 +80,12 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 	var err error
 	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+
+	if p.signerKP == nil && err == nil && KeyPathFlag != "" {
+		// we have no resolution but arg was provided
+		// this means that the file doesn't exist
+		err = fmt.Errorf("%q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
+	}
 
 	return err
 }

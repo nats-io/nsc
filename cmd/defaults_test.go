@@ -36,7 +36,6 @@ func TestDefault_LoadOrInit(t *testing.T) {
 	require.Equal(t, filepath.Join(dir, "nats"), tc.StoreRoot)
 	require.Equal(t, "", tc.Operator)
 	require.Equal(t, "", tc.Account)
-	require.Equal(t, "", tc.Cluster)
 	require.Equal(t, "my/foo", tc.GithubUpdates)
 }
 
@@ -44,7 +43,6 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	require.NoError(t, os.Setenv("TEST_NAME", ts.Dir))
 	ts.AddAccount(t, "A")
-	ts.AddCluster(t, "C")
 
 	var cc ContextConfig
 	cc.StoreRoot = ts.GetStoresRoot()
@@ -59,5 +57,4 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.Equal(t, ts.GetStoresRoot(), tc.StoreRoot)
 	require.Equal(t, "operator", tc.Operator)
 	require.Equal(t, "A", tc.Account)
-	require.Equal(t, "C", tc.Cluster)
 }

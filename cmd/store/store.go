@@ -567,8 +567,6 @@ func (ctx *Context) SetContext(name string, pub string) error {
 	switch pre {
 	case nkeys.PrefixByteOperator:
 		e = &ctx.Operator
-	case nkeys.PrefixByteCluster:
-		e = &ctx.Cluster
 	case nkeys.PrefixByteAccount:
 		e = &ctx.Account
 	}
@@ -583,6 +581,8 @@ func (ctx *Context) SetContext(name string, pub string) error {
 
 func (s *Store) GetContext() (*Context, error) {
 	var c Context
+	var err error
+
 	c.Store = s
 	c.KeyStore = NewKeyStore(s.Info.EnvironmentName)
 
@@ -631,26 +631,22 @@ func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.K
 		return nil, err
 	}
 	if kp == nil {
+		var pk string
 		switch kind {
 		case nkeys.PrefixByteAccount:
-			kp, err = ctx.KeyStore.GetAccountKey(ctx.Account.Name)
-			if err != nil {
-				return nil, err
-			}
-		case nkeys.PrefixByteCluster:
-			kp, err = ctx.KeyStore.GetClusterKey(ctx.Cluster.Name)
-			if err != nil {
-				return nil, err
-			}
+			pk = ctx.Account.PublicKey
 		case nkeys.PrefixByteOperator:
-			kp, err = ctx.KeyStore.GetOperatorKey(ctx.Operator.Name)
-			if err != nil {
-				return nil, err
-			}
+			pk = ctx.Operator.PublicKey
 		default:
 			return nil, fmt.Errorf("unsupported key %d resolution", kind)
 		}
-
+		// don't try to resolve empty
+		if pk != "" {
+			kp, err = ctx.KeyStore.GetKeyPair(pk)
+			if err != nil {
+				return nil, err
+			}
+		}
 		// not found
 		if kp == nil {
 			return nil, nil

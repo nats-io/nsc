@@ -62,6 +62,8 @@ github.com/nats-io/nats-server/v2/logger
 github.com/nats-io/nats-server/v2/server/pse
 # github.com/nats-io/nkeys v0.0.2
 github.com/nats-io/nkeys
+# github.com/nats-io/nuid v1.0.1
+github.com/nats-io/nuid
 # github.com/pelletier/go-toml v1.2.0
 github.com/pelletier/go-toml
 # github.com/pmezard/go-difflib v1.0.0

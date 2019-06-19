@@ -161,7 +161,7 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 
 	ts.KeyStore = ctx.KeyStore
 	if ts.OperatorKey != nil {
-		ts.OperatorKeyPath, err = ts.KeyStore.Store(operatorName, ts.OperatorKey, "")
+		ts.OperatorKeyPath, err = ts.KeyStore.Store(ts.OperatorKey)
 		require.NoError(t, err, "store operator key")
 	}
 	return s
@@ -223,19 +223,6 @@ func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userNam
 	require.NoError(t, err, "user creation")
 }
 
-func (ts *TestStore) AddCluster(t *testing.T, clusterName string) {
-	if !ts.Store.Has(store.Clusters, clusterName, store.JwtName(clusterName)) {
-		_, _, err := ExecuteCmd(createAddClusterCmd(), "--name", clusterName)
-		require.NoError(t, err, "cluster creation")
-	}
-}
-
-func (ts *TestStore) AddServer(t *testing.T, clusterName string, serverName string) {
-	ts.AddCluster(t, clusterName)
-	_, _, err := ExecuteCmd(createAddServerCmd(), "--cluster", clusterName, "--name", serverName)
-	require.NoError(t, err, "server creation")
-}
-
 func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {
 	flags := []string{"--account", accountName, "--subject", subject}
 	if !public {
@@ -280,9 +267,7 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 }
 
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
-	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
-	require.NoError(t, err)
-
+	tpub := ts.GetAccountPublicKey(t, targetAccount)
 	service := false
 	ac, err := ts.Store.ReadAccountClaim(srcAccount)
 	require.NoError(t, err)
@@ -304,8 +289,7 @@ func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject
 }
 
 func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount string, subject string, targetAccount string, sk nkeys.KeyPair) string {
-	tpub, err := ts.KeyStore.GetAccountPublicKey(targetAccount)
-	require.NoError(t, err)
+	tpub := ts.GetAccountPublicKey(t, targetAccount)
 	seed, err := sk.Seed()
 	require.NoError(t, err)
 
@@ -333,14 +317,6 @@ func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
 	err = ioutil.WriteFile(fp, s, 0600)
 	require.NoError(t, err)
 	return fp
-}
-
-func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.PrefixByteCluster)
-}
-
-func CreateServerKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateNkey(t, nkeys.PrefixByteServer)
 }
 
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
@@ -381,10 +357,6 @@ func ForceAccount(t *testing.T, account string) {
 	config.Account = account
 }
 
-func ForceCluster(t *testing.T, cluster string) {
-	config.Cluster = cluster
-}
-
 func StripTableDecorations(s string) string {
 	decorations := []string{"╭", "─", "┬", "╮", "├", "│", "┤", "┼", "╰", "┴", "╯"}
 	for _, c := range decorations {
@@ -393,4 +365,60 @@ func StripTableDecorations(s string) string {
 	// replace multiple spaces with just one
 	re := regexp.MustCompile(`\s+`)
 	return re.ReplaceAllString(s, " ")
+}
+
+func (ts *TestStore) GetAccountKey(t *testing.T, name string) (nkeys.KeyPair, error) {
+	ac, err := ts.Store.ReadAccountClaim(name)
+	require.NoError(t, err)
+	return ts.KeyStore.GetKeyPair(ac.Subject)
+}
+
+func (ts *TestStore) GetUserKey(t *testing.T, account string, name string) (nkeys.KeyPair, error) {
+	uc, err := ts.Store.ReadUserClaim(account, name)
+	require.NoError(t, err)
+	return ts.KeyStore.GetKeyPair(uc.Subject)
+}
+
+func (ts *TestStore) GetAccountKeyPath(t *testing.T, name string) string {
+	sc, err := ts.Store.ReadAccountClaim(name)
+	require.NoError(t, err)
+	return ts.KeyStore.GetKeyPath(sc.Subject)
+}
+
+func (ts *TestStore) GetClusterKeyPath(t *testing.T, name string) string {
+	sc, err := ts.Store.ReadClusterClaim(name)
+	require.NoError(t, err)
+	return ts.KeyStore.GetKeyPath(sc.Subject)
+}
+
+func (ts *TestStore) GetOperatorPublicKey(t *testing.T) string {
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	pk, err := ts.KeyStore.GetPublicKey(oc.Subject)
+	require.NoError(t, err)
+	return pk
+}
+
+func (ts *TestStore) GetAccountPublicKey(t *testing.T, name string) string {
+	sc, err := ts.Store.ReadAccountClaim(name)
+	require.NoError(t, err)
+	pk, err := ts.KeyStore.GetPublicKey(sc.Subject)
+	require.NoError(t, err)
+	return pk
+}
+
+func (ts *TestStore) GetUserPublicKey(t *testing.T, account string, name string) string {
+	sc, err := ts.Store.ReadUserClaim(account, name)
+	require.NoError(t, err)
+	pk, err := ts.KeyStore.GetPublicKey(sc.Subject)
+	require.NoError(t, err)
+	return pk
+}
+
+func (ts *TestStore) GetUserSeedKey(t *testing.T, account string, name string) string {
+	sc, err := ts.Store.ReadUserClaim(account, name)
+	require.NoError(t, err)
+	pk, err := ts.KeyStore.GetSeed(sc.Subject)
+	require.NoError(t, err)
+	return pk
 }

@@ -25,13 +25,10 @@ func TestDescribeAccount_Single(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	opub, err := ts.KeyStore.GetOperatorPublicKey("operator")
-	require.NoError(t, err)
+	opub := ts.GetOperatorPublicKey(t)
 
 	ts.AddAccount(t, "A")
-
-	pub, err := ts.KeyStore.GetAccountPublicKey("A")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "A")
 
 	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
@@ -79,11 +76,10 @@ func TestDescribeAccount_MultipleWithContext(t *testing.T) {
 	err := GetConfig().SetAccount("B")
 	require.NoError(t, err)
 
-	opub, err := ts.KeyStore.GetOperatorPublicKey("operator")
+	opub := ts.GetOperatorPublicKey(t)
 	require.NoError(t, err)
 
-	pub, err := ts.KeyStore.GetAccountPublicKey("B")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "B")
 
 	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
@@ -99,8 +95,7 @@ func TestDescribeAccount_MultipleWithFlag(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	pub, err := ts.KeyStore.GetAccountPublicKey("B")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "B")
 
 	stdout, _, err := ExecuteCmd(createDescribeAccountCmd(), "--account", "B")
 	require.NoError(t, err)

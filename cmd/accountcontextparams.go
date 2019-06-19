@@ -38,7 +38,6 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 			return err
 		}
 		ctx.StoreCtx().Account.Name = p.Name
-		return nil
 	} else {
 		if config.Account != "" {
 			ctx.StoreCtx().Account.Name = config.Account

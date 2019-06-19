@@ -105,7 +105,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
 
-	akp, err := ts.KeyStore.GetAccountKey("A")
+	akp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
@@ -137,12 +137,11 @@ func Test_AddPublicImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	pub, err := ts.KeyStore.GetAccountPublicKey("A")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
 	ts.AddAccount(t, "B")
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", pub, "--remote-subject", "foobar.>")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", pub, "--remote-subject", "foobar.>")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -178,7 +177,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
 
-	akp, err := ts.KeyStore.GetAccountKey("A")
+	akp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
@@ -211,7 +210,7 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
 
-	akp, err := ts.KeyStore.GetAccountKey("A")
+	akp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()

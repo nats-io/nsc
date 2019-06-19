@@ -376,69 +376,6 @@ func (u *UserDescriber) Describe() string {
 	return table.Render()
 }
 
-type ClusterDescriber struct {
-	jwt.ClusterClaims
-}
-
-func NewClusterDescriber(c jwt.ClusterClaims) *ClusterDescriber {
-	return &ClusterDescriber{ClusterClaims: c}
-}
-
-func (c *ClusterDescriber) Describe() string {
-	table := tablewriter.CreateTable()
-	table.UTF8Box()
-	table.AddTitle("Cluster")
-	table.AddRow("Name", c.Name)
-	table.AddRow("Cluster ID", ShortCodes(c.Subject))
-	table.AddRow("Issuer ID", ShortCodes(c.Issuer))
-	table.AddRow("Issued", RenderDate(c.IssuedAt))
-	table.AddRow("Expires", RenderDate(c.Expires))
-
-	table.AddSeparator()
-
-	AddListValues(table, "Trusted Operators", c.Trust)
-	if c.OperatorURL != "" {
-		table.AddRow("Operator Srv", c.OperatorURL)
-	}
-
-	table.AddSeparator()
-
-	AddListValues(table, "Trusted Accounts", c.Accounts)
-	if c.AccountURL != "" {
-		table.AddRow("Account Srv", c.AccountURL)
-	}
-
-	table.AddSeparator()
-	AddListValues(table, "Tags", c.Tags)
-
-	return table.Render()
-}
-
-type ServerDescriber struct {
-	jwt.ServerClaims
-}
-
-func NewServerDescriber(u jwt.ServerClaims) *ServerDescriber {
-	return &ServerDescriber{ServerClaims: u}
-}
-
-func (s *ServerDescriber) Describe() string {
-	table := tablewriter.CreateTable()
-	table.UTF8Box()
-	table.AddTitle("Server")
-	table.AddRow("Name", s.Name)
-	table.AddRow("Server ID", ShortCodes(s.Subject))
-	table.AddRow("Issuer ID", ShortCodes(s.Issuer))
-	table.AddRow("Issued", RenderDate(s.IssuedAt))
-	table.AddRow("Expires", RenderDate(s.Expires))
-
-	table.AddSeparator()
-
-	AddListValues(table, "Tags", s.Tags)
-
-	return table.Render()
-}
-
 type OperatorDescriber struct {
 	jwt.OperatorClaims
 }
