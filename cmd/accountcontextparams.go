@@ -32,6 +32,7 @@ func (p *AccountContextParams) BindFlags(cmd *cobra.Command) {
 func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 	config := GetConfig()
 	if p.Name != "" {
+		// if specified, sync the context
 		err := config.SetAccountTemp(p.Name)
 		if err != nil {
 			return err
@@ -44,6 +45,14 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 			p.Name = config.Account
 		}
 	}
+	if p.Name != "" {
+		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.Name)
+		if err != nil {
+			return err
+		}
+		ctx.StoreCtx().Account.PublicKey = ac.Subject
+	}
+
 	return nil
 }
 

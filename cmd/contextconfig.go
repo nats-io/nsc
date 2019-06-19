@@ -144,6 +144,7 @@ func (c *ContextConfig) SetAccountTemp(account string) error {
 		}
 	}
 	c.Account = account
+
 	return nil
 }
 
