@@ -88,7 +88,7 @@ func NewKeyStore(environmentName string) KeyStore {
 func KeysNeedMigration() (bool, error) {
 	dir := GetKeysDir()
 	ok, err := dirExists(dir)
-	if err != nil {
+	if err != nil || !ok {
 		return false, err
 	}
 	infos, err := ioutil.ReadDir(dir)

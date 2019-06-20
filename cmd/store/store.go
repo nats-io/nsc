@@ -734,78 +734,19 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 	return "", nil
 }
 
-// Returns a server name for the cluster if there's only one user
-func (ctx *Context) DefaultServer(cluster string) *string {
-	servers, err := ctx.Store.ListEntries(Clusters, cluster, Servers)
+// GetAccountKeys returns the public keys for the named account followed
+// by its signing keys
+func (ctx *Context) GetAccountKeys(name string) ([]string, error) {
+	var keys []string
+	ac, err := ctx.Store.ReadAccountClaim(name)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	if len(servers) == 1 {
-		return &servers[0]
+	if ac == nil {
+		// not found
+		return nil, nil
 	}
-	return nil
-}
-
-func (ctx *Context) PickServer(clusterName string) (string, error) {
-	var err error
-	if clusterName == "" {
-		clusterName = ctx.Cluster.Name
-	}
-
-	if clusterName == "" {
-		clusterName, err = ctx.PickCluster(clusterName)
-		if err != nil {
-			return "", err
-		}
-	}
-	// allow downstream use of context to have cluster
-	ctx.Cluster.Name = clusterName
-
-	servers, err := ctx.Store.ListEntries(Clusters, clusterName, Servers)
-	if err != nil {
-		return "", err
-	}
-	if len(servers) == 0 {
-		return "", fmt.Errorf("cluster %q doesn't have any servers - add one first", clusterName)
-	}
-	if len(servers) == 1 {
-		return servers[0], nil
-	}
-	if len(servers) > 1 {
-		i, err := cli.PromptChoices("select server", "", servers)
-		if err != nil {
-			return "", err
-		}
-		return servers[i], nil
-	}
-	return "", nil
-}
-
-func (ctx *Context) PickCluster(name string) (string, error) {
-	if name == "" {
-		name = ctx.Cluster.Name
-	}
-
-	clusters, err := ctx.Store.ListSubContainers(Clusters)
-	if err != nil {
-		return "", err
-	}
-	if len(clusters) == 0 {
-		return "", fmt.Errorf("no clusters defined - add one first")
-	}
-	if len(clusters) == 1 {
-		name = clusters[0]
-	}
-	if len(clusters) > 1 {
-		i, err := cli.PromptChoices("select cluster", "", clusters)
-		if err != nil {
-			return "", err
-		}
-		name = clusters[i]
-	}
-
-	// allow downstream use of context to have cluster
-	ctx.Cluster.Name = name
-
-	return name, nil
+	keys = append(keys, ac.Subject)
+	keys = append(keys, ac.SigningKeys...)
+	return keys, nil
 }

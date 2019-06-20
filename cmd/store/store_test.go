@@ -327,3 +327,42 @@ func TestStore_ListSubContainers(t *testing.T) {
 	require.Len(t, v, 1)
 	require.Equal(t, "bar", v[0])
 }
+
+func TestStore_GetAccountKeys(t *testing.T) {
+	_, _, kp := CreateOperatorKey(t)
+	_, apub, _ := CreateAccountKey(t)
+
+	s := CreateTestStoreForOperator(t, "O", kp)
+
+	ctx, err := s.GetContext()
+	require.NoError(t, err)
+
+	keys, err := ctx.GetAccountKeys("A")
+	require.NoError(t, err)
+	require.Nil(t, keys)
+
+	ac := jwt.NewAccountClaims(apub)
+	ac.Name = "A"
+	cd, err := ac.Encode(kp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	keys, err = ctx.GetAccountKeys("A")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	require.Contains(t, keys, apub)
+
+	_, apub2, _ := CreateAccountKey(t)
+	ac.SigningKeys.Add(apub2)
+	cd, err = ac.Encode(kp)
+	require.NoError(t, err)
+	err = s.StoreClaim([]byte(cd))
+	require.NoError(t, err)
+
+	keys, err = ctx.GetAccountKeys("A")
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	require.Equal(t, apub, keys[0])
+	require.Equal(t, apub2, keys[1])
+}

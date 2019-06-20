@@ -144,7 +144,7 @@ to your users and services.`,
 		}
 		if needsUpdate {
 			cmd.SilenceUsage = true
-			return fmt.Errorf("%q needs migration - type `nsc keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()))
+			return fmt.Errorf("the keystore %q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
 		}
 
 		return nil
