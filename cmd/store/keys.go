@@ -97,7 +97,7 @@ func KeysNeedMigration() (bool, error) {
 	if len(infos) == 0 {
 		return false, nil
 	}
-	ok, err = fileExists(filepath.Join(dir, KeysDir))
+	ok, err = dirExists(filepath.Join(dir, KeysDir))
 	return !ok, err
 }
 
@@ -106,16 +106,8 @@ func Migrate() (string, error) {
 	// make a new directory next to it
 	name := nuid.Next()
 	to := filepath.Join(filepath.Dir(dir), name)
-	if err := MaybeMakeDir(to); err != nil {
-		return "", err
-	}
-	if err := AddGitIgnore(to); err != nil {
-		return "", err
-	}
-	if err := MaybeMakeDir(filepath.Join(to, KeysDir)); err != nil {
-		return "", err
-	}
-	if err := MaybeMakeDir(filepath.Join(to, CredsDir)); err != nil {
+
+	if err := makeKeyStore(to); err != nil {
 		return "", err
 	}
 	// migrate the keys and creds
@@ -144,8 +136,7 @@ func (k *KeyStore) keyName(n string) string {
 }
 
 func (k *KeyStore) CalcUserCredsPath(account string, user string) string {
-	return filepath.Join(GetKeysDir(), CredsDir, k.Env, Accounts, account, k.credsName(user))
-
+	return filepath.Join(GetKeysDir(), CredsDir, k.Env, account, k.credsName(user))
 }
 
 func (k *KeyStore) GetUserCredsPath(account string, user string) string {
@@ -195,6 +186,19 @@ func (k *KeyStore) keypath(kp nkeys.KeyPair) (string, error) {
 	return k.GetKeyPath(pk), nil
 }
 
+func makeKeyStore(dir string) error {
+	if err := MaybeMakeDir(filepath.Join(dir, KeysDir)); err != nil {
+		return err
+	}
+	if err := MaybeMakeDir(filepath.Join(dir, CredsDir)); err != nil {
+		return err
+	}
+	if err := AddGitIgnore(dir); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (k *KeyStore) GetKeyPath(pubkey string) string {
 	kind := pubkey[0:1]
 	shard := pubkey[1:3]
@@ -228,7 +232,6 @@ func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
 	return string(d), nil
 }
 
-
 func AddGitIgnore(dir string) error {
 	if dir != "" {
 		_, err := os.Stat(dir)
@@ -250,15 +253,23 @@ func AddGitIgnore(dir string) error {
 	return nil
 }
 
-func (k *KeyStore) store(fp string, kp nkeys.KeyPair) (string, error) {
+func (k *KeyStore) Store(kp nkeys.KeyPair) (string, error) {
+	if err := makeKeyStore(GetKeysDir()); err != nil {
+		return "", err
+	}
+	fp, err := k.keypath(kp)
+	if err != nil {
+		return "", err
+	}
+
 	seed, err := kp.Seed()
 	if err != nil {
 		return "", fmt.Errorf("error reading seed from nkey: %v", err)
 	}
 
-	dir := filepath.Dir(fp)
-	err = MaybeMakeDir(dir)
-	AddGitIgnore(dir)
+	if err := MaybeMakeDir(filepath.Dir(fp)); err != nil {
+		return "", err
+	}
 
 	_, err = os.Stat(fp)
 	if err != nil {
@@ -278,15 +289,7 @@ func (k *KeyStore) store(fp string, kp nkeys.KeyPair) (string, error) {
 	if string(d) != string(seed) {
 		return "", fmt.Errorf("key %q already exists and is different", fp)
 	}
-	return "", nil
-}
-
-func (k *KeyStore) Store(kp nkeys.KeyPair) (string, error) {
-	fp, err := k.keypath(kp)
-	if err != nil {
-		return "", err
-	}
-	return k.store(fp, kp)
+	return fp, err
 }
 
 func (k *KeyStore) Read(path string) (nkeys.KeyPair, error) {
