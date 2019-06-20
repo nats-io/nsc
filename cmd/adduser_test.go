@@ -74,7 +74,7 @@ func Test_AddUserInteractive(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", ts.KeyStore.GetAccountKeyPath("A")}
+	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", ts.GetAccountKeyPath(t, "A")}
 
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)
@@ -84,7 +84,7 @@ func Test_AddUserInteractive(t *testing.T) {
 }
 
 func validateAddUserClaims(t *testing.T, ts *TestStore) {
-	skp, err := ts.KeyStore.GetUserKey("A", "U")
+	skp, err := ts.GetUserKey(t, "A", "U")
 	require.NoError(t, err)
 	_, err = skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
@@ -96,7 +96,7 @@ func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err)
 	require.Equal(t, sc.Subject, pub, "public key is subject")
 
-	okp, err := ts.KeyStore.GetAccountKey("A")
+	okp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 
 	oppub, err := okp.PublicKey()

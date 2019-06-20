@@ -105,10 +105,11 @@ type EditUserParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
-	claim *jwt.UserClaims
-	name  string
-	token string
-	out   string
+	claim         *jwt.UserClaims
+	name          string
+	token         string
+	out           string
+	credsFilePath string
 
 	allowPubs   []string
 	allowPubsub []string
@@ -265,7 +266,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 
 	// FIXME: super hack
 	ks := ctx.StoreCtx().KeyStore
-	ukp, err := ks.GetUserKey(p.AccountContextParams.Name, p.name)
+	ukp, err := ks.GetKeyPair(p.claim.Subject)
 	if err != nil {
 		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
 	}
@@ -277,7 +278,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 		if err != nil {
 			ctx.CurrentCmd().Printf("unable to save creds: %v", err)
 		} else {
-			err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+			p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
 			if err != nil {
 				ctx.CurrentCmd().Println(err.Error())
 			}

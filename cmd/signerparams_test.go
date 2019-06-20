@@ -85,19 +85,13 @@ func Test_SignerParams(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	akp, err := ts.KeyStore.GetAccountKey("A")
+	akp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
-
-	ts.AddCluster(t, "C")
-	ckp, err := ts.KeyStore.GetClusterKey("C")
-	require.NoError(t, err)
-	require.NotNil(t, ckp)
 
 	tests := CmdTests{
 		{createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), []string{"sp"}, nil, nil, false},
 		{createSignerCmd(nkeys.PrefixByteAccount, false, akp), []string{"sp"}, nil, nil, false},
-		{createSignerCmd(nkeys.PrefixByteCluster, false, ckp), []string{"sp"}, nil, nil, false},
 	}
 
 	tests.Run(t, "root")
@@ -110,7 +104,7 @@ func Test_ManagedSignerParams(t *testing.T) {
 	require.Nil(t, ts.OperatorKey)
 
 	ts.AddAccount(t, "A")
-	akp, err := ts.KeyStore.GetAccountKey("A")
+	akp, err := ts.GetAccountKey(t, "A")
 	require.NoError(t, err)
 	require.NotNil(t, akp)
 

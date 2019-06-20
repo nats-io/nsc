@@ -123,24 +123,12 @@ func (p *DescribeFile) Run(ctx ActionCtx) error {
 			return err
 		}
 		describer = NewActivationDescriber(*ac)
-	case jwt.ClusterClaim:
-		cc, err := jwt.DecodeClusterClaims(p.token)
-		if err != nil {
-			return err
-		}
-		describer = NewClusterDescriber(*cc)
 	case jwt.UserClaim:
 		uc, err := jwt.DecodeUserClaims(p.token)
 		if err != nil {
 			return err
 		}
 		describer = NewUserDescriber(*uc)
-	case jwt.ServerClaim:
-		uc, err := jwt.DecodeServerClaims(p.token)
-		if err != nil {
-			return err
-		}
-		describer = NewServerDescriber(*uc)
 	case jwt.OperatorClaim:
 		oc, err := jwt.DecodeOperatorClaims(p.token)
 		if err != nil {

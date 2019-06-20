@@ -25,9 +25,7 @@ func TestDescribeOperator_Single(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	pub, err := ts.KeyStore.GetOperatorPublicKey("operator")
-	require.NoError(t, err)
-
+	pub := ts.GetOperatorPublicKey(t)
 	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
@@ -54,8 +52,7 @@ func TestDescribeOperator_MultipleWithContext(t *testing.T) {
 	err := GetConfig().SetOperator("B")
 	require.NoError(t, err)
 
-	pub, err := ts.KeyStore.GetOperatorPublicKey("B")
-	require.NoError(t, err)
+	pub := ts.GetOperatorPublicKey(t)
 
 	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
@@ -73,8 +70,7 @@ func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 	err := GetConfig().SetOperator("B")
 	require.NoError(t, err)
 
-	pub, err := ts.KeyStore.GetOperatorPublicKey("B")
-	require.NoError(t, err)
+	pub := ts.GetOperatorPublicKey(t)
 
 	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "B")
 	require.NoError(t, err)
@@ -85,9 +81,6 @@ func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-
-	ts.AddCluster(t, "A")
-	ts.AddCluster(t, "B")
 
 	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "C")
 	require.Error(t, err)

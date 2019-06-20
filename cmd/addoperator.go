@@ -211,7 +211,7 @@ func (p *AddOperatorParams) Run(_ ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.keyPath, err = ctx.KeyStore.Store(p.name, p.signerKP, "")
+		p.keyPath, err = ctx.KeyStore.Store(p.signerKP)
 		if err != nil {
 			return err
 		}

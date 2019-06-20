@@ -22,6 +22,7 @@ require (
 	github.com/nats-io/jwt v0.2.6
 	github.com/nats-io/nats-server/v2 v2.0.0
 	github.com/nats-io/nkeys v0.0.2
+	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0

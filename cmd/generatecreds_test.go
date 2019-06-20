@@ -35,7 +35,7 @@ func TestGenerateConfig_Default(t *testing.T) {
 	accountJwt, err := ts.Store.Read(store.Accounts, "A", store.Users, "u.jwt")
 	require.NoError(t, err)
 
-	seed, err := ts.KeyStore.GetUserSeed("A", "u")
+	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
 	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
@@ -56,7 +56,7 @@ func TestGenerateConfig_MultipleAccounts(t *testing.T) {
 	accountJwt, err := ts.Store.Read(store.Accounts, "A", store.Users, "u.jwt")
 	require.NoError(t, err)
 
-	seed, err := ts.KeyStore.GetUserSeed("A", "u")
+	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
 	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
@@ -91,7 +91,7 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 	accountJwt, err := ts.Store.Read(store.Accounts, "A", store.Users, "u.jwt")
 	require.NoError(t, err)
 
-	seed, err := ts.KeyStore.GetUserSeed("A", "u")
+	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(createGenerateCredsCmd())
@@ -116,9 +116,7 @@ func TestGenerateConfig_Interactive(t *testing.T) {
 	accountJwt, err := ts.Store.Read(store.Accounts, "A", store.Users, "u.jwt")
 	require.NoError(t, err)
 
-	seed, err := ts.KeyStore.GetUserSeed("A", "u")
-	require.NoError(t, err)
-
+	seed := ts.GetUserSeedKey(t, "A", "u")
 	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), []interface{}{0, 0})
 	require.NoError(t, err)
 	require.Contains(t, stdout, string(accountJwt))

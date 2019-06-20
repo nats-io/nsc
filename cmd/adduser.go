@@ -92,15 +92,16 @@ type AddUserParams struct {
 	SignerParams
 	Entity
 	TimeParams
-	allowPubs   []string
-	allowPubsub []string
-	allowSubs   []string
-	denyPubs    []string
-	denyPubsub  []string
-	denySubs    []string
-	out         string
-	src         []string
-	tags        []string
+	allowPubs     []string
+	allowPubsub   []string
+	allowSubs     []string
+	denyPubs      []string
+	denyPubsub    []string
+	denySubs      []string
+	out           string
+	src           []string
+	tags          []string
+	credsFilePath string
 }
 
 func (p *AddUserParams) longHelp() string {
@@ -184,22 +185,17 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 
 	// FIXME: super hack
 	ks := ctx.StoreCtx().KeyStore
-	kp, err := ks.GetUserKey(p.AccountContextParams.Name, p.name)
-	if err != nil {
-		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
-	}
-	if kp == nil {
+	if p.kp == nil {
 		ctx.CurrentCmd().Println("unable to save creds - user key not found")
 	}
-	if kp != nil {
-		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, kp)
+
+	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, p.kp)
+	if err != nil {
+		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
+	} else {
+		p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
 		if err != nil {
-			ctx.CurrentCmd().Printf("unable to save creds: %v", err)
-		} else {
-			err := ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
-			if err != nil {
-				ctx.CurrentCmd().Println(err.Error())
-			}
+			ctx.CurrentCmd().Println(err.Error())
 		}
 	}
 

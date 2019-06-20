@@ -16,7 +16,6 @@
 package store
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,23 +69,23 @@ func TestGetKeys(t *testing.T) {
 
 	_, opk, okp := CreateOperatorKey(t)
 
-	_, err := ks.Store("operator", okp, "operator")
+	_, err := ks.Store(okp)
 	require.NoError(t, err)
-	ookp, err := ks.GetOperatorKey("operator")
+	ookp, err := ks.GetKeyPair(opk)
 	require.NoError(t, err)
-	oopk, err := ks.GetOperatorPublicKey("operator")
+	oopk, err := ookp.PublicKey()
 	require.NoError(t, err)
 	require.True(t, Match(opk, ookp))
 	require.Equal(t, opk, oopk)
 
 	_, apk, akp := CreateAccountKey(t)
-	_, err = ks.Store("account", akp, "operator")
+	_, err = ks.Store(akp)
 	require.NoError(t, err)
 
-	aapk, err := ks.GetAccountPublicKey("account")
+	aakp, err := ks.GetKeyPair(apk)
 	require.NoError(t, err)
 
-	aakp, err := ks.GetAccountKey("account")
+	aapk, err := aakp.PublicKey()
 	require.NoError(t, err)
 
 	require.True(t, Match(apk, aakp))
@@ -95,40 +94,20 @@ func TestGetKeys(t *testing.T) {
 	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 }
 
-func TestGetPrivateKey(t *testing.T) {
+func TestGetMissingKey(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)
 	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
 
-	_, _, okp := CreateOperatorKey(t)
-	_, _, akp := CreateAccountKey(t)
+	_, opk, _ := CreateOperatorKey(t)
 
 	ks := NewKeyStore("test_get_private_key")
-	_, _ = ks.Store("o", okp, "o")
-	_, _ = ks.Store("a", akp, "o")
 
-	ckp, err := ks.GetClusterKey("c")
+	ckp, err := ks.GetKeyPair(opk)
 	require.Nil(t, err)
 	require.Nil(t, ckp)
 
 	os.Setenv(NKeysPathEnv, old)
-}
-
-func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
-	p, err := kp.PublicKey()
-	require.NoError(t, err)
-
-	s, err := kp.Seed()
-	require.NoError(t, err)
-
-	fp := filepath.Join(dir, string(p)+".nk")
-	err = ioutil.WriteFile(fp, s, 0600)
-	require.NoError(t, err)
-	return fp
-}
-
-func CreateClusterKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
-	return CreateTestNKey(t, nkeys.CreateCluster)
 }
 
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {

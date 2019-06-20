@@ -52,7 +52,6 @@ func createEnvCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.StoreRoot, "store", "s", "", "set store directory")
 	cmd.Flags().StringVarP(&params.Operator, "operator", "o", "", "set operator name")
 	cmd.Flags().StringVarP(&params.Account, "account", "a", "", "set account name")
-	cmd.Flags().StringVarP(&params.Cluster, "cluster", "c", "", "set cluster name")
 
 	return cmd
 }
@@ -65,7 +64,6 @@ type SetContextParams struct {
 	StoreRoot string
 	Operator  string
 	Account   string
-	Cluster   string
 }
 
 func (p *SetContextParams) Run(cmd *cobra.Command) error {
@@ -101,14 +99,6 @@ func (p *SetContextParams) Run(cmd *cobra.Command) error {
 		_ = c.SetAccount(current.Account)
 	}
 
-	if p.Cluster != "" {
-		if err := c.SetCluster(p.Cluster); err != nil {
-			return err
-		}
-	} else {
-		_ = c.SetCluster(current.Cluster)
-	}
-
 	c.SetDefaults()
 	current.ContextConfig = *c
 
@@ -132,6 +122,5 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
 	table.AddRow("Default Operator", "", conf.Operator)
 	table.AddRow("Default Account", "", conf.Account)
-	table.AddRow("Default Cluster", "", conf.Cluster)
 	cmd.Println(table.Render())
 }

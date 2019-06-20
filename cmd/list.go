@@ -37,9 +37,7 @@ func init() {
 	GetRootCmd().AddCommand(listCmd)
 	listCmd.AddCommand(createListOperatorsCmd())
 	listCmd.AddCommand(createListAccountsCmd())
-	listCmd.AddCommand(createListClustersCmd())
 	listCmd.AddCommand(createListUsersCmd())
-	listCmd.AddCommand(createListServersCmd())
 }
 
 type listEntry struct {
@@ -213,106 +211,6 @@ func createListUsersCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&operator, "operator", "o", "", "operator name")
 	cmd.Flags().StringVarP(&account, "account", "a", "", "account name")
 
-	return cmd
-}
-
-func createListClustersCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:    "clusters",
-		Hidden: true,
-		Short:  "List clusters",
-		Args:   MaxArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			config := GetConfig()
-			if config.StoreRoot == "" {
-				return errors.New("no store set - `env --store <dir>`")
-			}
-			if config.Operator == "" {
-				return errors.New("no operator set - `env --operator <name>`")
-			}
-
-			containers, err := config.ListClusters()
-			if err != nil {
-				return err
-			}
-
-			s, err := config.LoadStore(config.Operator)
-			if err != nil {
-				return err
-			}
-			sort.Strings(containers)
-			var infos []*listEntry
-			for _, v := range containers {
-				var i listEntry
-				i.name = v
-				infos = append(infos, &i)
-				cc, err := s.ReadClusterClaim(v)
-				if err != nil {
-					i.err = err
-					continue
-				}
-				if cc == nil {
-					i.err = fmt.Errorf("%q jwt not found", v)
-					continue
-				}
-				i.claims = cc
-			}
-			cmd.Println(listEntities("Clusters", infos, config.Operator))
-			return nil
-		},
-	}
-	return cmd
-}
-
-func createListServersCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:    "servers",
-		Hidden: true,
-		Short:  "List servers",
-		Args:   MaxArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			config := GetConfig()
-			if config.StoreRoot == "" {
-				return fmt.Errorf("no store set - `%s env --store <dir>`", GetToolName())
-			}
-			if config.Operator == "" {
-				return fmt.Errorf("no operator set - `%s env --operator <name>`", GetToolName())
-			}
-			if config.Cluster == "" {
-				return fmt.Errorf("no cluster set - `%s env --cluster <name>`", GetToolName())
-			}
-
-			s, err := config.LoadStore(config.Operator)
-			if err != nil {
-				return err
-			}
-
-			names, err := s.ListEntries(store.Clusters, config.Cluster, store.Servers)
-			if err != nil {
-				return err
-			}
-			sort.Strings(names)
-
-			var infos []*listEntry
-			for _, v := range names {
-				var i listEntry
-				i.name = v
-				infos = append(infos, &i)
-				sc, err := s.ReadServerClaim(config.Cluster, v)
-				if err != nil {
-					i.err = err
-					continue
-				}
-				if sc == nil {
-					i.err = fmt.Errorf("%q jwt was not found", v)
-					continue
-				}
-				i.claims = sc
-			}
-			cmd.Println(listEntities("Servers", infos, config.Account))
-			return nil
-		},
-	}
 	return cmd
 }
 

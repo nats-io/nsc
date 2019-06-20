@@ -39,8 +39,7 @@ func TestDescribe_Operator(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	pub, err := ts.KeyStore.GetOperatorPublicKey("O")
-	require.NoError(t, err)
+	pub := ts.GetOperatorPublicKey(t)
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", "O.jwt")
 	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
@@ -53,8 +52,7 @@ func TestDescribe_Interactive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	pub, err := ts.KeyStore.GetAccountPublicKey("A")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "A")
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")
 
@@ -68,8 +66,7 @@ func TestDescribe_Account(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	pub, err := ts.KeyStore.GetAccountPublicKey("A")
-	require.NoError(t, err)
+	pub := ts.GetAccountPublicKey(t, "A")
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")
 	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
@@ -83,39 +80,9 @@ func TestDescribe_User(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "a")
-	pub, err := ts.KeyStore.GetUserPublicKey("A", "a")
-	require.NoError(t, err)
+	pub := ts.GetUserPublicKey(t, "A", "a")
 
 	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", store.Users, "a.jwt")
-	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
-	require.NoError(t, err)
-	require.Contains(t, out, pub)
-}
-
-func TestDescribe_Cluster(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
-	ts.AddCluster(t, "C")
-	pub, err := ts.KeyStore.GetClusterPublicKey("C")
-	require.NoError(t, err)
-
-	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Clusters, "C", "C.jwt")
-	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
-	require.NoError(t, err)
-	require.Contains(t, out, pub)
-}
-
-func TestDescribe_Server(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
-	ts.AddCluster(t, "C")
-	ts.AddServer(t, "C", "s")
-	pub, err := ts.KeyStore.GetServerPublicKey("C", "s")
-	require.NoError(t, err)
-
-	fp := filepath.Join(ts.GetStoresRoot(), "O", store.Clusters, "C", store.Servers, "s.jwt")
 	out, _, err := ExecuteCmd(createDescribeJwtCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.Contains(t, out, pub)

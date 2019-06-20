@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -111,16 +113,21 @@ func (p *GenerateCredsParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
-	p.entityKP, err = ctx.StoreCtx().KeyStore.GetUserKey(p.AccountContextParams.Name, p.user)
-	if err != nil {
-		return err
-	}
-
 	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user)) {
 		return fmt.Errorf("user %q not found in %q", p.user, p.AccountContextParams.Name)
 	}
 
 	p.entityJwt, err = ctx.StoreCtx().Store.Read(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user))
+	if err != nil {
+		return err
+	}
+
+	uc, err := jwt.DecodeUserClaims(string(p.entityJwt))
+	if err != nil {
+		return fmt.Errorf("error decoding user %q in %q jwt: %v", p.AccountContextParams.Name, p.user, err)
+	}
+
+	p.entityKP, err = ctx.StoreCtx().KeyStore.GetKeyPair(uc.Subject)
 	if err != nil {
 		return err
 	}
