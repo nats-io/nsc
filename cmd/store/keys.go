@@ -34,7 +34,6 @@ const DEfaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
 const NKeyExtension = "nk"
 const CredsExtension = "creds"
-const KeysFile = ".keys"
 const CredsDir = "creds"
 const KeysDir = "keys"
 
@@ -98,7 +97,7 @@ func KeysNeedMigration() (bool, error) {
 	if len(infos) == 0 {
 		return false, nil
 	}
-	ok, err = fileExists(filepath.Join(dir, KeysFile))
+	ok, err = fileExists(filepath.Join(dir, KeysDir))
 	return !ok, err
 }
 
@@ -113,7 +112,10 @@ func Migrate() (string, error) {
 	if err := AddGitIgnore(to); err != nil {
 		return "", err
 	}
-	if err := addKeysFile(to); err != nil {
+	if err := MaybeMakeDir(filepath.Join(to, KeysDir)); err != nil {
+		return "", err
+	}
+	if err := MaybeMakeDir(filepath.Join(to, CredsDir)); err != nil {
 		return "", err
 	}
 	// migrate the keys and creds
@@ -226,18 +228,6 @@ func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
 	return string(d), nil
 }
 
-func addKeysFile(dir string) error {
-	_, err := os.Stat(dir)
-	if err != nil {
-		return nil
-	}
-	kf := filepath.Join(dir, KeysFile)
-	_, err = os.Stat(kf)
-	if os.IsNotExist(err) {
-		return ioutil.WriteFile(kf, []byte("# keys directory - treat contents as secrets\n"), 0600)
-	}
-	return nil
-}
 
 func AddGitIgnore(dir string) error {
 	if dir != "" {
