@@ -171,9 +171,6 @@ func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte)
 	if err := MaybeMakeDir(dir); err != nil {
 		return "", err
 	}
-	if err := AddGitIgnore(dir); err != nil {
-		return "", err
-	}
 
 	return fp, ioutil.WriteFile(fp, data, 0600)
 }
