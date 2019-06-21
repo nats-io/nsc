@@ -53,7 +53,7 @@ github.com/mitchellh/go-homedir
 github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
-# github.com/nats-io/jwt v0.2.6
+# github.com/nats-io/jwt v0.2.8
 github.com/nats-io/jwt
 # github.com/nats-io/nats-server/v2 v2.0.0
 github.com/nats-io/nats-server/v2/server

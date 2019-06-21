@@ -106,3 +106,28 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout, u)
 }
+
+func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	require.NoError(t, err)
+	require.NotContains(t, stdout, "Operator Service URLs")
+
+	urls := []string{"nats://localhost:4222", "tls://localhost:4333"}
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	oc.OperatorServiceURLs.Add(urls...)
+
+	token, err := oc.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+
+	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	require.NoError(t, err)
+	require.Contains(t, stdout, "Operator Service URLs")
+	require.Contains(t, stdout, "nats://localhost:4222")
+	require.Contains(t, stdout, "tls://localhost:4333")
+}

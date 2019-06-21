@@ -330,9 +330,9 @@ func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
 	}
 }
 
-func AddListValues(table *tablewriter.Table, label string, subjects []string) {
-	if len(subjects) > 0 {
-		for i, v := range subjects {
+func AddListValues(table *tablewriter.Table, label string, values []string) {
+	if len(values) > 0 {
+		for i, v := range values {
 			if i == 0 {
 				table.AddRow(label, string(v))
 			} else {
@@ -392,6 +392,8 @@ func (o *OperatorDescriber) Describe() string {
 	if o.AccountServerURL != "" {
 		table.AddRow("Account JWT Server", o.AccountServerURL)
 	}
+
+	AddListValues(table, "Operator Service URLs", o.OperatorServiceURLs)
 
 	if len(o.Identities) > 0 {
 		table.AddSeparator()
