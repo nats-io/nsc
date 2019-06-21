@@ -129,7 +129,7 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	s1, pk1, _ := CreateOperatorKey(t)
 	_, pk2, _ := CreateOperatorKey(t)
 
-	_, _, err := ExecuteCmd(createEditOperator(), "--sk", pk1, "--sk", pk2)
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2)
 	require.NoError(t, err)
 
 	inputs := []interface{}{"A", true, "0", "0", string(s1)}

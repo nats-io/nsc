@@ -30,12 +30,12 @@ func Test_EditOperator(t *testing.T) {
 	defer ts.Done(t)
 
 	tests := CmdTests{
-		{createEditOperator(), []string{"edit", "operator"}, nil, []string{"specify an edit option"}, true},
-		{createEditOperator(), []string{"edit", "operator", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
-		{createEditOperator(), []string{"edit", "operator", "--sk"}, nil, []string{"flag needs an argument"}, true},
-		{createEditOperator(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
-		{createEditOperator(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
-		{createEditOperator(), []string{"edit", "operator", "--tag", "O", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator"}, nil, []string{"specify an edit option"}, true},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--sk"}, nil, []string{"flag needs an argument"}, true},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--tag", "O", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
 	}
 
 	tests.Run(t, "root", "edit")
@@ -48,7 +48,7 @@ func Test_EditOperatorSigningKeys(t *testing.T) {
 	s1, pk1, _ := CreateOperatorKey(t)
 	_, pk2, _ := CreateOperatorKey(t)
 
-	_, _, err := ExecuteCmd(createEditOperator(), "--sk", pk1, "--sk", pk2)
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2)
 	require.NoError(t, err)
 
 	d, err := ts.Store.Read(store.JwtName("O"))
@@ -67,7 +67,7 @@ func Test_EditOperatorSigningKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, oc.DidSign(ac))
 
-	_, _, err = ExecuteCmd(createEditOperator(), "--rm-sk", pk1)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-sk", pk1)
 	require.NoError(t, err)
 
 	d, err = ts.Store.Read(store.JwtName("O"))
@@ -79,4 +79,58 @@ func Test_EditOperatorSigningKeys(t *testing.T) {
 	require.NotContains(t, oc.SigningKeys, pk1)
 	require.Contains(t, oc.SigningKeys, pk2)
 	require.False(t, oc.DidSign(ac))
+}
+
+func Test_EditOperatorServiceURLs(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	u1 := "nats://localhost:4222"
+	u2 := "tls://localhost:4333"
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Len(t, oc.OperatorServiceURLs, 0)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--service-url", u1, "--service-url", u2)
+	require.NoError(t, err)
+
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Contains(t, oc.OperatorServiceURLs, u1)
+	require.Contains(t, oc.OperatorServiceURLs, u2)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-service-url", u1)
+	require.NoError(t, err)
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotContains(t, oc.OperatorServiceURLs, u1)
+	require.Contains(t, oc.OperatorServiceURLs, u2)
+}
+
+func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	u1 := "nats://localhost:4222"
+	u2 := "tls://localhost:4333"
+
+	// valid from, valid until, acc jwt server, add service url, url, add another, url, add another, add signing key
+	inputs := []interface{}{"0", "0", "", true, u1, true, u2, false, false}
+
+	_, _, err := ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Contains(t, oc.OperatorServiceURLs, u1)
+	require.Contains(t, oc.OperatorServiceURLs, u2)
+
+	// valid from, valid until, acc jwt server, add service url, remove server urls, add signing key
+	inputs = []interface{}{"0", "0", "", false, true, []int{0}, false}
+
+	_, _, err = ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotContains(t, oc.OperatorServiceURLs, u1)
+	require.Contains(t, oc.OperatorServiceURLs, u2)
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createEditOperator() *cobra.Command {
+func createEditOperatorCmd() *cobra.Command {
 	var params EditOperatorParams
 	cmd := &cobra.Command{
 		Use:          "operator",
@@ -49,13 +49,15 @@ func createEditOperator() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.asu, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https urls supported if updating with nsc)")
+	cmd.Flags().StringSliceVarP(&params.serviceURLs, "service-url", "n", nil, "add an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
+	cmd.Flags().StringSliceVarP(&params.rmServiceURLs, "rm-service-url", "", nil, "remove an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
 }
 
 func init() {
-	editCmd.AddCommand(createEditOperator())
+	editCmd.AddCommand(createEditOperatorCmd())
 }
 
 type EditOperatorParams struct {
@@ -64,6 +66,8 @@ type EditOperatorParams struct {
 	claim         *jwt.OperatorClaims
 	token         string
 	asu           string
+	serviceURLs   []string
+	rmServiceURLs []string
 	signingKeys   SigningKeysParams
 	rmSigningKeys []string
 }
@@ -71,7 +75,7 @@ type EditOperatorParams struct {
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url") {
+	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -118,6 +122,44 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 	p.asu = strings.TrimSpace(p.asu)
+
+	ok, err := cli.PromptYN("add a service url")
+	if err != nil {
+		return err
+	}
+	if ok {
+		for {
+			v, err := cli.Prompt("operator service url", "", true, jwt.ValidateOperatorServiceURL)
+			if err != nil {
+				return err
+			}
+			// the list will prune empty urls
+			p.serviceURLs = append(p.serviceURLs, v)
+			ok, err := cli.PromptYN("add another service url")
+			if err != nil {
+				return err
+			}
+			if !ok {
+				break
+			}
+		}
+	}
+	if len(p.claim.OperatorServiceURLs) > 0 {
+		ok, err = cli.PromptYN("remove any service urls")
+		if err != nil {
+			return err
+		}
+		if ok {
+			idx, err := cli.PromptMultipleChoices("select service urls to remove", p.claim.OperatorServiceURLs)
+			if err != nil {
+				return err
+			}
+			for _, v := range idx {
+				p.rmServiceURLs = append(p.rmServiceURLs, p.claim.OperatorServiceURLs[v])
+			}
+		}
+	}
+
 	return p.signingKeys.Edit()
 }
 
@@ -126,6 +168,13 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
+
+	for _, v := range p.serviceURLs {
+		if err := jwt.ValidateOperatorServiceURL(v); err != nil {
+			return err
+		}
+	}
+
 	if err = p.signingKeys.Valid(); err != nil {
 		return err
 	}
@@ -147,6 +196,13 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) error {
 	p.claim.SigningKeys.Remove(p.rmSigningKeys...)
 
 	p.claim.AccountServerURL = p.asu
+
+	for _, v := range p.serviceURLs {
+		p.claim.OperatorServiceURLs.Add(strings.ToLower(v))
+	}
+	for _, v := range p.rmServiceURLs {
+		p.claim.OperatorServiceURLs.Remove(strings.ToLower(v))
+	}
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
