@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mitchellh/go-homedir"
+
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -171,4 +173,31 @@ func Test_SignerParamsPathNotFound(t *testing.T) {
 	_, _, err := ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, nil), "-K", ts.OperatorKeyPath)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no such file or directory")
+}
+
+func Test_SignerParamsHomePath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	home, err := homedir.Dir()
+	require.NoError(t, err)
+
+	// yeap not going to remove it
+	tmpdir := filepath.Join(home, ".nsc_unit_test")
+	require.NoError(t, MaybeMakeDir(tmpdir))
+
+	fn := filepath.Join(tmpdir, filepath.Base(ts.OperatorKeyPath))
+	require.NoError(t, os.Rename(ts.OperatorKeyPath, fn))
+	require.FileExists(t, fn)
+
+	defer func() {
+		if err := os.Remove(fn); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	tfn := AbbrevHomePaths(fn)
+	require.Equal(t, "~", tfn[:1])
+	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", tfn)
+	require.NoError(t, err)
 }

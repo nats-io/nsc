@@ -63,6 +63,11 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		}
 	}
 
+	// show them an abbreviated path
+	if KeyPathFlag != "" {
+		KeyPathFlag = AbbrevHomePaths(KeyPathFlag)
+	}
+
 	label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
 	KeyPathFlag, err := cli.Prompt(label, KeyPathFlag, true, NKeyValidator(p.kind))
 	if err != nil {
