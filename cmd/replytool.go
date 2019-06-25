@@ -136,9 +136,9 @@ func (p *RepParams) Run(ctx ActionCtx) error {
 		if err := sub.AutoUnsubscribe(p.maxMessages); err != nil {
 			return err
 		}
-		ctx.CurrentCmd().Printf("Listening on [%s] for %d messages", subj, p.maxMessages)
+		ctx.CurrentCmd().Printf("Listening on [%s] for %d messages\n", subj, p.maxMessages)
 	} else {
-		ctx.CurrentCmd().Printf("Listening on [%s]", subj)
+		ctx.CurrentCmd().Printf("Listening on [%s]\n", subj)
 	}
 
 	if err := nc.Flush(); err != nil {

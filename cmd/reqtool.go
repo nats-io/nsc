@@ -120,6 +120,6 @@ func (p *ReqParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	ctx.CurrentCmd().Printf("Received reply: [%v] : '%s'", msg.Subject, string(msg.Data))
+	ctx.CurrentCmd().Printf("Received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
 	return nil
 }

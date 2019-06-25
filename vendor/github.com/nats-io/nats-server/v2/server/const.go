@@ -40,7 +40,7 @@ var (
 
 const (
 	// VERSION is the current version for the server.
-	VERSION = "2.0.0"
+	VERSION = "2.0.1"
 
 	// PROTO is the currently supported protocol.
 	// 0 was the original
@@ -114,6 +114,9 @@ const (
 
 	// DEFAULT_LEAF_NODE_RECONNECT LeafNode reconnect interval.
 	DEFAULT_LEAF_NODE_RECONNECT = time.Second
+
+	// DEFAULT_LEAF_TLS_TIMEOUT TLS timeout for LeafNodes
+	DEFAULT_LEAF_TLS_TIMEOUT = 2 * time.Second
 
 	// PROTO_SNIPPET_SIZE is the default size of proto to print on parse errors.
 	PROTO_SNIPPET_SIZE = 32

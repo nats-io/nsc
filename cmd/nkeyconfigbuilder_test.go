@@ -60,7 +60,7 @@ func Test_NkeyResolverBasicProperties(t *testing.T) {
 	err = builder.Add(ub)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -86,7 +86,7 @@ func Test_NkeyResolverExportsStreamsServices(t *testing.T) {
 	err = builder.Add(a)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -112,7 +112,7 @@ func Test_NkeyResolverExportsPrivateStreamsServices(t *testing.T) {
 	err = builder.Add(a)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -148,7 +148,7 @@ func Test_NkeyResolverMapsImporter(t *testing.T) {
 	err = builder.Add(b)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -187,11 +187,11 @@ func Test_NkeyResolverAddsSigningKeyUser(t *testing.T) {
 
 	ua, err := ts.Store.Read(store.Accounts, "A", store.Users, store.JwtName("ua"))
 	require.NoError(t, err)
-	builder.Add(ua)
+	require.NoError(t, builder.Add(ua))
 	uc, err := ts.Store.ReadUserClaim("A", "ua")
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)

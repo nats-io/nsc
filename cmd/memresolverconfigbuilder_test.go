@@ -17,11 +17,11 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/nats-server/v2/server"
-
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -32,12 +32,18 @@ func Test_MemResolverContainsStandardProperties(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	builder := NewMemResolverConfigBuilder()
+
+	o, err := ts.Store.Read(store.JwtName("O"))
+	require.NoError(t, err)
+	err = builder.Add(o)
+	require.NoError(t, err)
+
 	a, err := ts.Store.Read(store.Accounts, "A", store.JwtName("A"))
 	require.NoError(t, err)
 	err = builder.Add(a)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -56,11 +62,9 @@ func Test_MemResolverNotContainsOperator(t *testing.T) {
 	err = builder.Add(a)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
-	require.NoError(t, err)
-
-	conf := string(d)
-	require.NotContains(t, conf, "operator:")
+	_, err = builder.Generate()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "operator is not set")
 }
 
 func Test_MemResolverContainsOperator(t *testing.T) {
@@ -69,16 +73,22 @@ func Test_MemResolverContainsOperator(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	builder := NewMemResolverConfigBuilder()
+
+	o, err := ts.Store.Read(store.JwtName("O"))
+	require.NoError(t, err)
+	err = builder.Add(o)
+	require.NoError(t, err)
+
 	a, err := ts.Store.Read(store.Accounts, "A", store.JwtName("A"))
 	require.NoError(t, err)
 	err = builder.Add(a)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("/bogus/operator.jwt")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
-	require.Contains(t, conf, "operator: \"/bogus/operator.jwt\"")
+	require.Contains(t, conf, string(o))
 }
 
 func Test_MemResolverFiltersNonAccounts(t *testing.T) {
@@ -114,7 +124,7 @@ func Test_MemResolverFiltersNonAccounts(t *testing.T) {
 	err = builder.Add(b)
 	require.NoError(t, err)
 
-	d, err := builder.Generate("")
+	d, err := builder.Generate()
 	require.NoError(t, err)
 
 	conf := string(d)
@@ -130,20 +140,33 @@ func Test_MemResolverErrorBadClaim(t *testing.T) {
 	require.Error(t, builder.Add([]byte("bad")))
 }
 
-func Test_MemResolverQuotesRelativePath(t *testing.T) {
-	builder := NewMemResolverConfigBuilder()
-	d, err := builder.Generate("./test/relative.jwt")
-	require.NoError(t, err)
-	conf := string(d)
-	require.Contains(t, conf, "operator: \"./test/relative.jwt\"")
-}
+func Test_MemResolverDir(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
 
-func Test_MemResolverOperatorPlaceholder(t *testing.T) {
-	builder := NewMemResolverConfigBuilder()
-	d, err := builder.Generate("--")
+	out := filepath.Join(ts.Dir, "conf")
+	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+		"--dir", out)
 	require.NoError(t, err)
-	conf := string(d)
-	require.Contains(t, conf, "# operator: <specify_path_to_operator_jwt>\n")
+	require.FileExists(t, filepath.Join(out, "O.jwt"))
+	require.FileExists(t, filepath.Join(out, "A.jwt"))
+	require.FileExists(t, filepath.Join(out, "B.jwt"))
+	resolver := filepath.Join(out, "resolver.conf")
+	require.FileExists(t, resolver)
+	d, err := ioutil.ReadFile(resolver)
+	require.NoError(t, err)
+
+	contents := string(d)
+	require.Contains(t, contents, fmt.Sprintf("operator: %q", "O.jwt"))
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, contents, fmt.Sprintf("%s: %q", ac.Subject, "A.jwt"))
+
+	bc, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Contains(t, contents, fmt.Sprintf("%s: %q", bc.Subject, "B.jwt"))
 }
 
 func Test_MemResolverServerParse(t *testing.T) {
@@ -152,12 +175,10 @@ func Test_MemResolverServerParse(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	opjwt := filepath.Join(ts.Dir, "operator.jwt")
 	serverconf := filepath.Join(ts.Dir, "server.conf")
 
 	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", serverconf,
-		"--operator-jwt", opjwt)
+		"--config-file", serverconf)
 
 	require.NoError(t, err)
 
