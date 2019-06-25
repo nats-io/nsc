@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -32,27 +33,30 @@ func createServerConfigCmd() *cobra.Command {
 		Short:        "Generate an account config file for an operator",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example:      `nsc generate config`,
+		Example: `nsc generate config --mem-resolver
+nsc generate config --mem-resolver --config-file <outfile>
+nsc generate config --mem-resolver --config-file <outfile> --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if !QuietMode() && params.configOut != "--" {
-				cmd.Printf("Success!! - generated %q\n", params.configOut)
-				if params.operatorOut != "" && params.operatorOut != "--" {
-					cmd.Printf("            generated %q\n", params.operatorOut)
-				}
+			if !QuietMode() && params.configOut != "" && params.configOut != "--" {
+				cmd.Printf("Success!! - generated %q\n", AbbrevHomePaths(params.configOut))
+			}
+			if !QuietMode() && params.dirOut != "" {
+				cmd.Printf("Success!! - generated  %q\n", AbbrevHomePaths(filepath.Join(params.dirOut, "resolver.conf")))
 			}
 			return nil
 		},
 	}
 	cmd.Flags().BoolVarP(&params.nkeyConfig, "nkey", "", false, "generates an nkey account server configuration")
-	cmd.Flags().MarkHidden("nkey")
 	cmd.Flags().BoolVarP(&params.memResolverConfig, "mem-resolver", "", false, "generates a mem resolver server configuration")
-	cmd.Flags().StringVarP(&params.operatorOut, "operator-jwt", "", "", "output operator jwt '--' is standard output (mem-resolver only)")
-	cmd.Flags().StringVarP(&params.configOut, "config-file", "", "--", "output configuration file '--' is standard output")
+	cmd.Flags().StringVarP(&params.configOut, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
+	cmd.Flags().StringVarP(&params.dirOut, "dir", "", "", "output configuration dir (only valid when --mem-resolver is specified)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "overwrite output files if they exist")
-
+	cmd.Flags().MarkHidden("nkey")
+	cmd.Flags().MarkHidden("dir")
 	return cmd
 }
 
@@ -61,7 +65,7 @@ func init() {
 }
 
 type GenerateServerConfigParams struct {
-	operatorOut       string
+	dirOut            string
 	configOut         string
 	force             bool
 	nkeyConfig        bool
@@ -70,14 +74,21 @@ type GenerateServerConfigParams struct {
 }
 
 func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
-	if ctx.NothingToDo("nkey", "mem-resolver") {
+	if ctx.NothingToDo("nkey", "mem-resolver", "dir") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify a config type option")
 	}
-	if p.operatorOut != "" && p.nkeyConfig {
+
+	if p.dirOut != "" && p.nkeyConfig {
 		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("operator is not valid with nkey configuration")
+		return fmt.Errorf("--dir is not valid with nkey configuration")
 	}
+
+	if p.dirOut != "" && p.configOut != "--" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("--dir is exclusive of --config-file")
+	}
+
 	if p.nkeyConfig {
 		p.generator = NewNKeyConfigBuilder()
 	} else if p.memResolverConfig {
@@ -102,6 +113,10 @@ func (p *GenerateServerConfigParams) checkFile(fp string) (string, error) {
 	if fp == "--" {
 		return fp, nil
 	}
+	fp, err := homedir.Expand(fp)
+	if err != nil {
+		return "", fmt.Errorf("errof expanding '~' in path: %v", err)
+	}
 	afp, err := filepath.Abs(fp)
 	if err != nil {
 		return "", fmt.Errorf("error calculating abs %q: %v", fp, err)
@@ -120,13 +135,32 @@ func (p *GenerateServerConfigParams) checkFile(fp string) (string, error) {
 	return afp, nil
 }
 
-func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
-	if p.memResolverConfig {
-		if p.configOut == "--" && p.operatorOut != "--" || p.configOut != "--" && p.operatorOut == "--" {
-			return fmt.Errorf("operator-jwt and config-file have to both be to stdout '--' or point to files")
+func (p *GenerateServerConfigParams) checkDir(fp string) (string, error) {
+	if fp == "--" {
+		return fp, nil
+	}
+	fp, err := homedir.Expand(fp)
+	if err != nil {
+		return "", fmt.Errorf("errof expanding '~' in path: %v", err)
+	}
+	afp, err := filepath.Abs(fp)
+	if err != nil {
+		return "", fmt.Errorf("error calculating abs %q: %v", fp, err)
+	}
+	fi, err := os.Stat(afp)
+	if err == nil {
+		if !p.force {
+			return "", fmt.Errorf("%q already exists", afp)
+		}
+		// file exists, if force - delete it
+		if !fi.IsDir() {
+			return "", fmt.Errorf("%q already exists and is not a directory", afp)
 		}
 	}
+	return afp, nil
+}
 
+func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 	var err error
 	if p.configOut != "" {
 		p.configOut, err = p.checkFile(p.configOut)
@@ -134,10 +168,12 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 			return err
 		}
 	}
-
-	if p.operatorOut != "" {
-		p.operatorOut, err = p.checkFile(p.operatorOut)
+	if p.dirOut != "" {
+		p.dirOut, err = p.checkDir(p.dirOut)
 		if err != nil {
+			return err
+		}
+		if err := p.generator.SetOutputDir(p.dirOut); err != nil {
 			return err
 		}
 	}
@@ -150,6 +186,12 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 
 func (p *GenerateServerConfigParams) Run(ctx ActionCtx) error {
 	s := ctx.StoreCtx().Store
+
+	op, err := s.Read(store.JwtName(s.GetName()))
+	if err != nil {
+		return err
+	}
+	p.generator.Add(op)
 
 	names, err := GetConfig().ListAccounts()
 	if err != nil {
@@ -176,49 +218,20 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) error {
 		}
 	}
 
-	if p.operatorOut != "" {
-		d, err := s.Read(store.JwtName(s.GetName()))
-		if err != nil {
-			return err
-		}
-		if p.operatorOut == "--" {
-			if err := Write("--", []byte("-----BEGIN NATS OPERATOR JWT-----\n")); err != nil {
-				return err
-			}
-		}
-		if err := Write(p.operatorOut, d); err != nil {
-			return err
-		}
-		if p.operatorOut == "--" {
-			if err := Write("--", []byte("\n------END NATS OPERATOR JWT------\n")); err != nil {
-				return err
-			}
-		}
-	}
-
-	d, err := p.generator.Generate(p.operatorOut)
+	d, err := p.generator.Generate()
 	if err != nil {
 		return err
 	}
-	// if operator and config to stdout, add a header
-	if p.operatorOut == "--" && p.configOut == "--" {
-		if err := Write("--", []byte("-----BEGIN SERVER CONFIG -----\n")); err != nil {
-			return err
-		}
+
+	if p.configOut != "" {
+		return Write(p.configOut, d)
 	}
-	if err := Write(p.configOut, d); err != nil {
-		return err
-	}
-	// if operator and config to stdout, add a header
-	if p.operatorOut == "--" && p.configOut == "--" {
-		if err := Write("--", []byte("------END SERVER CONFIG ------\n")); err != nil {
-			return err
-		}
-	}
-	return nil
+
+	return err
 }
 
 type ServerConfigGenerator interface {
 	Add(rawClaim []byte) error
-	Generate(operatorPath string) ([]byte, error)
+	Generate() ([]byte, error)
+	SetOutputDir(fp string) error
 }

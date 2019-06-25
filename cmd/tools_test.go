@@ -35,12 +35,9 @@ func TestPub(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	// create the basic configuration
-	opjwt := filepath.Join(ts.Dir, "operator.jwt")
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-
 	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", serverconf,
-		"--operator-jwt", opjwt)
+		"--config-file", serverconf)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
@@ -84,12 +81,9 @@ func TestSub(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	// create the basic configuration
-	op := filepath.Join(ts.Dir, "operator.jwt")
 	conf := filepath.Join(ts.Dir, "server.conf")
-
 	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf,
-		"--operator-jwt", op)
+		"--config-file", conf)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
@@ -147,12 +141,10 @@ func TestReq(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	// create the basic configuration
-	op := filepath.Join(ts.Dir, "operator.jwt")
 	conf := filepath.Join(ts.Dir, "server.conf")
 
 	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf,
-		"--operator-jwt", op)
+		"--config-file", conf)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
@@ -191,12 +183,9 @@ func TestReply(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	// create the basic configuration
-	op := filepath.Join(ts.Dir, "operator.jwt")
 	conf := filepath.Join(ts.Dir, "server.conf")
-
 	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf,
-		"--operator-jwt", op)
+		"--config-file", conf)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port

@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -39,6 +40,10 @@ func NewNKeyConfigBuilder() *NKeyConfigBuilder {
 	cb.userClaims = make(map[string][]*jwt.UserClaims)
 	cb.srcToPrivateImports = make(map[string][]jwt.Import)
 	return &cb
+}
+
+func (cb *NKeyConfigBuilder) SetOutputDir(fp string) error {
+	return errors.New("nkey configurations don't support directory output")
 }
 
 func (cb *NKeyConfigBuilder) Add(rawClaim []byte) error {
@@ -105,7 +110,7 @@ func (cb *NKeyConfigBuilder) addUserClaim(uc *jwt.UserClaims) {
 	cb.userClaims[apk] = users
 }
 
-func (cb *NKeyConfigBuilder) Generate(ofp string) ([]byte, error) {
+func (cb *NKeyConfigBuilder) Generate() ([]byte, error) {
 	if err := cb.parse(); err != nil {
 		return nil, err
 	}
