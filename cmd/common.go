@@ -303,6 +303,40 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 	}
 }
 
+func NKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Validator {
+	return func(v string) error {
+		nk, err := store.ResolveKey(v)
+		if err != nil {
+			return err
+		}
+		t, err := store.KeyType(nk)
+		if err != nil {
+			return err
+		}
+		if t != kind {
+			return fmt.Errorf("specified key is not valid for an %s", kind.String())
+		}
+
+		pk, err := nk.PublicKey()
+		if err != nil {
+			return fmt.Errorf("error extracting public key: %v", err)
+		}
+
+		found := false
+		for _, k := range pukeys {
+			if k == pk {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("%q is not an expected signing key %v", v, pukeys)
+		}
+
+		return nil
+	}
+}
+
 func LoadFromURL(url string) ([]byte, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(url)

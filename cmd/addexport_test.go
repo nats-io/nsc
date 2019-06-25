@@ -131,7 +131,7 @@ func TestAddExportInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	input := []interface{}{0, 0, "foo.>", "Foo Stream", false, ts.OperatorKeyPath}
+	input := []interface{}{0, 0, "foo.>", "Foo Stream", false, 0}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")

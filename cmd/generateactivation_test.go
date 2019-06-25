@@ -148,7 +148,7 @@ func Test_InteractiveGenerate(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	inputs := []interface{}{true, 0, "foo", pub, "0", "0", ts.GetAccountKeyPath(t, "A")}
+	inputs := []interface{}{true, 0, "foo", pub, "0", "0", 0}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -169,7 +169,7 @@ func Test_InteractiveExternalKeyGenerate(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	inputs := []interface{}{true, 0, "foo", pub, "0", "0", ts.GetAccountKeyPath(t, "A")}
+	inputs := []interface{}{true, 0, "foo", pub, "0", "0", 0}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -191,7 +191,7 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	inputs := []interface{}{0, true, 0, "foo", pub, "0", "0", ts.GetAccountKeyPath(t, "A")}
+	inputs := []interface{}{0, true, 0, "foo", pub, "0", "0", 0}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 

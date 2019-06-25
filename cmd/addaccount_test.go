@@ -71,7 +71,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	inputs := []interface{}{"A", true, "2018-01-01", "2050-01-01", ts.OperatorKeyPath}
+	inputs := []interface{}{"A", true, "2018-01-01", "2050-01-01", 0}
 
 	cmd := CreateAddAccountCmd()
 	HoistRootFlags(cmd)
@@ -132,7 +132,8 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2)
 	require.NoError(t, err)
 
-	inputs := []interface{}{"A", true, "0", "0", string(s1)}
+	// sign with the custom key
+	inputs := []interface{}{"A", true, "0", "0", 1, string(s1)}
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
 
