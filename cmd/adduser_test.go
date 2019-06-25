@@ -74,7 +74,7 @@ func Test_AddUserInteractive(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", ts.GetAccountKeyPath(t, "A")}
+	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", 0}
 
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)

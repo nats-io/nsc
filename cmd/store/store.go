@@ -750,3 +750,20 @@ func (ctx *Context) GetAccountKeys(name string) ([]string, error) {
 	keys = append(keys, ac.SigningKeys...)
 	return keys, nil
 }
+
+// GetOperatorKeys returns the public keys for the operator
+// followed by its signing keys
+func (ctx *Context) GetOperatorKeys() ([]string, error) {
+	var keys []string
+	oc, err := ctx.Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
+	if oc == nil {
+		// not found
+		return nil, nil
+	}
+	keys = append(keys, oc.Subject)
+	keys = append(keys, oc.SigningKeys...)
+	return keys, nil
+}

@@ -119,7 +119,7 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, fp, "my import", "barfoo.>", ts.OperatorKeyPath}
+	input := []interface{}{1, false, fp, "my import", "barfoo.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -188,7 +188,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
-	input := []interface{}{1, true, apub, "foobar.x", true, "test", "test.foobar.alberto", ts.OperatorKeyPath}
+	input := []interface{}{1, true, apub, "foobar.x", true, "test", "test.foobar.alberto", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -221,7 +221,7 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, true, apub, "foobar.>", false, "test", "test.foobar.>", ts.OperatorKeyPath}
+	input := []interface{}{1, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 

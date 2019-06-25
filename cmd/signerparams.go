@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -49,28 +50,67 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		return nil
 	}
 
+	// build a list of the signing keys
+	var signers []string
 	if KeyPathFlag == "" {
 		ks := sctx.KeyStore
 		switch p.kind {
 		case nkeys.PrefixByteOperator:
 			KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
+			signers, err = ctx.StoreCtx().GetOperatorKeys()
+			if err != nil {
+				return err
+			}
 		case nkeys.PrefixByteAccount:
 			KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
-		case nkeys.PrefixByteCluster:
-			KeyPathFlag = ks.GetKeyPath(sctx.Cluster.PublicKey)
+			signers, err = ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// show them an abbreviated path
+	// show an abbreviated path
 	if KeyPathFlag != "" {
 		KeyPathFlag = AbbrevHomePaths(KeyPathFlag)
 	}
+	// allow selecting a key from the ones we have
+	var notFound []string
+	var keys []string
+	for _, s := range signers {
+		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)
+		_, err := os.Stat(fp)
+		if err == nil {
+			keys = append(keys, AbbrevHomePaths(fp))
+		} else {
+			notFound = append(notFound, ShortCodes(s))
+		}
+	}
+	// maybe add an option for asking for one we don't have
+	idx := -1
+	if len(notFound) > 0 {
+		idx = len(keys)
+		keys = append(keys, "Other...")
+	}
 
-	label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
-	KeyPathFlag, err := cli.Prompt(label, KeyPathFlag, true, NKeyValidator(p.kind))
+	// pick a key
+	choice, err := cli.PromptChoices("select the key to use for signing", KeyPathFlag, keys)
 	if err != nil {
 		return err
 	}
+	// if it is the extra option, ask for a path/key
+	if idx != -1 && choice == idx {
+		label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
+		// key must be one from keys
+		KeyPathFlag, err = cli.Prompt(label, KeyPathFlag, true, NKeyValidatorMatching(p.kind, signers))
+		if err != nil {
+			return err
+		}
+	} else {
+		// they picked one
+		KeyPathFlag = keys[choice]
+	}
+
 	// re-resolve the value using the user's input
 	p.signerKP, err = sctx.ResolveKey(p.kind, KeyPathFlag)
 	return err
