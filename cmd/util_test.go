@@ -18,14 +18,20 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nats-server/v2/server"
+	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -40,6 +46,10 @@ type TestStore struct {
 
 	OperatorKey     nkeys.KeyPair
 	OperatorKeyPath string
+
+	Server  *server.Server
+	ports   *server.Ports
+	Clients []*nats.Conn
 }
 
 // Some globals must be reset
@@ -183,6 +193,13 @@ func TestStoreTree(t *testing.T) {
 }
 
 func (ts *TestStore) Done(t *testing.T) {
+	for _, nc := range ts.Clients {
+		nc.Close()
+	}
+	if ts.Server != nil {
+		ts.Server.Shutdown()
+		ts.ports = nil
+	}
 	cli.ResetPromptLib()
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
@@ -421,4 +438,99 @@ func (ts *TestStore) GetUserSeedKey(t *testing.T, account string, name string) s
 	pk, err := ts.KeyStore.GetSeed(sc.Subject)
 	require.NoError(t, err)
 	return pk
+}
+
+// Runs a server from a config file, if `Port` is not set it runs at a random port
+func (ts *TestStore) RunServerWithConfig(t *testing.T, config string) *server.Ports {
+	var opts server.Options
+	require.NoError(t, opts.ProcessConfigFile(config))
+	return ts.RunServer(t, &opts)
+}
+
+// Runs a NATS server at a random port
+func (ts *TestStore) RunServer(t *testing.T, opts *server.Options) *server.Ports {
+	if opts.Port == 0 {
+		opts.Port = -1
+	}
+	if opts.HTTPPort == 0 {
+		opts.HTTPPort = -1
+	}
+	opts.NoLog = true
+	if opts == nil {
+		opts = &server.Options{
+			Host:           "127.0.0.1",
+			Port:           -1,
+			HTTPPort:       -1,
+			NoLog:          true,
+			NoSigs:         true,
+			MaxControlLine: 2048,
+		}
+	}
+	var err error
+	ts.Server, err = server.NewServer(opts)
+	if err != nil || ts.Server == nil {
+		t.Fatal(fmt.Sprintf("No NATS Server object returned: %v", err))
+	}
+
+	if !opts.NoLog {
+		ts.Server.ConfigureLogger()
+	}
+
+	// Run server in Go routine.
+	go ts.Server.Start()
+
+	ts.ports = ts.Server.PortsInfo(10 * time.Second)
+	if ts.ports == nil {
+		t.Fatal("Unable to start NATS Server in Go Routine")
+	}
+
+	return ts.ports
+}
+
+func (ts *TestStore) GetConnz(t *testing.T) *server.Connz {
+	if ts.ports == nil {
+		t.Fatal("not connected")
+	}
+	r, err := http.Get(fmt.Sprintf("%s/connz", ts.ports.Monitoring[0]))
+	require.NoError(t, err)
+
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	require.NoError(t, err)
+
+	var connz server.Connz
+	require.NoError(t, json.Unmarshal(body, &connz))
+
+	return &connz
+}
+
+func (ts *TestStore) CreateClient(t *testing.T, option ...nats.Option) *nats.Conn {
+	if ts.ports == nil {
+		t.Fatal("attempt to create a nats connection without a server running")
+	}
+	nc, err := nats.Connect(strings.Join(ts.ports.Nats, ","), option...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.Clients = append(ts.Clients, nc)
+	return nc
+}
+
+func (ts *TestStore) WaitForClient(t *testing.T, name string, subs uint32, maxWait time.Duration) {
+	max := time.Now().Add(maxWait)
+	end := max.Unix()
+	for {
+		connz := ts.GetConnz(t)
+		if connz.NumConns > 0 {
+			for _, v := range connz.Conns {
+				if v.Name == name && v.NumSubs >= subs {
+					return
+				}
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+		if time.Now().Unix() >= end {
+			t.Fatalf("timed out looking for client %q with %d subs", name, subs)
+		}
+	}
 }

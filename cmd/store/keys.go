@@ -326,6 +326,13 @@ func dataFromFile(path string) ([]byte, error) {
 }
 
 func keyFromFile(path string) (nkeys.KeyPair, error) {
+	var err error
+
+	// value could be a ~/ expand it
+	path, err = homedir.Expand(path)
+	if err != nil {
+		return nil, err
+	}
 	d, err := dataFromFile(path)
 	if err != nil {
 		return nil, err
