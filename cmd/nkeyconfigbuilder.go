@@ -30,6 +30,7 @@ type NKeyConfigBuilder struct {
 	accountClaims       map[string]*jwt.AccountClaims
 	userClaims          map[string][]*jwt.UserClaims
 	srcToPrivateImports map[string][]jwt.Import
+	sysAccount          string
 }
 
 func NewNKeyConfigBuilder() *NKeyConfigBuilder {
@@ -44,6 +45,10 @@ func NewNKeyConfigBuilder() *NKeyConfigBuilder {
 
 func (cb *NKeyConfigBuilder) SetOutputDir(fp string) error {
 	return errors.New("nkey configurations don't support directory output")
+}
+
+func (cb *NKeyConfigBuilder) SetSystemAccount(id string) error {
+	return errors.New("nkey configurations don't support system account")
 }
 
 func (cb *NKeyConfigBuilder) Add(rawClaim []byte) error {

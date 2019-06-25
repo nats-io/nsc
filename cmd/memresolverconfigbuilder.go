@@ -28,10 +28,11 @@ import (
 )
 
 type MemResolverConfigBuilder struct {
-	operator  string
-	claims    map[string]string
-	pubToName map[string]string
-	dir       string
+	operator   string
+	claims     map[string]string
+	pubToName  map[string]string
+	dir        string
+	sysAccount string
 }
 
 func NewMemResolverConfigBuilder() *MemResolverConfigBuilder {
@@ -43,6 +44,11 @@ func NewMemResolverConfigBuilder() *MemResolverConfigBuilder {
 
 func (cb *MemResolverConfigBuilder) SetOutputDir(fp string) error {
 	cb.dir = fp
+	return nil
+}
+
+func (cb *MemResolverConfigBuilder) SetSystemAccount(id string) error {
+	cb.sysAccount = id
 	return nil
 }
 
@@ -80,19 +86,23 @@ func (cb *MemResolverConfigBuilder) GenerateConfig() ([]byte, error) {
 		return nil, errors.New("operator is not set")
 	}
 	buf.WriteString(fmt.Sprintf("// Operator %q\n", cb.pubToName[opk]))
-	buf.WriteString(fmt.Sprintf("operator: %s\n", cb.operator))
+	buf.WriteString(fmt.Sprintf("operator: %s\n\n", cb.operator))
+
+	if cb.sysAccount != "" {
+		buf.WriteString(fmt.Sprintf("system_account: %s\n\n", cb.sysAccount))
+	}
 
 	var keys []string
 	for k := range cb.claims {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	buf.WriteString("resolver: MEMORY\n")
+	buf.WriteString("resolver: MEMORY\n\n")
 	buf.WriteString("resolver_preload: {\n")
 	for _, k := range keys {
 		v := cb.claims[k]
 		buf.WriteString(fmt.Sprintf("  // Account %q\n", cb.pubToName[k]))
-		buf.WriteString(fmt.Sprintf("  %s: %s\n", k, v))
+		buf.WriteString(fmt.Sprintf("  %s: %s\n\n", k, v))
 	}
 	buf.WriteString("}\n")
 	return buf.Bytes(), nil
@@ -121,14 +131,18 @@ func (cb *MemResolverConfigBuilder) GenerateDir() ([]byte, error) {
 		return nil, err
 	}
 	buf.WriteString(fmt.Sprintf("// Operator %q\n", cb.pubToName[opk]))
-	buf.WriteString(fmt.Sprintf("operator: %q\n", filepath.Join(".", filepath.Base(fn))))
+	buf.WriteString(fmt.Sprintf("operator: %q\n\n", filepath.Join(".", filepath.Base(fn))))
+
+	if cb.sysAccount != "" {
+		buf.WriteString(fmt.Sprintf("system_account: %s\n\n", cb.sysAccount))
+	}
 
 	var keys []string
 	for k := range cb.claims {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	buf.WriteString("resolver: MEMORY\n")
+	buf.WriteString("resolver: MEMORY\n\n")
 	buf.WriteString("resolver_preload: {\n")
 	for _, k := range keys {
 		v := cb.claims[k]
@@ -142,7 +156,7 @@ func (cb *MemResolverConfigBuilder) GenerateDir() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		buf.WriteString(fmt.Sprintf("  %s: %q\n", k, rel))
+		buf.WriteString(fmt.Sprintf("  %s: %q\n\n", k, rel))
 	}
 	buf.WriteString("}\n")
 
