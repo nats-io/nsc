@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/nats-io/nkeys"
@@ -78,6 +80,32 @@ func TestCommon_GetOutput(t *testing.T) {
 			t.Errorf("unexpected error creating %q: %v", d.fp, err)
 		}
 	}
+}
+
+func createWriteCmd(t *testing.T) *cobra.Command {
+	var out string
+	cmd := &cobra.Command{
+		Use: "test",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return Write(out, []byte("hello"))
+		},
+	}
+	cmd.Flags().StringVarP(&out, "out", "", "--", "")
+	return cmd
+}
+
+func Test_WriteDestinations(t *testing.T) {
+	stdout, _, err := ExecuteCmd(createWriteCmd(t), "--out", "--")
+	require.NoError(t, err)
+	require.Contains(t, stdout, "hello")
+	dir := MakeTempDir(t)
+	fn := filepath.Join(dir, "test.txt")
+	_, _, err = ExecuteCmd(createWriteCmd(t), "--out", fn)
+	require.NoError(t, err)
+	require.FileExists(t, fn)
+	d, err := ioutil.ReadFile(fn)
+	require.NoError(t, err)
+	require.Contains(t, string(d), "hello")
 }
 
 func TestCommon_IsStdOut(t *testing.T) {
