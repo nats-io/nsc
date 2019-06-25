@@ -185,3 +185,18 @@ func Test_MemResolverServerParse(t *testing.T) {
 	var opts server.Options
 	require.NoError(t, opts.ProcessConfigFile(serverconf))
 }
+
+func Test_MemResolverContainsSysAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	stdout, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+		"--sys-account", "B")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Contains(t, stdout, fmt.Sprintf("system_account: %s", ac.Subject))
+}

@@ -55,6 +55,7 @@ nsc generate config --mem-resolver --config-file <outfile> --force
 	cmd.Flags().StringVarP(&params.configOut, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
 	cmd.Flags().StringVarP(&params.dirOut, "dir", "", "", "output configuration dir (only valid when --mem-resolver is specified)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "overwrite output files if they exist")
+	cmd.Flags().StringVarP(&params.sysAccount, "sys-account", "", "", "system account name")
 	cmd.Flags().MarkHidden("nkey")
 	cmd.Flags().MarkHidden("dir")
 	return cmd
@@ -65,6 +66,7 @@ func init() {
 }
 
 type GenerateServerConfigParams struct {
+	sysAccount        string
 	dirOut            string
 	configOut         string
 	force             bool
@@ -178,6 +180,19 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
+	if p.sysAccount != "" {
+		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAccount)
+		if err != nil {
+			return fmt.Errorf("error reading account %q: %v", p.sysAccount, err)
+		}
+		if ac == nil {
+			return fmt.Errorf("account %q doesn't exist", p.sysAccount)
+		}
+		if err := p.generator.SetSystemAccount(ac.Subject); err != nil {
+			return err
+		}
+	}
+
 	if ctx.StoreCtx().Operator.Name == "" {
 		return errors.New("set an operator first - 'nsc env --operator <name>'")
 	}
@@ -234,4 +249,5 @@ type ServerConfigGenerator interface {
 	Add(rawClaim []byte) error
 	Generate() ([]byte, error)
 	SetOutputDir(fp string) error
+	SetSystemAccount(pubkey string) error
 }
