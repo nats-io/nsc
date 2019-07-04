@@ -21,6 +21,7 @@ var output io.Writer = os.Stdout
 
 type PromptLib interface {
 	Prompt(label string, value string, edit bool, validator Validator) (string, error)
+	PromptWithHelp(label string, value string, edit bool, validator Validator, help string) (string, error)
 	PromptYN(m string, defaultValue bool) (bool, error)
 	PromptSecret(m string) (string, error)
 	PromptChoices(m string, value string, choices []string) (int, error)
@@ -59,6 +60,10 @@ func Italic(s string) string {
 
 func Prompt(label string, value string, edit bool, validator Validator) (string, error) {
 	return cli.Prompt(label, value, edit, validator)
+}
+
+func PromptWithHelp(label string, value string, edit bool, validator Validator, help string) (string, error) {
+	return cli.PromptWithHelp(label, value, edit, validator, help)
 }
 
 func PromptYN(m string) (bool, error) {

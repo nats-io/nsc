@@ -292,6 +292,9 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 		if err != nil {
 			return err
 		}
+		if nk == nil {
+			return fmt.Errorf("%q is not a valid nkey", v)
+		}
 		t, err := store.KeyType(nk)
 		if err != nil {
 			return err

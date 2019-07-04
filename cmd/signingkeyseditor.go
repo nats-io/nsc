@@ -103,7 +103,7 @@ func (e *SigningKeysParams) Edit() error {
 		}
 		first = false
 
-		ok, err := cli.PromptYN(m)
+		ok, err := cli.PromptBoolean(m, false)
 		if err != nil {
 			return err
 		}

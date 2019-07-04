@@ -17,7 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 )
@@ -63,7 +65,18 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 
 	// show them an abbreviated path
 	if KeyPathFlag != "" {
-		KeyPathFlag = AbbrevHomePaths(KeyPathFlag)
+		// do we have the key
+		fp, err := homedir.Expand(KeyPathFlag)
+		if err != nil {
+			return err
+		}
+		_, err = os.Stat(fp)
+		if os.IsNotExist(err) {
+			// we don't have the key
+			KeyPathFlag = ""
+		} else {
+			KeyPathFlag = AbbrevHomePaths(KeyPathFlag)
+		}
 	}
 
 	label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())

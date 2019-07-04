@@ -38,16 +38,12 @@ func (t *TestPrompts) logInputs(kind string, label string, value interface{}) {
 
 func (t *TestPrompts) Prompt(label string, value string, edit bool, validator Validator) (string, error) {
 	t.logInputs("prompt", label, t.inputs[t.count])
-	val := t.inputs[t.count].(string)
-	t.count = t.count + 1
+	return t.prompt(label, value, edit, validator)
+}
 
-	if validator != nil {
-		err := validator(val)
-		if err != nil {
-			return Prompt(label, value, edit, validator)
-		}
-	}
-	return val, nil
+func (t *TestPrompts) PromptWithHelp(label string, value string, edit bool, validator Validator, help string) (string, error) {
+	t.logInputs("promptWithHelp", label, t.inputs[t.count])
+	return t.prompt(label, value, edit, validator)
 }
 
 func (t *TestPrompts) PromptYN(m string, defaultValue bool) (bool, error) {
@@ -75,5 +71,18 @@ func (t *TestPrompts) PromptMultipleChoices(m string, choices []string) ([]int, 
 	t.logInputs("multiple-choice", m, t.inputs[t.count])
 	val := t.inputs[t.count].([]int)
 	t.count = t.count + 1
+	return val, nil
+}
+
+func (t *TestPrompts) prompt(label string, value string, edit bool, validator Validator) (string, error) {
+	val := t.inputs[t.count].(string)
+	t.count = t.count + 1
+
+	if validator != nil {
+		err := validator(val)
+		if err != nil {
+			return Prompt(label, value, edit, validator)
+		}
+	}
 	return val, nil
 }

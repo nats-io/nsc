@@ -211,9 +211,11 @@ func (p *AddOperatorParams) Run(_ ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.keyPath, err = ctx.KeyStore.Store(p.signerKP)
-		if err != nil {
-			return err
+		if p.generate {
+			p.keyPath, err = ctx.KeyStore.Store(p.signerKP)
+			if err != nil {
+				return err
+			}
 		}
 
 		if p.Start != "" || p.Expiry != "" {

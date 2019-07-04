@@ -18,6 +18,19 @@ func (sui *SurveyUI) Prompt(label string, value string, edit bool, validator Val
 	return v, nil
 }
 
+func (sui *SurveyUI) PromptWithHelp(label string, value string, edit bool, validator Validator, help string) (string, error) {
+	v := value
+	p := &survey.Input{
+		Message: label,
+		Default: value,
+		Help:    help,
+	}
+	if err := survey.AskOne(p, &v, sui.wrap(validator)); err != nil {
+		return "", err
+	}
+	return v, nil
+}
+
 func (sui *SurveyUI) wrap(validator Validator) survey.Validator {
 	if validator == nil {
 		return nil
@@ -29,18 +42,6 @@ func (sui *SurveyUI) wrap(validator Validator) survey.Validator {
 }
 
 func (sui *SurveyUI) PromptYN(m string, defaultValue bool) (bool, error) {
-	v := defaultValue
-	p := &survey.Confirm{
-		Message: m,
-		Default: defaultValue,
-	}
-	if err := survey.AskOne(p, &v, nil); err != nil {
-		return false, err
-	}
-	return v, nil
-}
-
-func (sui *SurveyUI) PromptNY(m string, defaultValue bool) (bool, error) {
 	v := defaultValue
 	p := &survey.Confirm{
 		Message: m,
