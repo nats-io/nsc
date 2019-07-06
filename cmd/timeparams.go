@@ -42,7 +42,14 @@ func (p *TimeParams) valid(value string, label string, oldOK bool) error {
 		return fmt.Errorf("%s %q is invalid: %v", label, value, err)
 	}
 	if !oldOK && when != 0 && now > when {
-		return fmt.Errorf("%s %q is in the past (%s)", label, value, HumanizedDate(when))
+		m := fmt.Sprintf("%s %q is in the past (%s) - are you sure?", label, value, HumanizedDate(when))
+		ok, err := cli.PromptBoolean(m, false)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("%s %q is in the past (%s)", label, value, HumanizedDate(when))
+		}
 	}
 	return nil
 }
@@ -79,18 +86,23 @@ func (p *TimeParams) Validate() error {
 	return nil
 }
 
+func (p *TimeParams) canParse(s string) error {
+	_, err := ParseExpiry(s)
+	if err != nil {
+		return fmt.Errorf("%s is invalid: %v", s, err)
+	}
+	return nil
+}
+
 func (p *TimeParams) Edit() error {
 	var err error
-	p.Start, err = cli.Prompt("valid from (0 is always)", p.Start, true, func(s string) error {
-		return p.valid(s, "start", true)
-	})
+	format := "valid from ('0' is always) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)"
+	p.Start, err = cli.PromptWithHelp("valid", p.Start, true, p.canParse, format)
 	if err != nil {
 		return err
 	}
 
-	p.Expiry, err = cli.Prompt("valid until (0 is always)", p.Expiry, true, func(s string) error {
-		return p.valid(s, "expiry", false)
-	})
+	p.Expiry, err = cli.PromptWithHelp("valid until (0 is always)", p.Expiry, true, p.canParse, format)
 	return err
 }
 
@@ -116,7 +128,7 @@ func ParseExpiry(s string) (int64, error) {
 		}
 		return t.Unix(), nil
 	}
-	re = regexp.MustCompile(`(?P<count>\d+)(?P<qualifier>[mhdMyw])`)
+	re = regexp.MustCompile(`(?P<count>-?\d+)(?P<qualifier>[mhdMyw])`)
 	m := re.FindStringSubmatch(s)
 	if m != nil {
 		v, err := strconv.ParseInt(m[1], 10, 64)

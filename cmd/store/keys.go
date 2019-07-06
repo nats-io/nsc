@@ -197,6 +197,9 @@ func makeKeyStore(dir string) error {
 }
 
 func (k *KeyStore) GetKeyPath(pubkey string) string {
+	if pubkey == "" {
+		return ""
+	}
 	kind := pubkey[0:1]
 	shard := pubkey[1:3]
 	return filepath.Join(GetKeysDir(), KeysDir, kind, shard, fmt.Sprintf("%s.nk", pubkey))

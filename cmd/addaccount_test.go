@@ -43,7 +43,6 @@ func Test_AddAccount(t *testing.T) {
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"invalid account key"}, true},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "2018-01-01"}, nil, []string{"expiry \"2018-01-01\" is in the past"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
 
