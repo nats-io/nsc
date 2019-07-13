@@ -121,12 +121,147 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
-	var err error
-	if err = p.AccountContextParams.Edit(ctx); err != nil {
+func (p *AddImportParams) getAvailableExports(ctx ActionCtx) ([]AccountExport, error) {
+	// these are sorted by account name
+	found, err := GetAllExports()
+	if err != nil {
+		return nil, err
+	}
+
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(ctx.StoreCtx().Account.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []AccountExport
+	for _, f := range found {
+		// FIXME: filtering on the target account, should eliminate exports the account already has
+		if f.Subject != ac.Subject {
+			filtered = append(filtered, f)
+		}
+	}
+
+	return filtered, nil
+}
+
+func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
+	// see if we have any exports
+	available, err := p.getAvailableExports(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if len(available) > 0 {
+		// we have some exports that they may want
+		ok, err := cli.PromptYN("pick from locally available exports?")
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			var choices []AccountExportChoice
+			for _, v := range available {
+				choices = append(choices, v.Choices()...)
+			}
+			var labels = AccountExportChoices(choices).String()
+			// fixme: need to have validators on this
+
+			var c *AccountExportChoice
+			for {
+				idx, err := cli.PromptChoices("select the export", "", labels)
+				if err != nil {
+					return false, err
+				}
+				if choices[idx].Selection == nil {
+					ctx.CurrentCmd().Printf("%q is an account grouping not an export\n", labels[idx])
+					continue
+				}
+				c = &choices[idx]
+				break
+			}
+
+			targetAccountPK := ctx.StoreCtx().Account.PublicKey
+			p.srcAccount.publicKey = c.Subject
+			p.name = c.Selection.Name
+
+			ac, err := ctx.StoreCtx().Store.ReadAccountClaim(ctx.StoreCtx().Account.Name)
+			if err != nil {
+				return false, err
+			}
+
+			p.claim = ac
+			subject := string(c.Selection.Subject)
+
+			if c.Selection.IsService() && c.Selection.Subject.HasWildCards() {
+				a := strings.Split(subject, ".")
+				for i, e := range a {
+					if e == ">" || e == "*" {
+						a[i] = targetAccountPK
+					}
+				}
+				subject = strings.Join(a, ".")
+				subject, err = cli.Prompt("export subject", subject, true, func(s string) error {
+					sub := jwt.Subject(s)
+					if sub.HasWildCards() {
+						return errors.New("services cannot have wildcard subjects")
+					}
+					var vr jwt.ValidationResults
+					sub.Validate(&vr)
+					if len(vr.Issues) > 0 {
+						return errors.New(vr.Issues[0].Description)
+					}
+					return nil
+				})
+			}
+			p.remote = subject
+			p.local = subject
+
+			// FIXME - when no token required, import is not it not initialized
+			if c.Selection.TokenReq {
+				if err := p.generateToken(ctx, c); err != nil {
+					return false, err
+				}
+			}
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) error {
+	// load the source account
+	srcAC, err := ctx.StoreCtx().Store.ReadAccountClaim(c.Name)
+	if err != nil {
 		return err
 	}
 
+	var ap GenerateActivationParams
+	ap.Name = c.Name
+	ap.claims = srcAC
+	ap.service = c.Selection.IsService()
+	ap.accountKey.publicKey = ctx.StoreCtx().Account.PublicKey
+	ap.export = *c.Selection
+	ap.subject = p.remote
+
+	// collect the possible signers
+	var signers []string
+	signers = append(signers, srcAC.Subject)
+	signers = append(signers, srcAC.SigningKeys...)
+
+	ap.SignerParams.SetPrompt(fmt.Sprintf("select the signing key for account %q [%s]", srcAC.Name, ShortCodes(srcAC.Subject)))
+	if err := ap.SelectFromSigners(ctx, signers); err != nil {
+		return err
+	}
+
+	if err := ap.Run(ctx); err != nil {
+		return err
+	}
+
+	p.token = []byte(ap.Token)
+	return p.initFromActivation(ctx)
+}
+
+func (p *AddImportParams) addManualExport(ctx ActionCtx) error {
+	var err error
 	p.public, err = cli.PromptYN("is the export public?")
 	if err != nil {
 		return err
@@ -160,6 +295,22 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
+	var err error
+	if err = p.AccountContextParams.Edit(ctx); err != nil {
+		return err
+	}
+
+	ok, err := p.addLocalExport(ctx)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return p.addManualExport(ctx)
 	}
 
 	return nil
@@ -238,7 +389,6 @@ func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
 	if ac.IssuerAccount != "" {
 		p.srcAccount.publicKey = ac.IssuerAccount
 	}
-
 	if ac.Subject != "public" && p.claim.Subject != ac.Subject {
 		return fmt.Errorf("activation is not intended for this account - it is for %q", ac.Subject)
 	}
@@ -373,13 +523,13 @@ func (p *AddImportParams) createImport() *jwt.Import {
 		im.Type = jwt.Service
 		im.Subject, im.To = im.To, im.Subject
 	}
-
 	if p.tokenSrc != "" {
 		if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
 			im.Token = p.tokenSrc
-		} else {
-			im.Token = string(p.token)
 		}
+	}
+	if p.token != nil {
+		im.Token = string(p.token)
 	}
 
 	return &im

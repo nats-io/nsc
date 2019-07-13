@@ -20,9 +20,8 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nats-io/nkeys"
-
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -126,9 +125,7 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	defer ts.Done(t)
 
 	s1, pk1, _ := CreateOperatorKey(t)
-	_, pk2, _ := CreateOperatorKey(t)
-
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2)
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1)
 	require.NoError(t, err)
 
 	// sign with the custom key
@@ -136,13 +133,14 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
 
-	ac, err := ts.Store.ReadAccountClaim("A")
-	require.NoError(t, err)
-	require.Equal(t, ac.Issuer, pk1)
-
 	d, err := ts.Store.Read(store.JwtName("O"))
 	require.NoError(t, err)
 	oc, err := jwt.DecodeOperatorClaims(string(d))
 	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Issuer, pk1)
 	require.True(t, oc.DidSign(ac))
+	require.Equal(t, pk1, ac.Issuer)
 }
