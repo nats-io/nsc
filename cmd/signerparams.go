@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 )
@@ -29,6 +28,7 @@ import (
 type SignerParams struct {
 	kind     nkeys.PrefixByte
 	signerKP nkeys.KeyPair
+	prompt   string
 }
 
 func (p *SignerParams) SetDefaults(kind nkeys.PrefixByte, allowManaged bool, ctx ActionCtx) {
@@ -40,13 +40,71 @@ func (p *SignerParams) SetDefaults(kind nkeys.PrefixByte, allowManaged bool, ctx
 	}
 }
 
-func (p *SignerParams) Edit(ctx ActionCtx) error {
+func (p *SignerParams) SetPrompt(message string) {
+	p.prompt = message
+}
+
+func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error {
 	var err error
 
+	// build a list of the signing keys
+	// allow selecting a key from the ones we have
+	var notFound []string
+	var keys []string
+	var choices []string
+
+	for _, s := range signers {
+		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)
+		_, err := os.Stat(fp)
+		if err == nil {
+			keys = append(keys, fp)
+			choices = append(choices, s)
+		} else {
+			notFound = append(notFound, ShortCodes(s))
+		}
+	}
+	// if we have more than one key, we prompt
+	if len(keys) == 1 && len(notFound) == 0 {
+		p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[0])
+	} else {
+		// maybe add an option for asking for one we don't have
+		idx := -1
+		if len(notFound) > 0 {
+			idx = len(choices)
+			choices = append(choices, "Other...")
+		}
+		// pick a key
+		if p.prompt == "" {
+			p.prompt = "select the key to use for signing"
+		}
+		choice, err := cli.PromptChoices(p.prompt, choices[0], choices)
+		if err != nil {
+			return err
+		}
+		// if it is the extra option, ask for a path/key
+		if idx != -1 && choice == idx {
+			label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
+			// key must be one from signing keys
+			KeyPathFlag, err = cli.Prompt(label, "", true, NKeyValidatorMatching(p.kind, signers))
+			if err != nil {
+				return err
+			}
+			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+
+		} else {
+			// they picked one
+			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[choice])
+		}
+	}
+
+	return err
+}
+
+func (p *SignerParams) Edit(ctx ActionCtx) error {
+	var err error
 	sctx := ctx.StoreCtx()
 	p.signerKP, _ = sctx.ResolveKey(p.kind, KeyPathFlag)
 
-	// skip showing a signer
 	if p.signerKP != nil && ctx.StoreCtx().Store.IsManaged() {
 		return nil
 	}
@@ -71,61 +129,11 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 		}
 	}
 
-	// show an abbreviated path
-	if KeyPathFlag != "" {
-		// do we have the key
-		fp, err := homedir.Expand(KeyPathFlag)
-		if err != nil {
-			return err
-		}
-		_, err = os.Stat(fp)
-		if os.IsNotExist(err) {
-			// we don't have the key
-			KeyPathFlag = ""
-		} else {
-			KeyPathFlag = AbbrevHomePaths(KeyPathFlag)
-		}
-	}
-	// allow selecting a key from the ones we have
-	var notFound []string
-	var keys []string
-	for _, s := range signers {
-		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)
-		_, err := os.Stat(fp)
-		if err == nil {
-			keys = append(keys, AbbrevHomePaths(fp))
-		} else {
-			notFound = append(notFound, ShortCodes(s))
-		}
-	}
-	// maybe add an option for asking for one we don't have
-	idx := -1
-	if len(notFound) > 0 {
-		idx = len(keys)
-		keys = append(keys, "Other...")
-	}
-
-	// pick a key
-	choice, err := cli.PromptChoices("select the key to use for signing", KeyPathFlag, keys)
-	if err != nil {
+	if err := p.SelectFromSigners(ctx, signers); err != nil {
 		return err
 	}
-	// if it is the extra option, ask for a path/key
-	if idx != -1 && choice == idx {
-		label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
-		// key must be one from keys
-		KeyPathFlag, err = cli.Prompt(label, KeyPathFlag, true, NKeyValidatorMatching(p.kind, signers))
-		if err != nil {
-			return err
-		}
-	} else {
-		// they picked one
-		KeyPathFlag = keys[choice]
-	}
 
-	// re-resolve the value using the user's input
-	p.signerKP, err = sctx.ResolveKey(p.kind, KeyPathFlag)
-	return err
+	return nil
 }
 
 func (p *SignerParams) Resolve(ctx ActionCtx) error {

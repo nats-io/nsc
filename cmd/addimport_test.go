@@ -84,7 +84,7 @@ func Test_AddImportFromURL(t *testing.T) {
 	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 
 	ht := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, token)
+		fmt.Fprint(w, token)
 	}))
 	defer ht.Close()
 
@@ -95,7 +95,7 @@ func Test_AddImportFromURL(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ac)
 	require.Len(t, ac.Imports, 1)
-	require.Equal(t, ac.Imports[0].Token, ht.URL)
+	require.Equal(t, token, ac.Imports[0].Token)
 }
 
 func Test_AddImportInteractive(t *testing.T) {
@@ -119,7 +119,7 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, fp, "my import", "barfoo.>", 0}
+	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -129,6 +129,66 @@ func Test_AddImportInteractive(t *testing.T) {
 	require.Equal(t, "my import", ac.Imports[0].Name)
 	require.Equal(t, "barfoo.>", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
+	require.Equal(t, apub, ac.Imports[0].Account)
+}
+
+func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+
+	akp, err := ts.GetAccountKey(t, "A")
+	require.NoError(t, err)
+	require.NotNil(t, akp)
+	apub, err := akp.PublicKey()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "B")
+
+	cmd := createAddImportCmd()
+	HoistRootFlags(cmd)
+	input := []interface{}{1, true, 1, "my import", "barfoo.>", 0}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
+	require.Equal(t, "my import", ac.Imports[0].Name)
+	require.Equal(t, "barfoo.>", string(ac.Imports[0].To))
+	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
+	require.Equal(t, apub, ac.Imports[0].Account)
+}
+
+func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "foobar.>", false)
+
+	akp, err := ts.GetAccountKey(t, "A")
+	require.NoError(t, err)
+	require.NotNil(t, akp)
+	apub, err := akp.PublicKey()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "B")
+
+	cmd := createAddImportCmd()
+	HoistRootFlags(cmd)
+	input := []interface{}{1, true, 1, "barfoo.xx", "my import", "foobar.yy"}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
+	require.Equal(t, "my import", ac.Imports[0].Name)
+	require.Equal(t, "barfoo.xx", string(ac.Imports[0].To))
+	require.Equal(t, "foobar.yy", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
 
@@ -188,7 +248,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
-	input := []interface{}{1, true, apub, "foobar.x", true, "test", "test.foobar.alberto", 0}
+	input := []interface{}{1, false, true, apub, "foobar.x", true, "test", "test.foobar.alberto", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -220,9 +280,9 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	// B, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	// B, don't pick, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
+	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")

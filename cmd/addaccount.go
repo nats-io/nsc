@@ -128,7 +128,6 @@ func (p *AddAccountParams) Run(ctx ActionCtx) error {
 	// if we added an account - make this the current account
 	return GetConfig().SetAccount(p.Entity.name)
 }
-
 func (p *AddAccountParams) editAccount(c interface{}, ctx ActionCtx) error {
 	ac, ok := c.(*jwt.AccountClaims)
 	if !ok {
