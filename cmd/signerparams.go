@@ -85,7 +85,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 		if idx != -1 && choice == idx {
 			label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
 			// key must be one from signing keys
-			KeyPathFlag, err = cli.Prompt(label, "", true, NKeyValidatorMatching(p.kind, signers))
+			KeyPathFlag, err = cli.Prompt(label, "", true, SeedNKeyValidatorMatching(p.kind, signers))
 			if err != nil {
 				return err
 			}
