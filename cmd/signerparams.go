@@ -60,7 +60,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 			keys = append(keys, fp)
 			choices = append(choices, s)
 		} else {
-			notFound = append(notFound, ShortCodes(s))
+			notFound = append(notFound, s)
 		}
 	}
 	// if we have more than one key, we prompt

@@ -65,7 +65,6 @@ func ResetSharedFlags() {
 func NewEmptyStore(t *testing.T) *TestStore {
 	ResetForTests()
 	var ts TestStore
-	WideFlag = true
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil
@@ -91,7 +90,6 @@ func NewEmptyStore(t *testing.T) *TestStore {
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	ResetForTests()
 	var ts TestStore
-	WideFlag = true
 
 	// ngsStore is a global - so first test to get it initializes it
 	ngsStore = nil

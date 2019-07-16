@@ -51,7 +51,7 @@ func (a *AccountDescriber) Describe() string {
 	table.AddSeparator()
 
 	if len(a.SigningKeys) > 0 {
-		AddListValues(table, "Signing Keys", ShortCodesList(a.SigningKeys))
+		AddListValues(table, "Signing Keys", a.SigningKeys)
 		table.AddSeparator()
 	}
 
@@ -201,7 +201,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	}
 
 	if i.Token == "" {
-		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", ShortCodes(i.Account), "Yes")
+		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", i.Account, "Yes")
 		return
 	}
 	expiration := ""
@@ -211,7 +211,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, ShortCodes(i.Account), "No")
+	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, i.Account, "No")
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
@@ -262,10 +262,10 @@ func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
 	if cd.Name != "" {
 		table.AddRow("Name", cd.Name)
 	}
-	table.AddRow(label, ShortCodes(cd.Subject))
-	table.AddRow("Issuer ID", ShortCodes(cd.Issuer))
+	table.AddRow(label, cd.Subject)
+	table.AddRow("Issuer ID", cd.Issuer)
 	if issuer != "" {
-		table.AddRow("Issuer Account", ShortCodes(issuer))
+		table.AddRow("Issuer Account", issuer)
 	}
 	table.AddRow("Issued", RenderDate(cd.IssuedAt))
 	table.AddRow("Expires", RenderDate(cd.Expires))
@@ -287,7 +287,7 @@ func (c *ActivationDescriber) Describe() string {
 	table.AddTitle("Activation")
 	AddStandardClaimInfo(table, &c.ActivationClaims)
 	table.AddSeparator()
-	table.AddRow("Hash ID", ShortCodes(hash))
+	table.AddRow("Hash ID", hash)
 	table.AddSeparator()
 	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
@@ -404,7 +404,7 @@ func (o *OperatorDescriber) Describe() string {
 
 	if len(o.SigningKeys) > 0 {
 		table.AddSeparator()
-		AddListValues(table, "Signing Keys", ShortCodesList(o.SigningKeys))
+		AddListValues(table, "Signing Keys", o.SigningKeys)
 	}
 
 	if len(o.Tags) > 0 {
@@ -413,14 +413,4 @@ func (o *OperatorDescriber) Describe() string {
 	}
 
 	return table.Render()
-}
-
-func ShortCodesList(keys []string) []string {
-	var short []string
-	if len(keys) > 0 {
-		for _, v := range keys {
-			short = append(short, ShortCodes(v))
-		}
-	}
-	return short
 }

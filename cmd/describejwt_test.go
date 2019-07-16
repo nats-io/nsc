@@ -110,7 +110,7 @@ func TestDescribe_Activation(t *testing.T) {
 
 	hash, err := act.HashID()
 	require.NoError(t, err)
-	require.Contains(t, out, ShortCodes(hash))
+	require.Contains(t, out, hash)
 }
 
 func TestDescribe_ActivationWithSigner(t *testing.T) {
