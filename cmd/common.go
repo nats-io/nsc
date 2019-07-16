@@ -288,11 +288,21 @@ func RenderDate(d int64) string {
 
 func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 	return func(v string) error {
+		if v == "" {
+			return fmt.Errorf("value cannot be empty")
+		}
 		nk, err := store.ResolveKey(v)
 		if err != nil {
 			return err
 		}
 		if nk == nil {
+			// if it looks like a file, provide a better message
+			if strings.Contains(v, string(os.PathSeparator)) {
+				_, err := os.Stat(v)
+				if err != nil {
+					return err
+				}
+			}
 			return fmt.Errorf("%q is not a valid nkey", v)
 		}
 		t, err := store.KeyType(nk)
@@ -306,11 +316,24 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 	}
 }
 
-func NKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Validator {
+func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Validator {
 	return func(v string) error {
+		if v == "" {
+			return fmt.Errorf("value cannot be empty")
+		}
 		nk, err := store.ResolveKey(v)
 		if err != nil {
 			return err
+		}
+		if nk == nil {
+			// if it looks like a file, provide a better message
+			if strings.Contains(v, string(os.PathSeparator)) {
+				_, err := os.Stat(v)
+				if err != nil {
+					return err
+				}
+			}
+			return fmt.Errorf("%q is not a valid nkey", v)
 		}
 		t, err := store.KeyType(nk)
 		if err != nil {
@@ -334,6 +357,11 @@ func NKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Validator
 		}
 		if !found {
 			return fmt.Errorf("%q is not an expected signing key %v", v, pukeys)
+		}
+
+		_, err = nk.Seed()
+		if err != nil {
+			return err
 		}
 
 		return nil

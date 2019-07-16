@@ -377,3 +377,83 @@ func TestCommon_AbbrevHomePaths(t *testing.T) {
 		require.Equal(t, "~/bar", AbbrevHomePaths(filepath.Join(v, "bar")))
 	}
 }
+
+func Test_NKeyValidator(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	os, opk, _ := CreateOperatorKey(t)
+	as, pk, _ := CreateAccountKey(t)
+	asf := filepath.Join(ts.Dir, "account_seed_file.nk")
+	require.NoError(t, ioutil.WriteFile(asf, as, 0700))
+	pkf := filepath.Join(ts.Dir, "account_public_file.nk")
+	require.NoError(t, ioutil.WriteFile(pkf, []byte(pk), 0700))
+	nff := filepath.Join(ts.Dir, "not_exist.nk")
+
+	var keyTests = []struct {
+		arg string
+		ok  bool
+	}{
+		{asf, true},
+		{pkf, true},
+		{nff, false},
+		{ts.Dir, false},
+		{string(as), true},
+		{string(as), true},
+		{pk, true},
+		{string(os), false},
+		{opk, false},
+		{"", false},
+		{"foo", false},
+	}
+
+	fun := NKeyValidator(nkeys.PrefixByteAccount)
+	for i, kt := range keyTests {
+		err := fun(kt.arg)
+		var failed bool
+		message := fmt.Sprintf("unexpected error on test %q (%d): %v", kt.arg, i, err)
+		if err != nil {
+			failed = true
+		}
+		require.Equal(t, !kt.ok, failed, message)
+	}
+}
+
+func Test_SeedNKeyValidatorMatching(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	os, opk, _ := CreateOperatorKey(t)
+	as, pk, _ := CreateAccountKey(t)
+	as1, pk1, _ := CreateAccountKey(t)
+	as2, pk2, _ := CreateAccountKey(t)
+
+	validPubs := []string{string(pk), string(pk1)}
+
+	var keyTests = []struct {
+		arg string
+		ok  bool
+	}{
+		{string(os), false},
+		{"", false},
+		{"foo", false},
+		{pk, false},
+		{pk2, false},
+		{opk, false},
+		{filepath.Join(ts.Dir, "notexist.nk"), false},
+		{string(as2), false},
+		{string(as), true},
+		{string(as1), true},
+	}
+
+	fun := SeedNKeyValidatorMatching(nkeys.PrefixByteAccount, validPubs)
+	for i, kt := range keyTests {
+		err := fun(kt.arg)
+		var failed bool
+		message := fmt.Sprintf("unexpected error on test %q (%d): %v", kt.arg, i, err)
+		if err != nil {
+			failed = true
+		}
+		require.Equal(t, !kt.ok, failed, message)
+	}
+}
