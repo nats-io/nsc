@@ -156,7 +156,7 @@ func (oc *OperatorClaims) Encode(pair nkeys.KeyPair) (string, error) {
 		return "", err
 	}
 	oc.ClaimsData.Type = OperatorClaim
-	return oc.ClaimsData.encode(pair, oc)
+	return oc.ClaimsData.Encode(pair, oc)
 }
 
 // DecodeOperatorClaims tries to create an operator claims from a JWt string
