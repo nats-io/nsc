@@ -57,7 +57,7 @@ func NewRevocationClaims(subject string) *RevocationClaims {
 // Encode translates the claims to a JWT string
 func (rc *RevocationClaims) Encode(pair nkeys.KeyPair) (string, error) {
 	rc.ClaimsData.Type = RevocationClaim
-	return rc.ClaimsData.encode(pair, rc)
+	return rc.ClaimsData.Encode(pair, rc)
 }
 
 // DecodeRevocationClaims tries to parse a JWT string as a RevocationClaims

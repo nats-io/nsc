@@ -182,7 +182,7 @@ func (c *ClaimsData) hash() (string, error) {
 
 // encode encodes a claim into a JWT token. The claim is signed with the
 // provided nkey's private key
-func (c *ClaimsData) encode(kp nkeys.KeyPair, payload Claims) (string, error) {
+func (c *ClaimsData) Encode(kp nkeys.KeyPair, payload Claims) (string, error) {
 	return c.doEncode(&Header{TokenTypeJwt, AlgorithmNkey}, kp, payload)
 }
 

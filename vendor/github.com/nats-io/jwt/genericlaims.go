@@ -55,7 +55,7 @@ func (gc *GenericClaims) Payload() interface{} {
 
 // Encode takes a generic claims and creates a JWT string
 func (gc *GenericClaims) Encode(pair nkeys.KeyPair) (string, error) {
-	return gc.ClaimsData.encode(pair, gc)
+	return gc.ClaimsData.Encode(pair, gc)
 }
 
 // Validate checks the generic part of the claims data

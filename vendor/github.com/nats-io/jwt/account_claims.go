@@ -127,7 +127,7 @@ func (a *AccountClaims) Encode(pair nkeys.KeyPair) (string, error) {
 	}
 
 	a.ClaimsData.Type = AccountClaim
-	return a.ClaimsData.encode(pair, a)
+	return a.ClaimsData.Encode(pair, a)
 }
 
 // DecodeAccountClaims decodes account claims from a JWT string
