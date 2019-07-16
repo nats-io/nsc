@@ -515,11 +515,16 @@ func migrateCreds(src string, to string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("error processing %q: %v", src, err)
 		}
-		name := filepath.Base(src)
-		// parent is users, grab the account
-		account := filepath.Base(filepath.Dir(filepath.Dir(src)))
-		// grand parent is operator
-		operator := filepath.Base(filepath.Dir(account))
+
+		// .../<op>/accounts/<actname>/users/<un>.creds
+		a := strings.Split(src, string(os.PathSeparator))
+		c := len(a)
+		if c < 5 {
+			return "", fmt.Errorf("unexpected path %q", src)
+		}
+		name := a[c-1]
+		account := a[c-3]
+		operator := a[c-5]
 
 		to := filepath.Join(to, "creds", operator, account, name)
 		if err := MaybeMakeDir(filepath.Dir(to)); err != nil {
