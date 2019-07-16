@@ -247,7 +247,7 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 	signers = append(signers, srcAC.Subject)
 	signers = append(signers, srcAC.SigningKeys...)
 
-	ap.SignerParams.SetPrompt(fmt.Sprintf("select the signing key for account %q [%s]", srcAC.Name, ShortCodes(srcAC.Subject)))
+	ap.SignerParams.SetPrompt(fmt.Sprintf("select the signing key for account %q [%s]", srcAC.Name, srcAC.Subject))
 	if err := ap.SelectFromSigners(ctx, signers); err != nil {
 		return err
 	}

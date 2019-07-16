@@ -428,18 +428,6 @@ func MaxArgs(max int) cobra.PositionalArgs {
 	return cobra.MaximumNArgs(max)
 }
 
-// ShortKey returns the first 12 characters of a public key (or the key if it is < 12 long)
-func ShortCodes(s string) string {
-	if WideFlag {
-		return s
-	}
-	if s != "" && len(s) > 12 {
-		s = s[0:12]
-	}
-
-	return s
-}
-
 // ExpandPath expands the specified path calls. Resolves ~/ and ./.. paths.
 func Expand(s string) (string, error) {
 	var err error
