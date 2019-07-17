@@ -87,6 +87,8 @@ func createEditUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "add source network for connection - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmSrc, "rm-source-network", "", nil, "remove source network for connection - comma separated list or option can be specified multiple times")
 
+	cmd.Flags().Int64VarP(&params.payload.Number, "payload", "", -1, "set maximum message payload in bytes for the account (-1 is unlimited)")
+
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
 
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
@@ -120,6 +122,7 @@ type EditUserParams struct {
 	remove      []string
 	rmSrc       []string
 	src         []string
+	payload     DataParams
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -127,7 +130,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
-		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network") {
+		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -185,19 +188,35 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
+
+	if !ctx.CurrentCmd().Flag("payload").Changed {
+		p.payload.Number = p.claim.Limits.Payload
+	}
+
 	return err
 }
 
 func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
+	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	var err error
+
+	_, err = p.payload.NumberValue()
+	if err != nil {
+		return fmt.Errorf("error parsing %s: %s", "payload", p.payload.Value)
+	}
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
 	if err = p.SignerParams.Resolve(ctx); err != nil {
+		return err
+	}
+	if err = p.payload.Valid(); err != nil {
 		return err
 	}
 	return nil
@@ -226,6 +245,8 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	p.claim.Permissions.Sub.Deny.Add(p.denyPubsub...)
 	p.claim.Permissions.Sub.Deny.Remove(p.remove...)
 	sort.Strings(p.claim.Permissions.Sub.Deny)
+
+	p.claim.Limits.Payload = p.payload.Number
 
 	sort.Strings(p.claim.Tags)
 

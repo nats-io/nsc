@@ -306,7 +306,8 @@ func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
 	}
 
 	if lim.Payload > 0 {
-		table.AddRow("Max Msg Payload", humanize.Bytes(uint64(lim.Payload)))
+		v := fmt.Sprintf("%d bytes (≈%s)", lim.Payload, humanize.Bytes(uint64(lim.Payload)))
+		table.AddRow("Max Msg Payload", v)
 	} else {
 		table.AddRow("Max Msg Payload", "Unlimited")
 	}
