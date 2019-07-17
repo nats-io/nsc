@@ -19,6 +19,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -205,4 +207,27 @@ func Test_EditUserAddedWithSK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, p)
 	require.Equal(t, uc.IssuerAccount, ac.Subject)
+}
+
+func Test_EditUser_Payload(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	ts.AddUser(t, "A", "U")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--payload", "1000")
+	require.NoError(t, err)
+
+	cc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.Equal(t, int64(1000), cc.Limits.Payload)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--payload", "-1")
+	require.NoError(t, err)
+
+	cc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.Equal(t, int64(jwt.NoLimit), cc.Limits.Payload)
 }
