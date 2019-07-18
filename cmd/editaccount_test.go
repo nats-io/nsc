@@ -60,7 +60,6 @@ func Test_EditAccount_Tag(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 
 	require.Len(t, ac.Tags, 3)
 	require.ElementsMatch(t, ac.Tags, []string{"a", "b", "c"})
@@ -79,7 +78,6 @@ func Test_EditAccount_RmTag(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 
 	require.Len(t, ac.Tags, 1)
 	require.ElementsMatch(t, ac.Tags, []string{"c"})
@@ -102,7 +100,6 @@ func Test_EditAccount_Times(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Equal(t, start, ac.NotBefore)
 	require.Equal(t, expiry, ac.Expires)
 }
@@ -118,7 +115,6 @@ func Test_EditAccountLimits(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Equal(t, int64(5), ac.Limits.Conn)
 	require.Equal(t, int64(31), ac.Limits.LeafNodeConn)
 	require.Equal(t, int64(1000*1000*10), ac.Limits.Data)
@@ -141,7 +137,6 @@ func Test_EditAccountSigningKeys(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Contains(t, ac.SigningKeys, pk)
 	require.Contains(t, ac.SigningKeys, pk2)
 
@@ -149,8 +144,6 @@ func Test_EditAccountSigningKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
-	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.NoError(t, err)
 	require.NotContains(t, ac.SigningKeys, pk)
 }

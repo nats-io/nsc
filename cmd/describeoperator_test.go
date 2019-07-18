@@ -72,7 +72,7 @@ func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 
 	pub := ts.GetOperatorPublicKey(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "B")
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "B")
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " B ")
@@ -82,7 +82,7 @@ func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "C")
+	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "C")
 	require.Error(t, err)
 }
 
@@ -90,7 +90,7 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
 	require.NotContains(t, stdout, "Account JWT Server")
 
@@ -102,7 +102,7 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
 	require.Contains(t, stdout, u)
 }
@@ -111,7 +111,7 @@ func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
 	require.NotContains(t, stdout, "Operator Service URLs")
 
@@ -125,7 +125,7 @@ func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 	err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--operator", "O")
+	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
 	require.Contains(t, stdout, "Operator Service URLs")
 	require.Contains(t, stdout, "nats://localhost:4222")

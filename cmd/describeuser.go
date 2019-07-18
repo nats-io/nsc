@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -94,10 +93,6 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 
 	if p.user == "" {
 		return fmt.Errorf("user is required")
-	}
-
-	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.user)) {
-		return fmt.Errorf("user %q not found", p.user)
 	}
 
 	uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)

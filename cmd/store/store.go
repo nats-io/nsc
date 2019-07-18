@@ -42,6 +42,8 @@ const Servers = "servers"
 
 var standardDirs = []string{Accounts}
 
+var ErrNotExist = errors.New("resource does not exist")
+
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
@@ -57,6 +59,47 @@ type Info struct {
 	Kind            string `json:"kind"`
 	Version         string `json:"version"`
 	LastUpdateCheck int64  `json:"last_update_check"`
+}
+
+func underlyingError(err error) error {
+	switch err := err.(type) {
+	case *ResourceErr:
+		return err.Err
+	}
+	return err
+}
+
+type ResourceErr struct {
+	Kind     string
+	Resource string
+	Err      error
+}
+
+func NewResourceNotExistErr(kind string, name string) error {
+	return &ResourceErr{Kind: kind, Resource: name, Err: ErrNotExist}
+}
+
+func NewAccountNotExistErr(name string) error {
+	return NewResourceNotExistErr("account", name)
+}
+
+func NewUserNotExistErr(name string) error {
+	return NewResourceNotExistErr("user", name)
+}
+
+func (e *ResourceErr) Error() string {
+	extra := ""
+	switch e.Kind {
+	case "account":
+		extra = " in the current operator"
+	case "user":
+		extra = " in the current account"
+	}
+	return fmt.Sprintf("%s %s does not exist%s", e.Kind, e.Resource, extra)
+}
+
+func IsNotExist(err error) bool {
+	return underlyingError(err) == ErrNotExist
 }
 
 func (i *Info) String() string {
@@ -303,7 +346,7 @@ func (s *Store) StoreClaim(data []byte) error {
 				if err != nil {
 					return err
 				}
-				if c != nil && c.DidSign(uc) {
+				if c.DidSign(uc) {
 					account = i.Name()
 					break
 				}
@@ -438,7 +481,7 @@ func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
 		}
 		return c, nil
 	}
-	return nil, nil
+	return nil, NewAccountNotExistErr(name)
 }
 
 func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims, error) {
@@ -453,37 +496,7 @@ func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims,
 		}
 		return c, nil
 	}
-	return nil, nil
-}
-
-func (s *Store) ReadClusterClaim(name string) (*jwt.ClusterClaims, error) {
-	if s.Has(Clusters, name, JwtName(name)) {
-		d, err := s.Read(Clusters, name, JwtName(name))
-		if err != nil {
-			return nil, err
-		}
-		c, err := jwt.DecodeClusterClaims(string(d))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
-	}
-	return nil, nil
-}
-
-func (s *Store) ReadServerClaim(clusterName string, name string) (*jwt.ServerClaims, error) {
-	if s.Has(Clusters, clusterName, Servers, JwtName(name)) {
-		d, err := s.Read(Clusters, clusterName, Servers, JwtName(name))
-		if err != nil {
-			return nil, err
-		}
-		c, err := jwt.DecodeServerClaims(string(d))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
-	}
-	return nil, nil
+	return nil, NewUserNotExistErr(name)
 }
 
 func (s *Store) LoadRootClaim() (*jwt.GenericClaims, error) {
@@ -739,7 +752,7 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 func (ctx *Context) GetAccountKeys(name string) ([]string, error) {
 	var keys []string
 	ac, err := ctx.Store.ReadAccountClaim(name)
-	if err != nil {
+	if err != nil && !IsNotExist(err) {
 		return nil, err
 	}
 	if ac == nil {

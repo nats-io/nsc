@@ -42,7 +42,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	cmd.Flags().StringVarP(&params.name, "operator", "r", "", "operator name")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
 
 	return cmd
 }

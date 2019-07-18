@@ -185,9 +185,6 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 		if err != nil {
 			return fmt.Errorf("error reading account %q: %v", p.sysAccount, err)
 		}
-		if ac == nil {
-			return fmt.Errorf("account %q doesn't exist", p.sysAccount)
-		}
 		if err := p.generator.SetSystemAccount(ac.Subject); err != nil {
 			return err
 		}

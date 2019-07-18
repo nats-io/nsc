@@ -93,7 +93,6 @@ func Test_AddImportFromURL(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, token, ac.Imports[0].Token)
 }
@@ -206,7 +205,6 @@ func Test_AddPublicImport(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Imports, 1)
 }
 

@@ -219,7 +219,6 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 
 	d, err := ioutil.ReadFile(outpath)
 	require.NoError(t, err)

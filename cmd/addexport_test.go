@@ -63,7 +63,6 @@ func Test_AddExportVerify(t *testing.T) {
 func validateAddExports(t *testing.T, ts *TestStore) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 
 	require.Len(t, ac.Exports, 4)
 
@@ -102,7 +101,6 @@ func Test_AddExportOperatorLessStore(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Exports, 1)
 	require.Equal(t, "aaaa", string(ac.Exports[0].Subject))
 }
@@ -119,7 +117,6 @@ func Test_AddExportAccountNameRequired(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Exports, 1)
 	require.Equal(t, "bbbb", ac.Exports[0].Name)
 }
@@ -139,7 +136,6 @@ func TestAddExportInteractive(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Exports, 1)
 	require.Equal(t, "Foo Stream", ac.Exports[0].Name)
 	require.Equal(t, "foo.>", string(ac.Exports[0].Subject))

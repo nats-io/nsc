@@ -97,6 +97,10 @@ func GetAllExports() ([]AccountExport, error) {
 		for _, a := range accounts {
 			ac, err := s.ReadAccountClaim(a)
 			if err != nil {
+				if store.IsNotExist(err) {
+					// ignore it and move on
+					continue
+				}
 				return nil, err
 			}
 

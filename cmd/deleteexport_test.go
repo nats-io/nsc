@@ -68,6 +68,5 @@ func Test_DeleteExportInteractive(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Exports, 1)
 }
