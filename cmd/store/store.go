@@ -87,6 +87,10 @@ func NewUserNotExistErr(name string) error {
 	return NewResourceNotExistErr("user", name)
 }
 
+func NewOperatorNotExistErr(name string) error {
+	return NewResourceNotExistErr("operator", name)
+}
+
 func (e *ResourceErr) Error() string {
 	extra := ""
 	switch e.Kind {
@@ -466,7 +470,7 @@ func (s *Store) ReadOperatorClaim() (*jwt.OperatorClaims, error) {
 		}
 		return c, nil
 	}
-	return nil, nil
+	return nil, NewOperatorNotExistErr(s.GetName())
 }
 
 func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
