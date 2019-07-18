@@ -166,7 +166,6 @@ func Test_AddUser_WithSK(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 
 	u, err := ts.Store.ReadUserClaim("A", "bb")
 	require.NoError(t, err)

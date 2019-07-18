@@ -97,7 +97,7 @@ func TestDescribeAccount_MultipleWithFlag(t *testing.T) {
 
 	pub := ts.GetAccountPublicKey(t, "B")
 
-	stdout, _, err := ExecuteCmd(createDescribeAccountCmd(), "--account", "B")
+	stdout, _, err := ExecuteCmd(createDescribeAccountCmd(), "--name", "B")
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " B ")
@@ -110,7 +110,7 @@ func TestDescribeAccount_MultipleWithBadAccount(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createDescribeAccountCmd(), "--account", "C")
+	_, _, err := ExecuteCmd(createDescribeAccountCmd(), "--name", "C")
 	require.Error(t, err)
 }
 

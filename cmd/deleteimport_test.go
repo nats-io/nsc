@@ -79,7 +79,6 @@ func Test_DeleteImportInteractive(t *testing.T) {
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
-	require.NotNil(t, ac)
 	require.Len(t, ac.Imports, 1)
 }
 

@@ -400,12 +400,6 @@ func (ts *TestStore) GetAccountKeyPath(t *testing.T, name string) string {
 	return ts.KeyStore.GetKeyPath(sc.Subject)
 }
 
-func (ts *TestStore) GetClusterKeyPath(t *testing.T, name string) string {
-	sc, err := ts.Store.ReadClusterClaim(name)
-	require.NoError(t, err)
-	return ts.KeyStore.GetKeyPath(sc.Subject)
-}
-
 func (ts *TestStore) GetOperatorPublicKey(t *testing.T) string {
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)

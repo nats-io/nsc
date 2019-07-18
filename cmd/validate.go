@@ -140,6 +140,9 @@ func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
 	for _, v := range p.accounts {
 		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(v)
 		if err != nil {
+			if store.IsNotExist(err) {
+				continue
+			}
 			return err
 		}
 		aci := p.validateJWT(ac)

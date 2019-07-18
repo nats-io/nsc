@@ -131,10 +131,6 @@ func createListAccountsCmd() *cobra.Command {
 					i.err = err
 					continue
 				}
-				if ac == nil {
-					i.err = fmt.Errorf("%q jwt not found", v)
-					continue
-				}
 				i.claims = ac
 			}
 			cmd.Println(listEntities("Accounts", infos, config.Account))

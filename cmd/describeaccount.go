@@ -16,10 +16,7 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +38,7 @@ func createDescribeAccountCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
-	params.AccountContextParams.BindFlags(cmd)
+	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account name")
 
 	return cmd
 }
@@ -72,16 +69,12 @@ func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if !ctx.StoreCtx().Store.Has(store.Accounts, p.AccountContextParams.Name, store.JwtName(p.AccountContextParams.Name)) {
-		return fmt.Errorf("account %q is not defined in the current context", p.AccountContextParams.Name)
-	}
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
-	if ac != nil {
-		p.AccountClaims = *ac
-	}
+	p.AccountClaims = *ac
+
 	return nil
 }
 

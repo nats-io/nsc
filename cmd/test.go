@@ -126,10 +126,7 @@ func createFlagTable() *cobra.Command {
 					cmds.addCmd(v)
 				}
 			}
-
-			cmd.Println(cmds.render())
-
-			return nil
+			return Write("--", []byte(cmds.render()))
 		},
 	}
 	return cmd

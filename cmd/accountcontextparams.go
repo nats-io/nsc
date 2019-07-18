@@ -18,6 +18,8 @@ package cmd
 import (
 	"errors"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +48,7 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 	}
 	if p.Name != "" {
 		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.Name)
-		if err != nil {
+		if err != nil && !store.IsNotExist(err) {
 			return err
 		}
 		ctx.StoreCtx().Account.PublicKey = ac.Subject
