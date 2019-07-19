@@ -16,6 +16,8 @@
 package cli
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,4 +56,18 @@ func TestLengthValidator(t *testing.T) {
 	require.Error(t, fun(""))
 	require.NoError(t, fun("a"))
 	require.NoError(t, fun("aaa"))
+}
+
+func TestPathOrURLValidator(t *testing.T) {
+	fun := PathOrURLValidator()
+	require.Error(t, fun(""))
+	require.Error(t, fun("/tmp"))
+	f, err := ioutil.TempFile("", "file")
+	require.NoError(t, err)
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+	require.NoError(t, fun(f.Name()))
+	require.NoError(t, fun("http://www.google.com"))
 }

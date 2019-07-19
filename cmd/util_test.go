@@ -177,6 +177,31 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 	return s
 }
 
+func (ts *TestStore) SwitchOperator(t *testing.T, operator string) {
+	storeRoot := ts.GetStoresRoot()
+	s, err := store.LoadStore(filepath.Join(storeRoot, operator))
+	require.NoError(t, err)
+	ts.Store = s
+
+	ctx, err := ts.Store.GetContext()
+	require.NoError(t, err, "getting context")
+	ts.KeyStore = ctx.KeyStore
+
+	oc, err := s.LoadRootClaim()
+	require.NoError(t, err)
+
+	kp, err := ts.KeyStore.GetKeyPair(oc.Subject)
+	require.NoError(t, err)
+
+	ts.OperatorKey = kp
+	ts.OperatorKeyPath = ""
+	if kp != nil {
+		ts.OperatorKeyPath = ts.KeyStore.GetKeyPath(oc.Subject)
+	}
+
+	ForceOperator(t, operator)
+}
+
 func NewTestStore(t *testing.T, operatorName string) *TestStore {
 	_, _, kp := CreateOperatorKey(t)
 	return NewTestStoreWithOperator(t, operatorName, kp)
