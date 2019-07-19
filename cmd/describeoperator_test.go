@@ -67,15 +67,12 @@ func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 	ts.AddOperator(t, "A")
 	ts.AddOperator(t, "B")
 
-	err := GetConfig().SetOperator("B")
-	require.NoError(t, err)
-
 	pub := ts.GetOperatorPublicKey(t)
 
 	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "B")
 	require.NoError(t, err)
-	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " B ")
+	require.Contains(t, stdout, pub)
 }
 
 func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {

@@ -19,11 +19,47 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var WideFlag bool
+var Wide WideFun
+
+type WideFun = func(a string) string
+
+func noopNameFilter(a string) string {
+	return a
+}
+
+func friendlyNameFilter() (WideFun, error) {
+	m, err := friendlyNames(GetConfig().Operator)
+	if err != nil {
+		return nil, err
+	}
+	return func(a string) string {
+		v := m[a]
+		if v == "" {
+			v = a
+		}
+		return v
+	}, nil
+}
+
 var describeCmd = &cobra.Command{
 	Use:   "describe",
 	Short: "Describe assets such as operators, accounts, users, and jwt files",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+		if WideFlag {
+			Wide = noopNameFilter
+		} else {
+			Wide, err = friendlyNameFilter()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	},
 }
 
 func init() {
 	GetRootCmd().AddCommand(describeCmd)
+	describeCmd.PersistentFlags().BoolVarP(&WideFlag, "long-ids", "W", false, "display account ids on imports")
 }
