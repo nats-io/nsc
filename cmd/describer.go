@@ -201,7 +201,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	}
 
 	if i.Token == "" {
-		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", i.Account, "Yes")
+		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", Wide(i.Account), "Yes")
 		return
 	}
 	expiration := ""
@@ -211,7 +211,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, i.Account, "No")
+	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, Wide(i.Account), "No")
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {

@@ -155,23 +155,25 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 
 	var nk = &store.NamedKey{}
 	nk.Name = operatorName
-	if ts.OperatorKey != nil {
-		nk.KP = ts.OperatorKey
-	}
+	nk.KP = operator
 
 	s, err := store.CreateStore(operatorName, storeRoot, nk)
 	require.NoError(t, err)
-	if ts.Store == nil {
-		ts.Store = s
-	}
+	ts.Store = s
+
 	ctx, err := ts.Store.GetContext()
 	require.NoError(t, err, "getting context")
 
 	ts.KeyStore = ctx.KeyStore
-	if ts.OperatorKey != nil {
-		ts.OperatorKeyPath, err = ts.KeyStore.Store(ts.OperatorKey)
+	ts.OperatorKey = operator
+	ts.OperatorKeyPath = ""
+	if operator != nil {
+		ts.OperatorKeyPath, err = ts.KeyStore.Store(operator)
 		require.NoError(t, err, "store operator key")
 	}
+
+	ForceOperator(t, operatorName)
+
 	return s
 }
 
@@ -355,7 +357,6 @@ func CreateNkey(t *testing.T, kind nkeys.PrefixByte) ([]byte, string, nkeys.KeyP
 
 	pub, err := kp.PublicKey()
 	require.NoError(t, err)
-
 	return seed, pub, kp
 }
 
@@ -525,4 +526,30 @@ func (ts *TestStore) WaitForClient(t *testing.T, name string, subs uint32, maxWa
 			t.Fatalf("timed out looking for client %q with %d subs", name, subs)
 		}
 	}
+}
+
+func Test_Util(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	pk, _ := ts.OperatorKey.PublicKey()
+	require.Equal(t, pk, oc.Subject)
+
+	ts.AddAccount(t, "A")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, oc.Subject, ac.Issuer)
+
+	_, pk, kp := CreateOperatorKey(t)
+	ts.AddOperatorWithKey(t, "OO", kp)
+	oc2, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, pk, oc2.Subject)
+
+	ts.AddAccount(t, "AA")
+	ac2, err := ts.Store.ReadAccountClaim("AA")
+	require.NoError(t, err)
+	require.Equal(t, pk, ac2.Issuer)
 }

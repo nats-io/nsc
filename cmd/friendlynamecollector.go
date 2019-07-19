@@ -27,6 +27,7 @@ import (
 func friendlyNames(operator string) (map[string]string, error) {
 	m := make(map[string]string)
 	operators := config.ListOperators()
+	hasMany := len(operators) > 1
 	for _, o := range operators {
 		if o == "" {
 			continue
@@ -53,7 +54,7 @@ func friendlyNames(operator string) (map[string]string, error) {
 				return nil, err
 			}
 			name := ac.Name
-			if oc.Name != operator {
+			if hasMany && oc.Name != operator {
 				name = fmt.Sprintf("%s/%s", oc.Name, ac.Name)
 			}
 			m[ac.Subject] = name

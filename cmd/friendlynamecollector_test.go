@@ -21,6 +21,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_FriendlyNameFilter(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	fn, err := friendlyNameFilter()
+	require.NoError(t, err)
+	require.Equal(t, "O", fn(oc.Subject))
+	require.Equal(t, "XXX", fn("XXX"))
+
+}
+
 func Test_FriendlyNameCollector(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -51,19 +65,31 @@ func Test_FriendlyNameCollector(t *testing.T) {
 
 	// force fully qualifiying all names
 	m, err := friendlyNames("")
-	require.Len(t, m, 5)
-	require.Equal(t, "O", m[oc.Subject])
-	require.Equal(t, "O", m[oc.SigningKeys[0]])
-	require.Equal(t, "O/A", m[aac.Subject])
-	require.Equal(t, "O/A", m[aac.SigningKeys[0]])
-	require.Equal(t, "O/B", m[bac.Subject])
-
-	// set the current operator to "O" for purposes of labeling
-	m, err = friendlyNames("O")
+	require.NoError(t, err)
 	require.Len(t, m, 5)
 	require.Equal(t, "O", m[oc.Subject])
 	require.Equal(t, "O", m[oc.SigningKeys[0]])
 	require.Equal(t, "A", m[aac.Subject])
 	require.Equal(t, "A", m[aac.SigningKeys[0]])
 	require.Equal(t, "B", m[bac.Subject])
+
+	ts.AddOperator(t, "OO")
+	ooc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	oopk := ooc.Subject
+	ts.AddAccount(t, "X")
+	xc, err := ts.Store.ReadAccountClaim("X")
+	require.NoError(t, err)
+	xpk := xc.Subject
+
+	m, err = friendlyNames("OO")
+	require.NoError(t, err)
+	require.Len(t, m, 7)
+	require.Equal(t, "OO", m[oopk])
+	require.Equal(t, "X", m[xpk])
+	require.Equal(t, "O", m[oc.Subject])
+	require.Equal(t, "O", m[oc.SigningKeys[0]])
+	require.Equal(t, "O/A", m[aac.Subject])
+	require.Equal(t, "O/A", m[aac.SigningKeys[0]])
+	require.Equal(t, "O/B", m[bac.Subject])
 }
