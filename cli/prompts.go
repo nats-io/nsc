@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"net/url"
 	"os"
+	"path/filepath"
+
+	"github.com/mitchellh/go-homedir"
 )
 
 type Logger func(args ...interface{})
@@ -102,5 +106,32 @@ func LengthValidator(min int) Validator {
 			return nil
 		}
 		return errors.New("value is too short")
+	}
+}
+
+func PathOrURLValidator() Validator {
+	return func(s string) error {
+		if u, err := url.Parse(s); err == nil && u.Scheme != "" {
+			return nil
+		}
+
+		v, err := homedir.Expand(s)
+		if err != nil {
+			return err
+		}
+		v, err = filepath.Abs(v)
+		if err != nil {
+			return err
+		}
+
+		info, err := os.Lstat(v)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		if !info.Mode().IsRegular() {
+			return errors.New("path is not a file")
+		}
+		return nil
 	}
 }

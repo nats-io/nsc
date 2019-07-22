@@ -17,6 +17,10 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,7 +55,7 @@ func TestAddOperatorCreateOrName(t *testing.T) {
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--import", ts.Dir)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--url", ts.Dir)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "either name or import")
 }
@@ -69,7 +73,7 @@ func TestImportOperator(t *testing.T) {
 	err = Write(tf, []byte(token))
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--import", tf)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
 	require.NoError(t, err)
 	storeFile := filepath.Join(ts.Dir, "store", "O", ".nsc")
 	require.FileExists(t, storeFile)
@@ -125,4 +129,36 @@ func TestImportOperatorInteractive(t *testing.T) {
 
 	target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
 	require.FileExists(t, target)
+}
+
+func Test_ImportOperatorFromURL(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+
+	// create an http server to accept the request
+	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(token))
+		require.NoError(t, err)
+	}))
+	defer hts.Close()
+
+	u, err := url.Parse(hts.URL)
+	require.NoError(t, err)
+	u.Path = fmt.Sprintf("/jwt/v1/operators/%s", pub)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", u.String())
+	require.NoError(t, err)
+
+	ts.SwitchOperator(t, "O")
+	oo, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, pub, oo.Subject)
+	require.True(t, ts.Store.IsManaged())
 }

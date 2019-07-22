@@ -41,6 +41,7 @@ var cfgFile string
 //lint:ignore U1000 used by tests
 var ngsStore *store.Store
 var interceptorFn InterceptorFn
+var ErrNoOperator = errors.New("set an operator")
 
 // show some other hidden commands if the env is set
 var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
@@ -63,7 +64,7 @@ func GetStoreForOperator(operator string) (*store.Store, error) {
 	if config.Operator == "" {
 		config.SetDefaults()
 		if config.Operator == "" {
-			return nil, fmt.Errorf("set an operator")
+			return nil, ErrNoOperator
 		}
 	}
 

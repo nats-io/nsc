@@ -18,10 +18,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"net/url"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -53,7 +51,7 @@ func createAddOperatorCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
-	cmd.Flags().StringVarP(&params.jwtPath, "import", "", "", "import from jwt")
+	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url or file")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -91,26 +89,7 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 	if ok {
-		_, err := cli.Prompt("path to operator jwt", p.jwtPath, true, func(s string) error {
-			p.jwtPath, err = homedir.Expand(s)
-			if err != nil {
-				return err
-			}
-			p.jwtPath, err = filepath.Abs(p.jwtPath)
-			if err != nil {
-				return err
-			}
-
-			info, err := os.Lstat(p.jwtPath)
-			if err != nil && !os.IsNotExist(err) {
-				return err
-			}
-
-			if !info.Mode().IsRegular() {
-				return errors.New("path is not a file")
-			}
-			return nil
-		})
+		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, true, cli.PathOrURLValidator())
 
 		if err != nil {
 			return err
@@ -130,11 +109,19 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 
 func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 	if p.jwtPath != "" {
-		d, err := Read(p.jwtPath)
-		if err != nil {
-			return fmt.Errorf("error reading %q: %v", p.jwtPath, err)
+		var err error
+		var data []byte
+		if u, err := url.Parse(p.jwtPath); err == nil && u.Scheme != "" {
+			data, err = LoadFromURL(p.jwtPath)
 		}
-		s := string(d)
+		if data == nil {
+			data, err = Read(p.jwtPath)
+			if err != nil {
+				return fmt.Errorf("error reading %q: %v", p.jwtPath, err)
+			}
+		}
+
+		s := string(data)
 		t, _ := ExtractToken(s)
 		op, err := jwt.DecodeOperatorClaims(t)
 		if err != nil {
