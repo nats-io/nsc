@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,7 +31,7 @@ func createDescribeJwtCmd() *cobra.Command {
 		Use:          "jwt",
 		Short:        "Describe a jwt file",
 		Args:         MaxArgs(0),
-		Example:      fmt.Sprintf(`%s describe -f pathorurl`, GetToolName()),
+		Example:      fmt.Sprintf(`%s describe jwt -f pathorurl`, GetToolName()),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunStoreLessAction(cmd, args, &params); err != nil {
@@ -48,6 +48,13 @@ func createDescribeJwtCmd() *cobra.Command {
 
 func init() {
 	describeCmd.AddCommand(createDescribeJwtCmd())
+	// creds cmd is the same as jwt, but to make it show in help we need to add it again
+	creds := createDescribeJwtCmd()
+	creds.Use = "creds"
+	creds.Short = "Describe a creds file"
+	creds.Example = fmt.Sprintf(`%s describe creds -f pathorurl`, GetToolName())
+	creds.Flag("file").Usage = "a creds file"
+	describeCmd.AddCommand(creds)
 }
 
 type DescribeFile struct {
@@ -75,7 +82,7 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("file is required")
 	}
-	if url, err := url.Parse(p.file); err == nil && url.Scheme != "" {
+	if u, err := url.Parse(p.file); err == nil && u.Scheme != "" {
 		d, err := LoadFromURL(p.file)
 		if err != nil {
 			return err
@@ -86,9 +93,10 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.token, _ = ExtractToken(string(d))
-		if err != nil {
-			return err
+		var ok bool
+		p.token, ok = ExtractToken(string(d))
+		if !ok {
+			return fmt.Errorf("unable to extract JWT from %q", p.file)
 		}
 	}
 
