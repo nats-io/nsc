@@ -134,7 +134,8 @@ func TestGenerateConfig_HonorsAccount(t *testing.T) {
 
 	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A")
 	require.NoError(t, err)
-	userToken, _ := ExtractToken(stdout)
+	userToken, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	require.NoError(t, err)
 
 	uc, err := jwt.DecodeUserClaims(userToken)
 	require.NoError(t, err)
@@ -142,7 +143,8 @@ func TestGenerateConfig_HonorsAccount(t *testing.T) {
 
 	stdout, _, err = ExecuteCmd(createGenerateCredsCmd(), "--account", "B")
 	require.NoError(t, err)
-	userToken, _ = ExtractToken(stdout)
+	userToken, err = jwt.ParseDecoratedJWT([]byte(stdout))
+	require.NoError(t, err)
 
 	uc, err = jwt.DecodeUserClaims(userToken)
 	require.NoError(t, err)
@@ -163,17 +165,10 @@ func TestGenerateConfig_InteractiveHonorsAccount(t *testing.T) {
 	inputs := []interface{}{0}
 	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), inputs)
 	require.NoError(t, err)
-	userToken, _ := ExtractToken(stdout)
+	userToken, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	require.NoError(t, err)
 
 	uc, err := jwt.DecodeUserClaims(userToken)
 	require.NoError(t, err)
 	require.Equal(t, "au", uc.Name)
-
-	//stdout, _, err = ExecuteCmd(createGenerateCredsCmd(), "--account", "B")
-	//require.NoError(t, err)
-	//userToken, _ = ExtractToken(stdout)
-	//
-	//uc, err = jwt.DecodeUserClaims(userToken)
-	//require.NoError(t, err)
-	//require.Equal(t, "bu", uc.Name)
 }

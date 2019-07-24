@@ -39,8 +39,11 @@ func createEditAccount() *cobra.Command {
 
 			if !QuietMode() {
 				cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
-
-				_ = Write("--", FormatJwt("Account", params.token))
+				d, err := jwt.DecorateJWT(string(params.token))
+				if err != nil {
+					return err
+				}
+				_ = Write("--", d)
 
 				if params.claim.NotBefore > 0 {
 					cmd.Printf("Token valid on %s - %s\n",

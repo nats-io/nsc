@@ -19,7 +19,7 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/nats-io/jwt v0.2.10
+	github.com/nats-io/jwt v0.2.12
 	github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
 	github.com/nats-io/nats.go v1.8.1
 	github.com/nats-io/nkeys v0.0.2

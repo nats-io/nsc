@@ -326,7 +326,8 @@ func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject
 	}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
-	token, _ := ExtractToken(stdout)
+	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	require.NoError(t, err)
 	return token
 }
 
@@ -338,7 +339,7 @@ func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount strin
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject, "-K", string(seed)}
 	stdout, _, err := ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), flags...)
 	require.NoError(t, err)
-	token, _ := ExtractToken(stdout)
+	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
 	return token
 }
 

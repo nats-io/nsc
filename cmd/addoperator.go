@@ -121,13 +121,15 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 			}
 		}
 
-		s := string(data)
-		t, _ := ExtractToken(s)
-		op, err := jwt.DecodeOperatorClaims(t)
+		token, err := jwt.ParseDecoratedJWT(data)
+		if err != nil {
+			return err
+		}
+		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
 			return fmt.Errorf("error importing operator jwt: %v", err)
 		}
-		p.token = t
+		p.token = token
 		p.name = op.Name
 	}
 	return nil

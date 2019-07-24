@@ -161,8 +161,7 @@ func GenerateConfig(s *store.Store, account string, user string, userKey nkeys.K
 		if err != nil {
 			return nil, fmt.Errorf("error getting seed: %v", err)
 		}
-
-		return FormatConfig("User", string(d), string(seed)), nil
+		return jwt.FormatUserConfig(string(d), seed)
 	}
 	return nil, fmt.Errorf("unable to find user jwt")
 }
