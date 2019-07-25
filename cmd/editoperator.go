@@ -41,7 +41,11 @@ func createEditOperatorCmd() *cobra.Command {
 			}
 
 			cmd.Printf("Success! - edited operator\n")
-			return Write("--", FormatJwt("Operator", params.token))
+			d, err := jwt.DecorateJWT(params.token)
+			if err != nil {
+				return err
+			}
+			return Write("--", d)
 		},
 	}
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteOperator, cmd)

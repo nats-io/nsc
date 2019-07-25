@@ -54,7 +54,11 @@ func createEditUserCmd() *cobra.Command {
 			cmd.Printf("Success! - edited user %q in account %q\n", params.name, params.AccountContextParams.Name)
 			cmd.Println()
 
-			Write("--", FormatJwt("Account", params.token))
+			d, err := jwt.DecorateJWT(params.token)
+			if err != nil {
+				return err
+			}
+			Write("--", d)
 
 			if params.claim.NotBefore > 0 {
 				cmd.Printf("Token valid on %s - %s\n",

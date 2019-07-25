@@ -86,7 +86,7 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		p.token, _ = ExtractToken(string(d))
+		p.token, err = jwt.ParseDecoratedJWT(d)
 		if err != nil {
 			return err
 		}

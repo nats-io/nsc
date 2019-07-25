@@ -123,7 +123,8 @@ func testExternalToken(t *testing.T, tokenpath string) {
 	d, err := ioutil.ReadFile(tokenpath)
 	require.NoError(t, err)
 
-	s, _ := ExtractToken(string(d))
+	s, err := jwt.ParseDecoratedJWT(d)
+	require.NoError(t, err)
 
 	ac, err := jwt.DecodeActivationClaims(s)
 	if err != nil && strings.Contains(err.Error(), "illegal base64") {
@@ -223,7 +224,8 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 	d, err := ioutil.ReadFile(outpath)
 	require.NoError(t, err)
 
-	token, _ := ExtractToken(string(d))
+	token, err := jwt.ParseDecoratedJWT(d)
+	require.NoError(t, err)
 	actc, err := jwt.DecodeActivationClaims(token)
 	require.NoError(t, err)
 	require.Equal(t, actc.Issuer, pk)

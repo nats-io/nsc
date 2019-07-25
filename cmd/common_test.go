@@ -252,49 +252,6 @@ func TestCommon_IsValidDir(t *testing.T) {
 	require.Equal(t, "not a directory", err.Error())
 }
 
-func TestCommon_FormatConfig(t *testing.T) {
-	d := FormatConfig("test_type", "A_sTring_JWT", "sEEdString")
-
-	expected :=
-		`-----BEGIN NATS TEST_TYPE JWT-----
-A_sTring_JWT
-------END NATS TEST_TYPE JWT------
-
-************************* IMPORTANT *************************
-NKEY Seed printed below can be used to sign and prove identity.
-NKEYs are sensitive and should be treated as secrets.
-
------BEGIN TEST_TYPE NKEY SEED-----
-sEEdString
-------END TEST_TYPE NKEY SEED------
-
-*************************************************************
-`
-	require.Equal(t, expected, string(d))
-}
-
-func TestCommon_ExtractToken(t *testing.T) {
-	jwt := `eyJ0eXAiOiJqd3QiLCJhbGciOiJlZDI1NTE5In0.eyJqdGkiOiJNNzVVNFpHWUZVMk1UN0xKWDZKWkZUQklSVENRQjdHU0VFT05ZREJXUERKTzI3WDRCR0pRIiwiaWF0IjoxNTQ0MTM2MjA2LCJpc3MiOiJBQUpIQ0NNM1RMWjZWSU03V0xVU1FFNVBFWTY1SklFTUZSVldEUkNCVkJKNFhTSUhXQkpFSlFPNSIsInN1YiI6IkFCS09FUEJSQjNDWFZMVlc2TjQ0QVdaNVdHSU9QT0JEVkRQR0NHS0NFNUNUVzVISlhOSURKUUU1IiwidHlwZSI6ImFjdGl2YXRpb24iLCJuYXRzIjp7InN1YmplY3QiOiJmb28iLCJ0eXBlIjoic2VydmljZSJ9fQ.ubxSKauquOnUT-WkQ__ClexDtkLZFm9S_Ys5JHfQlZCvIyDYQE4PvYdf3U33dcQaIRmZ75ycZT948kzA3d6iDQ`
-	template := `-----BEGIN NATS ACTIVATION JWT-----
-%s
-------END NATS ACTIVATION JWT------`
-	v, ok := ExtractToken(fmt.Sprintf(template, jwt))
-	require.Equal(t, jwt, v)
-	require.True(t, ok)
-}
-
-func TestCommon_FormatJwt(t *testing.T) {
-	d := FormatJwt("test_type", "A_sTring_JWT")
-
-	expected :=
-		`-----BEGIN NATS TEST_TYPE JWT-----
-A_sTring_JWT
-------END NATS TEST_TYPE JWT------
-
-`
-	require.Equal(t, expected, string(d))
-}
-
 func TestCommon_MaybeMakeDir(t *testing.T) {
 	d := MakeTempDir(t)
 	dir := filepath.Join(d, "foo")

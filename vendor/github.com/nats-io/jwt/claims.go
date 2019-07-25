@@ -241,7 +241,7 @@ func (c *ClaimsData) IsSelfSigned() bool {
 // Decode takes a JWT string decodes it and validates it
 // and return the embedded Claims. If the token header
 // doesn't match the expected algorithm, or the claim is
-// not valid or verification fails an error is returned
+// not valid or verification fails an error is returned.
 func Decode(token string, target Claims) error {
 	// must have 3 chunks
 	chunks := strings.Split(token, ".")

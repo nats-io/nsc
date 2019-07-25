@@ -48,7 +48,7 @@ func (gc *GenericClaims) Claims() *ClaimsData {
 	return &gc.ClaimsData
 }
 
-// Payload returns the custom part of the claiims data
+// Payload returns the custom part of the claims data
 func (gc *GenericClaims) Payload() interface{} {
 	return &gc.Data
 }

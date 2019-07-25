@@ -330,7 +330,7 @@ func (p *AddImportParams) loadImport() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
 	}
-	v, _ := ExtractToken(string(data))
+	v, err := jwt.ParseDecoratedJWT(data)
 	if err != nil {
 		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
 	}

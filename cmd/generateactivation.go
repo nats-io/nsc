@@ -39,7 +39,11 @@ func createGenerateActivationCmd() *cobra.Command {
 				return err
 			}
 
-			if err := Write(params.out, FormatJwt("Activation", params.Token)); err != nil {
+			d, err := jwt.DecorateJWT(params.Token)
+			if err != nil {
+				return err
+			}
+			if err := Write(params.out, d); err != nil {
 				return err
 			}
 
