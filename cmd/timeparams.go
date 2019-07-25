@@ -41,7 +41,7 @@ func (p *TimeParams) valid(value string, label string, oldOK bool) error {
 	if err != nil {
 		return fmt.Errorf("%s %q is invalid: %v", label, value, err)
 	}
-	if !oldOK && when != 0 && now > when {
+	if InteractiveFlag && !oldOK && when != 0 && now > when {
 		m := fmt.Sprintf("%s %q is in the past (%s) - are you sure?", label, value, HumanizedDate(when))
 		ok, err := cli.PromptBoolean(m, false)
 		if err != nil {
