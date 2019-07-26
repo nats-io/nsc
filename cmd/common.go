@@ -29,13 +29,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 // Resolve a directory/file from an environment variable
@@ -360,4 +360,41 @@ func Expand(s string) (string, error) {
 		return "", err
 	}
 	return filepath.Abs(s)
+}
+
+func PushAccount(u string, accountjwt []byte) ([]byte, error) {
+	resp, err := http.Post(u, "application/text", bytes.NewReader(accountjwt))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		m := ""
+		if body != nil {
+			var vr jwt.ValidationResults
+			err := json.Unmarshal(body, &vr)
+			if err != nil {
+				m = string(body)
+			} else {
+				var lines []string
+				for _, vi := range vr.Issues {
+					lines = append(lines, fmt.Sprintf("\t - %s\n", vi.Description))
+				}
+				m = strings.Join(lines, "\n")
+			}
+		}
+		return nil, fmt.Errorf("error pushing jwt %d: %s:\n\t%s", resp.StatusCode, resp.Status, m)
+	}
+
+	// if the store is managed, this means that the account
+	// is self-signed, and the update should expect a response
+	// back - the response should include the JWT signed
+	// by the operator.
+	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return message, err
 }

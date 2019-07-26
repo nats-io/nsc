@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 )
@@ -132,6 +133,38 @@ func PathOrURLValidator() Validator {
 		if !info.Mode().IsRegular() {
 			return errors.New("path is not a file")
 		}
+		return nil
+	}
+}
+
+func URLValidator(protocol ...string) Validator {
+	return func(s string) error {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return errors.New("url cannot be empty")
+		}
+		u, err := url.Parse(s)
+		if err != nil {
+			return err
+		}
+		scheme := strings.ToLower(u.Scheme)
+
+		ok := false
+		for _, v := range protocol {
+			if scheme == v {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			var protos []string
+			protos = append(protos, protocol...)
+			return fmt.Errorf("scheme %q is not supported (%v)", scheme, strings.Join(protos, ", "))
+		}
+		if u.Host == "" {
+			return fmt.Errorf("no host specified (%v)", s)
+		}
+
 		return nil
 	}
 }

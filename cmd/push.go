@@ -236,7 +236,7 @@ func (p *PushCmdParams) pushURL(ac *jwt.AccountClaims) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	u.Path = path.Join(u.Path, ac.Subject)
+	u.Path = path.Join(u.Path, "accounts", ac.Subject)
 	return u.String(), nil
 }
 

@@ -20,10 +20,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/nats-io/jwt"
 
 	"github.com/spf13/cobra"
 
@@ -413,4 +416,44 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 		}
 		require.Equal(t, !kt.ok, failed, message)
 	}
+}
+
+func TestPushAccount(t *testing.T) {
+	_, opk, okp := CreateOperatorKey(t)
+
+	// create an http server to accept the request
+	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			require.NoError(t, err)
+		}
+		ac, err := jwt.DecodeAccountClaims(string(body))
+		require.NoError(t, err)
+
+		token, err := ac.Encode(okp)
+		require.NoError(t, err)
+
+		w.Header().Add("Content-Type", "application/jwt")
+		w.WriteHeader(200)
+		w.Write([]byte(token))
+	}))
+	defer hts.Close()
+
+	// self sign a jwt
+	_, apk, akp := CreateAccountKey(t)
+	ac := jwt.NewAccountClaims(apk)
+	araw, err := ac.Encode(akp)
+	require.NoError(t, err)
+
+	u, err := url.Parse(hts.URL)
+	sraw, err := PushAccount(u.String(), []byte(araw))
+	require.NoError(t, err)
+	require.NotNil(t, sraw)
+
+	ac, err = jwt.DecodeAccountClaims(string(sraw))
+	require.NoError(t, err)
+	require.Equal(t, apk, ac.Subject)
+	require.Equal(t, opk, ac.Issuer)
 }
