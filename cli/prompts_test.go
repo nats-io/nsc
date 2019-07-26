@@ -71,3 +71,15 @@ func TestPathOrURLValidator(t *testing.T) {
 	require.NoError(t, fun(f.Name()))
 	require.NoError(t, fun("http://www.google.com"))
 }
+
+func TestURLValidator(t *testing.T) {
+	fun := URLValidator("http", "https")
+	require.Error(t, fun(""))
+	require.Error(t, fun("/tmp"))
+	require.Error(t, fun("https://"))
+	require.Error(t, fun("ftp://localhost/path"))
+	require.NoError(t, fun("http://localhost/path"))
+	require.NoError(t, fun("http://localhost"))
+	require.NoError(t, fun("HTTP://localhost"))
+	require.NoError(t, fun("https://localhost"))
+}
