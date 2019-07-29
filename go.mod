@@ -19,10 +19,10 @@ require (
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/nats-io/jwt v0.2.12
+	github.com/nats-io/jwt v0.2.13-0.20190726194050-829b612a49c3
 	github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
 	github.com/nats-io/nats.go v1.8.1
-	github.com/nats-io/nkeys v0.0.2
+	github.com/nats-io/nkeys v0.1.0
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
@@ -33,10 +33,11 @@ require (
 	github.com/spf13/viper v1.2.1
 	github.com/stretchr/testify v1.2.2
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
-	golang.org/x/net v0.0.0-20190509222800-a4d6f7feada5 // indirect
+	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
-	golang.org/x/sys v0.0.0-20190509141414-a5b02f93d862 // indirect
+	golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e // indirect
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20190729092621-ff9f1409240a // indirect
 	gopkg.in/AlecAivazis/survey.v1 v1.7.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
