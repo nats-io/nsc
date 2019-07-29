@@ -116,6 +116,11 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Exports", "None")
 	}
 
+	if len(a.Revocations) != 0 {
+		table.AddSeparator()
+		table.AddRow("Revocations", fmt.Sprintf("%d", len(a.Revocations)))
+	}
+
 	if len(a.Tags) > 0 {
 		table.AddSeparator()
 		AddListValues(table, "Tags", a.Tags)
@@ -151,13 +156,13 @@ func (e *ExportsDescriber) Describe() string {
 	table.UTF8Box()
 
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public")
+	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations")
 	for _, v := range e.Exports {
 		public := "Yes"
 		if v.TokenReq {
 			public = "No"
 		}
-		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public)
+		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public, len(v.Revocations))
 	}
 	return table.Render()
 }
