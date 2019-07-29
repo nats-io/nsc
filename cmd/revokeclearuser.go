@@ -28,7 +28,7 @@ func createClearRevokeUserCmd() *cobra.Command {
 	var params ClearRevokeUserParams
 	cmd := &cobra.Command{
 		Use:          "clear_user",
-		Short:        "Clear the revocation for a user",
+		Short:        "Clear a user revocation",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
