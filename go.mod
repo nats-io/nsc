@@ -24,7 +24,7 @@ require (
 	github.com/nats-io/nats.go v1.8.1
 	github.com/nats-io/nkeys v0.1.0
 	github.com/nats-io/nuid v1.0.1
-	github.com/onsi/ginkgo v1.7.0 // indirect
+	github.com/onsi/ginkgo v1.7.0
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/spf13/cast v1.3.0 // indirect
