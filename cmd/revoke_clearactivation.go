@@ -28,8 +28,8 @@ import (
 func createClearRevokeActivationCmd() *cobra.Command {
 	var params RevokeClearActivationParams
 	cmd := &cobra.Command{
-		Use:          "clear_activation",
-		Short:        "Clear an account revocation from an export",
+		Use:          "delete_activation",
+		Short:        "Remove an account revocation from an export",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

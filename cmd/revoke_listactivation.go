@@ -30,8 +30,8 @@ import (
 func createRevokeListActivationCmd() *cobra.Command {
 	var params RevokeListActivationParams
 	cmd := &cobra.Command{
-		Use:          "list_export",
-		Short:        "List revocations for an export",
+		Use:          "list_activations",
+		Short:        "List account revocations for an export",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

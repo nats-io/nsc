@@ -29,7 +29,7 @@ import (
 func createRevokeActivationCmd() *cobra.Command {
 	var params RevokeActivationParams
 	cmd := &cobra.Command{
-		Use:          "activation",
+		Use:          "add_activation",
 		Short:        "Revoke an accounts access to an export",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,

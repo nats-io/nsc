@@ -29,7 +29,7 @@ import (
 func createRevokeUserCmd() *cobra.Command {
 	var params RevokeUserParams
 	cmd := &cobra.Command{
-		Use:          "user",
+		Use:          "add_user",
 		Short:        "Revoke a user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,

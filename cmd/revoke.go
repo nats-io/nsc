@@ -19,8 +19,8 @@ import "github.com/spf13/cobra"
 
 // removeCmd represents the revoke command
 var revokeCmd = &cobra.Command{
-	Use:   "revoke",
-	Short: "Revoke users and activations from an account",
+	Use:   "revocations",
+	Short: "Manage revocation for users and activations from an account",
 }
 
 func init() {
