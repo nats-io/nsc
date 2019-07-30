@@ -29,7 +29,7 @@ func createToolReqCmd() *cobra.Command {
 	var params ReqParams
 	var cmd = &cobra.Command{
 		Use:     "req",
-		Short:   "Send a request to a subject on your NGS account",
+		Short:   "Send a request to a subject on a NATS account",
 		Example: "ngs tool req <subject> <opt_payload>",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
