@@ -20,7 +20,7 @@ import (
 )
 
 var WideFlag bool
-var Wide WideFun
+var Wide = noopNameFilter
 
 type WideFun = func(a string) string
 
