@@ -17,10 +17,11 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
-	"strconv"
 
 	"github.com/spf13/cobra"
 )

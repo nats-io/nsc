@@ -17,9 +17,10 @@ package cmd
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"time"
 
 	"github.com/spf13/cobra"
 )

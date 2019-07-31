@@ -18,6 +18,7 @@ package cmd
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt"
 
@@ -40,6 +41,45 @@ func Test_EditUser(t *testing.T) {
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func Test_EditUserInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddUser(t, "A", "U")
+
+	inputs := []interface{}{"2018-01-01", "2050-01-01", false, "-1"}
+	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+
+	start, err := ParseExpiry("2018-01-01")
+	require.NoError(t, err)
+	require.Equal(t, start, uc.NotBefore)
+
+	expire, err := ParseExpiry("2050-01-01")
+	require.NoError(t, err)
+	require.Equal(t, expire, uc.Expires)
+	require.Nil(t, uc.Resp)
+}
+
+func Test_EditUserEditReply(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddUser(t, "A", "U")
+
+	inputs := []interface{}{"0", "0", true, "100", "1000ms", "-1"}
+	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 100, uc.Resp.MaxMsgs)
+	require.Equal(t, time.Millisecond*1000, uc.Resp.Expires)
 }
 
 func Test_EditUserAccountRequired(t *testing.T) {

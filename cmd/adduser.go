@@ -19,7 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/nats-io/nsc/cli"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -69,6 +73,9 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
 
+	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests for user)")
+	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
+
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
@@ -92,6 +99,8 @@ type AddUserParams struct {
 	SignerParams
 	Entity
 	TimeParams
+	respTTL       string
+	respMax       string
 	allowPubs     []string
 	allowPubsub   []string
 	allowSubs     []string
@@ -133,6 +142,27 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	ok, err := cli.PromptYN("Set response permissions?")
+	if err != nil {
+		return err
+	}
+	if ok {
+		p.respMax, err = cli.Prompt("Number of max responses", p.respMax, true, func(v string) error {
+			_, err := strconv.ParseInt(v, 10, 32)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		p.respTTL, err = cli.Prompt("Response TTL duration", p.respTTL, true, func(v string) error {
+			_, err := time.ParseDuration(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
 	if err = p.TimeParams.Edit(); err != nil {
 		return err
 	}
@@ -169,6 +199,20 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 
 	if err := p.TimeParams.Validate(); err != nil {
 		return err
+	}
+
+	if p.respMax != "" {
+		_, err := strconv.ParseInt(p.respMax, 10, 32)
+		if err != nil {
+			return err
+		}
+	}
+
+	if p.respTTL != "" {
+		_, err := time.ParseDuration(p.respTTL)
+		if err != nil {
+			return err
+		}
 	}
 
 	return p.Entity.Valid()
@@ -214,6 +258,28 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 
 	if p.TimeParams.IsExpiryChanged() {
 		uc.Expires, _ = p.TimeParams.ExpiryDate()
+	}
+
+	if p.respMax != "" {
+		v, err := strconv.ParseInt(p.respMax, 10, 32)
+		if err != nil {
+			return err
+		}
+		if uc.Resp == nil {
+			uc.Resp = &jwt.ResponsePermission{Expires: time.Millisecond * 5000}
+		}
+		uc.Resp.MaxMsgs = int(v)
+	}
+
+	if p.respTTL != "" {
+		v, err := time.ParseDuration(p.respTTL)
+		if err != nil {
+			return err
+		}
+		if uc.Resp == nil {
+			uc.Resp = &jwt.ResponsePermission{MaxMsgs: 1}
+		}
+		uc.Resp.Expires = v
 	}
 
 	uc.Permissions.Pub.Allow.Add(p.allowPubs...)
