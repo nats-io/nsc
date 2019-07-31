@@ -18,35 +18,67 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"path"
-	"path/filepath"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"path"
 )
 
 func createDeployCmd() *cobra.Command {
+	var allAccounts bool
 	var params DeployCmdParams
 	var cmd = &cobra.Command{
-		Short:   "Deploy an account to a remote operator",
+		Short:   "Deploy an account to a remote/managed operator",
+		Long: `Deploy pushes an account JWT to a remote operator, such as a managed service like NGS. 
+Deployed accounts are copied to the deployed operator, but are not to be edited. 
+All edits should happen on a local operator, and then deployed as necessary. The
+copy under the operator may be slightly different from your original account, as
+operators can set limits depending on your service plan.`,
 		Example: "deploy",
 		Use: `deploy --url  <operator_url>
 deploy --operator <operator name>`,
 		Args: MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return fmt.Errorf("deploy failed - %v", err)
+			var accounts []DeployCmdParams
+			if allAccounts {
+				tc := GetConfig()
+				if tc.Operator == "" {
+					return errors.New("create or add an operator first")
+				}
+				s, err := tc.LoadStore(tc.Operator)
+				if err != nil {
+					return err
+				}
+				names, err := s.ListSubContainers(store.Accounts)
+				if err != nil {
+					return err
+				}
+				for _, n := range names {
+					var dp DeployCmdParams
+					dp.operator = params.operator
+					dp.url = params.url
+					dp.AccountContextParams.Name = n
+					accounts = append(accounts, dp)
+				}
+			} else {
+				accounts = append(accounts, params)
 			}
-			cmd.Printf("deployed %q to operator %q\n", params.AccountContextParams.Name, params.claim.Name)
+			for _, dp := range accounts {
+				if err := RunAction(cmd, args, &dp); err != nil {
+					return fmt.Errorf("deploy $q failed - %v", dp.AccountContextParams.Name, err)
+				}
+				cmd.Printf("deployed %q to operator %q\n", dp.AccountContextParams.Name, dp.claim.Name)
+			}
+
 			return nil
 		},
 	}
+	cmd.Flags().BoolVarP(&allAccounts, "all-accounts", "A", false, "deploy all accounts under the current operator")
 	cmd.Flags().StringVarP(&params.operator, "operator", "o", "", "operator to deploy to")
 	cmd.Flags().StringVarP(&params.url, "url", "u", "", "operator url to deploy to")
 	params.AccountContextParams.BindFlags(cmd)
@@ -134,7 +166,6 @@ func (p *DeployCmdParams) Load(ctx ActionCtx) error {
 			return fmt.Errorf("error decoding JWT: %v", err)
 		}
 	}
-
 	if p.claim == nil {
 		return errors.New("unable to resolve an operator JWT")
 	}
@@ -160,10 +191,13 @@ func (p *DeployCmdParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *DeployCmdParams) Run(ctx ActionCtx) error {
+	var err error
+	var managedStore *store.Store
 	if p.operatorToken != "" {
 		s, err := GetConfig().LoadStore(p.claim.Name)
 		if err == nil {
 			// update it
+			managedStore = s
 			if err := s.StoreClaim([]byte(p.operatorToken)); err != nil {
 				return fmt.Errorf("error updating operator jwt: %v", err)
 			}
@@ -177,6 +211,12 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 			if err = os.StoreClaim([]byte(p.operatorToken)); err != nil {
 				return err
 			}
+			managedStore = os
+		}
+	} else {
+		managedStore, err = GetConfig().LoadStore(p.operator)
+		if err != nil {
+			return err
 		}
 	}
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
@@ -205,8 +245,6 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 		Write("--", d)
 
 		// ask for the JWT
-		u, err = url.Parse(p.asu)
-		u.Path = filepath.Join("/jwt/v1/accounts", ac.Subject)
 		r, err := http.Get(u.String())
 		if err != nil {
 			return fmt.Errorf("error retrieving jwt from %q: %v", u.String(), err)
@@ -223,6 +261,9 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 		aac, err := jwt.DecodeAccountClaims(s)
 		if err != nil {
 			return fmt.Errorf("error decoding JWT returned by the server: %v", err)
+		}
+		if err := managedStore.StoreClaim([]byte(s)); err != nil {
+			return fmt.Errorf("error storing JWT returned by the server: %v", err)
 		}
 		ad := NewAccountDescriber(*aac)
 		Write("--", []byte(ad.Describe()))
