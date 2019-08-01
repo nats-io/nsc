@@ -128,16 +128,11 @@ func ReadJson(fp string, v interface{}) error {
 }
 
 func Read(fp string) ([]byte, error) {
-	hfp, err := homedir.Expand(fp)
+	fp, err := Expand(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error expanding path %q: %v", fp, err)
+		return nil, err
 	}
-	afp, err := filepath.Abs(hfp)
-	if err != nil {
-		return nil, fmt.Errorf("error converting abs %q: %v", fp, err)
-	}
-
-	return ioutil.ReadFile(afp)
+	return ioutil.ReadFile(fp)
 }
 
 func ParseNumber(s string) (int64, error) {
@@ -302,7 +297,11 @@ func LoadFromFileOrURL(v string) ([]byte, error) {
 	if u, err := url.Parse(v); err == nil && u.Scheme != "" {
 		return LoadFromURL(v)
 	}
-	_, err := os.Stat(v)
+	v, err := Expand(v)
+	if err != nil {
+		return nil, err
+	}
+	_, err = os.Stat(v)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +390,7 @@ func PushAccount(u string, accountjwt []byte) ([]byte, error) {
 		if data != nil {
 			m = string(data)
 		}
-		return nil, fmt.Errorf("error pushing jwt %d: %s:\n%s", resp.StatusCode, resp.Status, m)
+		return nil, fmt.Errorf("%s:\n%s", resp.Status, m)
 	}
 	return data, err
 }

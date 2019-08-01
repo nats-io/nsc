@@ -32,7 +32,7 @@ import (
 )
 
 func createMigrateCmd() *cobra.Command {
-	var params ImportCmdParams
+	var params MigrateCmdParams
 	var storeDir string
 	var cmd = &cobra.Command{
 		Hidden: true,
@@ -45,13 +45,28 @@ func createMigrateCmd() *cobra.Command {
 			if params.url != "" && storeDir != "" {
 				return fmt.Errorf("specify one of --url or --store-dir")
 			}
-			var all []ImportCmdParams
+			var all []MigrateCmdParams
+			if InteractiveFlag {
+				ok, err := cli.PromptYN("migrate all accounts under a particular operator")
+				if err != nil {
+					return err
+				}
+				if ok {
+					storeDir, err = cli.Prompt("specify the directory for the operator", "", true, func(v string) error {
+						_, err := store.LoadStore(v)
+						return err
+					})
+					if err != nil {
+						return err
+					}
+				}
+			}
 			if storeDir != "" {
 				if KeyPathFlag != "" {
-					return fmt.Errorf("when --store-dir is specified no other options other than '-i' are allowed")
+					return fmt.Errorf("when --store-dir is specified no other options other than '-i' and '--force' are allowed")
 				}
 				if params.accountKeypath != "" {
-					return fmt.Errorf("when --store-dir is specified no other options other than '-i' are allowed")
+					return fmt.Errorf("when --store-dir is specified no other options other than '-i' and '--force' are allowed")
 				}
 
 				s, err := store.LoadStore(storeDir)
@@ -64,8 +79,9 @@ func createMigrateCmd() *cobra.Command {
 				}
 				for _, n := range names {
 					fp := filepath.Join(storeDir, store.Accounts, n, store.JwtName(n))
-					var ip ImportCmdParams
+					var ip MigrateCmdParams
 					ip.url = fp
+					ip.overwrite = params.overwrite
 					all = append(all, ip)
 				}
 			} else {
@@ -79,14 +95,15 @@ func createMigrateCmd() *cobra.Command {
 				if err := RunAction(cmd, []string{}, &p); err != nil {
 					return fmt.Errorf("import failed - %v", err)
 				}
-				cmd.Printf("migrated %q to operator %q\n", p.claim.Name, p.operator)
+				m := fmt.Sprintf("migrated %q to operator %q", p.claim.Name, p.operator)
+				um := fmt.Sprintf("%d users migrated", len(p.migratedUsers))
 				if len(p.migratedUsers) == 0 {
-					cmd.Println("no users migrated")
-					return nil
+					um = "no users migrated"
 				}
-				if p.isFileImport {
-					cmd.Printf("%d users migrated.\n", len(p.migratedUsers))
+				if !p.isFileImport {
+					um = ""
 				}
+				cmd.Printf("%s [%s]\n", m, um)
 			}
 			return nil
 		},
@@ -94,6 +111,7 @@ func createMigrateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.url, "url", "u", "", "path or url to import jwt from")
 	cmd.Flags().StringVarP(&params.accountKeypath, "account-key", "k", "", "path to account key")
 	cmd.Flags().StringVarP(&storeDir, "store-dir", "", "", "path to a store dir - all accounts are migrated")
+	cmd.Flags().BoolVarP(&params.overwrite, "force", "", false, "overwrite accounts with the same name")
 	HoistRootFlags(cmd)
 	return cmd
 }
@@ -102,7 +120,7 @@ func init() {
 	GetRootCmd().AddCommand(createMigrateCmd())
 }
 
-type ImportCmdParams struct {
+type MigrateCmdParams struct {
 	signer         SignerParams
 	accountKeypath string
 	accountToken   string
@@ -111,21 +129,26 @@ type ImportCmdParams struct {
 	isFileImport   bool
 	operator       string
 	migratedUsers  []*jwt.UserClaims
+	overwrite      bool
 }
 
-func (p *ImportCmdParams) SetDefaults(ctx ActionCtx) error {
+func (p *MigrateCmdParams) SetDefaults(ctx ActionCtx) error {
 	p.signer.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 	return nil
 }
 
-func (p *ImportCmdParams) PreInteractive(ctx ActionCtx) error {
+func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 	p.url, err = cli.Prompt("account jwt url/or path ", p.url, true, func(v string) error {
 		// we expect either a file or url
 		if u, err := url.Parse(v); err == nil && u.Scheme != "" {
 			return nil
 		}
-		_, err := os.Stat(v)
+		v, err := Expand(v)
+		if err != nil {
+			return err
+		}
+		_, err = os.Stat(v)
 		return err
 	})
 	if err != nil {
@@ -134,14 +157,14 @@ func (p *ImportCmdParams) PreInteractive(ctx ActionCtx) error {
 	return p.signer.Edit(ctx)
 }
 
-func (p *ImportCmdParams) getAccountKeys() []string {
+func (p *MigrateCmdParams) getAccountKeys() []string {
 	var keys []string
 	keys = append(keys, p.claim.Subject)
 	keys = append(keys, p.claim.SigningKeys...)
 	return keys
 }
 
-func (p *ImportCmdParams) Load(ctx ActionCtx) error {
+func (p *MigrateCmdParams) Load(ctx ActionCtx) error {
 	if p.url == "" {
 		return errors.New("an url or path to the account jwt is required")
 	}
@@ -171,7 +194,7 @@ func (p *ImportCmdParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ImportCmdParams) PostInteractive(ctx ActionCtx) error {
+func (p *MigrateCmdParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 	if p.accountKeypath == "" {
 		p.accountKeypath, err = cli.Prompt("account key", "", true,
@@ -180,10 +203,36 @@ func (p *ImportCmdParams) PostInteractive(ctx ActionCtx) error {
 			return err
 		}
 	}
+	if ctx.StoreCtx().Store.HasAccount(p.claim.Name) && !p.overwrite {
+		aac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.claim.Name)
+		if err != nil {
+			return err
+		}
+		p.overwrite = aac.Subject == p.claim.Subject
+		if !p.overwrite {
+			p.overwrite, err = cli.PromptYN("account %q already exists under the current operator, replace it")
+		}
+	}
 	return nil
 }
 
-func (p *ImportCmdParams) Validate(ctx ActionCtx) error {
+func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
+	if p.isFileImport {
+		parent := ctx.StoreCtx().Store.Dir
+		// it is already determined to be a file
+		fp, err := Expand(p.url)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(fp, parent) {
+			return fmt.Errorf("cannot migrate %q into %q (same operator)", fp, parent)
+		}
+	}
+
+	if !p.overwrite && ctx.StoreCtx().Store.HasAccount(p.claim.Name) {
+		return fmt.Errorf("account %q already exists, specify --force to overwrite", p.claim.Name)
+	}
+
 	var err error
 	var kp nkeys.KeyPair
 	if p.accountKeypath != "" {
@@ -212,7 +261,7 @@ func (p *ImportCmdParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ImportCmdParams) Run(ctx ActionCtx) error {
+func (p *MigrateCmdParams) Run(ctx ActionCtx) error {
 	tok, err := p.claim.Encode(p.signer.signerKP)
 	if err != nil {
 		return err

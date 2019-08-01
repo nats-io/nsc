@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/nats-io/nsc/cmd/store"
 	"path/filepath"
 	"testing"
 
@@ -24,20 +25,69 @@ import (
 
 func Test_Migrate(t *testing.T) {
 	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "B", "b")
+
+	ts.AddOperator(t, "OO")
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(ts.GetStoresRoot(), "O", "accounts", "A", "A.jwt"))
+	require.NoError(t, err)
+
+	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
+	require.NoError(t, err)
+	_, err = oos.ReadAccountClaim("A")
+	require.NoError(t, err)
+	_, err = oos.ReadUserClaim("A", "a")
+	require.NoError(t, err)
+}
+
+func Test_MigrateMany(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "a")
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "b")
 
-	srcDir := ts.Dir
-	t.Log(srcDir)
-
 	ts.AddOperator(t, "OO")
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir, "store", "O", "accounts", "A", "A.jwt"))
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir, "store", "O", "accounts", "B", "B.jwt"))
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--store-dir", filepath.Join(ts.GetStoresRoot(), "O"))
 	require.NoError(t, err)
 
-	t.Fail()
+	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
+	require.NoError(t, err)
+	_, err = oos.ReadAccountClaim("A")
+	require.NoError(t, err)
+	_, err = oos.ReadUserClaim("A", "a")
+	require.NoError(t, err)
+	_, err = oos.ReadAccountClaim("B")
+	require.NoError(t, err)
+	_, err = oos.ReadUserClaim("B", "b")
+	require.NoError(t, err)
+}
 
+func Test_MigrateSingleInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "B", "b")
+	ts.AddOperator(t, "OO")
+
+	args := []interface{}{false, filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")}
+	_, _, err := ExecuteInteractiveCmd(createMigrateCmd(), args)
+	require.NoError(t, err)
+
+	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
+	require.NoError(t, err)
+	_, err = oos.ReadAccountClaim("A")
+	require.NoError(t, err)
+	_, err = oos.ReadUserClaim("A", "a")
+	require.NoError(t, err)
 }

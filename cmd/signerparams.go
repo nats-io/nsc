@@ -77,7 +77,6 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 		if p.prompt == "" {
 			p.prompt = "select the key to use for signing"
 		}
-		ctx.CurrentCmd().Println("signers", len(signers))
 		choice, err := cli.PromptChoices(p.prompt, choices[0], choices)
 		if err != nil {
 			return err

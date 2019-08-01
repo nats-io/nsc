@@ -64,6 +64,7 @@ deploy --operator <operator name>`,
 					dp.operator = params.operator
 					dp.url = params.url
 					dp.AccountContextParams.Name = n
+					dp.overwrite = params.overwrite
 					accounts = append(accounts, dp)
 				}
 			} else {
@@ -82,6 +83,7 @@ deploy --operator <operator name>`,
 	cmd.Flags().BoolVarP(&allAccounts, "all-accounts", "A", false, "deploy all accounts under the current operator")
 	cmd.Flags().StringVarP(&params.operator, "operator", "o", "", "operator to deploy to")
 	cmd.Flags().StringVarP(&params.url, "url", "u", "", "operator url to deploy to")
+	cmd.Flags().BoolVarP(&params.overwrite, "force", "", false, "overwrite accounts with the same name")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -98,6 +100,7 @@ type DeployCmdParams struct {
 	claim         *jwt.OperatorClaims
 	url           string
 	asu           string
+	overwrite     bool
 }
 
 func (p *DeployCmdParams) SetDefaults(ctx ActionCtx) error {
@@ -220,6 +223,7 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 			return err
 		}
 	}
+
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
@@ -262,6 +266,25 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 		aac, err := jwt.DecodeAccountClaims(s)
 		if err != nil {
 			return fmt.Errorf("error decoding JWT returned by the server: %v", err)
+		}
+		if !p.overwrite && managedStore.HasAccount(aac.Name) {
+			old, err := managedStore.ReadAccountClaim(aac.Name)
+			if err != nil {
+				return fmt.Errorf("error loading existing JWT: %v", err)
+			}
+			// don't ask if we have the same account
+			p.overwrite = old.Subject == aac.Subject
+			// if not overwriting, and can ask ask
+			if !p.overwrite && InteractiveFlag {
+				p.overwrite, err = cli.PromptBoolean("a different account %q (for a different Subject, replace it", false)
+				if err != nil {
+					return err
+				}
+			}
+			// fail
+			if !p.overwrite {
+				return fmt.Errorf("account %q already exists (for a different Subject), specify --force to overwrite", aac.Name)
+			}
 		}
 		if err := managedStore.StoreClaim([]byte(s)); err != nil {
 			return fmt.Errorf("error storing JWT returned by the server: %v", err)
