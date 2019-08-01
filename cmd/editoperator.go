@@ -164,7 +164,11 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 		}
 	}
 
-	return p.signingKeys.Edit()
+	if err := p.signingKeys.Edit(); err != nil {
+		return err
+	}
+
+	return p.SignerParams.Edit(ctx)
 }
 
 func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
