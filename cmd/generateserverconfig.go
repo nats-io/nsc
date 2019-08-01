@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -115,13 +114,9 @@ func (p *GenerateServerConfigParams) checkFile(fp string) (string, error) {
 	if fp == "--" {
 		return fp, nil
 	}
-	fp, err := homedir.Expand(fp)
+	afp, err := Expand(fp)
 	if err != nil {
-		return "", fmt.Errorf("errof expanding '~' in path: %v", err)
-	}
-	afp, err := filepath.Abs(fp)
-	if err != nil {
-		return "", fmt.Errorf("error calculating abs %q: %v", fp, err)
+		return "", err
 	}
 	_, err = os.Stat(afp)
 	if err == nil {
@@ -141,22 +136,16 @@ func (p *GenerateServerConfigParams) checkDir(fp string) (string, error) {
 	if fp == "--" {
 		return fp, nil
 	}
-	fp, err := homedir.Expand(fp)
-	if err != nil {
-		return "", fmt.Errorf("errof expanding '~' in path: %v", err)
-	}
-	afp, err := filepath.Abs(fp)
-	if err != nil {
-		return "", fmt.Errorf("error calculating abs %q: %v", fp, err)
-	}
+	afp, err := Expand(fp)
+
 	fi, err := os.Stat(afp)
 	if err == nil {
 		if !p.force {
-			return "", fmt.Errorf("%q already exists", afp)
+			return "", fmt.Errorf("%q already exists", fp)
 		}
 		// file exists, if force - delete it
 		if !fi.IsDir() {
-			return "", fmt.Errorf("%q already exists and is not a directory", afp)
+			return "", fmt.Errorf("%q already exists and is not a directory", fp)
 		}
 	}
 	return afp, nil

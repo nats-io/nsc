@@ -128,7 +128,6 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 			}
 		}
 	}
-
 	if err := p.SelectFromSigners(ctx, signers); err != nil {
 		return err
 	}

@@ -16,12 +16,8 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -286,44 +282,7 @@ func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) error {
 		return err
 	}
 
-	resp, err := http.Post(u, "application/text", bytes.NewReader(raw))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		m := ""
-		if body != nil {
-			var vr jwt.ValidationResults
-			err := json.Unmarshal(body, &vr)
-			if err != nil {
-				m = string(body)
-			} else {
-				var lines []string
-				for _, vi := range vr.Issues {
-					lines = append(lines, fmt.Sprintf("\t - %s\n", vi.Description))
-				}
-				m = strings.Join(lines, "\n")
-			}
-		}
-		return fmt.Errorf("error pushing jwt %d: %s:\n\t%s", resp.StatusCode, resp.Status, m)
-	}
-
-	// if the store is managed, this means that the account
-	// is self-signed, and the update should expect a response
-	// back - the response should include the JWT signed
-	// by the operator.
-	if ctx.StoreCtx().Store.IsManaged() {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		_, err = jwt.DecodeAccountClaims(string(body))
-		if err != nil {
-			err = ctx.StoreCtx().Store.StoreClaim(raw)
-		}
-	}
+	// FIXME the push could return useful information that should be aggregated.
+	_, err = PushAccount(u, raw)
 	return err
 }

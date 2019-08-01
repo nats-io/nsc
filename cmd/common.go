@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -128,16 +128,11 @@ func ReadJson(fp string, v interface{}) error {
 }
 
 func Read(fp string) ([]byte, error) {
-	hfp, err := homedir.Expand(fp)
+	fp, err := Expand(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error expanding path %q: %v", fp, err)
+		return nil, err
 	}
-	afp, err := filepath.Abs(hfp)
-	if err != nil {
-		return nil, fmt.Errorf("error converting abs %q: %v", fp, err)
-	}
-
-	return ioutil.ReadFile(afp)
+	return ioutil.ReadFile(fp)
 }
 
 func ParseNumber(s string) (int64, error) {
@@ -292,6 +287,27 @@ func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Valid
 	}
 }
 
+func IsURL(v string) bool {
+	u, err := url.Parse(v)
+	return err == nil && u.Scheme != ""
+}
+
+func LoadFromFileOrURL(v string) ([]byte, error) {
+	// we expect either a file or url
+	if u, err := url.Parse(v); err == nil && u.Scheme != "" {
+		return LoadFromURL(v)
+	}
+	v, err := Expand(v)
+	if err != nil {
+		return nil, err
+	}
+	_, err = os.Stat(v)
+	if err != nil {
+		return nil, err
+	}
+	return Read(v)
+}
+
 func LoadFromURL(url string) ([]byte, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(url)
@@ -368,33 +384,13 @@ func PushAccount(u string, accountjwt []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
+	data, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
 		m := ""
-		if body != nil {
-			var vr jwt.ValidationResults
-			err := json.Unmarshal(body, &vr)
-			if err != nil {
-				m = string(body)
-			} else {
-				var lines []string
-				for _, vi := range vr.Issues {
-					lines = append(lines, fmt.Sprintf("\t - %s\n", vi.Description))
-				}
-				m = strings.Join(lines, "\n")
-			}
+		if data != nil {
+			m = string(data)
 		}
-		return nil, fmt.Errorf("error pushing jwt %d: %s:\n\t%s", resp.StatusCode, resp.Status, m)
+		return nil, fmt.Errorf("%s:\n%s", resp.Status, m)
 	}
-
-	// if the store is managed, this means that the account
-	// is self-signed, and the update should expect a response
-	// back - the response should include the JWT signed
-	// by the operator.
-	message, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return message, err
+	return data, err
 }

@@ -232,6 +232,10 @@ func (s *Store) Has(name ...string) bool {
 	return s.has(fp)
 }
 
+func (s *Store) HasAccount(name string) bool {
+	return s.Has(Accounts, name, JwtName(name))
+}
+
 func (s *Store) has(fp string) bool {
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return false
