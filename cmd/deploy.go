@@ -18,22 +18,23 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"path"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"path"
 )
 
 func createDeployCmd() *cobra.Command {
 	var allAccounts bool
 	var params DeployCmdParams
 	var cmd = &cobra.Command{
-		Short:   "Deploy an account to a remote/managed operator",
+		Short: "Deploy an account to a remote/managed operator",
 		Long: `Deploy pushes an account JWT to a remote operator, such as a managed service like NGS. 
 Deployed accounts are copied to the deployed operator, but are not to be edited. 
 All edits should happen on a local operator, and then deployed as necessary. The
@@ -70,7 +71,7 @@ deploy --operator <operator name>`,
 			}
 			for _, dp := range accounts {
 				if err := RunAction(cmd, args, &dp); err != nil {
-					return fmt.Errorf("deploy $q failed - %v", dp.AccountContextParams.Name, err)
+					return fmt.Errorf("deploy %q failed - %v", dp.AccountContextParams.Name, err)
 				}
 				cmd.Printf("deployed %q to operator %q\n", dp.AccountContextParams.Name, dp.claim.Name)
 			}

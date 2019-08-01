@@ -293,7 +293,7 @@ func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Valid
 }
 
 func IsURL(v string) bool {
-	u, err := url.Parse(v);
+	u, err := url.Parse(v)
 	return err == nil && u.Scheme != ""
 }
 

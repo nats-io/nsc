@@ -16,9 +16,10 @@
 package cmd
 
 import (
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Migrate(t *testing.T) {
@@ -32,9 +33,9 @@ func Test_Migrate(t *testing.T) {
 	t.Log(srcDir)
 
 	ts.AddOperator(t, "OO")
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir,"store", "O", "accounts", "A", "A.jwt"))
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir, "store", "O", "accounts", "A", "A.jwt"))
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir,"store", "O", "accounts", "B", "B.jwt"))
+	_, _, err = ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(srcDir, "store", "O", "accounts", "B", "B.jwt"))
 	require.NoError(t, err)
 
 	t.Fail()
