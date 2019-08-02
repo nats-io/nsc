@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,304 +19,243 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
+
+	"github.com/nats-io/jwt"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
-	"github.com/xlab/tablewriter"
 )
 
-func CreateInitCmd() *cobra.Command {
-	var p InitParams
+func createInitCmd() *cobra.Command {
+	var params EasyCmdParams
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Init a configuration directory",
-		Args:  MaxArgs(0),
-		Example: `init --name operatorname
-init --interactive
-`,
-		SilenceUsage: true,
+		Short: "create an operator, account and user",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
 
-			if err := p.SetDefaults(); err != nil {
-				return err
+			// validation function for provided name
+			checkName := func(v string) error {
+				operators := GetConfig().ListOperators()
+				for _, o := range operators {
+					if o == v {
+						return fmt.Errorf("an operator named %q already exists", v)
+					}
+				}
+				return nil
 			}
 
-			if err := p.Interactive(cmd); err != nil {
+			// if they didn't provide any values, prompt - this is first contact
+			prompted := false
+			if !cmd.Flag("name").Changed && !cmd.Flag("url").Changed {
+				prompted = true
+				params.Name, err = cli.Prompt("name your operator, account and user", params.Name, true, checkName)
+				if err != nil {
+					return err
+				}
+			}
+			if err := checkName(params.Name); err != nil {
 				return err
 			}
-
-			if err := p.Validate(); err != nil {
+			// possibly no stores exist yet - create one
+			if err := params.createStore(); err != nil {
 				return err
 			}
-
-			if err := p.Run(); err != nil {
-				fmt.Printf("%v\n", err)
-				return err
+			if err := RunAction(cmd, args, &params); err != nil {
+				return fmt.Errorf("init failed: %v", err)
 			}
+			cmd.Printf("Success!! created a new operator, account and user named %q.\n", params.Name)
+			cmd.Printf("User creds file stored in %q\n\n", params.User.CredsPath)
 
-			cmd.Println()
-
-			table := tablewriter.CreateTable()
-			table.UTF8Box()
-			table.AddTitle("Generated NKeys Location")
-			table.AddHeaders("Name", "Kind", "Location")
-			printed := false
-			for _, c := range p.Containers() {
-				if c.create && c.generated {
-					printed = true
-					table.AddRow(c.name, c.kind.String(), AbbrevHomePaths(c.keyPath))
-					if c.kind == nkeys.PrefixByteUser {
-						s, err := GetStore()
-						if err == nil {
-							ctx, err := s.GetContext()
-							if err == nil {
-								creds := ctx.KeyStore.GetUserCredsPath(p.account.name, p.user.name)
-								if creds != "" {
-									table.AddRow("", "creds file", AbbrevHomePaths(creds))
-								}
-							}
-						}
+			if prompted {
+				ok, err := cli.PromptBoolean("deploy account to a managed operator", false)
+				if ok {
+					params.Deploy, err = cli.Prompt("enter operator url", "", true, cli.URLValidator("http", "https"))
+					if err != nil {
+						return err
 					}
 				}
 			}
 
-			if printed && !QuietMode() {
-				cmd.Println(cli.Wrap(70, "Project initialization generated NKeys.",
-					"These keys should be treated as secrets.", "You can move the directory,",
-					"and reference them from the", fmt.Sprintf("`$%s`", store.NKeysPathEnv),
-					"environment variable. To remind yourself of current environment",
-					"configuration type `nsc env` while in a project directory.\n"))
-				cmd.Println(table.Render())
+			if params.Deploy != "" {
+				var deploy DeployCmdParams
+				deploy.AccountContextParams.Name = params.Name
+				deploy.url = params.Deploy
+
+				if err := RunAction(cmd, args, &deploy); err != nil {
+					return fmt.Errorf("deploy %q failed - %v", params.Name, err)
+				}
+				cmd.Printf("Success!! deployed %q to operator %q\n", params.Name, deploy.claim.Name)
 			}
 
-			if p.operator.create {
-				cmd.Println("Success! - initialized environment directory")
+			if params.Deploy == "" {
+				cmd.Printf("\n\nTo run a local server using this configuration, enter:\n")
+				cmd.Printf("> nsc generate config --mem-resolver --config-file <path/server.conf>\n")
+				cmd.Printf("start a nats-server using the generated config:\n")
+				cmd.Printf("> nats-server -c <path/server.conf>\n\n")
+
+				cmd.Printf("Or deploy your account to a managed service enter:\n")
+				cmd.Printf("> nsc deploy --url https://jwt.ngs.local:6060/jwt/v1/operator\n\n")
 			}
+
+			cmd.Printf("To listen for messages enter:\n")
+			cmd.Printf("> nsc tools sub \">\"\n")
+			cmd.Printf("To publish your first messages enter:\n")
+			cmd.Printf("> nsc tools pub hello \"Hello World\"\n\n")
 
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVarP(&p.environmentName, "name", "n", "test", "name for the configuration environment")
-
-	cmd.Flags().StringVarP(&p.operator.name, "operator-name", "", "", "operator name (default '<name>_operator')")
-	cmd.Flags().StringVarP(&p.operator.keyPath, "operator-key", "", "", "operator keypath (default generated)")
-	cmd.Flags().BoolVarP(&p.operator.create, "create-operator", "", true, "create an operator")
-
-	cmd.Flags().StringVarP(&p.account.name, "account-name", "", "", "name for the account (default '<name>_account')")
-	cmd.Flags().StringVarP(&p.account.keyPath, "account-key", "", "", "account keypath (default generated)")
-	cmd.Flags().BoolVarP(&p.account.create, "create-account", "", true, "create an account")
-
-	cmd.Flags().StringVarP(&p.user.name, "user-name", "", "", "name for the user (default '<name>_user')")
-	cmd.Flags().StringVarP(&p.user.keyPath, "user-key", "", "", "user keypath (default generated)")
-	cmd.Flags().BoolVarP(&p.user.create, "create-user", "", true, "create an user")
-
-	_ = cmd.Flags().MarkHidden("create-account")
-	_ = cmd.Flags().MarkHidden("create-operator")
-	_ = cmd.Flags().MarkHidden("create-user")
-
+	cmd.Flags().StringVarP(&params.Name, "name", "n", "Test", "name used for the operator, account and user")
+	cmd.Flags().StringVarP(&params.Deploy, "url", "u", "", "managed operator deploy url")
 	return cmd
 }
 
 func init() {
-	GetRootCmd().AddCommand(CreateInitCmd())
+	GetRootCmd().AddCommand(createInitCmd())
 }
 
-type InitParams struct {
-	storeRoot       string
-	environmentName string
-	operator        Entity
-	account         Entity
-	user            Entity
+type EasyCmdParams struct {
+	Name      string
+	Operator  keys
+	Account   keys
+	User      keys
+	Deploy    string
+	DeployURL string
 }
 
-func (p *InitParams) Containers() []*Entity {
-	return []*Entity{&p.operator, &p.account, &p.user}
+type keys struct {
+	KP        nkeys.KeyPair
+	PubKey    string
+	KeyPath   string
+	CredsPath string
 }
 
-func (p *InitParams) SetDefaults() error {
-	p.operator.kind = nkeys.PrefixByteOperator
-	p.account.kind = nkeys.PrefixByteAccount
-	p.user.kind = nkeys.PrefixByteUser
-
-	var err error
-	p.storeRoot, err = filepath.Abs(GetConfig().StoreRoot)
-	if err != nil {
-		return fmt.Errorf("error calculating the absolute filepath for %q: %v", p.storeRoot, err)
-	}
-
-	// if defaults are set we are not prompting
-	if p.environmentName == "" {
-		p.environmentName = "test"
-	}
-	if !InteractiveFlag {
-		p.SetDefaultNames()
-	}
+func (p *EasyCmdParams) SetDefaults(ctx ActionCtx) error {
+	return nil
+}
+func (p *EasyCmdParams) PreInteractive(ctx ActionCtx) error {
+	return nil
+}
+func (p *EasyCmdParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitParams) SetDefaultNames() {
-	// set the operator name
-	if p.operator.name == "" {
-		p.operator.name = fmt.Sprintf("%s_operator", p.environmentName)
-	}
-
-	if p.account.name == "" {
-		p.account.name = fmt.Sprintf("%s_account", p.environmentName)
-	}
-
-	if p.user.name == "" {
-		p.user.name = fmt.Sprintf("%s_user", p.environmentName)
-	}
-}
-
-func (p *InitParams) Interactive(cmd *cobra.Command) error {
-	var err error
-	if !InteractiveFlag {
-		return nil
-	}
-	m := cli.Wrap(70, "The nsc utility will walk you through creating a JWT-based NATS project.",
-		"NATS JWT projects are account isolated and use NKeys to authenticate to the server.",
-		"Clients authenticate to the server by signing a nonce and providing an `user configuration`",
-		"in the form of a JWT. For more information please refer to the NATS documentation.\n")
-	cmd.Println(m)
-
-	m = cli.Wrap(70, "This init session only covers the most common options, and tries to ",
-		"guess sensible defaults. The process will guide you through the process of creating an operator,",
-		"account, and user.\n")
-	cmd.Println(m)
-
-	m = cli.Wrap(70, "Entities, such as operators, accounts, users, clusters, and",
-		"servers are individually identified by NKeys (Ed25519 public key signature). You can choose",
-		"to specify an key or have nsc generate them for you.\n")
-	cmd.Println(m)
-
-	p.environmentName, err = cli.Prompt("environment name", p.environmentName, true, cli.LengthValidator(1))
-	if err != nil {
-		return err
-	}
-
-	p.SetDefaultNames()
-
-	if err := p.operator.Edit(); err != nil {
-		return err
-	}
-
-	if err := p.account.Edit(); err != nil {
-		return err
-	}
-
-	if err := p.user.Edit(); err != nil {
-		return err
-	}
-
-	for {
-		p.PrintSummary(cmd)
-		choices := []string{"Yes", "Cancel", "Edit operator", "Edit account", "Edit user"}
-		c, err := cli.PromptChoices("is this OK", "Yes", choices)
-		if err != nil {
-			return err
-		}
-		switch c {
-		case 0:
-			return nil
-		case 1:
-			return fmt.Errorf("canceled")
-		case 2:
-			p.operator.Edit()
-		case 3:
-			p.account.Edit()
-		case 4:
-			p.user.Edit()
-		}
-	}
-}
-
-func (p *InitParams) PrintSummary(cmd *cobra.Command) {
-	table := tablewriter.CreateTable()
-	table.UTF8Box()
-	table.AddTitle("Project Options")
-	table.AddHeaders("Entity", "Name", "NKey")
-	if p.operator.create {
-		table.AddRow("Operator", p.operator.name, p.operator.KeySource())
-	}
-	if p.account.create {
-		table.AddRow("Account", p.account.name, p.account.KeySource())
-	}
-	if p.user.create {
-		table.AddRow("User", p.user.name, p.user.KeySource())
-	}
-	cmd.Println(table.Render())
-}
-
-func (p *InitParams) Validate() error {
-	for _, e := range p.Containers() {
-		if err := e.Valid(); err != nil {
-			return err
-		}
-	}
+func (p *EasyCmdParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitParams) Run() error {
-	var operator *store.NamedKey
-	if p.operator.create {
-		operator = &store.NamedKey{Name: p.operator.name, KP: p.operator.kp}
-	} else {
-		operator = &store.NamedKey{Name: p.environmentName}
-	}
+func (p *EasyCmdParams) Validate(ctx ActionCtx) error {
+	return nil
+}
 
-	s, err := store.CreateStore(p.environmentName, p.storeRoot, operator)
+func (p *EasyCmdParams) createStore() error {
+	root, err := filepath.Abs(GetConfig().StoreRoot)
 	if err != nil {
 		return err
 	}
-
-	GetConfig().Operator = operator.Name
+	p.Operator.KP, err = nkeys.CreateOperator()
+	if err != nil {
+		return err
+	}
+	nk := &store.NamedKey{Name: p.Name, KP: p.Operator.KP}
+	_, err = store.CreateStore(p.Name, root, nk)
+	if err != nil {
+		return err
+	}
+	GetConfig().Operator = p.Name
 	if err := GetConfig().Save(); err != nil {
 		return err
 	}
+	return nil
+}
 
-	containers := p.Containers()
-	for _, e := range containers {
-		if !e.create {
-			continue
-		}
-		var parent string
-		switch e.kind {
-		case nkeys.PrefixByteUser:
-			parent = p.account.name
-		}
-
-		if err := e.StoreKeys(parent); err != nil {
-			return err
-		}
+func (p *EasyCmdParams) setOperatorDefaults(ctx ActionCtx) error {
+	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return err
+	}
+	oc.OperatorServiceURLs.Add("nats://localhost:4222")
+	token, err := oc.Encode(p.Operator.KP)
+	if err != nil {
+		return err
+	}
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(token)); err != nil {
+		return err
 	}
 
-	for i, c := range containers {
-		// operator container is created by the store - some flags may prevent creation
-		if !c.create || i == 0 {
-			continue
-		}
-		c.GenerateClaim(containers[i-1].kp, nil)
-		// FIXME: super hack
-		if c.kind == nkeys.PrefixByteUser {
-			ctx, err := s.GetContext()
-			if err != nil {
-				return err
-			}
-			ks := ctx.KeyStore
-			d, err := GenerateConfig(s, ctx.Account.Name, c.name, c.kp)
-			if err != nil {
-				fmt.Printf("unable to save creds: %v", err)
-			} else {
-				_, err = ks.MaybeStoreUserCreds(ctx.Account.Name, c.name, d)
-				if err != nil {
-					// cred storage doesn't fail it
-					fmt.Println(err.Error())
-				}
-			}
-		}
+	p.Operator.KeyPath, err = ctx.StoreCtx().KeyStore.Store(p.Operator.KP)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *EasyCmdParams) createAccount(ctx ActionCtx) error {
+	var err error
+	p.Account.KP, err = nkeys.CreateAccount()
+	if err != nil {
+		return err
+	}
+	p.Account.PubKey, err = p.Account.KP.PublicKey()
+	ac := jwt.NewAccountClaims(p.Account.PubKey)
+	ac.Name = p.Name
+	at, err := ac.Encode(p.Operator.KP)
+	if err != nil {
+		return err
+	}
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(at)); err != nil {
+		return err
+	}
+	p.Account.KeyPath, err = ctx.StoreCtx().KeyStore.Store(p.Account.KP)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *EasyCmdParams) createUser(ctx ActionCtx) error {
+	var err error
+	p.User.KP, err = nkeys.CreateUser()
+	if err != nil {
+		return err
+	}
+	p.User.PubKey, err = p.User.KP.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	uc := jwt.NewUserClaims(p.User.PubKey)
+	uc.Name = p.Name
+	at, err := uc.Encode(p.Account.KP)
+	if err != nil {
+		return err
+	}
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(at)); err != nil {
+		return err
+	}
+	p.User.KeyPath, err = ctx.StoreCtx().KeyStore.Store(p.User.KP)
+	if err != nil {
+		return err
+	}
+	config, err := GenerateConfig(ctx.StoreCtx().Store, p.Name, p.Name, p.User.KP)
+	p.User.CredsPath, err = ctx.StoreCtx().KeyStore.MaybeStoreUserCreds(p.Name, p.Name, config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *EasyCmdParams) Run(ctx ActionCtx) error {
+	if err := p.setOperatorDefaults(ctx); err != nil {
+		return err
+	}
+	if err := p.createAccount(ctx); err != nil {
+		return err
+	}
+	if err := p.createUser(ctx); err != nil {
+		return err
 	}
 
 	return nil
