@@ -370,6 +370,13 @@ func (u *UserDescriber) Describe() string {
 		AddListValues(table, "Sub Allow", u.Sub.Allow)
 		AddListValues(table, "Sub Deny", u.Sub.Deny)
 	}
+	table.AddSeparator()
+	if u.Resp == nil {
+		table.AddRow("Response Permissions", "Not Set")
+	} else {
+		table.AddRow("Max Responses", u.Resp.MaxMsgs)
+		table.AddRow("Response Permission TTL", u.Resp.Expires.String())
+	}
 
 	table.AddSeparator()
 	AddLimits(table, u.Limits)

@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -73,13 +74,17 @@ func Test_AddUserInteractive(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", 0}
+	inputs := []interface{}{"U", true, false, "2018-01-01", "2050-01-01", 0}
 
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)
 	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
 	require.NoError(t, err)
 	validateAddUserClaims(t, ts)
+
+	up, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Nil(t, up.Resp)
 }
 
 func validateAddUserClaims(t *testing.T, ts *TestStore) {
@@ -173,4 +178,26 @@ func Test_AddUser_WithSK(t *testing.T) {
 	require.Equal(t, u.Issuer, pk)
 
 	require.True(t, ac.DidSign(u))
+}
+
+func Test_AddUser_InteractiveResp(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err, "account creation")
+
+	inputs := []interface{}{"U", true, true, "100", "1000ms", "2018-01-01", "2050-01-01", 0}
+
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+	validateAddUserClaims(t, ts)
+
+	up, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, up.Resp)
+	require.Equal(t, 100, up.Resp.MaxMsgs)
+	require.Equal(t, time.Millisecond*1000, up.Resp.Expires)
 }

@@ -16,10 +16,11 @@
 package cmd
 
 import (
-	"github.com/nats-io/jwt"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/jwt"
 
 	"github.com/stretchr/testify/require"
 )
