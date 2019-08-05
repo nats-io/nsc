@@ -375,7 +375,7 @@ func (u *UserDescriber) Describe() string {
 		table.AddRow("Response Permissions", "Not Set")
 	} else {
 		table.AddRow("Max Responses", u.Resp.MaxMsgs)
-		table.AddRow("Response TTL", u.Resp.Expires.String())
+		table.AddRow("Response Permission TTL", u.Resp.Expires.String())
 	}
 
 	table.AddSeparator()

@@ -73,7 +73,7 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests for user)")
+	cmd.Flags().StringVarP(&params.respTTL, "response-permission-ttl", "", "", "max response permission ttl for responding to requests (global to all requests for user)")
 	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
@@ -154,7 +154,7 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 			}
 			return nil
 		})
-		p.respTTL, err = cli.Prompt("Response TTL duration", p.respTTL, true, func(v string) error {
+		p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, true, func(v string) error {
 			_, err := time.ParseDuration(v)
 			if err != nil {
 				return err
