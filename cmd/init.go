@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/nats-io/nsc/cli"
-
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -96,11 +95,14 @@ func createInitCmd() *cobra.Command {
 				cmd.Printf("> nats-server -c <path/server.conf>\n\n")
 
 				cmd.Printf("Or deploy your account to a managed service enter:\n")
-				cmd.Printf("> nsc deploy --url https://jwt.ngs.local:6060/jwt/v1/operator\n\n")
+				cmd.Printf("> nsc deploy --url <operator provided url>r\n\n")
 			}
 
+			cmd.Printf("Default operator JWT has a default service URL set to\n")
+			cmd.Printf("nats://localhost:4222\n")
 			cmd.Printf("To listen for messages enter:\n")
 			cmd.Printf("> nsc tools sub \">\"\n")
+			cmd.Printf("Tools connect to the operator's service url (nats://localhost:4222 by default).\n")
 			cmd.Printf("To publish your first messages enter:\n")
 			cmd.Printf("> nsc tools pub hello \"Hello World\"\n\n")
 
