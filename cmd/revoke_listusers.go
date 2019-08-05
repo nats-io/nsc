@@ -17,11 +17,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/nats-io/jwt"
-	"github.com/xlab/tablewriter"
 	"time"
 
+	"github.com/nats-io/jwt"
 	"github.com/spf13/cobra"
+	"github.com/xlab/tablewriter"
 )
 
 func createRevokeListUsersCmd() *cobra.Command {
