@@ -42,6 +42,9 @@ FILENAME_LOOKUP = {
 
 def release_url(platform, tag):
     try:
+        if "linux" in platform:
+            # convert any linux regardless of version reported to "linux"
+            platform = "linux"
         filename = FILENAME_LOOKUP[platform]
     except KeyError:
         print("Unable to locate appropriate filename for", platform)
@@ -90,19 +93,21 @@ def download_with_progress(url):
 
 
 def main():
+    url = release_url(sys.platform, sys.argv[1] if len(sys.argv) > 1 else None)
     bin_dir = nsc_bin_dir()
     exe_fn = os.path.join(bin_dir, "nsc")
+    windows = "windows" in url
+    if windows:
+        exe_fn = os.path.join(bin_dir, "nsc.exe")
 
-    url = release_url(sys.platform, sys.argv[1] if len(sys.argv) > 1 else None)
     compressed = download_with_progress(url)
-
     if url.endswith(".zip"):
         with zipfile.ZipFile(io.BytesIO(compressed), 'r') as z:
             with open(exe_fn, 'wb+') as exe:
-                if "windows" not in url:
-                    exe.write(z.read('nsc'))
-                else:
+                if windows:
                     exe.write(z.read('nsc.exe'))
+                else:
+                    exe.write(z.read('nsc'))
     else:
         # Note: gzip.decompress is not available in python2.
         content = zlib.decompress(compressed, 15 + 32)
@@ -112,14 +117,19 @@ def main():
 
     print("NSC: " + exe_fn)
     print("Now manually add %s to your $PATH" % bin_dir)
-    print("Bash Example:")
-    print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bash_profile" % bin_dir)
-    print("  source $HOME/.bash_profile")
-    print()
-    print("Zsh Example:")
-    print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.zshrc" % bin_dir)
-    print("  source $HOME/.zshrc")
-    print()
+    if windows:
+        print("Windows Cmd Prompt Example:")
+        print("  setx path %%path;\"%s\"" % bin_dir)
+        print()
+    else:
+        print("Bash Example:")
+        print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bash_profile" % bin_dir)
+        print("  source $HOME/.bash_profile")
+        print()
+        print("Zsh Example:")
+        print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.zshrc" % bin_dir)
+        print("  source $HOME/.zshrc")
+        print()
 
 def mkdir(d):
     if not os.path.exists(d):
