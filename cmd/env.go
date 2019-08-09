@@ -72,36 +72,9 @@ func (p *SetContextParams) Run(cmd *cobra.Command) error {
 		return nil
 	}
 	current := GetConfig()
-
-	root := current.StoreRoot
-	if p.StoreRoot != "" {
-		root = p.StoreRoot
-	}
-
-	c, err := NewContextConfig(root)
-	if err != nil {
+	if err := current.ContextConfig.Update(p.StoreRoot, p.Operator, p.Account); err != nil {
 		return err
 	}
-
-	if p.Operator != "" {
-		if err := c.SetOperator(p.Operator); err != nil {
-			return err
-		}
-	} else {
-		_ = c.SetOperator(current.Operator)
-	}
-
-	if p.Account != "" {
-		if err := c.SetAccount(p.Account); err != nil {
-			return err
-		}
-	} else {
-		_ = c.SetAccount(current.Account)
-	}
-
-	c.SetDefaults()
-	current.ContextConfig = *c
-
 	return current.Save()
 }
 

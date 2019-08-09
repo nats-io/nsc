@@ -56,6 +56,7 @@ type TestStore struct {
 func ResetForTests() {
 	config = ToolConfig{}
 	ResetSharedFlags()
+	wellKnownOperators = nil
 }
 
 func ResetSharedFlags() {
@@ -72,14 +73,17 @@ func NewEmptyStore(t *testing.T) *TestStore {
 
 	ts.Dir = MakeTempDir(t)
 	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
-	initToolHome(t.Name())
+	_, err := initToolHome(t.Name())
+	require.NoError(t, err)
+
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
-	ForceStoreRoot(t, ts.GetStoresRoot())
+	err = ForceStoreRoot(t, ts.GetStoresRoot())
+	require.NoError(t, err)
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
-	err := os.Mkdir(nkeysDir, 0700)
+	err = os.Mkdir(nkeysDir, 0700)
 	require.NoError(t, err, "error creating %q", nkeysDir)
 	require.NoError(t, err)
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
@@ -98,11 +102,14 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	ts.OperatorKey = operator
 	ts.Dir = MakeTempDir(t)
 	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
-	initToolHome(t.Name())
+	_, err := initToolHome(t.Name())
+	require.NoError(t, err)
 	// debug the test that created the store
 	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
-	ForceStoreRoot(t, ts.GetStoresRoot())
+	err = ForceStoreRoot(t, ts.GetStoresRoot())
+	require.NoError(t, err)
+
 	ForceOperator(t, operatorName)
 	ts.AddOperatorWithKey(t, operatorName, operator)
 
@@ -487,9 +494,8 @@ func (ts *TestStore) RunServer(t *testing.T, opts *server.Options) *server.Ports
 	}
 	var err error
 	ts.Server, err = server.NewServer(opts)
-	if err != nil || ts.Server == nil {
-		t.Fatal(fmt.Sprintf("No NATS Server object returned: %v", err))
-	}
+	require.NoError(t, err)
+	require.NotNil(t, ts.Server)
 
 	if !opts.NoLog {
 		ts.Server.ConfigureLogger()
@@ -499,9 +505,7 @@ func (ts *TestStore) RunServer(t *testing.T, opts *server.Options) *server.Ports
 	go ts.Server.Start()
 
 	ts.ports = ts.Server.PortsInfo(10 * time.Second)
-	if ts.ports == nil {
-		t.Fatal("Unable to start NATS Server in Go Routine")
-	}
+	require.NotNil(t, ts.ports)
 
 	return ts.ports
 }
@@ -528,9 +532,7 @@ func (ts *TestStore) CreateClient(t *testing.T, option ...nats.Option) *nats.Con
 		t.Fatal("attempt to create a nats connection without a server running")
 	}
 	nc, err := nats.Connect(strings.Join(ts.ports.Nats, ","), option...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ts.Clients = append(ts.Clients, nc)
 	return nc
 }
@@ -551,6 +553,82 @@ func (ts *TestStore) WaitForClient(t *testing.T, name string, subs uint32, maxWa
 		if time.Now().Unix() >= end {
 			t.Fatalf("timed out looking for client %q with %d subs", name, subs)
 		}
+	}
+}
+
+func (ts *TestStore) VerifyOperator(t *testing.T, name string, managed bool) {
+	s, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), name))
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	oc, err := s.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotNil(t, oc)
+	require.Equal(t, name, oc.Name)
+	require.Equal(t, managed, s.IsManaged())
+
+	kp, err := ts.KeyStore.GetKeyPair(oc.Subject)
+	require.NoError(t, err)
+	if managed {
+		require.Nil(t, kp)
+	} else {
+		require.NotNil(t, kp)
+	}
+}
+
+func (ts *TestStore) VerifyAccount(t *testing.T, operator string, account string, verifyKeys bool) {
+	s, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), operator))
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	ac, err := s.ReadAccountClaim(account)
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.Equal(t, account, ac.Name)
+
+	if verifyKeys {
+		old := ts.KeyStore.Env
+		defer func() {
+			ts.KeyStore.Env = old
+		}()
+		ts.KeyStore.Env = operator
+
+		kp, err := ts.KeyStore.GetKeyPair(ac.Subject)
+		require.NoError(t, err)
+		require.NotNil(t, kp)
+	}
+}
+
+func (ts *TestStore) VerifyUser(t *testing.T, operator string, account string, user string, verifyKeys bool) {
+	s, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), operator))
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	uc, err := s.ReadUserClaim(account, user)
+	require.NoError(t, err)
+	require.NotNil(t, uc)
+	require.Equal(t, user, uc.Name)
+
+	if verifyKeys {
+		old := ts.KeyStore.Env
+		defer func() {
+			ts.KeyStore.Env = old
+		}()
+		ts.KeyStore.Env = operator
+
+		kp, err := ts.KeyStore.GetKeyPair(uc.Subject)
+		require.NoError(t, err)
+		require.NotNil(t, kp)
+		sk, err := kp.Seed()
+		require.NoError(t, err)
+
+		fp := ts.KeyStore.CalcUserCredsPath(account, user)
+		_, err = os.Stat(fp)
+		require.NoError(t, err)
+
+		creds, err := Read(fp)
+		require.NoError(t, err)
+		require.Contains(t, string(creds), string(sk))
 	}
 }
 
