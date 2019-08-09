@@ -240,15 +240,18 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 		return err
 	}
 
-	d, err := PushAccount(u.String(), []byte(raw))
+	status, d, err := PushAccount(u.String(), []byte(raw))
 	if err != nil {
 		return fmt.Errorf("error pushing to %q: %v", u.String(), err)
 	}
 
+	// output sever message to the user
 	if d != nil {
 		d = append(d, '\n')
 		Write("--", d)
+	}
 
+	if IsAccountAvailable(status) {
 		// ask for the JWT
 		r, err := http.Get(u.String())
 		if err != nil {
@@ -292,5 +295,10 @@ func (p *DeployCmdParams) Run(ctx ActionCtx) error {
 		ad := NewAccountDescriber(*aac)
 		Write("--", []byte(ad.Describe()))
 	}
+
+	if IsAccountPending(status) {
+		ctx.CurrentCmd().Printf("account was accepted - server message above contains additional instructions\n")
+	}
+
 	return nil
 }

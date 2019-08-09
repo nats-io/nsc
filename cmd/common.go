@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
@@ -315,6 +317,9 @@ func LoadFromURL(url string) ([]byte, error) {
 		return nil, fmt.Errorf("error loading %q: %v", url, err)
 	}
 	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error reading response from %q: %v", url, r.Status)
+	}
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r.Body)
 	if err != nil {
@@ -378,19 +383,64 @@ func Expand(s string) (string, error) {
 	return filepath.Abs(s)
 }
 
-func PushAccount(u string, accountjwt []byte) ([]byte, error) {
+func PushAccount(u string, accountjwt []byte) (int, []byte, error) {
 	resp, err := http.Post(u, "application/text", bytes.NewReader(accountjwt))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		m := ""
-		if data != nil {
-			m = string(data)
+	return resp.StatusCode, data, err
+}
+
+func IsAccountAvailable(status int) bool {
+	return status == http.StatusOK
+}
+
+func IsAccountPending(status int) bool {
+	return status > http.StatusOK && status < 300
+}
+
+// Validate an operator name
+func OperatorNameValidator(v string) error {
+	operators := GetConfig().ListOperators()
+	for _, o := range operators {
+		if o == v {
+			r := GetConfig().StoreRoot
+			return fmt.Errorf("an operator named %q already exists in %q - specify a different directory with --dir", v, r)
 		}
-		return nil, fmt.Errorf("%s:\n%s", resp.Status, m)
 	}
-	return data, err
+	return nil
+}
+
+func AccountJwtURLFromString(asu string, accountSubject string) (string, error) {
+	u, err := url.Parse(asu)
+	if err != nil {
+		return "", err
+	}
+	u.Path = path.Join(u.Path, "accounts", accountSubject)
+	return u.String(), nil
+}
+
+func AccountJwtURL(oc *jwt.OperatorClaims, ac *jwt.AccountClaims) (string, error) {
+	if oc.AccountServerURL == "" {
+		return "", fmt.Errorf("error: operator %q doesn't set an account server url", oc.Name)
+	}
+	return AccountJwtURLFromString(oc.AccountServerURL, ac.Subject)
+}
+
+func OperatorJwtURLFromString(asu string) (string, error) {
+	u, err := url.Parse(asu)
+	if err != nil {
+		return "", err
+	}
+	u.Path = path.Join(u.Path, "operator")
+	return u.String(), nil
+}
+
+func OperatorJwtURL(oc *jwt.OperatorClaims) (string, error) {
+	if oc.AccountServerURL == "" {
+		return "", fmt.Errorf("error: operator %q doesn't set an account server url", oc.Name)
+	}
+	return OperatorJwtURLFromString(oc.AccountServerURL)
 }

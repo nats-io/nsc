@@ -448,7 +448,7 @@ func TestPushAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	u, err := url.Parse(hts.URL)
-	sraw, err := PushAccount(u.String(), []byte(araw))
+	_, sraw, err := PushAccount(u.String(), []byte(araw))
 	require.NoError(t, err)
 	require.NotNil(t, sraw)
 

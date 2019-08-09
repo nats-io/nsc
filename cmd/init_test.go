@@ -17,116 +17,23 @@ package cmd
 
 import (
 	"net/url"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/cli"
+
 	"github.com/stretchr/testify/require"
 )
 
-func Test_InitInteractive(t *testing.T) {
-	ts := NewTestStore(t, "X")
-	defer ts.Done(t)
-
-	_, _, err := ExecuteInteractiveCmd(createInitCmd(), []interface{}{"O", false})
-	require.NoError(t, err)
-	// set the operator and the keystore env
-	require.NoError(t, GetConfig().SetOperator("O"))
-	ts.KeyStore.Env = "O"
-
-	s, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "O"))
-	require.NoError(t, err)
-	oc, err := s.ReadOperatorClaim()
-	require.NoError(t, err)
-	require.NotNil(t, oc)
-	require.Equal(t, "O", oc.Name)
-	require.NotEmpty(t, oc.OperatorServiceURLs)
-
-	kp, err := ts.KeyStore.GetKeyPair(oc.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-
-	ac, err := s.ReadAccountClaim("O")
-	require.NoError(t, err)
-	require.NotNil(t, ac)
-	require.Equal(t, "O", ac.Name)
-
-	kp, err = ts.KeyStore.GetKeyPair(ac.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-
-	uc, err := s.ReadUserClaim("O", "O")
-	require.NoError(t, err)
-	require.NotNil(t, uc)
-	require.Equal(t, "O", uc.Name)
-
-	kp, err = ts.KeyStore.GetKeyPair(uc.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-	sk, err := kp.Seed()
-	require.NoError(t, err)
-
-	fp := ts.KeyStore.GetUserCredsPath("O", "O")
-	_, err = os.Stat(fp)
-	require.NoError(t, err)
-
-	creds, err := Read(fp)
-	require.NoError(t, err)
-
-	require.Contains(t, string(creds), string(sk))
-}
-
-func Test_Init(t *testing.T) {
+func Test_InitLocal(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(createInitCmd(), "--name", "O")
 	require.NoError(t, err)
-	// set the operator and the keystore env
-	require.NoError(t, GetConfig().SetOperator("O"))
-	ts.KeyStore.Env = "O"
 
-	s, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "O"))
-	require.NoError(t, err)
-	oc, err := s.ReadOperatorClaim()
-	require.NoError(t, err)
-	require.NotNil(t, oc)
-	require.Equal(t, "O", oc.Name)
-	require.NotEmpty(t, oc.OperatorServiceURLs)
-
-	kp, err := ts.KeyStore.GetKeyPair(oc.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-
-	ac, err := s.ReadAccountClaim("O")
-	require.NoError(t, err)
-	require.NotNil(t, ac)
-	require.Equal(t, "O", ac.Name)
-
-	kp, err = ts.KeyStore.GetKeyPair(ac.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-
-	uc, err := s.ReadUserClaim("O", "O")
-	require.NoError(t, err)
-	require.NotNil(t, uc)
-	require.Equal(t, "O", uc.Name)
-
-	kp, err = ts.KeyStore.GetKeyPair(uc.Subject)
-	require.NoError(t, err)
-	require.NotNil(t, kp)
-	sk, err := kp.Seed()
-	require.NoError(t, err)
-
-	fp := ts.KeyStore.GetUserCredsPath("O", "O")
-	_, err = os.Stat(fp)
-	require.NoError(t, err)
-
-	creds, err := Read(fp)
-	require.NoError(t, err)
-
-	require.Contains(t, string(creds), string(sk))
+	ts.VerifyOperator(t, "O", false)
+	ts.VerifyAccount(t, "O", "O", true)
+	ts.VerifyUser(t, "O", "O", "O", true)
 }
 
 func Test_InitExists(t *testing.T) {
@@ -141,7 +48,7 @@ func Test_InitDeploy(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	as, storage := RunTestAccountServer(t)
+	as, _ := RunTestAccountServer(t)
 	defer as.Close()
 
 	ourl, err := url.Parse(as.URL)
@@ -151,10 +58,142 @@ func Test_InitDeploy(t *testing.T) {
 	_, _, err = ExecuteCmd(createInitCmd(), "--name", "O", "--url", ourl.String())
 	require.NoError(t, err)
 
-	sdir := filepath.Join(ts.GetStoresRoot(), "O")
-	s, err := store.LoadStore(sdir)
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "O", true)
+	ts.VerifyUser(t, "T", "O", "O", true)
+}
+
+func Test_InitWellKnown(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	// run a jwt account server
+	as, _ := RunTestAccountServer(t)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	ourl.Path = "/jwt/v1/operator"
+
+	var twko KnownOperator
+	twko.AccountServerURL = ourl.String()
+	twko.Name = "T"
+
+	// make it be the first
+	var wkops KnownOperators
+	wkops = append(wkops, twko)
+
+	ops, _ := GetWellKnownOperators()
+	wkops = append(wkops, ops...)
+	wellKnownOperators = wkops
+
+	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
 	require.NoError(t, err)
-	ac, err := s.ReadAccountClaim("O")
+
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "A", true)
+	ts.VerifyUser(t, "T", "A", "A", true)
+}
+
+func Test_InitWellKnown2(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	// run a jwt account server
+	as, _ := RunTestAccountServer(t)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	ourl.Path = "/jwt/v1/operator"
+
+	var twko KnownOperator
+	twko.AccountServerURL = ourl.String()
+	twko.Name = "T"
+
+	// make it be the first
+	var wkops KnownOperators
+	wkops = append(wkops, twko)
+
+	ops, _ := GetWellKnownOperators()
+	wkops = append(wkops, ops...)
+	wellKnownOperators = wkops
+
+	// get the managed operator on the first
+	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
 	require.NoError(t, err)
-	require.NotNil(t, storage[ac.Subject])
+
+	// now add another account
+	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "B")
+	require.NoError(t, err)
+
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "B", true)
+	ts.VerifyUser(t, "T", "B", "B", true)
+}
+
+func Test_InitWellKnownInteractive(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	// run a jwt account server
+	as, _ := RunTestAccountServer(t)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	ourl.Path = "/jwt/v1/operator"
+
+	var twko KnownOperator
+	twko.AccountServerURL = ourl.String()
+	twko.Name = "T"
+
+	// make it be the first
+	var wkops KnownOperators
+	wkops = append(wkops, twko)
+
+	ops, _ := GetWellKnownOperators()
+	wkops = append(wkops, ops...)
+	wellKnownOperators = wkops
+
+	_, _, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 0, "A"})
+	require.NoError(t, err)
+
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "A", true)
+	ts.VerifyUser(t, "T", "A", "A", true)
+}
+
+func Test_InitLocalInteractive(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	cli.LogFn = t.Log
+	_, _, err := ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 1, "O"})
+	require.NoError(t, err)
+
+	ts.VerifyOperator(t, "O", false)
+	ts.VerifyAccount(t, "O", "O", true)
+	ts.VerifyUser(t, "O", "O", "O", true)
+}
+
+func Test_InitCustomInteractive(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	// run a jwt account server
+	as, _ := RunTestAccountServer(t)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
+	ourl.Path = "/jwt/v1/operator"
+
+	_, _, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 2, ourl.String(), "A"})
+	require.NoError(t, err)
+
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "A", true)
+	ts.VerifyUser(t, "T", "A", "A", true)
 }

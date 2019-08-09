@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/nats-io/jwt"
@@ -227,15 +226,6 @@ func (p *PushCmdParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *PushCmdParams) pushURL(ac *jwt.AccountClaims) (string, error) {
-	u, err := url.Parse(p.ASU)
-	if err != nil {
-		return "", err
-	}
-	u.Path = path.Join(u.Path, "accounts", ac.Subject)
-	return u.String(), nil
-}
-
 func (p *PushCmdParams) getSelectedAccounts() ([]string, error) {
 	if p.allAccounts {
 		a, err := GetConfig().ListAccounts()
@@ -277,12 +267,12 @@ func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	u, err := p.pushURL(c)
+	u, err := AccountJwtURLFromString(p.ASU, c.Subject)
 	if err != nil {
 		return err
 	}
 
 	// FIXME the push could return useful information that should be aggregated.
-	_, err = PushAccount(u, raw)
+	_, _, err = PushAccount(u, raw)
 	return err
 }

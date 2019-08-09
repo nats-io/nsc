@@ -16,10 +16,10 @@
 package cmd
 
 import (
-	"github.com/nats-io/nsc/cmd/store"
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 

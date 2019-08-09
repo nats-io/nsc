@@ -15,7 +15,10 @@
 
 package cli
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type TestPrompts struct {
 	count  int
@@ -61,8 +64,9 @@ func (t *TestPrompts) PromptSecret(m string) (string, error) {
 }
 
 func (t *TestPrompts) PromptChoices(m string, value string, choices []string) (int, error) {
-	t.logInputs("choices", m, t.inputs[t.count])
+	t.logInputs("choices", m, fmt.Sprintf("[%s]", strings.Join(choices, ", ")))
 	val := t.inputs[t.count].(int)
+	t.logInputs("choices", "   selection", fmt.Sprintf("%d (%s)", val, choices[val]))
 	t.count = t.count + 1
 	return val, nil
 }

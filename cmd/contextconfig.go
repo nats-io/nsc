@@ -32,16 +32,42 @@ type ContextConfig struct {
 }
 
 func NewContextConfig(storeRoot string) (*ContextConfig, error) {
-	var err error
 	ctx := ContextConfig{}
-	if storeRoot != "" {
-		ctx.StoreRoot, err = filepath.Abs(storeRoot)
-		if err != nil {
-			return nil, err
-		}
-		ctx.SetDefaults()
+	if err := ctx.setStoreRoot(storeRoot); err != nil {
+		return nil, err
 	}
+
 	return &ctx, nil
+}
+
+func (c *ContextConfig) setStoreRoot(storeRoot string) error {
+	var err error
+	if storeRoot != "" {
+		c.StoreRoot, err = filepath.Abs(storeRoot)
+		if err != nil {
+			return err
+		}
+		c.SetDefaults()
+	}
+	return nil
+}
+
+func (c *ContextConfig) Update(root string, operator string, account string) error {
+	if err := c.setStoreRoot(root); err != nil {
+		return err
+	}
+	if operator != "" {
+		if err := c.SetOperator(operator); err != nil {
+			return err
+		}
+	}
+	if account != "" {
+		if err := c.SetAccount(account); err != nil {
+			return err
+		}
+	}
+	c.SetDefaults()
+	return nil
 }
 
 // deduce as much context as possible
