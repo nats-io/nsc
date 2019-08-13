@@ -18,14 +18,19 @@
 package store
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -43,6 +48,93 @@ const Servers = "servers"
 var standardDirs = []string{Accounts}
 
 var ErrNotExist = errors.New("resource does not exist")
+
+func OK(status int) bool {
+	return status == http.StatusOK
+}
+
+func Pending(status int) bool {
+	return status > 200 && status < 300
+}
+
+type Status struct {
+	HttpStatus int
+	Data       []byte
+	Err        error
+}
+
+func (s *Status) OK() bool {
+	return s.HttpStatus == http.StatusOK
+}
+
+type RemoteStoreStatus struct {
+	Push Status
+	Sync Status
+	Err  error
+}
+
+func (r *RemoteStoreStatus) HasError() bool {
+	return r.Err != nil || r.Sync.Err != nil || r.Push.Err != nil
+}
+
+func (r *RemoteStoreStatus) GetError() error {
+	if r.Err != nil {
+		return r.Err
+	}
+	if r.Sync.Err != nil {
+		return r.Sync.Err
+	}
+	if r.Push.Err != nil {
+		return r.Push.Err
+	}
+	return nil
+}
+
+func (r *RemoteStoreStatus) GetPushMessage() []byte {
+	return r.Push.Data
+}
+
+func (r *RemoteStoreStatus) OK() bool {
+	return r.GetError() == nil && r.Sync.OK() && r.Push.OK()
+}
+
+func (r *RemoteStoreStatus) Error() string {
+	if r.Err != nil {
+		return r.Err.Error()
+	}
+	if r.Push.Err != nil {
+		return r.Push.Err.Error()
+	}
+	if r.Sync.Err != nil {
+		return r.Sync.Err.Error()
+	}
+
+	if !r.Push.OK() {
+		if r.Push.HttpStatus > 200 && r.Push.HttpStatus < 300 {
+			m := "account push succeeded, but is not yet available - enter 'nsc sync' to synchronize with the remote server"
+			if len(r.Push.Data) > 0 {
+				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
+			}
+			return m
+		}
+		if r.Push.HttpStatus < 200 || r.Push.HttpStatus > 299 {
+			m := fmt.Sprintf("account push failed with %s", http.StatusText(r.Push.HttpStatus))
+			if len(r.Push.Data) > 0 {
+				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
+			}
+			return m
+		}
+	}
+	if !r.Sync.OK() {
+		return fmt.Sprintf("account sync failed with %s", http.StatusText(r.Push.HttpStatus))
+	}
+
+	if r.OK() && len(r.Push.Data) > 0 {
+		return fmt.Sprintf("account synchronization succeeded\n%s\n", string(r.Push.Data))
+	}
+
+	return ""
+}
 
 // Store is a directory that contains nsc assets
 type Store struct {
@@ -321,19 +413,116 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 	return entries, nil
 }
 
-func (s *Store) StoreClaim(data []byte) error {
+func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
 	// Decode the jwt to figure out where it goes
 	gc, err := jwt.DecodeGeneric(string(data))
 	if err != nil {
-		return fmt.Errorf("invalid jwt: %v", err)
+		return nil, fmt.Errorf("invalid jwt: %v", err)
 	}
 	if gc.Name == "" {
-		return errors.New("jwt claim doesn't have a name")
+		return nil, errors.New("jwt claim doesn't have a name")
+	}
+	return &gc.Type, nil
+}
+
+func (s *Store) syncRemoteAccount(u string) (int, []byte, error) {
+	c := &http.Client{Timeout: time.Second * 5}
+	r, err := c.Get(u)
+	if err != nil {
+		return 0, nil, fmt.Errorf("error loading %q: %v", u, err)
+	}
+	defer r.Body.Close()
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("error reading response from %q: %v", u, err)
+	}
+	return r.StatusCode, buf.Bytes(), nil
+}
+
+func (s *Store) pushRemoteAccount(u string, data []byte) (int, []byte, error) {
+	resp, err := http.Post(u, "application/jwt", bytes.NewReader(data))
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+	message, err := ioutil.ReadAll(resp.Body)
+	return resp.StatusCode, message, err
+}
+
+func (s *Store) handleManagedAccount(data []byte) *RemoteStoreStatus {
+	var status RemoteStoreStatus
+	ac, err := jwt.DecodeAccountClaims(string(data))
+	if err != nil {
+		status.Err = fmt.Errorf("error decoding account claim")
+		return &status
+	}
+
+	oc, err := s.ReadOperatorClaim()
+	if err != nil {
+		status.Err = fmt.Errorf("unable to push to the operator - failed to read operator claim: %v", err)
+		return &status
+	}
+	if oc.AccountServerURL == "" {
+		status.Err = errors.New("unable to push to the operator - operator jwt doesn't set account server url")
+		return &status
+	}
+
+	u, err := url.Parse(oc.AccountServerURL)
+	if err != nil {
+		status.Err = fmt.Errorf("unable to push to the operator - failed to parse account server url (%q): %v", oc.AccountServerURL, err)
+		return &status
+	}
+	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
+	status.Push.HttpStatus, status.Push.Data, status.Push.Err = s.pushRemoteAccount(u.String(), data)
+	if status.Push.Err != nil {
+		return &status
+	}
+
+	if status.Push.OK() {
+		status.Sync.HttpStatus, status.Sync.Data, err = s.syncRemoteAccount(u.String())
+	}
+	return &status
+}
+
+func (s *Store) StoreClaim(data []byte) error {
+	ct, err := s.ClaimType(data)
+	if err != nil {
+		return err
+	}
+	if *ct == jwt.AccountClaim && s.IsManaged() {
+		rs := s.handleManagedAccount(data)
+		if rs.HasError() {
+			return rs
+		}
+		if rs.OK() {
+			if err := s.StoreRaw(rs.Sync.Data); err != nil {
+				return err
+			}
+			if len(rs.Push.Data) == 0 {
+				// nothing to display to the user
+				return nil
+			}
+		}
+		return rs
+	} else {
+		return s.StoreRaw(data)
+	}
+}
+
+func (s *Store) StoreRaw(data []byte) error {
+	ct, err := s.ClaimType(data)
+	if err != nil {
+		return err
 	}
 	var path string
-	switch gc.Type {
+	switch *ct {
 	case jwt.AccountClaim:
-		path = filepath.Join(Accounts, gc.Name, JwtName(gc.Name))
+		ac, err := jwt.DecodeAccountClaims(string(data))
+		if err != nil {
+			return err
+		}
+		path = filepath.Join(Accounts, ac.Name, JwtName(ac.Name))
 	case jwt.UserClaim:
 		uc, err := jwt.DecodeUserClaims(string(data))
 		if err != nil {
@@ -363,38 +552,15 @@ func (s *Store) StoreClaim(data []byte) error {
 		if account == "" {
 			return fmt.Errorf("account with public key %q is not in the store", issuer)
 		}
-		path = filepath.Join(Accounts, account, Users, JwtName(gc.Name))
-	case jwt.ServerClaim:
-		issuer := gc.Issuer
-		var cluster string
-		infos, err := s.List(Clusters)
+		path = filepath.Join(Accounts, account, Users, JwtName(uc.Name))
+	case jwt.OperatorClaim:
+		oc, err := jwt.DecodeOperatorClaims(string(data))
 		if err != nil {
 			return err
 		}
-		for _, i := range infos {
-			if i.IsDir() {
-				c, err := s.LoadClaim(Clusters, i.Name(), JwtName(i.Name()))
-				if err != nil {
-					return err
-				}
-				if c != nil {
-					if c.Subject == issuer {
-						cluster = i.Name()
-						break
-					}
-				}
-			}
-		}
-		if cluster == "" {
-			return fmt.Errorf("cluster with public key %q is not in the store", issuer)
-		}
-		path = filepath.Join(Clusters, cluster, Servers, JwtName(gc.Name))
-	case jwt.ClusterClaim:
-		path = filepath.Join(Clusters, gc.Name, JwtName(gc.Name))
-	case jwt.OperatorClaim:
-		path = JwtName(gc.Name)
+		path = JwtName(oc.Name)
 	default:
-		return fmt.Errorf("unsuported store claim type: %s", gc.Type)
+		return fmt.Errorf("unsuported store claim type: %s", *ct)
 	}
 
 	return s.Write(data, path)

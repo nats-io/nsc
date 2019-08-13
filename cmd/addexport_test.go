@@ -91,8 +91,11 @@ func validateAddExports(t *testing.T, ts *TestStore) {
 	require.True(t, privbar.TokenReq)
 }
 
-func Test_AddExportOperatorLessStore(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+func Test_AddExportManagedStore(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
@@ -106,11 +109,16 @@ func Test_AddExportOperatorLessStore(t *testing.T) {
 }
 
 func Test_AddExportAccountNameRequired(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
+	t.Log("A", ts.GetAccountPublicKey(t, "A"))
 	ts.AddAccount(t, "B")
+	t.Log("B", ts.GetAccountPublicKey(t, "B"))
 
 	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "bbbb")
 	require.NoError(t, err)

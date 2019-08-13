@@ -20,9 +20,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cli"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +41,7 @@ func CreateAddAccountCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if params.generated && !QuietMode() {
+			if params.generate && !QuietMode() {
 				cmd.Printf("Generated account key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
 			}
 
@@ -61,30 +64,63 @@ func init() {
 }
 
 type AddAccountParams struct {
-	Entity
 	SignerParams
 	TimeParams
+	token    string
+	name     string
+	generate bool
+	keyPath  string
+	akp      nkeys.KeyPair
 }
 
 func (p *AddAccountParams) SetDefaults(ctx ActionCtx) error {
-	p.create = true
-	p.Entity.kind = nkeys.PrefixByteAccount
-	p.editFn = p.editAccount
+	p.generate = p.keyPath == ""
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
 
+func (p *AddAccountParams) resolveAccountNKey(s string) (nkeys.KeyPair, error) {
+	nk, err := store.ResolveKey(s)
+	if err != nil {
+		return nil, err
+	}
+	if nk == nil {
+		return nil, fmt.Errorf("a key is required")
+	}
+	t, err := store.KeyType(nk)
+	if err != nil {
+		return nil, err
+	}
+	if t != nkeys.PrefixByteAccount {
+		return nil, errors.New("specified key is not a valid account nkey")
+	}
+	return nk, nil
+}
+
+func (p *AddAccountParams) validateAccountNKey(s string) error {
+	_, err := p.resolveAccountNKey(s)
+	return err
+}
+
 func (p *AddAccountParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	if err = p.Entity.Edit(); err != nil {
+	p.name, err = cli.Prompt("account name", p.name, true, cli.LengthValidator(1))
+	if err != nil {
 		return err
+	}
+
+	p.generate, err = cli.PromptYN("generate an account nkey")
+	if err != nil {
+		return err
+	}
+	if !p.generate {
+		p.keyPath, err = cli.Prompt("path to an account nkey or nkey", p.keyPath, true, p.validateAccountNKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err = p.TimeParams.Edit(); err != nil {
-		return err
-	}
-
-	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
 
@@ -92,48 +128,120 @@ func (p *AddAccountParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddAccountParams) Load(ctx ActionCtx) error {
+	var err error
+	if p.generate {
+		p.akp, err = nkeys.CreateAccount()
+		if err != nil {
+			return err
+		}
+		if p.keyPath, err = ctx.StoreCtx().KeyStore.Store(p.akp); err != nil {
+			return err
+		}
+	} else {
+		p.akp, err = p.resolveAccountNKey(p.keyPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
+func (p *AddAccountParams) validSigners(ctx ActionCtx) ([]string, error) {
+	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
+	var signers []string
+	signers = append(signers, oc.Subject)
+	signers = append(signers, oc.SigningKeys...)
+	if ctx.StoreCtx().Store.IsManaged() && p.akp != nil {
+		pk, err := p.akp.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+		signers = append(signers, pk)
+	}
+	return signers, nil
+}
+
 func (p *AddAccountParams) PostInteractive(ctx ActionCtx) error {
-	return nil
+	signers, err := p.validSigners(ctx)
+	if err != nil {
+		return err
+	}
+	p.SignerParams.SetPrompt("select the key to sign the account")
+	return p.SignerParams.SelectFromSigners(ctx, signers)
 }
 
 func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 	var err error
 	if p.name == "" {
-		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("account name is required")
+	}
+
+	names, err := GetConfig().ListAccounts()
+	if err != nil {
+		return err
+	}
+	found := false
+	lcn := strings.ToLower(p.name)
+	for _, v := range names {
+		if lcn == strings.ToLower(v) {
+			found = true
+			break
+		}
+	}
+	if found {
+		return fmt.Errorf("the account %q already exists", p.name)
+	}
+
+	if p.akp == nil {
+		return errors.New("path to an account nkey or nkey is required - specify --public-key")
+	}
+
+	kt, err := store.KeyType(p.akp)
+	if err != nil {
+		return err
+	}
+
+	if kt != nkeys.PrefixByteAccount {
+		return errors.New("invalid account key")
 	}
 
 	if err = p.TimeParams.Validate(); err != nil {
 		return err
 	}
 
-	if err := p.Resolve(ctx); err != nil {
+	// the account doesn't exist, so insure self signed works
+	p.SignerParams.ForceManagedAccountKey(ctx, p.akp)
+	if err := p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
 
-	return p.Valid()
+	signers, err := p.validSigners(ctx)
+	if err != nil {
+		return err
+	}
+	ok, err := ValidSigner(p.SignerParams.signerKP, signers)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("invalid account signer")
+	}
+	return nil
 }
 
 func (p *AddAccountParams) Run(ctx ActionCtx) error {
-	if err := p.Entity.StoreKeys(ctx.StoreCtx().Store.GetName()); err != nil {
-		return err
-	}
-	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
+	var err error
+	pk, err := p.akp.PublicKey()
+	if err != nil {
 		return err
 	}
 
-	// if we added an account - make this the current account
-	return GetConfig().SetAccount(p.Entity.name)
-}
-func (p *AddAccountParams) editAccount(c interface{}, ctx ActionCtx) error {
-	ac, ok := c.(*jwt.AccountClaims)
-	if !ok {
-		return errors.New("unable to cast to account claim")
-	}
-
+	ac := jwt.NewAccountClaims(pk)
+	ac.Name = p.name
 	if p.TimeParams.IsStartChanged() {
 		ac.NotBefore, _ = p.TimeParams.StartDate()
 	}
@@ -142,5 +250,19 @@ func (p *AddAccountParams) editAccount(c interface{}, ctx ActionCtx) error {
 		ac.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	return nil
+	signer := p.akp
+	if !ctx.StoreCtx().Store.IsManaged() || p.signerKP != nil {
+		signer = p.signerKP
+	}
+	p.token, err = ac.Encode(signer)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
+		return err
+	}
+
+	// if we added an account - make this the current account
+	return GetConfig().SetAccount(ac.Name)
 }

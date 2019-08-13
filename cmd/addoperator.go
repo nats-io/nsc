@@ -72,8 +72,9 @@ type AddOperatorParams struct {
 }
 
 func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
+	p.generate = KeyPathFlag == ""
+	p.keyPath = KeyPathFlag
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
-
 	if p.name != "" && p.jwtPath != "" {
 		return errors.New("specify either name or import")
 	}
@@ -135,6 +136,29 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *AddOperatorParams) resolveOperatorNKey(s string) (nkeys.KeyPair, error) {
+	nk, err := store.ResolveKey(s)
+	if err != nil {
+		return nil, err
+	}
+	if nk == nil {
+		return nil, fmt.Errorf("a key is required")
+	}
+	t, err := store.KeyType(nk)
+	if err != nil {
+		return nil, err
+	}
+	if t != nkeys.PrefixByteOperator {
+		return nil, errors.New("specified key is not a valid operator nkey")
+	}
+	return nk, nil
+}
+
+func (p *AddOperatorParams) validateOperatorNKey(s string) error {
+	_, err := p.resolveOperatorNKey(s)
+	return err
+}
+
 func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
@@ -149,7 +173,8 @@ func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if !p.generate {
-			if err := p.SignerParams.Edit(ctx); err != nil {
+			p.keyPath, err = cli.Prompt("path to an operator nkey or nkey", p.keyPath, true, p.validateOperatorNKey)
+			if err != nil {
 				return err
 			}
 		}
@@ -173,16 +198,25 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.Resolve(ctx); err != nil {
-		return err
-	}
-
-	if p.signerKP == nil {
-		p.generate = true
+	if p.generate {
 		p.signerKP, err = nkeys.CreateOperator()
 		if err != nil {
 			return err
 		}
+		if p.keyPath, err = ctx.StoreCtx().KeyStore.Store(p.signerKP); err != nil {
+			return err
+		}
+	}
+
+	if p.keyPath != "" {
+		p.signerKP, err = p.resolveOperatorNKey(p.keyPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := p.Resolve(ctx); err != nil {
+		return err
 	}
 
 	return nil

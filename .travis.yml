@@ -22,7 +22,8 @@ before_script:
 #- megacheck $EXCLUDE_VENDOR
 
 script:
-- ./scripts/cov.sh TRAVIS
+#- ./scripts/cov.sh TRAVIS
+- go test ./...
 
 after_success:
 - git reset --hard

@@ -97,7 +97,7 @@ func TestRevokeUserAt(t *testing.T) {
 }
 
 func Test_RevokeUserAccountNameRequired(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")

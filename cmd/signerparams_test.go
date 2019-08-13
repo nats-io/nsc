@@ -99,8 +99,12 @@ func Test_SignerParams(t *testing.T) {
 }
 
 func Test_ManagedSignerParams(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
+
 	require.True(t, ts.Store.IsManaged())
 	require.Nil(t, ts.OperatorKey)
 

@@ -116,8 +116,11 @@ func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	require.Equal(t, expire, sc.Expires)
 }
 
-func Test_AddUserOperatorLessStore(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+func Test_AddUserManagedStore(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")

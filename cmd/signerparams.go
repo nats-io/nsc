@@ -151,3 +151,9 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 	return err
 }
+
+func (p *SignerParams) ForceManagedAccountKey(ctx ActionCtx, kp nkeys.KeyPair) {
+	if ctx.StoreCtx().Store.IsManaged() && p.signerKP == nil {
+		p.signerKP = kp
+	}
+}
