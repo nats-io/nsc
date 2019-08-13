@@ -16,63 +16,23 @@
 package cmd
 
 import (
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/nats-io/nkeys"
-
-	"github.com/nats-io/jwt"
 	"github.com/stretchr/testify/require"
 )
 
-func setOperatorAccountServer(t *testing.T, ts *TestStore, hts *httptest.Server, sk nkeys.KeyPair) {
-	u, err := url.Parse(hts.URL)
-	require.NoError(t, err)
-	u.Path = "/jwt/v1/accounts"
-	oc, err := ts.Store.ReadOperatorClaim()
-	require.NoError(t, err)
-	oc.AccountServerURL = u.String()
-
-	if sk == nil {
-		sk = ts.OperatorKey
-	}
-	token, err := oc.Encode(sk)
-	require.NoError(t, err)
-
-	err = ts.Store.StoreClaim([]byte(token))
-	require.NoError(t, err)
-}
-
 func Test_SyncOK(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
 
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	err := ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
 	ts.AddAccount(t, "A")
 
-	// create an http server to accept the request
-	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		_, err = jwt.DecodeAccountClaims(string(body))
-		require.NoError(t, err)
-
-		err = ts.Store.StoreClaim(body)
-		require.NoError(t, err)
-
-		w.WriteHeader(200)
-	}))
-	defer hts.Close()
-	setOperatorAccountServer(t, ts, hts, nil)
-
 	// edit the jwt
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
 	require.NoError(t, err)
 
 	// sync the store
@@ -86,114 +46,46 @@ func Test_SyncOK(t *testing.T) {
 }
 
 func Test_SyncNoURL(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	ts.AddAccount(t, "A")
+	as.Close()
 
-	// create an http server to accept the request
-	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+	// remove the account server so we cannot push
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	oc.AccountServerURL = ""
+	token, err := oc.Encode(okp)
+	require.NoError(t, err)
+	ts.Store.StoreClaim([]byte(token))
 
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		_, err = jwt.DecodeAccountClaims(string(body))
-		require.NoError(t, err)
-
-		err = ts.Store.StoreClaim(body)
-		require.NoError(t, err)
-
-		w.WriteHeader(200)
-	}))
-	defer hts.Close()
-
-	// sync the store
-	_, _, err := ExecuteCmd(createPushCmd(), "--account", "A")
+	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no account server url was provided")
+	t.Log(err.Error())
+	require.Contains(t, err.Error(), "no account server url was provided by the operator jwt")
 }
 
 func Test_SyncNoServer(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
+	as, m := RunTestAccountServer(t)
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	ts.AddAccount(t, "A")
+	as.Close()
 
-	// create an http server to accept the request
-	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		_, err = jwt.DecodeAccountClaims(string(body))
-		require.NoError(t, err)
-
-		err = ts.Store.StoreClaim(body)
-		require.NoError(t, err)
-
-		w.WriteHeader(200)
-	}))
-	setOperatorAccountServer(t, ts, hts, nil)
-	hts.Close()
-
-	// sync the store
 	_, stderr, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
 	require.Contains(t, stderr, "connect: connection refused")
 }
 
 func Test_SyncManaged(t *testing.T) {
-	_, pk, kp := CreateOperatorKey(t)
-	oc := jwt.NewOperatorClaims(pk)
-	oc.Name = "O"
-	d, err := oc.Encode(kp)
-	require.NoError(t, err)
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
 
-	ts := NewTestStoreWithOperatorJWT(t, d)
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
-
-	// create an http server to accept the request
-	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		ac, err := jwt.DecodeAccountClaims(string(body))
-		require.NoError(t, err)
-
-		token, err := ac.Encode(kp)
-		require.NoError(t, err)
-
-		d := []byte(token)
-		err = ts.Store.StoreClaim(d)
-		require.NoError(t, err)
-
-		w.Header().Add("Content-Type", "application/jwt")
-		w.WriteHeader(200)
-		w.Write(d)
-	}))
-	defer hts.Close()
-
-	// set the account server
-	setOperatorAccountServer(t, ts, hts, kp)
 
 	ts.AddAccount(t, "A")
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.True(t, ac.IsSelfSigned())
-
-	// sync the store
-	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
-	require.NoError(t, err)
-
-	ac, err = ts.Store.ReadAccountClaim("A")
-	require.NoError(t, err)
 	require.False(t, ac.IsSelfSigned())
-	require.Equal(t, ac.Issuer, pk)
 }

@@ -52,18 +52,22 @@ func Test_DeleteExportAccountRequired(t *testing.T) {
 	require.Contains(t, err.Error(), "account is required")
 }
 
-func Test_DeleteExportInteractive(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+func Test_DeleteExportInteractiveManagedStore(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
 	ts.AddExport(t, "A", jwt.Stream, "foo", true)
 	ts.AddExport(t, "A", jwt.Stream, "baz", true)
 	ts.AddAccount(t, "B")
 
-	input := []interface{}{0, 0, ts.GetAccountKeyPath(t, "A")}
 	cmd := createDeleteExportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+
+	input := []interface{}{0, 0, ts.GetAccountKeyPath(t, "A")}
+	_, _, err := ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

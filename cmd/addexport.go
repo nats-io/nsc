@@ -81,7 +81,6 @@ toolName add export --name myexport --subject a.b --service`
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
-
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	p.export.TokenReq = p.private

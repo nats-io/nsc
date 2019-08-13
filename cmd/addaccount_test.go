@@ -41,7 +41,7 @@ func Test_AddAccount(t *testing.T) {
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"Generated account key", "added account"}, false},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"invalid account key"}, true},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"specified key is not a valid account nkey"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
 
@@ -111,13 +111,15 @@ func validateAddAccountClaims(t *testing.T, ts *TestStore) {
 	require.Equal(t, expire, ac.Expires)
 }
 
-func Test_AddAccountOperatorLessStore(t *testing.T) {
-	ts := NewTestStoreWithOperator(t, "test", nil)
+func Test_AddAccountManagedStore(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
-	validateAddAccountClaims(t, ts)
 }
 
 func Test_AddAccountInteractiveSigningKey(t *testing.T) {

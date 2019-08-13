@@ -47,11 +47,7 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 		}
 	}
 	if p.Name != "" {
-		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.Name)
-		if err != nil && !store.IsNotExist(err) {
-			return err
-		}
-		ctx.StoreCtx().Account.PublicKey = ac.Subject
+		return p.setAccount(ctx, p.Name)
 	}
 
 	return nil
@@ -59,12 +55,11 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *AccountContextParams) Edit(ctx ActionCtx) error {
 	var err error
-	p.Name, err = ctx.StoreCtx().PickAccount(p.Name)
+	name, err := ctx.StoreCtx().PickAccount(p.Name)
 	if err != nil {
 		return err
 	}
-	ctx.StoreCtx().Account.Name = p.Name
-	return nil
+	return p.setAccount(ctx, name)
 }
 
 func (p *AccountContextParams) Validate(ctx ActionCtx) error {
@@ -73,5 +68,15 @@ func (p *AccountContextParams) Validate(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("an account is required")
 	}
+	return nil
+}
+
+func (p *AccountContextParams) setAccount(ctx ActionCtx, name string) error {
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(name)
+	if err != nil && !store.IsNotExist(err) {
+		return err
+	}
+	p.Name = name
+	ctx.StoreCtx().Account.PublicKey = ac.Subject
 	return nil
 }

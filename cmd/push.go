@@ -181,7 +181,7 @@ func (p *PushCmdParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *PushCmdParams) Validate(ctx ActionCtx) error {
 	if p.ASU == "" {
-		return errors.New("no account server url was provided by the operator jwt or to nsc")
+		return errors.New("no account server url was provided by the operator jwt")
 	}
 
 	if err := p.validURL(p.ASU); err != nil {

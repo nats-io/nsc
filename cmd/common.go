@@ -444,3 +444,18 @@ func OperatorJwtURL(oc *jwt.OperatorClaims) (string, error) {
 	}
 	return OperatorJwtURLFromString(oc.AccountServerURL)
 }
+
+func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
+	pk, err := kp.PublicKey()
+	if err != nil {
+		return false, err
+	}
+	ok := false
+	for _, v := range signers {
+		if pk == v {
+			ok = true
+			break
+		}
+	}
+	return ok, nil
+}

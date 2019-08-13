@@ -245,7 +245,7 @@ func (ts *TestStore) GetStoresRoot() string {
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
 		_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", accountName)
-		require.NoError(t, err, "account creation")
+		require.NoError(t, err)
 	}
 }
 
@@ -254,14 +254,14 @@ func (ts *TestStore) AddAccountWithSigner(t *testing.T, accountName string, sk n
 		seed, err := sk.Seed()
 		require.NoError(t, err)
 		_, _, err = ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "--name", accountName, "-K", string(seed))
-		require.NoError(t, err, "account creation")
+		require.NoError(t, err)
 	}
 }
 
 func (ts *TestStore) AddUser(t *testing.T, accountName string, userName string) {
 	ts.AddAccount(t, accountName)
 	_, _, err := ExecuteCmd(CreateAddUserCmd(), "--account", accountName, "--name", userName)
-	require.NoError(t, err, "user creation")
+	require.NoError(t, err)
 }
 
 func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userName string, sk nkeys.KeyPair) {
@@ -269,7 +269,7 @@ func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userNam
 	seed, err := sk.Seed()
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--account", accountName, "--name", userName, "-K", string(seed))
-	require.NoError(t, err, "user creation")
+	require.NoError(t, err)
 }
 
 func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {

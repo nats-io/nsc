@@ -162,3 +162,38 @@ func Test_ImportOperatorFromURL(t *testing.T) {
 	require.Equal(t, pub, oo.Subject)
 	require.True(t, ts.Store.IsManaged())
 }
+
+func Test_AddOperatorWithKey(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	seed, pub, _ := CreateOperatorKey(t)
+	cmd := createAddOperatorCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteCmd(cmd, "--name", "T", "-K", string(seed))
+	require.NoError(t, err)
+
+	ts.SwitchOperator(t, "T")
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, pub, oc.Subject)
+	require.Equal(t, pub, oc.Issuer)
+}
+
+func Test_AddOperatorWithKeyInteractive(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	seed, pub, _ := CreateOperatorKey(t)
+	cmd := createAddOperatorCmd()
+	HoistRootFlags(cmd)
+
+	args := []interface{}{false, "T", "0", "0", false, string(seed)}
+	_, _, err := ExecuteInteractiveCmd(cmd, args)
+	require.NoError(t, err)
+
+	ts.SwitchOperator(t, "T")
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, pub, oc.Subject)
+}

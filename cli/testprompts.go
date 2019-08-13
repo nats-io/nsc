@@ -64,7 +64,7 @@ func (t *TestPrompts) PromptSecret(m string) (string, error) {
 }
 
 func (t *TestPrompts) PromptChoices(m string, value string, choices []string) (int, error) {
-	t.logInputs("choices", m, fmt.Sprintf("[%s]", strings.Join(choices, ", ")))
+	t.logInputs("choices", m, fmt.Sprintf("[%s]", strings.Join(choices, ",\n\t")))
 	val := t.inputs[t.count].(int)
 	t.logInputs("choices", "   selection", fmt.Sprintf("%d (%s)", val, choices[val]))
 	t.count = t.count + 1

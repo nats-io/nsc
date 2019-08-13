@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -121,10 +121,10 @@ func Test_DeployInteractiveKnown(t *testing.T) {
 	require.NotNil(t, storage[apk])
 }
 
-// Runs a TestAccountServer returning the server and the underlying storage
-func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
-	_, opk, okp := CreateOperatorKey(t)
+func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httptest.Server, map[string][]byte) {
 	storage := make(map[string][]byte)
+	opk, err := okp.PublicKey()
+	require.NoError(t, err)
 
 	tas := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		errHandler := func(w http.ResponseWriter, err error) {
@@ -157,13 +157,22 @@ func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 			}
 
 			ok := false
-			if ac.Claims().IsSelfSigned() {
+			if ac.Claims().IsSelfSigned() || ac.Issuer == opk {
 				ok = true
 			} else {
 				ok = ac.SigningKeys.Contains(ac.Issuer)
 			}
 
 			if ok {
+				ac.Limits.Conn = -1
+				ac.Limits.Data = -1
+				ac.Limits.Exports = -1
+				ac.Limits.Imports = -1
+				ac.Limits.LeafNodeConn = -1
+				ac.Limits.Payload = -1
+				ac.Limits.Subs = -1
+				ac.Limits.WildcardExports = true
+
 				token, err := ac.Encode(okp)
 				if err != nil {
 					errHandler(w, err)
@@ -172,9 +181,8 @@ func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 				storage[ac.Subject] = []byte(token)
 
 				w.WriteHeader(200)
-				w.Write([]byte(fmt.Sprintf("accepted %v", ac.Subject)))
 			} else {
-				errHandler(w, errors.New("account not self-signed nor by a signer"))
+				errHandler(w, fmt.Errorf("account %q not self-signed nor by a signer - issuer %q", ac.Subject, ac.Issuer))
 			}
 		}
 
@@ -200,4 +208,10 @@ func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 	storage["operator"] = []byte(token)
 
 	return tas, storage
+}
+
+// Runs a TestAccountServer returning the server and the underlying storage
+func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
+	_, _, okp := CreateOperatorKey(t)
+	return RunTestAccountServerWithOperatorKP(t, okp)
 }
