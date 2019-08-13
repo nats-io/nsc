@@ -441,7 +441,7 @@ func (s *Store) syncRemoteAccount(u string) (int, []byte, error) {
 }
 
 func (s *Store) pushRemoteAccount(u string, data []byte) (int, []byte, error) {
-	resp, err := http.Post(u, "application/text", bytes.NewReader(data))
+	resp, err := http.Post(u, "application/jwt", bytes.NewReader(data))
 	if err != nil {
 		return 0, nil, err
 	}
