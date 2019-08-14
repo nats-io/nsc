@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -22,6 +20,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -416,16 +416,20 @@ func StripTableDecorations(s string) string {
 	return re.ReplaceAllString(s, " ")
 }
 
-func (ts *TestStore) GetAccountKey(t *testing.T, name string) (nkeys.KeyPair, error) {
+func (ts *TestStore) GetAccountKey(t *testing.T, name string) nkeys.KeyPair {
 	ac, err := ts.Store.ReadAccountClaim(name)
 	require.NoError(t, err)
-	return ts.KeyStore.GetKeyPair(ac.Subject)
+	kp, err := ts.KeyStore.GetKeyPair(ac.Subject)
+	require.NoError(t, err)
+	return kp
 }
 
-func (ts *TestStore) GetUserKey(t *testing.T, account string, name string) (nkeys.KeyPair, error) {
+func (ts *TestStore) GetUserKey(t *testing.T, account string, name string) nkeys.KeyPair {
 	uc, err := ts.Store.ReadUserClaim(account, name)
 	require.NoError(t, err)
-	return ts.KeyStore.GetKeyPair(uc.Subject)
+	kp, err := ts.KeyStore.GetKeyPair(uc.Subject)
+	require.NoError(t, err)
+	return kp
 }
 
 func (ts *TestStore) GetAccountKeyPath(t *testing.T, name string) string {
@@ -656,4 +660,99 @@ func Test_Util(t *testing.T) {
 	ac2, err := ts.Store.ReadAccountClaim("AA")
 	require.NoError(t, err)
 	require.Equal(t, pk, ac2.Issuer)
+}
+
+func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httptest.Server, map[string][]byte) {
+	storage := make(map[string][]byte)
+	opk, err := okp.PublicKey()
+	require.NoError(t, err)
+
+	tas := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		errHandler := func(w http.ResponseWriter, err error) {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+		}
+		getHandler := func(w http.ResponseWriter, r *http.Request) {
+			id := filepath.Base(r.RequestURI)
+			data := storage[id]
+			if data == nil {
+				w.WriteHeader(http.StatusNotFound)
+			}
+			w.Header().Add("Content-Type", "application/jwt")
+			w.WriteHeader(200)
+			w.Write(data)
+		}
+
+		updateHandler := func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+			body, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				errHandler(w, err)
+				return
+			}
+
+			ac, err := jwt.DecodeAccountClaims(string(body))
+			if err != nil {
+				errHandler(w, err)
+				return
+			}
+
+			ok := false
+			if ac.Claims().IsSelfSigned() || ac.Issuer == opk {
+				ok = true
+			} else {
+				ok = ac.SigningKeys.Contains(ac.Issuer)
+			}
+
+			if ok {
+				ac.Limits.Conn = -1
+				ac.Limits.Data = -1
+				ac.Limits.Exports = -1
+				ac.Limits.Imports = -1
+				ac.Limits.LeafNodeConn = -1
+				ac.Limits.Payload = -1
+				ac.Limits.Subs = -1
+				ac.Limits.WildcardExports = true
+
+				token, err := ac.Encode(okp)
+				if err != nil {
+					errHandler(w, err)
+					return
+				}
+				storage[ac.Subject] = []byte(token)
+
+				w.WriteHeader(200)
+			} else {
+				errHandler(w, fmt.Errorf("account %q not self-signed nor by a signer - issuer %q", ac.Subject, ac.Issuer))
+			}
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			getHandler(w, r)
+		case http.MethodPost:
+			updateHandler(w, r)
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+
+	oc := jwt.NewOperatorClaims(opk)
+	oc.Name = "T"
+	oc.Subject = opk
+	u, err := url.Parse(tas.URL)
+	require.NoError(t, err)
+	u.Path = "jwt/v1"
+	oc.AccountServerURL = u.String()
+	token, err := oc.Encode(okp)
+	require.NoError(t, err)
+	storage["operator"] = []byte(token)
+
+	return tas, storage
+}
+
+// Runs a TestAccountServer returning the server and the underlying storage
+func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
+	_, _, okp := CreateOperatorKey(t)
+	return RunTestAccountServerWithOperatorKP(t, okp)
 }

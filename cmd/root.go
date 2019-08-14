@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -129,10 +129,7 @@ func QuietMode() bool {
 
 var rootCmd = &cobra.Command{
 	Use:   "nsc",
-	Short: "NSC enables you to create and manage NATS accounts and user configurations",
-	Long: `The nsc tool allows you to create NATS accounts, users and manage their permissions.
-The nsc cli creates accounts, users, and JWT tokens that provide access
-to your users and services.`,
+	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
 			return nil

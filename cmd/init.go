@@ -32,11 +32,8 @@ func createInitCmd() *cobra.Command {
 	var params InitCmdParams
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "create an operator, account and user",
+		Short: "Initialize an environment by creating an operator, account and user",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tc := GetConfig()
-			fmt.Println(tc.StoreRoot)
-
 			if err := params.init(cmd); err != nil {
 				return err
 			}
@@ -44,7 +41,7 @@ func createInitCmd() *cobra.Command {
 				return err
 			}
 			// store doesn't exist yet - make one
-			if err := params.createStore(); err != nil {
+			if err := params.createStore(cmd); err != nil {
 				return err
 			}
 
@@ -315,7 +312,9 @@ func (p *InitCmdParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitCmdParams) createStore() error {
+func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
+	cmd.SilenceUsage = true
+
 	var err error
 	if err := OperatorNameValidator(p.Name); err != nil {
 		return err
@@ -346,11 +345,14 @@ func (p *InitCmdParams) createStore() error {
 		}
 		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
-			fmt.Println(token)
 			return fmt.Errorf("error decoding operator jwt: %v", err)
 		}
 		onk.Name = op.Name
 		p.AccountServerURL = op.AccountServerURL
+
+		if p.AccountServerURL == "" {
+			return fmt.Errorf("error importing operator %q - it doesn't define an account server url", onk.Name)
+		}
 
 		// see if we already have it
 		ts, err := GetConfig().LoadStore(op.Name)
@@ -467,6 +469,7 @@ func (p *InitCmdParams) createUser(ctx ActionCtx) error {
 }
 
 func (p *InitCmdParams) Run(ctx ActionCtx) error {
+	ctx.CurrentCmd().SilenceUsage = true
 	if p.CreateOperator {
 		if err := p.setOperatorDefaults(ctx); err != nil {
 			return err

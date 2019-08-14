@@ -38,7 +38,7 @@ func createAddOperatorCmd() *cobra.Command {
 			if err := RunStoreLessAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if params.generate {
+			if params.generate && params.keyPath != "" {
 				cmd.Printf("Generated operator key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
 			}
 			verb := "added"
@@ -75,9 +75,6 @@ func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.generate = KeyPathFlag == ""
 	p.keyPath = KeyPathFlag
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
-	if p.name != "" && p.jwtPath != "" {
-		return errors.New("specify either name or import")
-	}
 
 	return nil
 }
@@ -131,7 +128,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 			return fmt.Errorf("error importing operator jwt: %v", err)
 		}
 		p.token = token
-		p.name = op.Name
+		if p.name == "" {
+			p.name = op.Name
+		}
 	}
 	return nil
 }

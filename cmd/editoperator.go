@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -77,7 +75,7 @@ type EditOperatorParams struct {
 }
 
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
-	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url") {
 		ctx.CurrentCmd().SilenceUsage = false
@@ -118,6 +116,12 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 
 func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	var err error
+	if p.claim.NotBefore > 0 {
+		p.TimeParams.Start = UnixToDate(p.claim.NotBefore)
+	}
+	if p.claim.Expires > 0 {
+		p.TimeParams.Expiry = UnixToDate(p.claim.Expires)
+	}
 	if err = p.GenericClaimsParams.Edit(); err != nil {
 		return err
 	}

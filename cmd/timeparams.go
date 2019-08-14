@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -120,6 +120,12 @@ func ParseExpiry(s string) (int64, error) {
 	if s == "" || s == "0" {
 		return 0, nil
 	}
+	// try to parse directly
+	t, err := time.Parse("2006-01-02 15:04:05 UTC", s)
+	if err == nil {
+		return t.Unix(), nil
+	}
+
 	re := regexp.MustCompile(`(\d){4}-(\d){2}-(\d){2}`)
 	if re.MatchString(s) {
 		t, err := time.Parse("2006-01-02", s)
@@ -128,6 +134,7 @@ func ParseExpiry(s string) (int64, error) {
 		}
 		return t.Unix(), nil
 	}
+
 	re = regexp.MustCompile(`(?P<count>-?\d+)(?P<qualifier>[mhdMyw])`)
 	m := re.FindStringSubmatch(s)
 	if m != nil {

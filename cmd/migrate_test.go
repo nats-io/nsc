@@ -55,7 +55,7 @@ func Test_MigrateMany(t *testing.T) {
 	ts.AddUser(t, "B", "b")
 
 	ts.AddOperator(t, "OO")
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--store-dir", filepath.Join(ts.GetStoresRoot(), "O"))
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.GetStoresRoot(), "O"))
 	require.NoError(t, err)
 
 	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))

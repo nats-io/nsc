@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,6 +19,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nsc/cli"
 
 	"github.com/nats-io/jwt"
 
@@ -48,7 +50,9 @@ func Test_EditUserInteractive(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddUser(t, "A", "U")
 
-	inputs := []interface{}{"2018-01-01", "2050-01-01", false, "-1"}
+	cli.LogFn = t.Log
+
+	inputs := []interface{}{false, "-1", "2018-01-01", "2050-01-01"}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
@@ -70,7 +74,7 @@ func Test_EditUserEditReply(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddUser(t, "A", "U")
 
-	inputs := []interface{}{"0", "0", true, "100", "1000ms", "-1"}
+	inputs := []interface{}{true, "100", "1000ms", "-1", "0", "0"}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
