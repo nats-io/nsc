@@ -86,8 +86,7 @@ func Test_SignerParams(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 
 	tests := CmdTests{
@@ -109,8 +108,7 @@ func Test_ManagedSignerParams(t *testing.T) {
 	require.Nil(t, ts.OperatorKey)
 
 	ts.AddAccount(t, "A")
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 
 	tests := CmdTests{

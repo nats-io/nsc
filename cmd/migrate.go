@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -42,6 +41,7 @@ func createMigrateCmd() *cobra.Command {
 		Use:     `migrate`,
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
 			if params.url != "" && storeDir != "" {
 				return fmt.Errorf("specify one of --url or --store-dir")
 			}
@@ -62,16 +62,13 @@ func createMigrateCmd() *cobra.Command {
 				}
 			}
 			if storeDir != "" {
-				if KeyPathFlag != "" {
-					return fmt.Errorf("when --store-dir is specified no other options other than '-i' and '--force' are allowed")
+				storeDir, err = Expand(storeDir)
+				if err != nil {
+					return err
 				}
-				if params.accountKeypath != "" {
-					return fmt.Errorf("when --store-dir is specified no other options other than '-i' and '--force' are allowed")
-				}
-
 				s, err := store.LoadStore(storeDir)
 				if err != nil {
-					return fmt.Errorf("error loading store dir %q: %v", storeDir, err)
+					return fmt.Errorf("error loading operator %q: %v", storeDir, err)
 				}
 				names, err := s.ListSubContainers(store.Accounts)
 				if err != nil {
@@ -89,12 +86,10 @@ func createMigrateCmd() *cobra.Command {
 			}
 
 			for _, p := range all {
-				// no other args are supported here, and the KeyPathFlag
-				// resolution is not re-entrant.
-				KeyPathFlag = ""
-				if err := RunAction(cmd, []string{}, &p); err != nil {
-					return fmt.Errorf("import failed - %v", err)
+				if err := RunAction(cmd, args, &p); err != nil {
+					return err
 				}
+
 				m := fmt.Sprintf("migrated %q to operator %q", p.claim.Name, p.operator)
 				um := fmt.Sprintf("%d users migrated", len(p.migratedUsers))
 				if len(p.migratedUsers) == 0 {
@@ -109,10 +104,8 @@ func createMigrateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.url, "url", "u", "", "path or url to import jwt from")
-	cmd.Flags().StringVarP(&params.accountKeypath, "account-key", "k", "", "path to account key")
-	cmd.Flags().StringVarP(&storeDir, "store-dir", "", "", "path to a store dir - all accounts are migrated")
-	cmd.Flags().BoolVarP(&params.overwrite, "force", "", false, "overwrite accounts with the same name")
-	HoistRootFlags(cmd)
+	cmd.Flags().StringVarP(&storeDir, "operator-dir", "", "", "path to an operator dir - all accounts are migrated")
+	cmd.Flags().BoolVarP(&params.overwrite, "force", "F", false, "overwrite accounts with the same name")
 	return cmd
 }
 
@@ -121,19 +114,16 @@ func init() {
 }
 
 type MigrateCmdParams struct {
-	signer         SignerParams
-	accountKeypath string
-	accountToken   string
-	claim          *jwt.AccountClaims
-	url            string
-	isFileImport   bool
-	operator       string
-	migratedUsers  []*jwt.UserClaims
-	overwrite      bool
+	accountToken  string
+	claim         *jwt.AccountClaims
+	url           string
+	isFileImport  bool
+	operator      string
+	migratedUsers []*jwt.UserClaims
+	overwrite     bool
 }
 
 func (p *MigrateCmdParams) SetDefaults(ctx ActionCtx) error {
-	p.signer.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 	return nil
 }
 
@@ -151,10 +141,7 @@ func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
 		_, err = os.Stat(v)
 		return err
 	})
-	if err != nil {
-		return err
-	}
-	return p.signer.Edit(ctx)
+	return err
 }
 
 func (p *MigrateCmdParams) getAccountKeys() []string {
@@ -183,26 +170,10 @@ func (p *MigrateCmdParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("error decoding JWT: %v", err)
 	}
 
-	for _, k := range p.getAccountKeys() {
-		kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(k)
-		if kp != nil {
-			p.accountKeypath = ctx.StoreCtx().KeyStore.GetKeyPath(k)
-			break
-		}
-	}
-
 	return nil
 }
 
 func (p *MigrateCmdParams) PostInteractive(ctx ActionCtx) error {
-	var err error
-	if p.accountKeypath == "" {
-		p.accountKeypath, err = cli.Prompt("account key", "", true,
-			SeedNKeyValidatorMatching(nkeys.PrefixByteAccount, p.getAccountKeys()))
-		if err != nil {
-			return err
-		}
-	}
 	if ctx.StoreCtx().Store.HasAccount(p.claim.Name) && !p.overwrite {
 		aac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.claim.Name)
 		if err != nil {
@@ -210,7 +181,7 @@ func (p *MigrateCmdParams) PostInteractive(ctx ActionCtx) error {
 		}
 		p.overwrite = aac.Subject == p.claim.Subject
 		if !p.overwrite {
-			p.overwrite, err = cli.PromptYN("account %q already exists under the current operator, replace it")
+			p.overwrite, err = cli.PromptBoolean("account %q already exists under the current operator, replace it", false)
 		}
 	}
 	return nil
@@ -225,7 +196,7 @@ func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
 			return err
 		}
 		if strings.HasPrefix(fp, parent) {
-			return fmt.Errorf("cannot migrate %q into %q (same operator)", fp, parent)
+			return fmt.Errorf("cannot migrate %q onto itself", fp)
 		}
 	}
 
@@ -233,41 +204,13 @@ func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("account %q already exists, specify --force to overwrite", p.claim.Name)
 	}
 
-	var err error
-	var kp nkeys.KeyPair
-	if p.accountKeypath != "" {
-		kp, err = store.ResolveKey(p.accountKeypath)
-		if err != nil {
-			return err
-		}
-	}
-	pk, err := kp.PublicKey()
-	if err != nil {
-		return err
-	}
-	matched := false
-	for _, v := range p.getAccountKeys() {
-		if v == pk {
-			matched = true
-			break
-		}
-	}
-	if !matched {
-		return fmt.Errorf("unable to match an account public key for: %s", strings.Join(p.getAccountKeys(), ","))
-	}
-	if err := p.signer.Resolve(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (p *MigrateCmdParams) Run(ctx ActionCtx) error {
-	tok, err := p.claim.Encode(p.signer.signerKP)
-	if err != nil {
-		return err
-	}
+	ctx.CurrentCmd().SilenceUsage = true
 	p.operator = ctx.StoreCtx().Operator.Name
-	if err = ctx.StoreCtx().Store.StoreClaim([]byte(tok)); err != nil {
+	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.accountToken)); err != nil {
 		return err
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -104,8 +104,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
 
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 	require.NoError(t, err)
@@ -138,8 +137,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
 
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 	require.NoError(t, err)
@@ -168,8 +166,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foobar.>", false)
 
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 	require.NoError(t, err)
@@ -235,8 +232,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
 
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 	require.NoError(t, err)
@@ -268,8 +264,7 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
 
-	akp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
 	apub, err := akp.PublicKey()
 	require.NoError(t, err)

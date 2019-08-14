@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package store
@@ -64,25 +62,29 @@ type Status struct {
 }
 
 func (s *Status) OK() bool {
-	return s.HttpStatus == http.StatusOK
+	return OK(s.HttpStatus)
+}
+
+func (s *Status) Pending() bool {
+	return Pending(s.HttpStatus)
 }
 
 type RemoteStoreStatus struct {
 	Push Status
-	Sync Status
+	Pull Status
 	Err  error
 }
 
 func (r *RemoteStoreStatus) HasError() bool {
-	return r.Err != nil || r.Sync.Err != nil || r.Push.Err != nil
+	return r.Err != nil || r.Pull.Err != nil || r.Push.Err != nil
 }
 
 func (r *RemoteStoreStatus) GetError() error {
 	if r.Err != nil {
 		return r.Err
 	}
-	if r.Sync.Err != nil {
-		return r.Sync.Err
+	if r.Pull.Err != nil {
+		return r.Pull.Err
 	}
 	if r.Push.Err != nil {
 		return r.Push.Err
@@ -95,7 +97,11 @@ func (r *RemoteStoreStatus) GetPushMessage() []byte {
 }
 
 func (r *RemoteStoreStatus) OK() bool {
-	return r.GetError() == nil && r.Sync.OK() && r.Push.OK()
+	return r.GetError() == nil && r.Pull.OK() && r.Push.OK()
+}
+
+func (r *RemoteStoreStatus) Pending() bool {
+	return r.GetError() == nil && r.Push.Pending()
 }
 
 func (r *RemoteStoreStatus) Error() string {
@@ -105,32 +111,32 @@ func (r *RemoteStoreStatus) Error() string {
 	if r.Push.Err != nil {
 		return r.Push.Err.Error()
 	}
-	if r.Sync.Err != nil {
-		return r.Sync.Err.Error()
+	if r.Pull.Err != nil {
+		return r.Pull.Err.Error()
 	}
 
 	if !r.Push.OK() {
 		if r.Push.HttpStatus > 200 && r.Push.HttpStatus < 300 {
-			m := "account push succeeded, but is not yet available - enter 'nsc sync' to synchronize with the remote server"
+			m := fmt.Sprintf("account push %q, but is not yet available - enter 'nsc sync' to synchronize with the remote server", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
 			if len(r.Push.Data) > 0 {
 				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
 			}
 			return m
 		}
 		if r.Push.HttpStatus < 200 || r.Push.HttpStatus > 299 {
-			m := fmt.Sprintf("account push failed with %s", http.StatusText(r.Push.HttpStatus))
+			m := fmt.Sprintf("account push failed with %q", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
 			if len(r.Push.Data) > 0 {
 				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
 			}
 			return m
 		}
 	}
-	if !r.Sync.OK() {
-		return fmt.Sprintf("account sync failed with %s", http.StatusText(r.Push.HttpStatus))
+	if !r.Pull.OK() {
+		return fmt.Sprintf("account pull failed with %q", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
 	}
 
 	if r.OK() && len(r.Push.Data) > 0 {
-		return fmt.Sprintf("account synchronization succeeded\n%s\n", string(r.Push.Data))
+		return fmt.Sprintf("account update succeeded\n%s\n", string(r.Push.Data))
 	}
 
 	return ""
@@ -425,11 +431,11 @@ func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
 	return &gc.Type, nil
 }
 
-func (s *Store) syncRemoteAccount(u string) (int, []byte, error) {
+func (s *Store) pullRemoteAccount(u string) (int, []byte, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(u)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error loading %q: %v", u, err)
+		return 0, nil, fmt.Errorf("error pulling %q: %v", u, err)
 	}
 	defer r.Body.Close()
 	var buf bytes.Buffer
@@ -464,13 +470,13 @@ func (s *Store) handleManagedAccount(data []byte) *RemoteStoreStatus {
 		return &status
 	}
 	if oc.AccountServerURL == "" {
-		status.Err = errors.New("unable to push to the operator - operator jwt doesn't set account server url")
+		status.Err = fmt.Errorf("unable to push to %q - operator doesn't set an account server url", oc.Name)
 		return &status
 	}
 
 	u, err := url.Parse(oc.AccountServerURL)
 	if err != nil {
-		status.Err = fmt.Errorf("unable to push to the operator - failed to parse account server url (%q): %v", oc.AccountServerURL, err)
+		status.Err = fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
 		return &status
 	}
 	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
@@ -480,7 +486,7 @@ func (s *Store) handleManagedAccount(data []byte) *RemoteStoreStatus {
 	}
 
 	if status.Push.OK() {
-		status.Sync.HttpStatus, status.Sync.Data, err = s.syncRemoteAccount(u.String())
+		status.Pull.HttpStatus, status.Pull.Data, err = s.pullRemoteAccount(u.String())
 	}
 	return &status
 }
@@ -496,12 +502,18 @@ func (s *Store) StoreClaim(data []byte) error {
 			return rs
 		}
 		if rs.OK() {
-			if err := s.StoreRaw(rs.Sync.Data); err != nil {
+			if err := s.StoreRaw(rs.Pull.Data); err != nil {
 				return err
 			}
 			if len(rs.Push.Data) == 0 {
 				// nothing to display to the user
 				return nil
+			}
+		}
+		if rs.Pending() {
+			// store the self signed
+			if err := s.StoreRaw(data); err != nil {
+				return err
 			}
 		}
 		return rs
@@ -554,11 +566,11 @@ func (s *Store) StoreRaw(data []byte) error {
 		}
 		path = filepath.Join(Accounts, account, Users, JwtName(uc.Name))
 	case jwt.OperatorClaim:
-		oc, err := jwt.DecodeOperatorClaims(string(data))
+		_, err := jwt.DecodeOperatorClaims(string(data))
 		if err != nil {
 			return err
 		}
-		path = JwtName(oc.Name)
+		path = JwtName(s.GetName())
 	default:
 		return fmt.Errorf("unsuported store claim type: %s", *ct)
 	}

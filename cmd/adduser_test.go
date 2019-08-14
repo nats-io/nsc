@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -88,9 +86,8 @@ func Test_AddUserInteractive(t *testing.T) {
 }
 
 func validateAddUserClaims(t *testing.T, ts *TestStore) {
-	skp, err := ts.GetUserKey(t, "A", "U")
-	require.NoError(t, err)
-	_, err = skp.Seed()
+	skp := ts.GetUserKey(t, "A", "U")
+	_, err := skp.Seed()
 	require.NoError(t, err, "stored key should be a seed")
 
 	sc, err := ts.Store.ReadUserClaim("A", "U")
@@ -100,8 +97,7 @@ func validateAddUserClaims(t *testing.T, ts *TestStore) {
 	require.NoError(t, err)
 	require.Equal(t, sc.Subject, pub, "public key is subject")
 
-	okp, err := ts.GetAccountKey(t, "A")
-	require.NoError(t, err)
+	okp := ts.GetAccountKey(t, "A")
 
 	oppub, err := okp.PublicKey()
 	require.NoError(t, err, "getting public key for account")

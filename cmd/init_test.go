@@ -96,12 +96,11 @@ func Test_InitWellKnown(t *testing.T) {
 }
 
 func Test_InitWellKnown2(t *testing.T) {
-	ts := NewTestStore(t, "X")
-	defer ts.Done(t)
-
-	// run a jwt account server
-	as, _ := RunTestAccountServer(t)
+	as, m := RunTestAccountServer(t)
 	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)
@@ -133,12 +132,11 @@ func Test_InitWellKnown2(t *testing.T) {
 }
 
 func Test_InitWellKnownInteractive(t *testing.T) {
-	ts := NewTestStore(t, "X")
-	defer ts.Done(t)
-
-	// run a jwt account server
-	as, _ := RunTestAccountServer(t)
+	as, m := RunTestAccountServer(t)
 	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)

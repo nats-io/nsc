@@ -47,19 +47,6 @@ func Test_AddOperator(t *testing.T) {
 	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "O.jwt"))
 }
 
-func TestAddOperatorCreateOrName(t *testing.T) {
-	ts := NewEmptyStore(t)
-	defer ts.Done(t)
-
-	_, err := os.Lstat(filepath.Join(ts.Dir, "store"))
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--url", ts.Dir)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "either name or import")
-}
-
 func TestImportOperator(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
