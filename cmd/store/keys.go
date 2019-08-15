@@ -24,16 +24,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nats-io/nuid"
-
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nuid"
 )
 
-const DEfaultNKeysPath = ".nkeys"
+const DefaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
-const NKeyExtension = "nk"
-const CredsExtension = "creds"
+const NKeyExtension = ".nk"
+const CredsExtension = ".creds"
 const CredsDir = "creds"
 const KeysDir = "keys"
 
@@ -57,7 +56,7 @@ func GetKeysDir() string {
 	if err != nil {
 		return ResolvePath("", NKeysPathEnv)
 	}
-	return ResolvePath(filepath.Join(u.HomeDir, DEfaultNKeysPath), NKeysPathEnv)
+	return ResolvePath(filepath.Join(u.HomeDir, DefaultNKeysPath), NKeysPathEnv)
 }
 
 // Resolve a key value provided as a flag - value could be an actual nkey or a path to an nkey
@@ -84,6 +83,47 @@ func NewKeyStore(environmentName string) KeyStore {
 	return KeyStore{Env: environmentName}
 }
 
+func IsOldKeyRing(dir string) (bool, error) {
+	var err error
+	dir, err = homedir.Expand(dir)
+	if err != nil {
+		return false, err
+	}
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		return false, err
+	}
+	isOld := false
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		// breakout if we determined we have old keyring
+		if isOld {
+			return filepath.SkipDir
+		}
+		// make the path relative to ease parsing
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		// this is the keys/creds dir - ignore them
+		if (rel == KeysDir || rel == CredsDir) && info.IsDir() {
+			// walking new dirs
+			return filepath.SkipDir
+		}
+		// if we find a key/creds file outside of the expected place
+		// we have the old structure
+		ext := filepath.Ext(path)
+		if ext == NKeyExtension || ext == CredsExtension {
+			isOld = true
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if err != nil && err != filepath.SkipDir {
+		return false, err
+	}
+	return isOld, nil
+}
+
 func KeysNeedMigration() (bool, error) {
 	dir := GetKeysDir()
 	ok, err := dirExists(dir)
@@ -97,8 +137,7 @@ func KeysNeedMigration() (bool, error) {
 	if len(infos) == 0 {
 		return false, nil
 	}
-	ok, err = dirExists(filepath.Join(dir, KeysDir))
-	return !ok, err
+	return IsOldKeyRing(dir)
 }
 
 func Migrate() (string, error) {
@@ -128,11 +167,11 @@ func Migrate() (string, error) {
 }
 
 func (k *KeyStore) credsName(n string) string {
-	return fmt.Sprintf("%s.%s", n, CredsExtension)
+	return fmt.Sprintf("%s%s", n, CredsExtension)
 }
 
 func (k *KeyStore) keyName(n string) string {
-	return fmt.Sprintf("%s.%s", n, NKeyExtension)
+	return fmt.Sprintf("%s%s", n, NKeyExtension)
 }
 
 func (k *KeyStore) CalcUserCredsPath(account string, user string) string {
@@ -202,7 +241,7 @@ func (k *KeyStore) GetKeyPath(pubkey string) string {
 	}
 	kind := pubkey[0:1]
 	shard := pubkey[1:3]
-	return filepath.Join(GetKeysDir(), KeysDir, kind, shard, fmt.Sprintf("%s.nk", pubkey))
+	return filepath.Join(GetKeysDir(), KeysDir, kind, shard, fmt.Sprintf("%s%s", pubkey, NKeyExtension))
 }
 
 func (k *KeyStore) GetKeyPair(pubkey string) (nkeys.KeyPair, error) {
@@ -241,7 +280,7 @@ func AddGitIgnore(dir string) error {
 		ignoreFile := filepath.Join(dir, ".gitignore")
 		_, err = os.Stat(ignoreFile)
 		if os.IsNotExist(err) {
-			d := `# ignore all nk files
+			d := `# ignore all nk files 
 **/*.nk
 
 # ignore all creds files
@@ -429,22 +468,7 @@ func dirExists(fp string) (bool, error) {
 	}
 }
 
-func fileExists(fp string) (bool, error) {
-	fi, err := os.Stat(fp)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if fi.IsDir() {
-		return false, fmt.Errorf("%q is not a file", fp)
-	} else {
-		return true, nil
-	}
-}
-
-func migrateKeyStore(from string, to string) (keys []string, creds []string, err error) {
+func migrateKeyStore(ksroot string, to string) (keys []string, creds []string, err error) {
 	if err := MaybeMakeDir(to); err != nil {
 		return nil, nil, err
 	}
@@ -455,10 +479,10 @@ func migrateKeyStore(from string, to string) (keys []string, creds []string, err
 		return nil, nil, err
 	}
 
-	err = filepath.Walk(from, func(src string, info os.FileInfo, err error) error {
+	err = filepath.Walk(ksroot, func(src string, info os.FileInfo, err error) error {
 		ext := filepath.Ext(src)
 		switch ext {
-		case ".nk":
+		case NKeyExtension:
 			fp, err := migrateKey(src, to)
 			if err != nil {
 				return err
@@ -467,8 +491,8 @@ func migrateKeyStore(from string, to string) (keys []string, creds []string, err
 				return nil
 			}
 			keys = append(keys, fp)
-		case ".creds":
-			fp, err := migrateCreds(src, to)
+		case CredsExtension:
+			fp, err := migrateCreds(ksroot, src, to)
 			if err != nil {
 				return err
 			}
@@ -483,7 +507,7 @@ func migrateKeyStore(from string, to string) (keys []string, creds []string, err
 }
 
 func migrateKey(src string, to string) (string, error) {
-	if filepath.Ext(src) == ".nk" {
+	if filepath.Ext(src) == NKeyExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
 			return "", fmt.Errorf("error processing %q: %v", src, err)
@@ -500,7 +524,7 @@ func migrateKey(src string, to string) (string, error) {
 		kind := pk[0:1]
 		shard := pk[1:3]
 
-		fp := filepath.Join(to, "keys", kind, shard, fmt.Sprintf("%s.nk", pk))
+		fp := filepath.Join(to, "keys", kind, shard, fmt.Sprintf("%s%s", pk, NKeyExtension))
 		if err := MaybeMakeDir(filepath.Dir(fp)); err != nil {
 			return "", err
 		}
@@ -509,24 +533,40 @@ func migrateKey(src string, to string) (string, error) {
 	return "", nil
 }
 
-func migrateCreds(src string, to string) (string, error) {
-	if filepath.Ext(src) == ".creds" {
+func relCredsPath(ksroot string, p string) (string, error) {
+	// old creds are expected as:
+	// <op>/accounts/<actname>/users/<un>.creds
+	// new creds are found:
+	// creds/<op>/<actname>/<un>.creds
+	rel, err := filepath.Rel(ksroot, p)
+	if err != nil {
+		return "", err
+	}
+	a := strings.Split(rel, string(os.PathSeparator))
+	if len(a) == 4 && a[0] == CredsDir {
+		// this is a file in the current format
+		return rel, nil
+	}
+	if len(a) == 5 {
+		return filepath.Join(CredsDir, a[0], a[2], a[4]), nil
+	}
+	return "", fmt.Errorf("unexpected creds filepath len of %d: %q", len(a), rel)
+
+}
+
+func migrateCreds(ksroot string, src string, to string) (string, error) {
+	if filepath.Ext(src) == CredsExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
 			return "", fmt.Errorf("error processing %q: %v", src, err)
 		}
 
-		// .../<op>/accounts/<actname>/users/<un>.creds
-		a := strings.Split(src, string(os.PathSeparator))
-		c := len(a)
-		if c < 5 {
-			return "", fmt.Errorf("unexpected path %q", src)
+		rel, err := relCredsPath(ksroot, src)
+		if err != nil {
+			return "", err
 		}
-		name := a[c-1]
-		account := a[c-3]
-		operator := a[c-5]
 
-		to := filepath.Join(to, "creds", operator, account, name)
+		to := filepath.Join(to, rel)
 		if err := MaybeMakeDir(filepath.Dir(to)); err != nil {
 			return "", err
 		}
