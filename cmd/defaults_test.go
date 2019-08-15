@@ -58,3 +58,61 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.Equal(t, "operator", tc.Operator)
 	require.Equal(t, "A", tc.Account)
 }
+
+func Test_isOperatorDir(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	x := filepath.Join(ts.Dir, "X")
+	err := os.Mkdir(x, 0777)
+	require.NoError(t, err)
+
+	ok, err := isOperatorDir(x)
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	odir := filepath.Join(ts.GetStoresRoot(), "O")
+	ok, err = isOperatorDir(odir)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	ok, err = isOperatorDir(filepath.Dir(odir))
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
+func Test_GetCwdStore(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	d, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(d)
+
+	// normalize the path representation
+	require.NoError(t, os.Chdir(ts.Dir))
+	testDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	require.Equal(t, "", GetCwdStoresRoot())
+
+	storeRoot := filepath.Join(testDir, "store")
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(storeRoot))
+	require.Equal(t, storeRoot, GetCwdStoresRoot())
+
+	odir := filepath.Join(storeRoot, "O")
+	require.NoError(t, os.Chdir(odir))
+	require.Equal(t, storeRoot, GetCwdStoresRoot())
+
+	accounts := filepath.Join(odir, "accounts")
+	require.NoError(t, os.Chdir(accounts))
+	require.Equal(t, storeRoot, GetCwdStoresRoot())
+
+	actdir := filepath.Join(accounts, "A")
+	require.NoError(t, os.Chdir(actdir))
+	require.Equal(t, storeRoot, GetCwdStoresRoot())
+}

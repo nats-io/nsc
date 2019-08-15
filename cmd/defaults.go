@@ -16,14 +16,17 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 //NscHomeEnv the folder for the config file
@@ -54,6 +57,84 @@ func GetConfig() *ToolConfig {
 	return &config
 }
 
+func GetCwdStoresRoot() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	dir := cwd
+	ok, err := isOperatorDir(dir)
+	if err != nil {
+		return ""
+	}
+	if ok {
+		return filepath.Dir(dir)
+	}
+
+	// search down
+	infos, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, v := range infos {
+		ok, err := isOperatorDir(filepath.Join(dir, v.Name()))
+		if err != nil {
+			return ""
+		}
+		if ok {
+			return dir
+		}
+	}
+
+	// search up
+	dir = cwd
+	for {
+		ok, err := isOperatorDir(dir)
+		if err != nil {
+			return ""
+		}
+		if ok {
+			return filepath.Dir(dir)
+		}
+		pdir := filepath.Dir(dir)
+		if pdir == dir {
+			// not found
+			return ""
+		}
+		dir = pdir
+	}
+}
+
+func isOperatorDir(dir string) (bool, error) {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return false, err
+	}
+	if !fi.IsDir() {
+		return false, nil
+	}
+	tf := filepath.Join(dir, ".nsc")
+	fi, err = os.Stat(tf)
+	if err == nil && !fi.IsDir() {
+		var v store.Info
+		d, err := ioutil.ReadFile(tf)
+		if err != nil {
+			return false, err
+		}
+		err = json.Unmarshal(d, &v)
+		if err != nil {
+			return false, err
+		}
+		if v.Kind == "operator" {
+			// return the parent of store
+			return true, nil
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
+	return false, nil
+}
+
 func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 	var err error
 	if toolHomeEnvName == "" {
@@ -75,7 +156,6 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 		config.GithubUpdates = github
 
 		config.LastUpdate = time.Now().UTC().Unix() // this is not "true" but avoids the initial check
-
 		// ~/.ngs_cli/nats
 		config.StoreRoot = filepath.Join(toolHome, "nats")
 		if err := MaybeMakeDir(config.StoreRoot); err != nil {
@@ -88,7 +168,14 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 		if err := config.Save(); err != nil {
 			return nil, err
 		}
+	} else {
+		storeRoot := GetCwdStoresRoot()
+		if storeRoot != "" {
+			config.StoreRoot = storeRoot
+			config.SetDefaults()
+		}
 	}
+
 	// trigger updating defaults
 	config.SetDefaults()
 
