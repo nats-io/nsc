@@ -35,7 +35,7 @@ func TestResolveLocal(t *testing.T) {
 
 	u, err := homedir.Dir()
 	require.NoError(t, err)
-	fp := filepath.Join(u, DEfaultNKeysPath)
+	fp := filepath.Join(u, DefaultNKeysPath)
 
 	require.Equal(t, dir, fp)
 }
