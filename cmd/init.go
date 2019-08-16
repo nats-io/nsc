@@ -17,8 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 
 	"github.com/nats-io/jwt"
@@ -48,20 +46,20 @@ func createInitCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return fmt.Errorf("init failed: %v", err)
 			}
-
-			if err := params.deploy(); err != nil {
-				return err
-			}
-
-			if err := params.sync(cmd); err != nil {
-				return err
-			}
-
-			// output server message to the user
-			if params.PushMessage != nil {
-				params.PushMessage = append(params.PushMessage, '\n')
-				Write("--", params.PushMessage)
-			}
+			//
+			//if err := params.deploy(); err != nil {
+			//	return err
+			//}
+			//
+			//if err := params.sync(cmd); err != nil {
+			//	return err
+			//}
+			//
+			//// output server message to the user
+			//if params.PushMessage != nil {
+			//	params.PushMessage = append(params.PushMessage, '\n')
+			//	Write("--", params.PushMessage)
+			//}
 
 			if params.CreateOperator {
 				cmd.Printf("Success!! created a new operator, account and user named %q.\n", params.Name)
@@ -227,65 +225,65 @@ func (p *InitCmdParams) resolveOperator() error {
 	return nil
 }
 
-func (p *InitCmdParams) deploy() error {
-	op, err := p.Store.ReadOperatorClaim()
-	if err != nil {
-		return err
-	}
-	p.ServiceURLs = op.OperatorServiceURLs
-
-	an := GetConfig().Account
-	ac, err := p.Store.ReadAccountClaim(an)
-	if err != nil {
-		return err
-	}
-
-	if !p.CreateOperator {
-		d, err := p.Store.Read(store.Accounts, an, store.JwtName(an))
-		p.AccountServerURL, err = AccountJwtURL(op, ac)
-		if err != nil {
-			return err
-		}
-		p.PushStatus, p.PushMessage, err = PushAccount(p.AccountServerURL, d)
-		if err != nil {
-			return fmt.Errorf("error pushing to %q: %v", p.AccountServerURL, err)
-		}
-	}
-	return nil
-}
-
-func (p *InitCmdParams) sync(cmd *cobra.Command) error {
-	if IsAccountAvailable(p.PushStatus) {
-		// ask for the JWT
-		r, err := http.Get(p.AccountServerURL)
-		if err != nil {
-			return fmt.Errorf("error retrieving jwt from %q: %v", p.AccountServerURL, err)
-		}
-		defer r.Body.Close()
-		m, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			return fmt.Errorf("error reading server response: %v", err)
-		}
-		token, err := jwt.ParseDecoratedJWT(m)
-		if err != nil {
-			return fmt.Errorf("error parsing JWT returned by the server: %v", err)
-		}
-		aac, err := jwt.DecodeAccountClaims(token)
-		if err != nil {
-			return fmt.Errorf("error decoding JWT returned by the server: %v", err)
-		}
-
-		if err := p.Store.StoreClaim([]byte(token)); err != nil {
-			return fmt.Errorf("error storing JWT returned by the server: %v", err)
-		}
-		ad := NewAccountDescriber(*aac)
-		Write("--", []byte(ad.Describe()))
-	}
-	if IsAccountPending(p.PushStatus) {
-		cmd.Printf("account was accepted - server message below contains additional instructions\n")
-	}
-	return nil
-}
+//func (p *InitCmdParams) deploy() error {
+//	op, err := p.Store.ReadOperatorClaim()
+//	if err != nil {
+//		return err
+//	}
+//	p.ServiceURLs = op.OperatorServiceURLs
+//
+//	an := GetConfig().Account
+//	ac, err := p.Store.ReadAccountClaim(an)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if !p.CreateOperator {
+//		d, err := p.Store.Read(store.Accounts, an, store.JwtName(an))
+//		p.AccountServerURL, err = AccountJwtURL(op, ac)
+//		if err != nil {
+//			return err
+//		}
+//		p.PushStatus, p.PushMessage, err = PushAccount(p.AccountServerURL, d)
+//		if err != nil {
+//			return fmt.Errorf("error pushing to %q: %v", p.AccountServerURL, err)
+//		}
+//	}
+//	return nil
+//}
+//
+//func (p *InitCmdParams) sync(cmd *cobra.Command) error {
+//	if IsAccountAvailable(p.PushStatus) {
+//		// ask for the JWT
+//		r, err := http.Get(p.AccountServerURL)
+//		if err != nil {
+//			return fmt.Errorf("error retrieving jwt from %q: %v", p.AccountServerURL, err)
+//		}
+//		defer r.Body.Close()
+//		m, err := ioutil.ReadAll(r.Body)
+//		if err != nil {
+//			return fmt.Errorf("error reading server response: %v", err)
+//		}
+//		token, err := jwt.ParseDecoratedJWT(m)
+//		if err != nil {
+//			return fmt.Errorf("error parsing JWT returned by the server: %v", err)
+//		}
+//		aac, err := jwt.DecodeAccountClaims(token)
+//		if err != nil {
+//			return fmt.Errorf("error decoding JWT returned by the server: %v", err)
+//		}
+//
+//		if err := p.Store.StoreClaim([]byte(token)); err != nil {
+//			return fmt.Errorf("error storing JWT returned by the server: %v", err)
+//		}
+//		ad := NewAccountDescriber(*aac)
+//		Write("--", []byte(ad.Describe()))
+//	}
+//	if IsAccountPending(p.PushStatus) {
+//		cmd.Printf("account was accepted - server message below contains additional instructions\n")
+//	}
+//	return nil
+//}
 
 type keys struct {
 	KP        nkeys.KeyPair
@@ -373,7 +371,7 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 				return err
 			}
 		}
-		if err := p.Store.StoreClaim([]byte(token)); err != nil {
+		if err := p.Store.StoreRaw([]byte(token)); err != nil {
 			return err
 		}
 	}
@@ -396,7 +394,7 @@ func (p *InitCmdParams) setOperatorDefaults(ctx ActionCtx) error {
 		if p.AccountServerURL != "" {
 			oc.AccountServerURL = p.AccountServerURL
 		}
-		if err := ctx.StoreCtx().Store.StoreClaim([]byte(token)); err != nil {
+		if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
 			return err
 		}
 
@@ -408,11 +406,11 @@ func (p *InitCmdParams) setOperatorDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitCmdParams) createAccount(ctx ActionCtx) error {
+func (p *InitCmdParams) createAccount(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.Account.KP, err = nkeys.CreateAccount()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	p.Account.PubKey, err = p.Account.KP.PublicKey()
 	ac := jwt.NewAccountClaims(p.Account.PubKey)
@@ -424,16 +422,13 @@ func (p *InitCmdParams) createAccount(ctx ActionCtx) error {
 	}
 	at, err := ac.Encode(kp)
 	if err != nil {
-		return err
-	}
-	if err := ctx.StoreCtx().Store.StoreClaim([]byte(at)); err != nil {
-		return err
+		return nil, err
 	}
 	p.Account.KeyPath, err = ctx.StoreCtx().KeyStore.Store(p.Account.KP)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return ctx.StoreCtx().Store.StoreClaim([]byte(at))
 }
 
 func (p *InitCmdParams) createUser(ctx ActionCtx) error {
@@ -453,7 +448,7 @@ func (p *InitCmdParams) createUser(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if err := ctx.StoreCtx().Store.StoreClaim([]byte(at)); err != nil {
+	if err := ctx.StoreCtx().Store.StoreRaw([]byte(at)); err != nil {
 		return err
 	}
 	p.User.KeyPath, err = ctx.StoreCtx().KeyStore.Store(p.User.KP)
@@ -468,19 +463,23 @@ func (p *InitCmdParams) createUser(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitCmdParams) Run(ctx ActionCtx) error {
+func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
 	if p.CreateOperator {
 		if err := p.setOperatorDefaults(ctx); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	if err := p.createAccount(ctx); err != nil {
-		return err
+	rs, err := p.createAccount(ctx)
+	if err != nil {
+		return rs, err
+	}
+	if err := GetConfig().SetAccount(p.Name); err != nil {
+		return rs, err
 	}
 
 	if err := p.createUser(ctx); err != nil {
-		return err
+		return rs, err
 	}
-	return GetConfig().SetAccount(p.Name)
+	return rs, nil
 }

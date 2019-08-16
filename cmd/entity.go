@@ -138,9 +138,9 @@ func (c *Entity) Edit() error {
 	return nil
 }
 
-func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
+func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) (store.Status, error) {
 	if !c.create {
-		return nil
+		return nil, nil
 	}
 	// self-sign if we don't have a parent keypair
 	if signer == nil {
@@ -149,12 +149,12 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 
 	pub, err := c.kp.PublicKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	s, err := GetStore()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var claim jwt.Claims
@@ -172,11 +172,11 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 		claim = uc
 		ctx, err := s.GetContext()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		spk, err := signer.PublicKey()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if ctx.Account.PublicKey != spk {
 			uc.IssuerAccount = ctx.Account.PublicKey
@@ -191,13 +191,13 @@ func (c *Entity) GenerateClaim(signer nkeys.KeyPair, ctx ActionCtx) error {
 
 	if c.editFn != nil {
 		if err = c.editFn(claim, ctx); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	token, err := claim.Encode(signer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return s.StoreClaim([]byte(token))

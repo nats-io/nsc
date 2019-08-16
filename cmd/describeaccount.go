@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -86,7 +87,7 @@ func (p *DescribeAccountParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) Run(ctx ActionCtx) error {
+func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	v := NewAccountDescriber(p.AccountClaims).Describe()
-	return Write(p.outputFile, []byte(v))
+	return nil, Write(p.outputFile, []byte(v))
 }

@@ -18,6 +18,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -185,8 +187,8 @@ func (a *actionResponse) Validate(ctx ActionCtx) error {
 	return a.validate(ctx)
 }
 
-func (a *actionResponse) Run(ctx ActionCtx) error {
-	return a.run(ctx)
+func (a *actionResponse) Run(ctx ActionCtx) (store.Status, error) {
+	return nil, a.run(ctx)
 }
 
 func newDefaultAction() actionResponse {

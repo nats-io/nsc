@@ -198,8 +198,8 @@ func (p *ValidateCmdParams) getSelectedAccounts() ([]string, error) {
 	return nil, nil
 }
 
-func (p *ValidateCmdParams) Run(ctx ActionCtx) error {
-	return nil
+func (p *ValidateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
+	return nil, nil
 }
 
 func (p *ValidateCmdParams) foundErrors() bool {

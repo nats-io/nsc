@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 )
@@ -95,12 +97,12 @@ func (p *RttParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RttParams) Run(ctx ActionCtx) error {
+func (p *RttParams) Run(ctx ActionCtx) (store.Status, error) {
 	opts := createDefaultToolOptions("nsc_rtt", ctx)
 	opts = append(opts, nats.UserCredentials(p.credsPath))
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer nc.Close()
 
@@ -108,5 +110,5 @@ func (p *RttParams) Run(ctx ActionCtx) error {
 	nc.Flush()
 	rtt := time.Since(start)
 	ctx.CurrentCmd().Printf("round trip time to [%s] = %v\n", nc.ConnectedUrl(), rtt)
-	return nil
+	return nil, nil
 }

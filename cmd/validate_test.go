@@ -57,7 +57,7 @@ func Test_ValidateExpiredOperator(t *testing.T) {
 	oc.Expires = before
 
 	token, err := oc.Encode(ts.OperatorKey)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
@@ -72,7 +72,7 @@ func Test_ValidateBadOperatorIssuer(t *testing.T) {
 	require.NoError(t, err)
 	_, _, kp := CreateOperatorKey(t)
 	token, err := oc.Encode(kp)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
@@ -91,7 +91,10 @@ func Test_ExpiredAccount(t *testing.T) {
 	require.NoError(t, err)
 	ac.Expires = before
 	token, err := ac.Encode(ts.OperatorKey)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	require.NoError(t, err)
+	rs, err := ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
@@ -108,7 +111,10 @@ func Test_ValidateBadAccountIssuer(t *testing.T) {
 
 	_, _, kp := CreateOperatorKey(t)
 	token, err := ac.Encode(kp)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	require.NoError(t, err)
+	rs, err := ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
@@ -148,7 +154,10 @@ func Test_ValidateExpiredUser(t *testing.T) {
 	uc.Expires = before
 	kp := ts.GetAccountKey(t, "A")
 	token, err := uc.Encode(kp)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	require.NoError(t, err)
+	rs, err := ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)

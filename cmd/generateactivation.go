@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -263,7 +265,7 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
+func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.activation = jwt.NewActivationClaims(p.accountKey.publicKey)
 	p.activation.NotBefore, _ = p.timeParams.StartDate()
@@ -275,7 +277,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 
 	spub, err := p.signerKP.PublicKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if p.claims.Subject != spub {
 		p.activation.IssuerAccount = p.claims.Subject
@@ -283,8 +285,8 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) error {
 
 	p.Token, err = p.activation.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }

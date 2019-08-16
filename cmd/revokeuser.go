@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -154,8 +156,7 @@ func (p *RevokeUserParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeUserParams) Run(ctx ActionCtx) error {
-
+func (p *RevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.at == 0 {
 		p.claim.Revoke(p.userPubKey)
 	} else {
@@ -164,7 +165,7 @@ func (p *RevokeUserParams) Run(ctx ActionCtx) error {
 
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

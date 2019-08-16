@@ -46,7 +46,7 @@ type Action interface {
 	// Validate the action
 	Validate(ctx ActionCtx) error
 	// Run the action
-	Run(ctx ActionCtx) error
+	Run(ctx ActionCtx) (store.Status, error)
 }
 
 type Actx struct {
@@ -139,11 +139,11 @@ func run(ctx ActionCtx, action interface{}) error {
 		return err
 	}
 
-	if err := e.Run(ctx); err != nil {
-		return err
+	rs, err := e.Run(ctx)
+	if rs != nil {
+		ctx.CurrentCmd().Println(rs.Message())
 	}
-
-	return RunInterceptor(ctx, action)
+	return err
 }
 
 func (c *Actx) StoreCtx() *store.Context {

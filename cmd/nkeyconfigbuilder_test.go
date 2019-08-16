@@ -174,7 +174,9 @@ func Test_NkeyResolverAddsSigningKeyUser(t *testing.T) {
 	ac.SigningKeys.Add(pk)
 	token, err := ac.Encode(sk)
 	require.NoError(t, err)
-	require.NoError(t, ts.Store.StoreClaim([]byte(token)))
+	rs, err := ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	ts.AddUserWithSigner(t, "A", "ua", sk)
 

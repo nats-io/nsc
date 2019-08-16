@@ -181,7 +181,7 @@ func TestStoreOperator(t *testing.T) {
 	token, err := c.Encode(kp)
 	require.NoError(t, err)
 
-	err = s.StoreClaim([]byte(token))
+	_, err = s.StoreClaim([]byte(token))
 	require.NoError(t, err)
 	c, err = s.LoadClaim("x.jwt")
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestStoreAccount(t *testing.T) {
 	c.Name = "foo"
 	cd, err := c.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	_, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
 	gc, err := s.LoadClaim(Accounts, "foo", "foo.jwt")
@@ -218,7 +218,7 @@ func TestStoreAccountWithSigningKey(t *testing.T) {
 	oc.SigningKeys.Add(spk1, spk2)
 	cd, err := oc.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	_, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
 	oc, err = s.ReadOperatorClaim()
@@ -230,7 +230,7 @@ func TestStoreAccountWithSigningKey(t *testing.T) {
 	c.Name = "foo"
 	cd, err = c.Encode(skp1)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	_, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
 	gc, err := s.LoadClaim(Accounts, "foo", "foo.jwt")
@@ -251,7 +251,7 @@ func TestStoreUser(t *testing.T) {
 	ac.Name = "foo"
 	cd, err := ac.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	_, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
 	uc := jwt.NewUserClaims(upub)
@@ -259,7 +259,7 @@ func TestStoreUser(t *testing.T) {
 	ud, err := uc.Encode(akp)
 	require.NoError(t, err)
 
-	err = s.StoreClaim([]byte(ud))
+	_, err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)
 
 	gc, err := s.LoadClaim(Accounts, "foo", Users, "bar.jwt")
@@ -281,7 +281,7 @@ func TestStoreUserWithSigningKeys(t *testing.T) {
 	ac.SigningKeys.Add(spub)
 	cd, err := ac.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	_, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
 
 	uc := jwt.NewUserClaims(upub)
@@ -289,7 +289,7 @@ func TestStoreUserWithSigningKeys(t *testing.T) {
 	uc.IssuerAccount = apub
 	ud, err := uc.Encode(sakp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(ud))
+	_, err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)
 
 	gc, err := s.LoadClaim(Accounts, "foo", Users, "bar.jwt")
@@ -310,15 +310,16 @@ func TestStore_ListSubContainers(t *testing.T) {
 	ac.Name = "foo"
 	cd, err := ac.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	rs, err := s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	uc := jwt.NewUserClaims(upub)
 	uc.Name = "bar"
 	ud, err := uc.Encode(akp)
 	require.NoError(t, err)
 
-	err = s.StoreClaim([]byte(ud))
+	_, err = s.StoreClaim([]byte(ud))
 	require.NoError(t, err)
 
 	v, err := s.ListEntries(Accounts, "foo", Users)
@@ -345,8 +346,9 @@ func TestStore_GetAccountKeys(t *testing.T) {
 	ac.Name = "A"
 	cd, err := ac.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	rs, err := s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	keys, err = ctx.GetAccountKeys("A")
 	require.NoError(t, err)
@@ -357,8 +359,9 @@ func TestStore_GetAccountKeys(t *testing.T) {
 	ac.SigningKeys.Add(apub2)
 	cd, err = ac.Encode(kp)
 	require.NoError(t, err)
-	err = s.StoreClaim([]byte(cd))
+	rs, err = s.StoreClaim([]byte(cd))
 	require.NoError(t, err)
+	require.Nil(t, rs)
 
 	keys, err = ctx.GetAccountKeys("A")
 	require.NoError(t, err)

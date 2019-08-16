@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -183,13 +185,13 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DeleteImportParams) Run(ctx ActionCtx) error {
+func (p *DeleteImportParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.deletedImport = p.claim.Imports[p.index]
 	p.claim.Imports = append(p.claim.Imports[:p.index], p.claim.Imports[p.index+1:]...)
 
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

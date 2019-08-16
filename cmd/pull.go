@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
@@ -91,12 +93,13 @@ type PullParams struct {
 }
 
 type PullJob struct {
-	Name       string
-	ASU        string
+	Name     string
+	ASU      string
+	Err      error
+	StoreErr error
+
 	Data       []byte
 	StatusCode int
-	Err        error
-	StoreErr   error
 }
 
 func (j *PullJob) Error() error {
@@ -280,10 +283,10 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *PullParams) Run(ctx ActionCtx) error {
+func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
 	if err := p.setupJobs(ctx); err != nil {
-		return err
+		return nil, err
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(p.Jobs))
@@ -299,9 +302,9 @@ func (p *PullParams) Run(ctx ActionCtx) error {
 		if err := j.Error(); err != nil {
 			continue
 		}
-		// token parsing already succeeded
+		// token parsing already succeeded - and this is the server provided version
 		token, _ := j.Token()
-		if err := ctx.StoreCtx().Store.StoreClaim([]byte(token)); err != nil {
+		if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
 			j.StoreErr = err
 		}
 	}
@@ -309,7 +312,7 @@ func (p *PullParams) Run(ctx ActionCtx) error {
 	err := p.Jobs.Error()
 	if err != nil {
 		// description will show actual error
-		return errors.New("")
+		return nil, errors.New("")
 	}
-	return nil
+	return nil, nil
 }

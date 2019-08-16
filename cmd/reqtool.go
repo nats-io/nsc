@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 )
@@ -95,12 +97,12 @@ func (p *ReqParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ReqParams) Run(ctx ActionCtx) error {
+func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 	opts := createDefaultToolOptions("nsc_req", ctx)
 	opts = append(opts, nats.UserCredentials(p.credsPath))
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer nc.Close()
 
@@ -114,12 +116,12 @@ func (p *ReqParams) Run(ctx ActionCtx) error {
 	msg, err := nc.Request(subj, []byte(payload), 5*time.Second)
 	if err == nats.ErrTimeout {
 		ctx.CurrentCmd().Println("request timed out")
-		return nil
+		return nil, nil
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx.CurrentCmd().Printf("Received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
-	return nil
+	return nil, nil
 }

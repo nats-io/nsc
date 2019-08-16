@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cli"
 	"github.com/spf13/cobra"
@@ -108,38 +110,38 @@ func (p *DescribeFile) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeFile) Run(ctx ActionCtx) error {
+func (p *DescribeFile) Run(ctx ActionCtx) (store.Status, error) {
 	var describer Describer
 	switch p.kind {
 	case jwt.AccountClaim:
 		ac, err := jwt.DecodeAccountClaims(p.token)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		describer = NewAccountDescriber(*ac)
 	case jwt.ActivationClaim:
 		ac, err := jwt.DecodeActivationClaims(p.token)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		describer = NewActivationDescriber(*ac)
 	case jwt.UserClaim:
 		uc, err := jwt.DecodeUserClaims(p.token)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		describer = NewUserDescriber(*uc)
 	case jwt.OperatorClaim:
 		oc, err := jwt.DecodeOperatorClaims(p.token)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		describer = NewOperatorDescriber(*oc)
 	}
 
 	if describer == nil {
-		return fmt.Errorf("describer for %q is not implemented", p.kind)
+		return nil, fmt.Errorf("describer for %q is not implemented", p.kind)
 	}
 
-	return Write(p.outputFile, []byte(describer.Describe()))
+	return nil, Write(p.outputFile, []byte(describer.Describe()))
 }

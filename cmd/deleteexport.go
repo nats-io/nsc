@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -137,13 +139,13 @@ func (p *DeleteExportParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DeleteExportParams) Run(ctx ActionCtx) error {
+func (p *DeleteExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.deletedExport = p.claim.Exports[p.index]
 	p.claim.Exports = append(p.claim.Exports[:p.index], p.claim.Exports[p.index+1:]...)
 
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

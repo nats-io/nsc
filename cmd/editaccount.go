@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
@@ -231,7 +233,7 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditAccountParams) Run(ctx ActionCtx) error {
+func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	keys, _ := p.signingKeys.PublicKeys()
 	if len(keys) > 0 {
@@ -240,26 +242,26 @@ func (p *EditAccountParams) Run(ctx ActionCtx) error {
 	p.claim.SigningKeys.Remove(p.rmSigningKeys...)
 
 	if err := p.GenericClaimsParams.Run(ctx, p.claim); err != nil {
-		return err
+		return nil, err
 	}
 
 	p.claim.Limits.Conn = p.conns.NumberValue
 	p.claim.Limits.LeafNodeConn = p.leafConns.NumberValue
 	p.claim.Limits.Data, err = p.data.NumberValue()
 	if err != nil {
-		return fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
+		return nil, fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
 	}
 	p.claim.Limits.Exports = p.exports.NumberValue
 	p.claim.Limits.WildcardExports = p.exportsWc
 	p.claim.Limits.Imports = p.imports.NumberValue
 	p.claim.Limits.Payload, err = p.payload.NumberValue()
 	if err != nil {
-		return fmt.Errorf("error parsing %s: %s", "payload", p.data.Value)
+		return nil, fmt.Errorf("error parsing %s: %s", "payload", p.data.Value)
 	}
 	p.claim.Limits.Subs = p.subscriptions.NumberValue
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
 }

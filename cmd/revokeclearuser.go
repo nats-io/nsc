@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 
@@ -136,16 +138,16 @@ func (p *ClearRevokeUserParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ClearRevokeUserParams) Run(ctx ActionCtx) error {
+func (p *ClearRevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if !p.claim.IsRevokedAt(p.userPubKey, time.Unix(0, 0)) {
-		return fmt.Errorf("user with public key %s is not revoked", p.userPubKey)
+		return nil, fmt.Errorf("user with public key %s is not revoked", p.userPubKey)
 	}
 
 	p.claim.ClearRevocation(p.userPubKey)
 
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

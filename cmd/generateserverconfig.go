@@ -185,27 +185,27 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateServerConfigParams) Run(ctx ActionCtx) error {
+func (p *GenerateServerConfigParams) Run(ctx ActionCtx) (store.Status, error) {
 	s := ctx.StoreCtx().Store
 
 	op, err := s.Read(store.JwtName(s.GetName()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	p.generator.Add(op)
 
 	names, err := GetConfig().ListAccounts()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(names) == 0 {
-		return fmt.Errorf("operator %q has no accounts", GetConfig().Operator)
+		return nil, fmt.Errorf("operator %q has no accounts", GetConfig().Operator)
 	}
 
 	for _, n := range names {
 		d, err := s.Read(store.Accounts, n, store.JwtName(n))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		p.generator.Add(d)
 
@@ -213,7 +213,7 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) error {
 		for _, u := range users {
 			d, err := s.Read(store.Accounts, n, store.Users, store.JwtName(u))
 			if err != nil {
-				return err
+				return nil, err
 			}
 			p.generator.Add(d)
 		}
@@ -221,14 +221,14 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) error {
 
 	d, err := p.generator.Generate()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if p.configOut != "" {
-		return Write(p.configOut, d)
+		return nil, Write(p.configOut, d)
 	}
 
-	return err
+	return nil, err
 }
 
 type ServerConfigGenerator interface {

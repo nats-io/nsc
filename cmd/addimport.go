@@ -21,6 +21,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -252,7 +254,7 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 		return err
 	}
 
-	if err := ap.Run(ctx); err != nil {
+	if _, err := ap.Run(ctx); err != nil {
 		return err
 	}
 
@@ -489,23 +491,23 @@ func (p *AddImportParams) filter(kind jwt.ExportType, imports jwt.Imports) jwt.I
 	return buf
 }
 
-func (p *AddImportParams) Run(ctx ActionCtx) error {
+func (p *AddImportParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.claim.Imports.Add(p.createImport())
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ac, err := jwt.DecodeAccountClaims(token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var vr jwt.ValidationResults
 	ac.Validate(&vr)
 	errs := vr.Errors()
 	if len(errs) > 0 {
-		return errs[0]
+		return nil, errs[0]
 	}
 
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))

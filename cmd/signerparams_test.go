@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
@@ -70,15 +72,15 @@ func (a *signerParamsTest) Validate(ctx ActionCtx) error {
 	return a.sp.Resolve(ctx)
 }
 
-func (a *signerParamsTest) Run(ctx ActionCtx) error {
+func (a *signerParamsTest) Run(ctx ActionCtx) (store.Status, error) {
 	if a.expected == nil && a.sp.signerKP != nil {
 		d, _ := a.sp.signerKP.Seed()
-		return fmt.Errorf("no key expected - found %q", string(d))
+		return nil, fmt.Errorf("no key expected - found %q", string(d))
 	}
 	if a.expected != nil && a.sp.signerKP == nil {
-		return fmt.Errorf("expected key - none found")
+		return nil, fmt.Errorf("expected key - none found")
 	}
-	return nil
+	return nil, nil
 }
 
 func Test_SignerParams(t *testing.T) {

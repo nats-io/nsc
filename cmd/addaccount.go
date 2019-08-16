@@ -41,15 +41,13 @@ func CreateAddAccountCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if params.generate && !QuietMode() {
-				cmd.Printf("Generated account key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
-			}
-
 			if !QuietMode() {
+				if params.generate {
+					cmd.Printf("Generated account key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
+				}
 				cmd.Printf("Success! - added account %q\n", params.name)
 			}
-
-			return nil
+			return GetConfig().SetAccount(params.name)
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "account name")
@@ -233,11 +231,11 @@ func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddAccountParams) Run(ctx ActionCtx) error {
+func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	pk, err := p.akp.PublicKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ac := jwt.NewAccountClaims(pk)
@@ -256,13 +254,8 @@ func (p *AddAccountParams) Run(ctx ActionCtx) error {
 	}
 	p.token, err = ac.Encode(signer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
-		return err
-	}
-
-	// if we added an account - make this the current account
-	return GetConfig().SetAccount(ac.Name)
+	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
 }

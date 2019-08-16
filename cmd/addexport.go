@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -213,10 +215,10 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddExportParams) Run(ctx ActionCtx) error {
+func (p *AddExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

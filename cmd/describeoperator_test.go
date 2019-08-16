@@ -96,7 +96,7 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	oc.AccountServerURL = u
 	token, err := oc.Encode(ts.OperatorKey)
 	require.NoError(t, err)
-	err = ts.Store.StoreClaim([]byte(token))
+	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
 	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
@@ -119,7 +119,7 @@ func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 
 	token, err := oc.Encode(ts.OperatorKey)
 	require.NoError(t, err)
-	err = ts.Store.StoreClaim([]byte(token))
+	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
 	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")

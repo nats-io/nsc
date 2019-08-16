@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/spf13/cobra"
 )
@@ -113,7 +115,7 @@ func (p *DescribeUserParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeUserParams) Run(ctx ActionCtx) error {
+func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	v := NewUserDescriber(p.UserClaims).Describe()
-	return Write(p.outputFile, []byte(v))
+	return nil, Write(p.outputFile, []byte(v))
 }

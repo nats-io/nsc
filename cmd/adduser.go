@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/nsc/cli"
 
 	"github.com/nats-io/jwt"
@@ -219,15 +221,18 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 	return p.Entity.Valid()
 }
 
-func (p *AddUserParams) Run(ctx ActionCtx) error {
+func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
+	var rs store.Status
+	var err error
+
 	if err := p.Entity.StoreKeys(p.AccountContextParams.Name); err != nil {
-		return err
+		return nil, err
 	}
-	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
-		return err
+	rs, err = p.Entity.GenerateClaim(p.signerKP, ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	// FIXME: super hack
 	ks := ctx.StoreCtx().KeyStore
 	if p.kp == nil {
 		ctx.CurrentCmd().Println("unable to save creds - user key not found")
@@ -243,7 +248,7 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 		}
 	}
 
-	return nil
+	return rs, nil
 }
 
 func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
