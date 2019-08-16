@@ -33,6 +33,7 @@ type ActionCtx interface {
 }
 
 type ActionFn func(ctx ActionCtx) error
+type ActionRunFn func(ctx ActionCtx) (store.Status, error)
 
 type Action interface {
 	// SetDefaults that can be derived from cmd flags

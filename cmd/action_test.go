@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/nsc/cmd/store"
-
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -160,11 +159,15 @@ type actionResponse struct {
 	load            ActionFn
 	postInteractive ActionFn
 	validate        ActionFn
-	run             ActionFn
+	run             ActionRunFn
 }
 
 var nilResponse = func(ctx ActionCtx) error {
 	return nil
+}
+
+var nilRunResponse = func(ctx ActionCtx) (store.Status, error) {
+	return nil, nil
 }
 
 func (a *actionResponse) SetDefaults(ctx ActionCtx) error {
@@ -188,7 +191,7 @@ func (a *actionResponse) Validate(ctx ActionCtx) error {
 }
 
 func (a *actionResponse) Run(ctx ActionCtx) (store.Status, error) {
-	return nil, a.run(ctx)
+	return a.run(ctx)
 }
 
 func newDefaultAction() actionResponse {
@@ -198,7 +201,42 @@ func newDefaultAction() actionResponse {
 	ar.load = nilResponse
 	ar.postInteractive = nilResponse
 	ar.validate = nilResponse
-	ar.run = nilResponse
+	ar.run = nilRunResponse
 
 	return ar
+}
+
+type testStatus struct {
+	message string
+}
+
+func (m *testStatus) Message() string {
+	return m.message
+}
+
+func TestActionMessage(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ar := newDefaultAction()
+	ar.run = func(ctx ActionCtx) (store.Status, error) {
+		var m testStatus
+		m.message = "This is a test message"
+		return &m, nil
+	}
+
+	cmd := &cobra.Command{
+		Use:   "add",
+		Short: "Add assets such as accounts, imports, users, clusters, servers",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := RunAction(cmd, args, &ar); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	out, _, err := ExecuteCmd(cmd)
+	require.NoError(t, err)
+	require.Contains(t, "This is a test message", out)
 }
