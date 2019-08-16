@@ -47,101 +47,6 @@ var standardDirs = []string{Accounts}
 
 var ErrNotExist = errors.New("resource does not exist")
 
-func OK(status int) bool {
-	return status == http.StatusOK
-}
-
-func Pending(status int) bool {
-	return status > 200 && status < 300
-}
-
-type Status struct {
-	HttpStatus int
-	Data       []byte
-	Err        error
-}
-
-func (s *Status) OK() bool {
-	return OK(s.HttpStatus)
-}
-
-func (s *Status) Pending() bool {
-	return Pending(s.HttpStatus)
-}
-
-type RemoteStoreStatus struct {
-	Push Status
-	Pull Status
-	Err  error
-}
-
-func (r *RemoteStoreStatus) HasError() bool {
-	return r.Err != nil || r.Pull.Err != nil || r.Push.Err != nil
-}
-
-func (r *RemoteStoreStatus) GetError() error {
-	if r.Err != nil {
-		return r.Err
-	}
-	if r.Pull.Err != nil {
-		return r.Pull.Err
-	}
-	if r.Push.Err != nil {
-		return r.Push.Err
-	}
-	return nil
-}
-
-func (r *RemoteStoreStatus) GetPushMessage() []byte {
-	return r.Push.Data
-}
-
-func (r *RemoteStoreStatus) OK() bool {
-	return r.GetError() == nil && r.Pull.OK() && r.Push.OK()
-}
-
-func (r *RemoteStoreStatus) Pending() bool {
-	return r.GetError() == nil && r.Push.Pending()
-}
-
-func (r *RemoteStoreStatus) Error() string {
-	if r.Err != nil {
-		return r.Err.Error()
-	}
-	if r.Push.Err != nil {
-		return r.Push.Err.Error()
-	}
-	if r.Pull.Err != nil {
-		return r.Pull.Err.Error()
-	}
-
-	if !r.Push.OK() {
-		if r.Push.HttpStatus > 200 && r.Push.HttpStatus < 300 {
-			m := fmt.Sprintf("account push %q, but is not yet available - enter 'nsc sync' to synchronize with the remote server", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
-			if len(r.Push.Data) > 0 {
-				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
-			}
-			return m
-		}
-		if r.Push.HttpStatus < 200 || r.Push.HttpStatus > 299 {
-			m := fmt.Sprintf("account push failed with %q", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
-			if len(r.Push.Data) > 0 {
-				m = fmt.Sprintf("%s\n%s\n", m, string(r.Push.Data))
-			}
-			return m
-		}
-	}
-	if !r.Pull.OK() {
-		return fmt.Sprintf("account pull failed with %q", strings.ToLower(http.StatusText(r.Push.HttpStatus)))
-	}
-
-	if r.OK() && len(r.Push.Data) > 0 {
-		return fmt.Sprintf("account update succeeded\n%s\n", string(r.Push.Data))
-	}
-
-	return ""
-}
-
 // Store is a directory that contains nsc assets
 type Store struct {
 	sync.Mutex
@@ -250,7 +155,8 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 		if err != nil {
 			return nil, err
 		}
-		if err := s.StoreClaim([]byte(token)); err != nil {
+		// this is a local operator - so just write it
+		if err := s.StoreRaw([]byte(token)); err != nil {
 			return nil, fmt.Errorf("error writing operator jwt: %v", err)
 		}
 	} else {
@@ -428,94 +334,84 @@ func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
 	return &gc.Type, nil
 }
 
-func (s *Store) pullRemoteAccount(u string) (int, []byte, error) {
+func (s *Store) pullRemoteAccount(u string) (PullStatus, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(u)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error pulling %q: %v", u, err)
+		return PullStatus{}, fmt.Errorf("error pulling %q: %v", u, err)
 	}
 	defer r.Body.Close()
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r.Body)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error reading response from %q: %v", u, err)
+		return PullStatus{}, fmt.Errorf("error reading response from %q: %v", u, err)
 	}
-	return r.StatusCode, buf.Bytes(), nil
+	return PullStatus{HttpStatus: HttpStatus{Status: r.StatusCode}, Data: buf.Bytes()}, nil
 }
 
-func (s *Store) pushRemoteAccount(u string, data []byte) (int, []byte, error) {
+func (s *Store) pushRemoteAccount(u string, data []byte) (PushStatus, error) {
 	resp, err := http.Post(u, "application/jwt", bytes.NewReader(data))
 	if err != nil {
-		return 0, nil, err
+		return PushStatus{}, err
 	}
 	defer resp.Body.Close()
 	message, err := ioutil.ReadAll(resp.Body)
-	return resp.StatusCode, message, err
+
+	return PushStatus{HttpStatus: HttpStatus{Status: resp.StatusCode}, OperatorMessage: message}, err
 }
 
-func (s *Store) handleManagedAccount(data []byte) *RemoteStoreStatus {
-	var status RemoteStoreStatus
+func (s *Store) handleManagedAccount(data []byte) (*PushPullStatus, error) {
+	var status PushPullStatus
 	ac, err := jwt.DecodeAccountClaims(string(data))
 	if err != nil {
-		status.Err = fmt.Errorf("error decoding account claim")
-		return &status
+		return nil, fmt.Errorf("error decoding account claim")
 	}
 
 	oc, err := s.ReadOperatorClaim()
 	if err != nil {
-		status.Err = fmt.Errorf("unable to push to the operator - failed to read operator claim: %v", err)
-		return &status
+		return nil, fmt.Errorf("unable to push to the operator - failed to read operator claim: %v", err)
 	}
 	if oc.AccountServerURL == "" {
-		status.Err = fmt.Errorf("unable to push to %q - operator doesn't set an account server url", oc.Name)
-		return &status
+		return nil, fmt.Errorf("unable to push to %q - operator doesn't set an account server url", oc.Name)
 	}
 
 	u, err := url.Parse(oc.AccountServerURL)
 	if err != nil {
-		status.Err = fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
-		return &status
+		return nil, fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
 	}
 	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
-	status.Push.HttpStatus, status.Push.Data, status.Push.Err = s.pushRemoteAccount(u.String(), data)
-	if status.Push.Err != nil {
-		return &status
+	status.Push, err = s.pushRemoteAccount(u.String(), data)
+	if err != nil {
+		return nil, err
 	}
 
 	if status.Push.OK() {
-		status.Pull.HttpStatus, status.Pull.Data, err = s.pullRemoteAccount(u.String())
+		status.Pull, err = s.pullRemoteAccount(u.String())
+		if err != nil {
+			return &status, err
+		}
 	}
-	return &status
+	return &status, nil
 }
 
-func (s *Store) StoreClaim(data []byte) error {
+func (s *Store) StoreClaim(data []byte) (Status, error) {
 	ct, err := s.ClaimType(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if *ct == jwt.AccountClaim && s.IsManaged() {
-		rs := s.handleManagedAccount(data)
-		if rs.HasError() {
-			return rs
+		rs, err := s.handleManagedAccount(data)
+		if err != nil {
+			return rs, err
 		}
-		if rs.OK() {
+		if rs.Push.OK() || rs.Push.Pending() {
 			if err := s.StoreRaw(rs.Pull.Data); err != nil {
-				return err
-			}
-			if len(rs.Push.Data) == 0 {
-				// nothing to display to the user
-				return nil
+				return rs, err
 			}
 		}
-		if rs.Pending() {
-			// store the self signed
-			if err := s.StoreRaw(data); err != nil {
-				return err
-			}
-		}
-		return rs
+		return rs, nil
 	} else {
-		return s.StoreRaw(data)
+		return nil, s.StoreRaw(data)
 	}
 }
 

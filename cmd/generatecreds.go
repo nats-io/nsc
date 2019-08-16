@@ -135,17 +135,17 @@ func (p *GenerateCredsParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *GenerateCredsParams) Run(ctx ActionCtx) error {
+func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.entityKP == nil {
-		return fmt.Errorf("user was not found - please specify it")
+		return nil, fmt.Errorf("user was not found - please specify it")
 	}
 
 	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.user, p.entityKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return Write(p.out, d)
+	return nil, Write(p.out, d)
 }
 
 func GenerateConfig(s *store.Store, account string, user string, userKey nkeys.KeyPair) ([]byte, error) {

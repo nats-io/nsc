@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -197,16 +199,16 @@ func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeClearActivationParams) Run(ctx ActionCtx) error {
+func (p *RevokeClearActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.export == nil {
-		return fmt.Errorf("unable to locate export")
+		return nil, fmt.Errorf("unable to locate export")
 	}
 
 	p.export.ClearRevocation(p.accountKey.publicKey)
 
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
 }

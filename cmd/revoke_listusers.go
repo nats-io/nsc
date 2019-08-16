@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/xlab/tablewriter"
 
@@ -91,7 +93,7 @@ func (p *RevokeListUserParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeListUserParams) Run(ctx ActionCtx) error {
+func (p *RevokeListUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
 
@@ -110,6 +112,5 @@ func (p *RevokeListUserParams) Run(ctx ActionCtx) error {
 		table.AddRow(pubKey, formatted)
 	}
 
-	Write("--", []byte(table.Render()))
-	return nil
+	return nil, Write("--", []byte(table.Render()))
 }

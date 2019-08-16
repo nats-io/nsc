@@ -77,7 +77,7 @@ func (p *GenerateNKeysParam) Run(cmd *cobra.Command) error {
 	if p.server {
 		p.PrintKey(nkeys.PrefixByteServer, cmd)
 	}
-	return RunInterceptor(nil, nil)
+	return nil
 }
 
 func createGenerateNkey() *cobra.Command {

@@ -196,10 +196,10 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditOperatorParams) Run(ctx ActionCtx) error {
+func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	if err = p.GenericClaimsParams.Run(ctx, p.claim); err != nil {
-		return err
+		return nil, err
 	}
 	keys, _ := p.signingKeys.PublicKeys()
 	if len(keys) > 0 {
@@ -218,7 +218,7 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) error {
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
 }

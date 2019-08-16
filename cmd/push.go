@@ -238,12 +238,12 @@ func (p *PushCmdParams) getSelectedAccounts() ([]string, error) {
 	}
 }
 
-func (p *PushCmdParams) Run(ctx ActionCtx) error {
+func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 
 	p.targeted, err = p.getSelectedAccounts()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, v := range p.targeted {
@@ -255,7 +255,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) error {
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) error {

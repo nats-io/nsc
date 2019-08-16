@@ -114,7 +114,7 @@ func (p *DescribeOperatorParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeOperatorParams) Run(ctx ActionCtx) error {
+func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	v := NewOperatorDescriber(p.claim).Describe()
-	return Write(p.outputFile, []byte(v))
+	return nil, Write(p.outputFile, []byte(v))
 }

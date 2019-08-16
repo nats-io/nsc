@@ -47,7 +47,7 @@ func createAddOperatorCmd() *cobra.Command {
 			}
 			cmd.Printf("Success! - %s operator %q\n", verb, params.name)
 
-			return nil
+			return GetConfig().SetOperator(params.name)
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
@@ -221,59 +221,47 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddOperatorParams) Run(_ ActionCtx) error {
+func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 	operator := &store.NamedKey{Name: p.name, KP: p.signerKP}
 	s, err := store.CreateStore(p.name, GetConfig().StoreRoot, operator)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if p.token == "" {
 		ctx, err := s.GetContext()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if p.generate {
 			p.keyPath, err = ctx.KeyStore.Store(p.signerKP)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 
 		if p.Start != "" || p.Expiry != "" {
 			oc, err := ctx.Store.ReadOperatorClaim()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if p.Start != "" {
 				oc.NotBefore, err = p.TimeParams.StartDate()
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 			if p.Expiry != "" {
 				oc.Expires, err = p.TimeParams.ExpiryDate()
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
-			token, err := oc.Encode(p.signerKP)
-			if err = s.StoreClaim([]byte(token)); err != nil {
-				return err
+			p.token, err = oc.Encode(p.signerKP)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
-
-	if p.token != "" {
-		if err := s.StoreClaim([]byte(p.token)); err != nil {
-			return err
-		}
-	}
-
-	GetConfig().Operator = operator.Name
-	if err := GetConfig().Save(); err != nil {
-		return err
-	}
-
-	return nil
+	return s.StoreClaim([]byte(p.token))
 }

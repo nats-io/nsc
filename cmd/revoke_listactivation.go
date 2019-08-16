@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -186,9 +188,9 @@ func (p *RevokeListActivationParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeListActivationParams) Run(ctx ActionCtx) error {
+func (p *RevokeListActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.export == nil {
-		return fmt.Errorf("unable to locate export")
+		return nil, fmt.Errorf("unable to locate export")
 	}
 
 	table := tablewriter.CreateTable()
@@ -209,6 +211,5 @@ func (p *RevokeListActivationParams) Run(ctx ActionCtx) error {
 		table.AddRow(pubKey, formatted)
 	}
 
-	Write("--", []byte(table.Render()))
-	return nil
+	return nil, Write("--", []byte(table.Render()))
 }

@@ -100,17 +100,6 @@ func ResolveKeyFlag() (nkeys.KeyPair, error) {
 	return nil, nil
 }
 
-func SetInterceptor(fn InterceptorFn) {
-	interceptorFn = fn
-}
-
-func RunInterceptor(ctx ActionCtx, params interface{}) error {
-	if interceptorFn != nil {
-		return interceptorFn(ctx, params)
-	}
-	return nil
-}
-
 func GetRootCmd() *cobra.Command {
 	return rootCmd
 }

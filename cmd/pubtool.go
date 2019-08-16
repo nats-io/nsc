@@ -20,6 +20,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 )
@@ -98,12 +100,12 @@ func (p *PubParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *PubParams) Run(ctx ActionCtx) error {
+func (p *PubParams) Run(ctx ActionCtx) (store.Status, error) {
 	opts := createDefaultToolOptions("nsc_pub", ctx)
 	opts = append(opts, nats.UserCredentials(p.credsPath))
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer nc.Close()
 
@@ -113,13 +115,13 @@ func (p *PubParams) Run(ctx ActionCtx) error {
 		payload = ctx.Args()[1]
 	}
 	if err := nc.Publish(subj, []byte(payload)); err != nil {
-		return err
+		return nil, err
 	}
 	if err := nc.Flush(); err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx.CurrentCmd().Printf("Published [%s] : %q\n", subj, payload)
 
-	return nil
+	return nil, nil
 }

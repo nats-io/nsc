@@ -207,11 +207,12 @@ func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *MigrateCmdParams) Run(ctx ActionCtx) error {
+func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
 	p.operator = ctx.StoreCtx().Operator.Name
-	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.accountToken)); err != nil {
-		return err
+	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.accountToken))
+	if err != nil {
+		return rs, err
 	}
 
 	if p.isFileImport {
@@ -220,7 +221,7 @@ func (p *MigrateCmdParams) Run(ctx ActionCtx) error {
 		if err == nil && fi.IsDir() {
 			infos, err := ioutil.ReadDir(udir)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for _, v := range infos {
 				n := v.Name()
@@ -228,20 +229,20 @@ func (p *MigrateCmdParams) Run(ctx ActionCtx) error {
 					up := filepath.Join(udir, n)
 					d, err := Read(up)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					s, err := jwt.ParseDecoratedJWT(d)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					uc, err := jwt.DecodeUserClaims(s)
-					if err := ctx.StoreCtx().Store.StoreClaim([]byte(s)); err != nil {
-						return err
+					if err := ctx.StoreCtx().Store.StoreRaw([]byte(s)); err != nil {
+						return rs, err
 					}
 					p.migratedUsers = append(p.migratedUsers, uc)
 				}
 			}
 		}
 	}
-	return nil
+	return rs, nil
 }

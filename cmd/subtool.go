@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nsc/cmd/store"
+
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 )
@@ -104,12 +106,12 @@ func (p *SubParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *SubParams) Run(ctx ActionCtx) error {
+func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 	opts := createDefaultToolOptions("nscsub", ctx)
 	opts = append(opts, nats.UserCredentials(p.credsPath))
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer nc.Close()
 
@@ -120,17 +122,17 @@ func (p *SubParams) Run(ctx ActionCtx) error {
 	if p.queue != "" {
 		sub, err = nc.QueueSubscribeSync(subj, p.queue)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		sub, err = nc.SubscribeSync(subj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if p.maxMessages > 0 {
 		if err := sub.AutoUnsubscribe(p.maxMessages); err != nil {
-			return err
+			return nil, err
 		}
 		ctx.CurrentCmd().Printf("Listening on [%s] for %d messages\n", subj, p.maxMessages)
 	} else {
@@ -138,7 +140,7 @@ func (p *SubParams) Run(ctx ActionCtx) error {
 	}
 
 	if err := nc.Flush(); err != nil {
-		return err
+		return nil, err
 	}
 
 	i := 0
@@ -154,12 +156,12 @@ func (p *SubParams) Run(ctx ActionCtx) error {
 			break
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		i++
 		ctx.CurrentCmd().Printf("[#%d] Received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
 	}
 
-	return nil
+	return nil, nil
 }

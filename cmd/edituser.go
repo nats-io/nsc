@@ -290,7 +290,7 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *EditUserParams) Run(ctx ActionCtx) error {
+func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.GenericClaimsParams.Run(ctx, p.claim)
 
@@ -332,7 +332,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 		if p.respMax != "" {
 			v, err := strconv.ParseInt(p.respMax, 10, 32)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if p.claim.Resp == nil {
 				p.claim.Resp = &jwt.ResponsePermission{Expires: time.Millisecond * 5000}
@@ -343,7 +343,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 		if p.respTTL != "" {
 			v, err := time.ParseDuration(p.respTTL)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if p.claim.Resp == nil {
 				p.claim.Resp = &jwt.ResponsePermission{MaxMsgs: 1}
@@ -355,13 +355,13 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	// get the account JWT - must have since we resolved the user based on it
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// extract the signer public key
 	pk, err := p.signerKP.PublicKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// signer doesn't match - so we set IssuerAccount to the account
 	if pk != ac.Subject {
@@ -371,12 +371,13 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 	// we sign
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// if the signer is not allowed, the store will reject
-	if err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token)); err != nil {
-		return err
+	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	if err != nil {
+		return nil, err
 	}
 
 	// FIXME: super hack
@@ -400,5 +401,5 @@ func (p *EditUserParams) Run(ctx ActionCtx) error {
 		}
 	}
 
-	return nil
+	return rs, nil
 }
