@@ -57,82 +57,111 @@ func GetConfig() *ToolConfig {
 	return &config
 }
 
-func GetCwdStoresRoot() string {
+func GetCwdCtx() *ContextConfig {
+	var ctx ContextConfig
 	cwd, err := os.Getwd()
 	if err != nil {
-		return ""
+		return nil
 	}
 	dir := cwd
-	ok, err := isOperatorDir(dir)
+	info, ok, err := isOperatorDir(dir)
 	if err != nil {
-		return ""
+		return nil
 	}
 	if ok {
-		return filepath.Dir(dir)
+		ctx.StoreRoot = filepath.Dir(dir)
+		ctx.Operator = info.EnvironmentName
+		return &ctx
 	}
 
 	// search down
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return ""
+		return nil
 	}
 	for _, v := range infos {
-		ok, err := isOperatorDir(filepath.Join(dir, v.Name()))
+		if !v.IsDir() {
+			continue
+		}
+		_, ok, err := isOperatorDir(filepath.Join(dir, v.Name()))
 		if err != nil {
-			return ""
+			return nil
 		}
 		if ok {
-			return dir
+			ctx.StoreRoot = dir
+			return &ctx
 		}
 	}
 
 	// search up
 	dir = cwd
 	for {
-		ok, err := isOperatorDir(dir)
+		info, ok, err := isOperatorDir(dir)
 		if err != nil {
-			return ""
+			return nil
 		}
 		if ok {
-			return filepath.Dir(dir)
+			ctx.StoreRoot = filepath.Dir(dir)
+			ctx.Operator = info.EnvironmentName
+			sep := string(os.PathSeparator)
+			name := fmt.Sprintf("%s%s%s%s%s", sep, info.EnvironmentName, sep, store.Accounts, sep)
+			idx := strings.Index(cwd, name)
+			if idx != -1 {
+				prefix := cwd[:idx+len(name)]
+				sub, err := filepath.Rel(prefix, cwd)
+				if err == nil && len(sub) > 0 {
+					names := strings.Split(sub, sep)
+
+					if len(names) > 0 {
+						ctx.Account = names[0]
+					}
+				}
+			}
+			return &ctx
 		}
 		pdir := filepath.Dir(dir)
 		if pdir == dir {
 			// not found
-			return ""
+			return nil
 		}
 		dir = pdir
 	}
 }
 
-func isOperatorDir(dir string) (bool, error) {
+func isOperatorDir(dir string) (store.Info, bool, error) {
+	var v store.Info
 	fi, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return v, false, nil
+	}
 	if err != nil {
-		return false, err
+		return v, false, err
 	}
 	if !fi.IsDir() {
-		return false, nil
+		return v, false, nil
 	}
 	tf := filepath.Join(dir, ".nsc")
 	fi, err = os.Stat(tf)
-	if err == nil && !fi.IsDir() {
-		var v store.Info
+	if os.IsNotExist(err) {
+		return v, false, nil
+	}
+	if err != nil {
+		return v, false, nil
+	}
+	if !fi.IsDir() {
 		d, err := ioutil.ReadFile(tf)
 		if err != nil {
-			return false, err
+			return v, false, err
 		}
 		err = json.Unmarshal(d, &v)
 		if err != nil {
-			return false, err
+			return v, false, err
 		}
-		if v.Kind == "operator" {
-			// return the parent of store
-			return true, nil
+		if v.EntityName != "" {
+			return v, true, nil
 		}
-	} else if err != nil && !os.IsNotExist(err) {
-		return false, err
 	}
-	return false, nil
+	return v, false, nil
 }
 
 func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
@@ -169,9 +198,15 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 			return nil, err
 		}
 	} else {
-		storeRoot := GetCwdStoresRoot()
-		if storeRoot != "" {
-			config.StoreRoot = storeRoot
+		ctx := GetCwdCtx()
+		if ctx != nil {
+			config.StoreRoot = ctx.StoreRoot
+			if ctx.Operator != "" {
+				config.Operator = ctx.Operator
+				if ctx.Account != "" {
+					config.Account = ctx.Account
+				}
+			}
 			config.SetDefaults()
 		}
 	}
