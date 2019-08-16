@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
 )
@@ -70,7 +72,7 @@ func GetCwdCtx() *ContextConfig {
 	}
 	if ok {
 		ctx.StoreRoot = filepath.Dir(dir)
-		ctx.Operator = info.EnvironmentName
+		ctx.Operator = info.Name
 		return &ctx
 	}
 
@@ -102,9 +104,9 @@ func GetCwdCtx() *ContextConfig {
 		}
 		if ok {
 			ctx.StoreRoot = filepath.Dir(dir)
-			ctx.Operator = info.EnvironmentName
+			ctx.Operator = info.Name
 			sep := string(os.PathSeparator)
-			name := fmt.Sprintf("%s%s%s%s%s", sep, info.EnvironmentName, sep, store.Accounts, sep)
+			name := fmt.Sprintf("%s%s%s%s%s", sep, info.Name, sep, store.Accounts, sep)
 			idx := strings.Index(cwd, name)
 			if idx != -1 {
 				prefix := cwd[:idx+len(name)]
@@ -157,7 +159,7 @@ func isOperatorDir(dir string) (store.Info, bool, error) {
 		if err != nil {
 			return v, false, err
 		}
-		if v.EntityName != "" {
+		if v.Name != "" && v.Kind == jwt.OperatorClaim {
 			return v, true, nil
 		}
 	}

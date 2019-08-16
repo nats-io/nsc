@@ -79,7 +79,7 @@ func Test_isOperatorDir(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotEmpty(t, info)
-	require.Equal(t, "O", info.EntityName)
+	require.Equal(t, "O", info.Name)
 
 	info, ok, err = isOperatorDir(filepath.Dir(odir))
 	require.NoError(t, err)
