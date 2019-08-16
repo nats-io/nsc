@@ -25,10 +25,15 @@ import (
 )
 
 func envSet(varName string) string {
-	if os.Getenv(varName) == "" {
-		return "No"
+	return yn(os.Getenv(varName) != "")
+}
+
+func yn(v bool) string {
+	if v {
+		return "Yes"
 	}
-	return "Yes"
+	return "No"
+
 }
 
 func createEnvCmd() *cobra.Command {
@@ -92,6 +97,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	if r == "" {
 		r = "Not Set"
 	}
+	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
 	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
 	table.AddRow("Default Operator", "", conf.Operator)
 	table.AddRow("Default Account", "", conf.Account)

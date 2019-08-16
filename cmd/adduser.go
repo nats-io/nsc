@@ -223,7 +223,6 @@ func (p *AddUserParams) Run(ctx ActionCtx) error {
 	if err := p.Entity.StoreKeys(p.AccountContextParams.Name); err != nil {
 		return err
 	}
-
 	if err := p.Entity.GenerateClaim(p.signerKP, ctx); err != nil {
 		return err
 	}

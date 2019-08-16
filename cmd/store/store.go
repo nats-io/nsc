@@ -151,12 +151,10 @@ type Store struct {
 }
 
 type Info struct {
-	Managed         bool   `json:"managed"`
-	EntityName      string `json:"name"`
-	EnvironmentName string `json:"env"`
-	Kind            string `json:"kind"`
-	Version         string `json:"version"`
-	LastUpdateCheck int64  `json:"last_update_check"`
+	Managed bool   `json:"managed"`
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	Version string `json:"version"`
 }
 
 func underlyingError(err error) error {
@@ -226,9 +224,9 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 	s := &Store{
 		Dir: root,
 		Info: Info{
-			EntityName:      operator.Name,
-			EnvironmentName: operator.Name,
-			Version:         Version,
+			Name:    operator.Name,
+			Version: Version,
+			Kind:    jwt.OperatorClaim,
 		},
 	}
 
@@ -284,12 +282,11 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 	}
 
 	var v = jwt.NewGenericClaims(string(pub))
+	s.Info.Kind = jwt.OperatorClaim
 	v.Name = operator.Name
+	v.Type = jwt.OperatorClaim
 
-	if nkeys.IsValidPublicOperatorKey(pub) {
-		s.Info.Kind = jwt.OperatorClaim
-		v.Type = jwt.OperatorClaim
-	} else {
+	if !nkeys.IsValidPublicOperatorKey(pub) {
 		return "", fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
 	}
 
@@ -579,7 +576,7 @@ func (s *Store) StoreRaw(data []byte) error {
 }
 
 func (s *Store) GetName() string {
-	return s.Info.EntityName
+	return s.Info.Name
 }
 
 func (s *Store) operatorJwtName() (string, error) {
@@ -589,7 +586,7 @@ func (s *Store) operatorJwtName() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return JwtName(t.EntityName), nil
+		return JwtName(t.Name), nil
 	}
 	return "", fmt.Errorf("'.nsc' file was not found")
 }
@@ -783,7 +780,7 @@ func (s *Store) GetContext() (*Context, error) {
 	var err error
 
 	c.Store = s
-	c.KeyStore = NewKeyStore(s.Info.EnvironmentName)
+	c.KeyStore = NewKeyStore(s.Info.Name)
 
 	root, err := s.LoadRootClaim()
 	if err != nil {

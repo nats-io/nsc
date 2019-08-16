@@ -33,6 +33,14 @@ type ContextConfig struct {
 
 func NewContextConfig(storeRoot string) (*ContextConfig, error) {
 	ctx := ContextConfig{}
+	dc := GetCwdCtx()
+	if dc != nil {
+		ctx = *dc
+		config.SetDefaults()
+		ctx.setStoreRoot(ctx.StoreRoot)
+		return &ctx, nil
+	}
+
 	if err := ctx.setStoreRoot(storeRoot); err != nil {
 		return nil, err
 	}

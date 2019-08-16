@@ -58,3 +58,92 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.Equal(t, "operator", tc.Operator)
 	require.Equal(t, "A", tc.Account)
 }
+
+func Test_isOperatorDir(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	x := filepath.Join(ts.Dir, "X")
+	err := os.Mkdir(x, 0777)
+	require.NoError(t, err)
+
+	info, ok, err := isOperatorDir(x)
+	require.NoError(t, err)
+	require.False(t, ok)
+	require.Empty(t, info)
+
+	odir := filepath.Join(ts.GetStoresRoot(), "O")
+	info, ok, err = isOperatorDir(odir)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NotEmpty(t, info)
+	require.Equal(t, "O", info.Name)
+
+	info, ok, err = isOperatorDir(filepath.Dir(odir))
+	require.NoError(t, err)
+	require.False(t, ok)
+	require.Empty(t, info)
+}
+
+func Test_GetCwdStore(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	d, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(d)
+
+	// normalize the path representation
+	require.NoError(t, os.Chdir(ts.Dir))
+	testDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	require.Nil(t, GetCwdCtx())
+
+	storeRoot := filepath.Join(testDir, "store")
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(storeRoot))
+
+	require.NotNil(t, GetCwdCtx())
+	require.Equal(t, storeRoot, GetCwdCtx().StoreRoot)
+
+	odir := filepath.Join(storeRoot, "O")
+	require.NoError(t, os.Chdir(odir))
+
+	ctx := GetCwdCtx()
+	require.NotNil(t, ctx)
+	require.Equal(t, storeRoot, ctx.StoreRoot)
+	require.Equal(t, "O", ctx.Operator)
+	require.Equal(t, "", ctx.Account)
+
+	accounts := filepath.Join(odir, "accounts")
+	require.NoError(t, os.Chdir(accounts))
+
+	ctx = GetCwdCtx()
+	require.NotNil(t, ctx)
+	require.Equal(t, storeRoot, ctx.StoreRoot)
+	require.Equal(t, "O", ctx.Operator)
+	require.Equal(t, "", ctx.Account)
+
+	actdir := filepath.Join(accounts, "A")
+	require.NoError(t, os.Chdir(actdir))
+
+	ctx = GetCwdCtx()
+	require.NotNil(t, ctx)
+	require.Equal(t, storeRoot, ctx.StoreRoot)
+	require.Equal(t, "O", ctx.Operator)
+	require.Equal(t, "A", ctx.Account)
+
+	actdir = filepath.Join(accounts, "B")
+	require.NoError(t, os.Chdir(actdir))
+
+	ctx = GetCwdCtx()
+	require.NotNil(t, ctx)
+	require.Equal(t, storeRoot, ctx.StoreRoot)
+	require.Equal(t, "O", ctx.Operator)
+	require.Equal(t, "B", ctx.Account)
+}

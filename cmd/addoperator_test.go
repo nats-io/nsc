@@ -69,7 +69,7 @@ func TestImportOperator(t *testing.T) {
 	var info store.Info
 	json.Unmarshal(d, &info)
 	require.True(t, info.Managed)
-	require.Equal(t, "O", info.EntityName)
+	require.Equal(t, "O", info.Name)
 
 	target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
 	require.FileExists(t, target)
