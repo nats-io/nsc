@@ -46,20 +46,6 @@ func createInitCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return fmt.Errorf("init failed: %v", err)
 			}
-			//
-			//if err := params.deploy(); err != nil {
-			//	return err
-			//}
-			//
-			//if err := params.sync(cmd); err != nil {
-			//	return err
-			//}
-			//
-			//// output server message to the user
-			//if params.PushMessage != nil {
-			//	params.PushMessage = append(params.PushMessage, '\n')
-			//	Write("--", params.PushMessage)
-			//}
 
 			if params.CreateOperator {
 				cmd.Printf("Success!! created a new operator, account and user named %q.\n", params.Name)
@@ -224,66 +210,6 @@ func (p *InitCmdParams) resolveOperator() error {
 	}
 	return nil
 }
-
-//func (p *InitCmdParams) deploy() error {
-//	op, err := p.Store.ReadOperatorClaim()
-//	if err != nil {
-//		return err
-//	}
-//	p.ServiceURLs = op.OperatorServiceURLs
-//
-//	an := GetConfig().Account
-//	ac, err := p.Store.ReadAccountClaim(an)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if !p.CreateOperator {
-//		d, err := p.Store.Read(store.Accounts, an, store.JwtName(an))
-//		p.AccountServerURL, err = AccountJwtURL(op, ac)
-//		if err != nil {
-//			return err
-//		}
-//		p.PushStatus, p.PushMessage, err = PushAccount(p.AccountServerURL, d)
-//		if err != nil {
-//			return fmt.Errorf("error pushing to %q: %v", p.AccountServerURL, err)
-//		}
-//	}
-//	return nil
-//}
-//
-//func (p *InitCmdParams) sync(cmd *cobra.Command) error {
-//	if IsAccountAvailable(p.PushStatus) {
-//		// ask for the JWT
-//		r, err := http.Get(p.AccountServerURL)
-//		if err != nil {
-//			return fmt.Errorf("error retrieving jwt from %q: %v", p.AccountServerURL, err)
-//		}
-//		defer r.Body.Close()
-//		m, err := ioutil.ReadAll(r.Body)
-//		if err != nil {
-//			return fmt.Errorf("error reading server response: %v", err)
-//		}
-//		token, err := jwt.ParseDecoratedJWT(m)
-//		if err != nil {
-//			return fmt.Errorf("error parsing JWT returned by the server: %v", err)
-//		}
-//		aac, err := jwt.DecodeAccountClaims(token)
-//		if err != nil {
-//			return fmt.Errorf("error decoding JWT returned by the server: %v", err)
-//		}
-//
-//		if err := p.Store.StoreClaim([]byte(token)); err != nil {
-//			return fmt.Errorf("error storing JWT returned by the server: %v", err)
-//		}
-//		ad := NewAccountDescriber(*aac)
-//		Write("--", []byte(ad.Describe()))
-//	}
-//	if IsAccountPending(p.PushStatus) {
-//		cmd.Printf("account was accepted - server message below contains additional instructions\n")
-//	}
-//	return nil
-//}
 
 type keys struct {
 	KP        nkeys.KeyPair
