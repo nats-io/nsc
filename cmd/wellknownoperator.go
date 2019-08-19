@@ -16,8 +16,12 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 )
+
+const EnvOperatorPrefix = "NSC_"
+const EnvOperatorSuffix = "_OPERATOR"
 
 type KnownOperator struct {
 	Name             string `json:"name"`
@@ -38,8 +42,36 @@ func defaultWellKnownOperators() KnownOperators {
 func GetWellKnownOperators() (KnownOperators, error) {
 	if wellKnownOperators == nil {
 		wellKnownOperators = defaultWellKnownOperators()
+		eo := fromEnv()
+		if eo != nil {
+			wellKnownOperators = append(wellKnownOperators, eo...)
+		}
 	}
 	return wellKnownOperators, nil
+}
+
+// fromEnv returns operators in the environment named as `NSC_<name>_OPERATOR`
+// the value on the environment should be an URL
+func fromEnv() KnownOperators {
+	return findEnvOperators(os.Environ())
+}
+
+func findEnvOperators(env []string) KnownOperators {
+	pl := len(EnvOperatorPrefix)
+	sl := len(EnvOperatorSuffix)
+	var envOps KnownOperators
+	for _, v := range env {
+		pair := strings.Split(v, "=")
+		k := strings.ToUpper(pair[0])
+		if strings.HasPrefix(k, EnvOperatorPrefix) && strings.HasSuffix(k, EnvOperatorSuffix) {
+			var envOp KnownOperator
+			envOp.Name = pair[0][pl : len(pair[0])-sl]
+			envOp.AccountServerURL = pair[1]
+			envOps = append(envOps, envOp)
+		}
+
+	}
+	return envOps
 }
 
 func FindKnownOperator(name string) (*KnownOperator, error) {

@@ -35,3 +35,19 @@ func Test_ListWellKnownOperators(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, s)
 }
+
+func Test_FindEnvOperators(t *testing.T) {
+	env := []string{
+		"one=1",
+		"nsc_opa_operator=http://localhost:1234",
+		"NSC_opb_operator=http://localhost:5678",
+		"NSC_HOME=x",
+	}
+
+	ops := findEnvOperators(env)
+	require.Len(t, ops, 2)
+	require.Equal(t, "opa", ops[0].Name)
+	require.Equal(t, "http://localhost:1234", ops[0].AccountServerURL)
+	require.Equal(t, "opb", ops[1].Name)
+	require.Equal(t, "http://localhost:5678", ops[1].AccountServerURL)
+}
