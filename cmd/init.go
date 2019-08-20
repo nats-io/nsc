@@ -271,7 +271,7 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("error decoding operator jwt: %v", err)
 		}
-		onk.Name = op.Name
+		onk.Name = GetOperatorName(op.Name, p.OperatorJwtURL)
 		p.AccountServerURL = op.AccountServerURL
 
 		if p.AccountServerURL == "" {
@@ -279,7 +279,7 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 		}
 
 		// see if we already have it
-		ts, err := GetConfig().LoadStore(op.Name)
+		ts, err := GetConfig().LoadStore(onk.Name)
 		if err == nil {
 			tso, err := ts.ReadOperatorClaim()
 			if err == nil {

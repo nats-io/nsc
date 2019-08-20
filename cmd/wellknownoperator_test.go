@@ -51,3 +51,16 @@ func Test_FindEnvOperators(t *testing.T) {
 	require.Equal(t, "opb", ops[1].Name)
 	require.Equal(t, "http://localhost:5678", ops[1].AccountServerURL)
 }
+
+func Test_GetOperatorName(t *testing.T) {
+	wko, err := GetWellKnownOperators()
+	require.NoError(t, err)
+	require.NotNil(t, wko)
+	require.True(t, len(wko) >= 1)
+
+	n := GetOperatorName("test", "https://api.synadia.io/jwt/v1/synadia")
+	require.Equal(t, "synadia", n)
+
+	n = GetOperatorName("X", "http://something.io/jwt/v1/foobar")
+	require.Equal(t, "X", n)
+}
