@@ -109,7 +109,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 	if p.jwtPath != "" {
 		var err error
 		var data []byte
+		loadedFromURL := false
 		if u, err := url.Parse(p.jwtPath); err == nil && u.Scheme != "" {
+			loadedFromURL = true
 			data, err = LoadFromURL(p.jwtPath)
 		}
 		if data == nil {
@@ -130,6 +132,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		p.token = token
 		if p.name == "" {
 			p.name = op.Name
+			if loadedFromURL {
+				p.name = GetOperatorName(p.name, p.jwtPath)
+			}
 		}
 	}
 	return nil

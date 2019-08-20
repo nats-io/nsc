@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"net/url"
 	"os"
 	"strings"
 )
@@ -88,4 +89,27 @@ func FindKnownOperator(name string) (*KnownOperator, error) {
 		}
 	}
 	return nil, nil
+}
+
+func GetOperatorName(name string, asu string) string {
+	uv, err := url.Parse(asu)
+	if err != nil {
+		return name
+	}
+	hn := strings.ToLower(uv.Hostname())
+	ops, err := GetWellKnownOperators()
+	if err != nil {
+		return name
+	}
+	for _, o := range ops {
+		tu, err := url.Parse(o.AccountServerURL)
+		if err == nil {
+			h := strings.ToLower(tu.Hostname())
+			if h == hn {
+				return o.Name
+			}
+		}
+	}
+	return name
+
 }
