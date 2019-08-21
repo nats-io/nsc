@@ -21,7 +21,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	flag "github.com/spf13/pflag"
@@ -32,72 +31,6 @@ var testCmd = &cobra.Command{
 	Hidden: true,
 	Use:    "test",
 	Short:  "Test commands",
-}
-
-type GenerateNKeysParam struct {
-	operator bool
-	account  bool
-	user     bool
-	cluster  bool
-	server   bool
-}
-
-func (p *GenerateNKeysParam) PrintKey(kind nkeys.PrefixByte, cmd *cobra.Command) {
-	kp, err := nkeys.CreatePair(kind)
-	if err != nil {
-		panic(err)
-	}
-	seed, err := kp.Seed()
-	if err != nil {
-		panic(err)
-	}
-
-	cmd.Println(string(seed))
-
-	pub, err := kp.PublicKey()
-	if err != nil {
-		panic(err)
-	}
-	cmd.Println(pub)
-}
-
-func (p *GenerateNKeysParam) Run(cmd *cobra.Command) error {
-	if p.operator {
-		p.PrintKey(nkeys.PrefixByteOperator, cmd)
-	}
-	if p.account {
-		p.PrintKey(nkeys.PrefixByteAccount, cmd)
-	}
-	if p.user {
-		p.PrintKey(nkeys.PrefixByteUser, cmd)
-	}
-	if p.cluster {
-		p.PrintKey(nkeys.PrefixByteCluster, cmd)
-	}
-	if p.server {
-		p.PrintKey(nkeys.PrefixByteServer, cmd)
-	}
-	return nil
-}
-
-func createGenerateNkey() *cobra.Command {
-	var params GenerateNKeysParam
-	cmd := &cobra.Command{
-		Use:           "nkey",
-		Short:         "Generates an nkey",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return params.Run(cmd)
-		},
-	}
-	cmd.Flags().BoolVarP(&params.operator, "operator", "o", false, "operator")
-	cmd.Flags().BoolVarP(&params.account, "account", "a", false, "account")
-	cmd.Flags().BoolVarP(&params.user, "user", "u", false, "user")
-	cmd.Flags().BoolVarP(&params.cluster, "cluster", "c", false, "cluster")
-	cmd.Flags().BoolVarP(&params.server, "server", "s", false, "server")
-
-	return cmd
 }
 
 func createFlagTable() *cobra.Command {
@@ -249,7 +182,7 @@ func (t *flagTable) render() string {
 
 func init() {
 	GetRootCmd().AddCommand(testCmd)
-	testCmd.AddCommand(createGenerateNkey())
+	testCmd.AddCommand(createGenerateNKeyCmd())
 	testCmd.AddCommand(createFlagTable())
 	testCmd.AddCommand(generateDoc())
 }
