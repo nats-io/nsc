@@ -30,7 +30,7 @@ func createGenerateNKeyCmd() *cobra.Command {
 	params.user.prefix = nkeys.PrefixByteUser
 
 	cmd := &cobra.Command{
-		Use:   "generate",
+		Use:   "nkey",
 		Short: "Generates an nkey",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
@@ -45,7 +45,7 @@ func createGenerateNKeyCmd() *cobra.Command {
 }
 
 func init() {
-	keysCmd.AddCommand(createGenerateNKeyCmd())
+	generateCmd.AddCommand(createGenerateNKeyCmd())
 }
 
 type GenerateNKeysParam struct {
