@@ -106,7 +106,6 @@ func TestGetMissingKey(t *testing.T) {
 	ckp, err := ks.GetKeyPair(opk)
 	require.Nil(t, err)
 	require.Nil(t, ckp)
-
 	os.Setenv(NKeysPathEnv, old)
 }
 
@@ -133,4 +132,25 @@ func CreateTestNKey(t *testing.T, f NKeyFactory) ([]byte, string, nkeys.KeyPair)
 	require.NoError(t, err)
 
 	return seed, pub, kp
+}
+
+func TestAllKeys(t *testing.T) {
+	dir := MakeTempDir(t)
+	old := os.Getenv(NKeysPathEnv)
+	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
+	defer os.Setenv(NKeysPathEnv, old)
+
+	ks := NewKeyStore(t.Name())
+	_, opk, okp := CreateOperatorKey(t)
+	_, err := ks.Store(okp)
+	require.NoError(t, err)
+
+	_, apk, akp := CreateAccountKey(t)
+	_, err = ks.Store(akp)
+	require.NoError(t, err)
+
+	keys, err := ks.AllKeys()
+	require.NoError(t, err)
+	require.Contains(t, keys, opk)
+	require.Contains(t, keys, apk)
 }
