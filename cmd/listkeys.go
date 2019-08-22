@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -44,6 +45,7 @@ func createListKeysCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.users, "users", "u", false, "show user keys")
 	cmd.Flags().BoolVarP(&params.all, "all", "A", false, "show operator, accounts and users")
 	cmd.Flags().StringVarP(&params.like, "like", "", "", "filter keys containing string")
+	cmd.Flags().BoolVarP(&params.unreferenced, "not-in-context", "", false, "shows keys that are not referenced in the current operator context")
 
 	return cmd
 }
@@ -53,21 +55,24 @@ func init() {
 }
 
 type ListKeysParams struct {
-	operator bool
-	accounts bool
-	users    bool
-	like     string
-	all      bool
-	Keys     Keys
+	operator     bool
+	accounts     bool
+	account      string
+	users        bool
+	user         string
+	like         string
+	all          bool
+	unreferenced bool ``
 }
 
 type Key struct {
-	Name    string
-	Signing bool
-	Pub     string
-	KeyPath string
-	Kind    nkeys.PrefixByte
-	Invalid bool
+	Name         string
+	Pub          string
+	Parent       string
+	ExpectedKind nkeys.PrefixByte
+	Signing      bool
+	KeyPath      string
+	Invalid      bool
 }
 
 func (k *Key) Resolve(ks store.KeyStore) {
@@ -85,13 +90,31 @@ func (k *Key) HasKey() bool {
 
 type Keys []*Key
 
+func (ki Keys) Len() int {
+	return len(ki)
+}
+
+func (ki Keys) Swap(i, j int) {
+	ki[i], ki[j] = ki[j], ki[i]
+}
+
+func (ki Keys) Less(i, j int) bool {
+	return ki[i].Pub < ki[j].Pub
+}
+
 func (ki Keys) Message() string {
+	if len(ki) == 0 {
+		return "no keys matched query"
+	}
+	var hasUnreferenced bool
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
-
 	table.AddTitle("Keys")
-	table.AddHeaders("Entry", "Key", "Signing Key", "Stored")
+	table.AddHeaders("Entity", "Key", "Signing Key", "Stored")
 	for _, k := range ki {
+		if k.Name == "?" {
+			hasUnreferenced = true
+		}
 		sk := ""
 		if k.Signing {
 			sk = "*"
@@ -105,7 +128,11 @@ func (ki Keys) Message() string {
 		}
 		table.AddRow(k.Name, k.Pub, sk, stored)
 	}
-	return string(table.Render())
+	s := table.Render()
+	if hasUnreferenced {
+		s = fmt.Sprintf("%s[?] unreferenced key - may belong to a different context", s)
+	}
+	return s
 }
 
 func (p *ListKeysParams) SetDefaults(ctx ActionCtx) error {
@@ -125,93 +152,90 @@ func (p *ListKeysParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ListKeysParams) handleOperator(ctx ActionCtx) error {
-	if p.operator {
-		sctx := ctx.StoreCtx()
-		oc, err := sctx.Store.ReadOperatorClaim()
-		if err != nil {
-			return err
-		}
-		var oki Key
-		oki.Name = oc.Name
-		oki.Kind = nkeys.PrefixByteOperator
-		oki.Pub = oc.Subject
-		oki.Resolve(sctx.KeyStore)
-		p.Keys = append(p.Keys, &oki)
-
-		for _, k := range oc.SigningKeys {
-			var sk Key
-			sk.Name = oc.Name
-			sk.Pub = k
-			sk.Signing = true
-			sk.Kind = nkeys.PrefixByteOperator
-			sk.Resolve(sctx.KeyStore)
-			p.Keys = append(p.Keys, &sk)
-		}
-
+func (p *ListKeysParams) handleOperator(ctx ActionCtx) (Keys, error) {
+	var keys Keys
+	sctx := ctx.StoreCtx()
+	oc, err := sctx.Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	var oki Key
+	oki.Name = oc.Name
+	oki.ExpectedKind = nkeys.PrefixByteOperator
+	oki.Pub = oc.Subject
+	oki.Resolve(sctx.KeyStore)
+	keys = append(keys, &oki)
+
+	for _, k := range oc.SigningKeys {
+		var sk Key
+		sk.Name = oc.Name
+		sk.Pub = k
+		sk.Signing = true
+		sk.ExpectedKind = nkeys.PrefixByteOperator
+		sk.Resolve(sctx.KeyStore)
+		keys = append(keys, &sk)
+	}
+
+	return keys, nil
 }
 
-func (p *ListKeysParams) handleAccount(ctx ActionCtx, name string) error {
+func (p *ListKeysParams) handleAccount(ctx ActionCtx, parent string, name string) (Keys, error) {
 	s := ctx.StoreCtx().Store
 	ks := ctx.StoreCtx().KeyStore
 
-	if p.accounts {
-		ac, err := s.ReadAccountClaim(name)
-		if err != nil {
-			return err
-		}
-		var aki Key
-		aki.Name = ac.Name
-		aki.Kind = nkeys.PrefixByteAccount
-		aki.Pub = ac.Subject
-		aki.Resolve(ks)
-		p.Keys = append(p.Keys, &aki)
+	var keys Keys
 
-		for _, k := range ac.SigningKeys {
-			var ask Key
-			ask.Name = ac.Name
-			ask.Pub = k
-			ask.Signing = true
-			ask.Resolve(ks)
-			p.Keys = append(p.Keys, &ask)
-		}
-
+	ac, err := s.ReadAccountClaim(name)
+	if err != nil {
+		return nil, err
 	}
+	var aki Key
+	aki.Parent = parent
+	aki.Name = ac.Name
+	aki.ExpectedKind = nkeys.PrefixByteAccount
+	aki.Pub = ac.Subject
+	aki.Resolve(ks)
+	keys = append(keys, &aki)
+
+	for _, k := range ac.SigningKeys {
+		var ask Key
+		ask.Name = ac.Name
+		ask.Pub = k
+		ask.Signing = true
+		ask.Resolve(ks)
+		keys = append(keys, &ask)
+	}
+
 	var users []string
-	var err error
-	if p.users {
-		users, err = s.ListEntries(store.Accounts, config.Account, store.Users)
-		if err != nil {
-			return err
-		}
-		sort.Strings(users)
-
-		for _, u := range users {
-			if err := p.handleUser(ctx, name, u); err != nil {
-				return err
-			}
-		}
+	users, err = s.ListEntries(store.Accounts, config.Account, store.Users)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	sort.Strings(users)
+	for _, u := range users {
+		uk, err := p.handleUser(ctx, name, u)
+		if err != nil {
+			return nil, err
+		}
+		uk.Parent = ac.Subject
+	}
+	return keys, nil
 }
 
-func (p *ListKeysParams) handleUser(ctx ActionCtx, account string, name string) error {
+func (p *ListKeysParams) handleUser(ctx ActionCtx, account string, name string) (*Key, error) {
 	s := ctx.StoreCtx().Store
 	ks := ctx.StoreCtx().KeyStore
 
 	uc, err := s.ReadUserClaim(account, name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var uki Key
 	uki.Name = uc.Name
 	uki.Pub = uc.Subject
-	uki.Kind = nkeys.PrefixByteUser
+	uki.ExpectedKind = nkeys.PrefixByteUser
 	uki.Resolve(ks)
-	p.Keys = append(p.Keys, &uki)
-	return nil
+	return &uki, nil
 }
 
 func (p *ListKeysParams) PostInteractive(ctx ActionCtx) error {
@@ -223,9 +247,11 @@ func (p *ListKeysParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *ListKeysParams) Run(ctx ActionCtx) (store.Status, error) {
-	if err := p.handleOperator(ctx); err != nil {
+	keys, err := p.handleOperator(ctx)
+	if err != nil {
 		return nil, err
 	}
+
 	var accounts []string
 	an, err := GetConfig().ListAccounts()
 	if err != nil {
@@ -234,22 +260,72 @@ func (p *ListKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 	accounts = append(accounts, an...)
 
 	for _, a := range accounts {
-		err := p.handleAccount(ctx, a)
+		akeys, err := p.handleAccount(ctx, keys[0].Pub, a)
 		if err != nil {
 			return nil, err
 		}
+		keys = append(keys, akeys...)
 	}
 
-	var filteredKeys Keys
-	if p.like != "" {
-		p.like = strings.ToUpper(p.like)
-		for _, k := range p.Keys {
-			if strings.Contains(k.Pub, p.like) {
-				filteredKeys = append(filteredKeys, k)
+	if p.unreferenced {
+		all, err := ctx.StoreCtx().KeyStore.AllKeys()
+		if err != nil {
+			return nil, err
+		}
+		m := make(map[string]*Key)
+		for _, v := range keys {
+			m[v.Pub] = v
+		}
+		ks := ctx.StoreCtx().KeyStore
+		var okeys Keys
+		var akeys Keys
+		var ukeys Keys
+		for _, v := range all {
+			_, ok := m[v]
+			if !ok {
+				var k Key
+				k.Name = "?"
+				k.Pub = v
+				k.ExpectedKind, err = store.PubKeyType(k.Pub)
+				if err != nil {
+					return nil, err
+				}
+				k.Resolve(ks)
+				switch k.ExpectedKind {
+				case nkeys.PrefixByteOperator:
+					okeys = append(okeys, &k)
+				case nkeys.PrefixByteAccount:
+					akeys = append(akeys, &k)
+				case nkeys.PrefixByteUser:
+					ukeys = append(ukeys, &k)
+				}
 			}
 		}
-		p.Keys = filteredKeys
+		sort.Sort(okeys)
+		sort.Sort(akeys)
+		sort.Sort(ukeys)
+		keys = append(keys, okeys...)
+		keys = append(keys, akeys...)
+		keys = append(keys, ukeys...)
 	}
 
-	return p.Keys, nil
+	var keyFilter = strings.ToUpper(p.like)
+	var filteredKeys Keys
+	for _, k := range keys {
+		if !p.operator && k.ExpectedKind == nkeys.PrefixByteOperator {
+			continue
+		}
+		if !p.accounts && k.ExpectedKind == nkeys.PrefixByteAccount {
+			continue
+		}
+		if !p.users && k.ExpectedKind == nkeys.PrefixByteUser {
+			continue
+		}
+		if keyFilter != "" && !strings.Contains(k.Pub, keyFilter) {
+			continue
+		}
+		filteredKeys = append(filteredKeys, k)
+	}
+
+	return filteredKeys, nil
 }

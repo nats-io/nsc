@@ -166,6 +166,20 @@ func Migrate() (string, error) {
 	return old, nil
 }
 
+func (k *KeyStore) AllKeys() ([]string, error) {
+	var keys []string
+	err := filepath.Walk(GetKeysDir(), func(src string, info os.FileInfo, err error) error {
+		ext := filepath.Ext(src)
+		switch ext {
+		case NKeyExtension:
+			n := filepath.Base(src)
+			keys = append(keys, n[:len(n)-3])
+		}
+		return nil
+	})
+	return keys, err
+}
+
 func (k *KeyStore) credsName(n string) string {
 	return fmt.Sprintf("%s%s", n, CredsExtension)
 }
@@ -340,7 +354,7 @@ func Match(pubkey string, kp nkeys.KeyPair) bool {
 	if err != nil {
 		return false
 	}
-	if pubkey != string(pk) {
+	if pubkey != pk {
 		return false
 	}
 
@@ -430,27 +444,31 @@ func IsPublicKey(kind nkeys.PrefixByte, key string) bool {
 	return f(key)
 }
 
-func KeyType(kp nkeys.KeyPair) (nkeys.PrefixByte, error) {
-	d, err := kp.PublicKey()
-	if err != nil {
-		return 0, err
-	}
-	if nkeys.IsValidPublicOperatorKey(d) {
+func PubKeyType(pk string) (nkeys.PrefixByte, error) {
+	if nkeys.IsValidPublicOperatorKey(pk) {
 		return nkeys.PrefixByteOperator, nil
 	}
-	if nkeys.IsValidPublicAccountKey(d) {
+	if nkeys.IsValidPublicAccountKey(pk) {
 		return nkeys.PrefixByteAccount, nil
 	}
-	if nkeys.IsValidPublicClusterKey(d) {
+	if nkeys.IsValidPublicClusterKey(pk) {
 		return nkeys.PrefixByteCluster, nil
 	}
-	if nkeys.IsValidPublicServerKey(d) {
+	if nkeys.IsValidPublicServerKey(pk) {
 		return nkeys.PrefixByteServer, nil
 	}
-	if nkeys.IsValidPublicUserKey(d) {
+	if nkeys.IsValidPublicUserKey(pk) {
 		return nkeys.PrefixByteUser, nil
 	}
 	return 0, fmt.Errorf("unsupported key type")
+}
+
+func KeyType(kp nkeys.KeyPair) (nkeys.PrefixByte, error) {
+	pk, err := kp.PublicKey()
+	if err != nil {
+		return 0, err
+	}
+	return PubKeyType(pk)
 }
 
 func dirExists(fp string) (bool, error) {
