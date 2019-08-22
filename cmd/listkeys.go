@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,8 +30,30 @@ import (
 func createListKeysCmd() *cobra.Command {
 	var params ListKeysParams
 	cmd := &cobra.Command{
-		Use:          "keys",
-		Short:        "list keys related accounts and users in the current operator",
+		Use:   "keys",
+		Short: "List operator, account and user keys in the current operator and account context",
+		Long: `List operator, account and user keys in the current operator and account context.
+Additional flags allow you to specify which types of keys to display. For example
+the --operator shows the operator key, the --accounts show account keys, etc.
+
+You can further limit the account and user displayed by specying the 
+--account and --user flags respectively. To show all all keys specify 
+the --all flag.
+
+The --not-referenced flag displays all keys not relevant to the current 
+operator, accounts and users. These keys may be referenced by a different 
+operator context.
+
+The --filter flag allows you to specify a few letters in a public key
+and display only those keys that match provided the --operator, 
+--accounts, and --user or --all flags match the key type.
+`,
+		Example: `nsc list keys
+nsc list keys --all (same as specifying --operator --accounts --users)
+nsc list keys --operator --not-referenced (shows all other operator keys)
+nsc list keys --all --filter VSVMGA (shows all keys containing the filter)
+nsc list keys --account A (
+`,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,9 +66,11 @@ func createListKeysCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.operator, "operator", "o", false, "show operator keys")
 	cmd.Flags().BoolVarP(&params.accounts, "accounts", "a", false, "show account keys")
 	cmd.Flags().BoolVarP(&params.users, "users", "u", false, "show user keys")
+	cmd.Flags().StringVarP(&params.account, "account", "", "", "show specified account keys")
+	cmd.Flags().StringVarP(&params.user, "user", "", "", "show specified user key")
 	cmd.Flags().BoolVarP(&params.all, "all", "A", false, "show operator, accounts and users")
-	cmd.Flags().StringVarP(&params.like, "like", "", "", "filter keys containing string")
-	cmd.Flags().BoolVarP(&params.unreferenced, "not-in-context", "", false, "shows keys that are not referenced in the current operator context")
+	cmd.Flags().StringVarP(&params.like, "filter", "f", "", "filter keys containing string")
+	cmd.Flags().BoolVarP(&params.unreferenced, "not-referenced", "", false, "shows keys that are not referenced in the current operator context")
 
 	return cmd
 }
@@ -62,7 +87,7 @@ type ListKeysParams struct {
 	user         string
 	like         string
 	all          bool
-	unreferenced bool ``
+	unreferenced bool
 }
 
 type Key struct {
@@ -112,8 +137,10 @@ func (ki Keys) Message() string {
 	table.AddTitle("Keys")
 	table.AddHeaders("Entity", "Key", "Signing Key", "Stored")
 	for _, k := range ki {
+		unreferenced := false
 		if k.Name == "?" {
 			hasUnreferenced = true
+			unreferenced = true
 		}
 		sk := ""
 		if k.Signing {
@@ -126,16 +153,42 @@ func (ki Keys) Message() string {
 		if k.Invalid {
 			stored = "BAD"
 		}
-		table.AddRow(k.Name, k.Pub, sk, stored)
+		pad := ""
+		if !unreferenced {
+			switch k.ExpectedKind {
+			case nkeys.PrefixByteAccount:
+				pad = " "
+			case nkeys.PrefixByteUser:
+				pad = "  "
+			}
+		}
+		n := fmt.Sprintf("%s%s", pad, k.Name)
+		table.AddRow(n, k.Pub, sk, stored)
 	}
 	s := table.Render()
 	if hasUnreferenced {
-		s = fmt.Sprintf("%s[?] unreferenced key - may belong to a different context", s)
+		s = fmt.Sprintf("%s[?] unreferenced key - may belong to a different operator context", s)
 	}
 	return s
 }
 
 func (p *ListKeysParams) SetDefaults(ctx ActionCtx) error {
+	conf := GetConfig()
+
+	if ctx.NothingToDo("operator", "accounts", "users", "all") {
+		// default if no args
+		account := p.account
+		if account == "" {
+			account = conf.Account
+		}
+		if account == "" {
+			return errors.New("set an account first or specify it with the --account flag")
+		}
+		p.operator = true
+		p.account = account
+		p.accounts = true
+		p.users = true
+	}
 	if p.all {
 		p.operator = true
 		p.accounts = true
@@ -205,15 +258,25 @@ func (p *ListKeysParams) handleAccount(ctx ActionCtx, parent string, name string
 		ask.Resolve(ks)
 		keys = append(keys, &ask)
 	}
+	return keys, nil
+}
 
-	var users []string
-	users, err = s.ListEntries(store.Accounts, name, store.Users)
+func (p *ListKeysParams) handleUsers(ctx ActionCtx, account string) (Keys, error) {
+	var keys Keys
+
+	s := ctx.StoreCtx().Store
+	ac, err := s.ReadAccountClaim(account)
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := s.ListEntries(store.Accounts, account, store.Users)
 	if err != nil {
 		return nil, err
 	}
 	sort.Strings(users)
 	for _, u := range users {
-		uk, err := p.handleUser(ctx, name, u)
+		uk, err := p.handleUser(ctx, account, u)
 		if err != nil {
 			return nil, err
 		}
@@ -254,18 +317,35 @@ func (p *ListKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	var accounts []string
-	an, err := GetConfig().ListAccounts()
-	if err != nil {
-		return nil, err
+	if p.account != "" {
+		accounts = append(accounts, p.account)
+	} else {
+		an, err := GetConfig().ListAccounts()
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, an...)
 	}
-	accounts = append(accounts, an...)
-
 	for _, a := range accounts {
 		akeys, err := p.handleAccount(ctx, keys[0].Pub, a)
 		if err != nil {
 			return nil, err
 		}
 		keys = append(keys, akeys...)
+
+		if p.user != "" {
+			uk, err := p.handleUser(ctx, a, p.user)
+			if err != nil {
+				return nil, err
+			}
+			keys = append(keys, uk)
+		} else {
+			ukeys, err := p.handleUsers(ctx, a)
+			if err != nil {
+				return nil, err
+			}
+			keys = append(keys, ukeys...)
+		}
 	}
 
 	if p.unreferenced {
@@ -305,6 +385,7 @@ func (p *ListKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 		sort.Sort(okeys)
 		sort.Sort(akeys)
 		sort.Sort(ukeys)
+		keys = Keys{}
 		keys = append(keys, okeys...)
 		keys = append(keys, akeys...)
 		keys = append(keys, ukeys...)
