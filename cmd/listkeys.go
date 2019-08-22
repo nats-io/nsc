@@ -207,7 +207,7 @@ func (p *ListKeysParams) handleAccount(ctx ActionCtx, parent string, name string
 	}
 
 	var users []string
-	users, err = s.ListEntries(store.Accounts, config.Account, store.Users)
+	users, err = s.ListEntries(store.Accounts, name, store.Users)
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +218,7 @@ func (p *ListKeysParams) handleAccount(ctx ActionCtx, parent string, name string
 			return nil, err
 		}
 		uk.Parent = ac.Subject
+		keys = append(keys, uk)
 	}
 	return keys, nil
 }
