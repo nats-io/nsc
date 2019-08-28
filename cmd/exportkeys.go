@@ -74,6 +74,7 @@ nsc export keys --account <name> (changes the account context to the specified a
 	cmd.Flags().BoolVarP(&params.Unreferenced, "not-referenced", "", false, "export keys that are not referenced in the current operator context")
 	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to export keys to")
 	cmd.Flags().BoolVarP(&params.Force, "force", "F", false, "overwrite existing files")
+	cmd.Flags().BoolVarP(&params.Remove, "remove", "R", false, "removes the original key file from the keyring after exporting it")
 	cmd.MarkFlagRequired("dir")
 
 	return cmd
@@ -84,8 +85,9 @@ func init() {
 }
 
 type ExportKeysParams struct {
-	Force bool
-	Dir   string
+	Force  bool
+	Remove bool
+	Dir    string
 	KeyCollectorParams
 }
 
@@ -159,6 +161,14 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 				status.Err = fmt.Errorf("error exporting %q: %v", j.description, j.err)
 			} else {
 				status.OK = fmt.Sprintf("exported %q", j.description)
+				if p.Remove {
+					err := ks.Remove(j.description)
+					if err != nil {
+						status.Err = fmt.Errorf("exported %q but failed to delete original file: %v", j.description, err)
+					} else {
+						status.OK = fmt.Sprintf("moved %q", j.description)
+					}
+				}
 			}
 		} else {
 			status.Warn = fmt.Sprintf("skipped %q - no seed available", j.description)
