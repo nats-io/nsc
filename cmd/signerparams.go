@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
@@ -112,20 +113,9 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 	// build a list of the signing keys
 	var signers []string
 	if KeyPathFlag == "" {
-		ks := sctx.KeyStore
-		switch p.kind {
-		case nkeys.PrefixByteOperator:
-			KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
-			signers, err = ctx.StoreCtx().GetOperatorKeys()
-			if err != nil {
-				return err
-			}
-		case nkeys.PrefixByteAccount:
-			KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
-			signers, err = ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
-			if err != nil {
-				return err
-			}
+		signers, err = p.getSigners(ctx)
+		if err != nil {
+			return err
 		}
 	}
 	if err := p.SelectFromSigners(ctx, signers); err != nil {
@@ -135,6 +125,28 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *SignerParams) getSigners(ctx ActionCtx) ([]string, error) {
+	sctx := ctx.StoreCtx()
+	ks := sctx.KeyStore
+	var signers []string
+	var err error
+	switch p.kind {
+	case nkeys.PrefixByteOperator:
+		KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
+		signers, err = ctx.StoreCtx().GetOperatorKeys()
+		if err != nil {
+			return nil, err
+		}
+	case nkeys.PrefixByteAccount:
+		KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
+		signers, err = ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return signers, nil
+}
+
 func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if p.signerKP != nil {
 		return nil
@@ -142,11 +154,19 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 	var err error
 	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
-
-	if p.signerKP == nil && err == nil && KeyPathFlag != "" {
-		// we have no resolution but arg was provided
-		// this means that the file doesn't exist
-		err = fmt.Errorf("%q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
+	if err != nil {
+		return err
+	}
+	if p.signerKP == nil {
+		// if they specified a key, the file didn't resolve to a key
+		if KeyPathFlag != "" {
+			err = fmt.Errorf("%q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
+		}
+		signers, err := p.getSigners(ctx)
+		if err != nil {
+			return fmt.Errorf("error reading signers: %v", err)
+		}
+		return fmt.Errorf("unable to resolve any of the following signing keys in the keystore: %s", strings.Join(signers, ", "))
 	}
 
 	return err

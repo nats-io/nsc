@@ -129,7 +129,7 @@ func Test_SignerOperator(t *testing.T) {
 	require.FileExists(t, dest)
 
 	tests := CmdTests{
-		{createSignerCmd(nkeys.PrefixByteOperator, false, nil), []string{"sp"}, nil, nil, false},
+		{createSignerCmd(nkeys.PrefixByteOperator, false, nil), []string{"sp"}, nil, nil, true},
 		{createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), []string{"sp", "-K", dest}, nil, nil, false},
 	}
 
@@ -175,7 +175,7 @@ func Test_SignerParamsPathNotFound(t *testing.T) {
 	require.NoError(t, os.Remove(ts.OperatorKeyPath))
 	_, _, err := ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, nil), "-K", ts.OperatorKeyPath)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no such file or directory")
+	require.Contains(t, err.Error(), "unable to resolve any of the following signing keys in the keystore")
 }
 
 func Test_SignerParamsHomePath(t *testing.T) {
