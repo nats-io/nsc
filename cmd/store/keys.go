@@ -285,6 +285,29 @@ func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
 	return string(d), nil
 }
 
+func (k *KeyStore) Remove(pubkey string) error {
+	kp := k.GetKeyPath(pubkey)
+	_, err := os.Stat(kp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if err := os.Remove(kp); err != nil {
+		return err
+	}
+	pd := filepath.Dir(kp)
+	infos, err := ioutil.ReadDir(pd)
+	// nothing to do from here, but attempt to cleanup
+	// empty directories - go won't delete empty dirs
+	// but we check anyway
+	if err == nil && len(infos) == 0 {
+		os.Remove(pd)
+	}
+	return nil
+}
+
 func AddGitIgnore(dir string) error {
 	if dir != "" {
 		_, err := os.Stat(dir)

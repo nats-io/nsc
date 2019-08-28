@@ -94,6 +94,32 @@ func TestGetKeys(t *testing.T) {
 	require.NoError(t, os.Setenv(NKeysPathEnv, old))
 }
 
+func Test_RemoveKeys(t *testing.T) {
+	dir := MakeTempDir(t)
+	old := os.Getenv(NKeysPathEnv)
+	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
+
+	ks := NewKeyStore(t.Name())
+
+	_, opk, okp := CreateOperatorKey(t)
+
+	_, err := ks.Store(okp)
+	require.NoError(t, err)
+	ookp, err := ks.GetKeyPair(opk)
+	require.NoError(t, err)
+	oopk, err := ookp.PublicKey()
+	require.NoError(t, err)
+	require.True(t, Match(opk, ookp))
+	require.Equal(t, opk, oopk)
+
+	require.NoError(t, ks.Remove(opk))
+	kp := ks.GetKeyPath(opk)
+	_, err = os.Stat(kp)
+	require.True(t, os.IsNotExist(err))
+
+	require.NoError(t, os.Setenv(NKeysPathEnv, old))
+}
+
 func TestGetMissingKey(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)

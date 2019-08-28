@@ -17,6 +17,7 @@ package store
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -114,4 +115,76 @@ func (r *PushPullStatus) Message() string {
 	}
 
 	return buf.String()
+}
+
+type JobStatus struct {
+	Warn string
+	OK   string
+	Err  error
+}
+
+func (js *JobStatus) Message() string {
+	if js.Err != nil {
+		return js.Err.Error()
+	}
+	if js.Warn != "" {
+		return js.Warn
+	}
+	return js.OK
+}
+
+type MultiJob []JobStatus
+
+func (mj MultiJob) Message() string {
+	ok := "[ OK ] "
+	warn := "[WARN] "
+	err := "[ERR ] "
+	var buf bytes.Buffer
+	for _, j := range mj {
+		if buf.Len() > 0 {
+			buf.WriteString("\n")
+		}
+		if j.Err != nil {
+			buf.WriteString(err)
+		} else if j.Warn != "" {
+			buf.WriteString(warn)
+		} else {
+			buf.WriteString(ok)
+		}
+		buf.WriteString(j.Message())
+	}
+	return buf.String()
+}
+
+func (mj MultiJob) Summary() (string, error) {
+	c := len(mj)
+	var ok, warn, err int
+	for _, j := range mj {
+		if j.OK != "" {
+			ok++
+		} else if j.Warn != "" {
+			warn++
+		} else {
+			err++
+		}
+	}
+	if ok == c {
+		m := "all jobs succeeded"
+		if c == 1 {
+			m = "job succeeded"
+		}
+		return m, nil
+	}
+	if ok == 0 {
+		m := "none of the jobs succeeded"
+		if c == 1 {
+			m = "job failed"
+		}
+		return "", errors.New(m)
+	}
+	if err > 0 {
+		return "", fmt.Errorf("%d jobs failed - %d jobs succeeded and %d had warnings", err, ok, warn)
+	}
+
+	return fmt.Sprintf("%d jobs succeeded - there were %d errors and %d warnings", ok, err, warn), nil
 }
