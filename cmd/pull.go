@@ -62,7 +62,7 @@ func createPullCmd() *cobra.Command {
 					return fmt.Errorf(m)
 				}
 				if jc > 1 {
-					return fmt.Errorf("%d of %d sync jobs failed\n", params.Jobs.ErrorCount(), jc)
+					return fmt.Errorf("%d of %d pull jobs failed\n", params.Jobs.ErrorCount(), jc)
 				}
 				return fmt.Errorf("pull job failed\n")
 			}
@@ -77,6 +77,7 @@ func createPullCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&params.All, "all", "A", false, "operator and all accounts under the operator")
+	cmd.Flags().BoolVarP(&params.Overwrite, "overwrite-newer", "F", false, "overwrite local JWTs that are newer than remote")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -89,14 +90,16 @@ type PullParams struct {
 	AccountContextParams
 	All              bool
 	AccountServerURL string
-	Jobs             SyncJobs
+	Jobs             PullJobs
+	Overwrite        bool
 }
 
 type PullJob struct {
-	Name     string
-	ASU      string
-	Err      error
-	StoreErr error
+	Name       string
+	ASU        string
+	Err        error
+	StoreErr   error
+	LocalClaim jwt.Claims
 
 	Data       []byte
 	StatusCode int
@@ -175,9 +178,9 @@ func (j *PullJob) Run() {
 	j.Data = buf.Bytes()
 }
 
-type SyncJobs []*PullJob
+type PullJobs []*PullJob
 
-func (jobs SyncJobs) Error() error {
+func (jobs PullJobs) Error() error {
 	for _, j := range jobs {
 		if err := j.Error(); err != nil {
 			return err
@@ -186,7 +189,7 @@ func (jobs SyncJobs) Error() error {
 	return nil
 }
 
-func (jobs SyncJobs) ErrorCount() int {
+func (jobs PullJobs) ErrorCount() int {
 	i := 0
 	for _, j := range jobs {
 		if err := j.Error(); err != nil {
@@ -232,13 +235,14 @@ func (p *PullParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	if oc.AccountServerURL == "" {
-		return fmt.Errorf("operator %q doesn't set account server url - unable to sync", ctx.StoreCtx().Operator.Name)
+		return fmt.Errorf("operator %q doesn't set account server url - unable to pull", ctx.StoreCtx().Operator.Name)
 	}
 	return nil
 }
 
 func (p *PullParams) setupJobs(ctx ActionCtx) error {
-	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	s := ctx.StoreCtx().Store
+	oc, err := s.ReadOperatorClaim()
 	if err != nil {
 		return err
 	}
@@ -247,7 +251,7 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		j := PullJob{ASU: u, Name: oc.Name}
+		j := PullJob{ASU: u, Name: oc.Name, LocalClaim: oc}
 		p.Jobs = append(p.Jobs, &j)
 
 		tc := GetConfig()
@@ -256,7 +260,7 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 			return err
 		}
 		for _, v := range accounts {
-			ac, err := ctx.StoreCtx().Store.ReadAccountClaim(v)
+			ac, err := s.ReadAccountClaim(v)
 			if err != nil {
 				return err
 			}
@@ -264,11 +268,11 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 			if err != nil {
 				return err
 			}
-			j := PullJob{ASU: u, Name: ac.Name}
+			j := PullJob{ASU: u, Name: ac.Name, LocalClaim: ac}
 			p.Jobs = append(p.Jobs, &j)
 		}
 	} else {
-		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.Name)
+		ac, err := s.ReadAccountClaim(p.Name)
 		if err != nil {
 			return err
 		}
@@ -276,7 +280,7 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		j := PullJob{ASU: u, Name: ac.Name}
+		j := PullJob{ASU: u, Name: ac.Name, LocalClaim: ac}
 		p.Jobs = append(p.Jobs, &j)
 	}
 
@@ -302,8 +306,18 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 		if err := j.Error(); err != nil {
 			continue
 		}
-		// token parsing already succeeded - and this is the server provided version
 		token, _ := j.Token()
+		remoteClaim, err := jwt.DecodeGeneric(token)
+		if err != nil {
+			j.Err = fmt.Errorf("error decoding remote token: %v", err)
+			continue
+		}
+		orig := j.LocalClaim.Claims().IssuedAt
+		remote := remoteClaim.IssuedAt
+		if (orig > remote) && !p.Overwrite {
+			j.Err = errors.New("local jwt is newer than remote version - specify --force to overwrite")
+			continue
+		}
 		if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
 			j.StoreErr = err
 		}
