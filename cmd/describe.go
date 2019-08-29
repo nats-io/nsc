@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Raw bool
 var WideFlag bool
 var Wide = noopNameFilter
 
@@ -62,4 +63,5 @@ var describeCmd = &cobra.Command{
 func init() {
 	GetRootCmd().AddCommand(describeCmd)
 	describeCmd.PersistentFlags().BoolVarP(&WideFlag, "long-ids", "W", false, "display account ids on imports")
+	describeCmd.PersistentFlags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
 }

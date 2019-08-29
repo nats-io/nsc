@@ -533,47 +533,71 @@ func (s *Store) LoadClaim(name ...string) (*jwt.GenericClaims, error) {
 }
 
 func (s *Store) ReadOperatorClaim() (*jwt.OperatorClaims, error) {
+	d, err := s.ReadRawOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
+	c, err := jwt.DecodeOperatorClaims(string(d))
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *Store) ReadRawOperatorClaim() ([]byte, error) {
 	fn := JwtName(s.GetName())
 	if s.Has(fn) {
 		d, err := s.Read(fn)
 		if err != nil {
 			return nil, err
 		}
-		c, err := jwt.DecodeOperatorClaims(string(d))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
+		return d, nil
 	}
 	return nil, NewOperatorNotExistErr(s.GetName())
 }
 
 func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
+	d, err := s.ReadRawAccountClaim(name)
+	if err != nil {
+		return nil, err
+	}
+	c, err := jwt.DecodeAccountClaims(string(d))
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *Store) ReadRawAccountClaim(name string) ([]byte, error) {
 	if s.Has(Accounts, name, JwtName(name)) {
 		d, err := s.Read(Accounts, name, JwtName(name))
 		if err != nil {
 			return nil, err
 		}
-		c, err := jwt.DecodeAccountClaims(string(d))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
+		return d, nil
 	}
 	return nil, NewAccountNotExistErr(name)
 }
 
 func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims, error) {
+	d, err := s.ReadRawUserClaim(accountName, name)
+	if err != nil {
+		return nil, err
+	}
+	c, err := jwt.DecodeUserClaims(string(d))
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *Store) ReadRawUserClaim(accountName string, name string) ([]byte, error) {
 	if s.Has(Accounts, accountName, Users, JwtName(name)) {
 		d, err := s.Read(Accounts, accountName, Users, JwtName(name))
 		if err != nil {
 			return nil, err
 		}
-		c, err := jwt.DecodeUserClaims(string(d))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
+		return d, nil
 	}
 	return nil, NewUserNotExistErr(name)
 }

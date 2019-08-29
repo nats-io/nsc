@@ -18,6 +18,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,6 +32,25 @@ func TestDescribeOperator_Single(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout, pub)
 	require.Contains(t, stdout, " operator ")
+}
+
+func TestDescribeOperator_Raw(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	oldRaw := Raw
+	Raw = true
+	defer func() {
+		Raw = oldRaw
+	}()
+
+	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	require.NoError(t, err)
+
+	oc, err := jwt.DecodeOperatorClaims(stdout)
+	require.NoError(t, err)
+
+	require.NotNil(t, oc)
+	require.Equal(t, "operator", oc.Name)
 }
 
 func TestDescribeOperator_Multiple(t *testing.T) {

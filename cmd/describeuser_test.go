@@ -20,6 +20,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,6 +43,28 @@ func TestDescribeUser_Single(t *testing.T) {
 	require.Contains(t, stdout, pub)
 	// name for the account
 	require.Contains(t, stdout, " a ")
+}
+
+func TestDescribeUserRaw(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	oldRaw := Raw
+	Raw = true
+	defer func() {
+		Raw = oldRaw
+	}()
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
+	require.NoError(t, err)
+
+	uc, err := jwt.DecodeUserClaims(stdout)
+	require.NoError(t, err)
+
+	require.NotNil(t, uc)
+	require.Equal(t, "U", uc.Name)
 }
 
 func TestDescribeUser_Multiple(t *testing.T) {
@@ -134,6 +158,29 @@ func TestDescribeUser_Interactive(t *testing.T) {
 }
 
 func TestDescribeUser_Account(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, pub, kp := CreateAccountKey(t)
+	_, _, err := ExecuteCmd(createEditAccount(), "--account", "A", "--sk", pub)
+	require.NoError(t, err)
+
+	// signed with default account key
+	ts.AddUser(t, "A", "aa")
+	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
+	require.NoError(t, err)
+	require.NotContains(t, stdout, "Issuer Account")
+
+	// signed with a signing key
+	ts.AddUserWithSigner(t, "A", "bb", kp)
+	require.NoError(t, err)
+	stdout, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
+	require.NoError(t, err)
+	require.Contains(t, stdout, "Issuer Account")
+}
+
+func TestDescribeRawUser(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 

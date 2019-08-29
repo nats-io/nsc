@@ -55,6 +55,7 @@ type DescribeOperatorParams struct {
 	name       string
 	outputFile string
 	claim      jwt.OperatorClaims
+	raw        []byte
 }
 
 func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
@@ -87,22 +88,18 @@ func (p *DescribeOperatorParams) PreInteractive(ctx ActionCtx) error {
 func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 	var err error
 
-	name := ctx.StoreCtx().Store.GetName()
-	if !ctx.StoreCtx().Store.Has(store.JwtName(name)) {
-		return fmt.Errorf("no operator %q found", name)
+	if Raw {
+		p.raw, err = ctx.StoreCtx().Store.ReadRawOperatorClaim()
+		if err != nil {
+			return err
+		}
+	} else {
+		oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+		if err != nil {
+			return err
+		}
+		p.claim = *oc
 	}
-
-	d, err := ctx.StoreCtx().Store.Read(store.JwtName(name))
-	if err != nil {
-		return err
-	}
-
-	oc, err := jwt.DecodeOperatorClaims(string(d))
-	if err != nil {
-		return err
-	}
-
-	p.claim = *oc
 	return nil
 }
 
@@ -115,6 +112,10 @@ func (p *DescribeOperatorParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
+	if Raw {
+		p.raw = append(p.raw, '\n')
+		return nil, Write(p.outputFile, p.raw)
+	}
 	v := NewOperatorDescriber(p.claim).Describe()
 	return nil, Write(p.outputFile, []byte(v))
 }
