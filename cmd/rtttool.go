@@ -101,13 +101,15 @@ func (p *RttParams) Run(ctx ActionCtx) (store.Status, error) {
 	opts := createDefaultToolOptions("nsc_rtt", ctx)
 	opts = append(opts, nats.UserCredentials(p.credsPath))
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
+	defer nc.Close()
+
 	if err != nil {
 		return nil, err
 	}
-	defer nc.Close()
-
 	start := time.Now()
-	nc.Flush()
+	if err := nc.Flush(); err != nil {
+		return nil, err
+	}
 	rtt := time.Since(start)
 	ctx.CurrentCmd().Printf("round trip time to [%s] = %v\n", nc.ConnectedUrl(), rtt)
 	return nil, nil
