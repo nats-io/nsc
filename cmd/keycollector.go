@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"errors"
 	"sort"
 	"strings"
 
@@ -43,9 +42,6 @@ func (p *KeyCollectorParams) SetDefaults(ctx ActionCtx) error {
 		account := p.Account
 		if account == "" {
 			account = conf.Account
-		}
-		if account == "" {
-			return errors.New("set an account first or specify it with the --account flag")
 		}
 		p.Operator = true
 		p.Account = account
