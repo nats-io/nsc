@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -27,7 +28,6 @@ func editAccount(t *testing.T, kp nkeys.KeyPair, d []byte, tag string) []byte {
 	ac, err := jwt.DecodeAccountClaims(string(d))
 	require.NoError(t, err)
 	ac.Tags.Add(tag)
-
 	token, err := ac.Encode(kp)
 	require.NoError(t, err)
 	return []byte(token)
@@ -96,4 +96,43 @@ func Test_SyncNoAccountServer(t *testing.T) {
 
 	_, _, err := ExecuteCmd(createPullCmd())
 	require.Error(t, err)
+}
+
+func Test_SyncNewer(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	kp := ts.GetAccountKey(t, "A")
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+	time.Sleep(time.Second * 2)
+	// the client is supposed to update the remote server
+	// so this is really just an edge case - we save a newer
+	// one than the server has to create the issue
+	err = ts.Store.StoreRaw(editAccount(t, kp, m[pk], "test"))
+	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Tags, "test")
+
+	_, _, err = ExecuteCmd(createPullCmd())
+	require.Error(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Tags, "test")
+
+	// now allow the overwrite
+	_, _, err = ExecuteCmd(createPullCmd(), "--overwrite-newer")
+	if err != nil {
+		panic(err)
+	}
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Empty(t, ac.Tags)
 }
