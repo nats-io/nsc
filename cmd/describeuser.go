@@ -57,6 +57,7 @@ type DescribeUserParams struct {
 	jwt.UserClaims
 	user       string
 	outputFile string
+	raw        []byte
 }
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
@@ -97,11 +98,16 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
-	uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
-	if err != nil {
-		return err
-	}
-	if uc != nil {
+	if Raw {
+		p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
+		if err != nil {
+			return err
+		}
+	} else {
+		uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
+		if err != nil {
+			return err
+		}
 		p.UserClaims = *uc
 	}
 	return nil
@@ -116,6 +122,10 @@ func (p *DescribeUserParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
+	if Raw {
+		p.raw = append(p.raw, '\n')
+		return nil, Write(p.outputFile, p.raw)
+	}
 	v := NewUserDescriber(p.UserClaims).Describe()
 	return nil, Write(p.outputFile, []byte(v))
 }

@@ -18,6 +18,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,6 +40,27 @@ func TestDescribeAccount_Single(t *testing.T) {
 	require.Contains(t, stdout, opub)
 	// name for the account
 	require.Contains(t, stdout, " A ")
+}
+
+func TestDescribeAccountRaw(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+	oldRaw := Raw
+	Raw = true
+	defer func() {
+		Raw = oldRaw
+	}()
+
+	ts.AddAccount(t, "A")
+
+	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
+	require.NoError(t, err)
+
+	ac, err := jwt.DecodeAccountClaims(stdout)
+	require.NoError(t, err)
+
+	require.NotNil(t, ac)
+	require.Equal(t, "A", ac.Name)
 }
 
 func TestDescribeAccount_Multiple(t *testing.T) {

@@ -52,6 +52,7 @@ type DescribeAccountParams struct {
 	AccountContextParams
 	jwt.AccountClaims
 	outputFile string
+	raw        []byte
 }
 
 func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -70,11 +71,18 @@ func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
-	if err != nil {
-		return err
+	if Raw {
+		p.raw, err = ctx.StoreCtx().Store.ReadRawAccountClaim(p.AccountContextParams.Name)
+		if err != nil {
+			return err
+		}
+	} else {
+		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+		if err != nil {
+			return err
+		}
+		p.AccountClaims = *ac
 	}
-	p.AccountClaims = *ac
 
 	return nil
 }
@@ -88,6 +96,10 @@ func (p *DescribeAccountParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
+	if Raw {
+		p.raw = append(p.raw, '\n')
+		return nil, Write(p.outputFile, p.raw)
+	}
 	v := NewAccountDescriber(p.AccountClaims).Describe()
 	return nil, Write(p.outputFile, []byte(v))
 }
