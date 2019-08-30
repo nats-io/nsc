@@ -51,25 +51,25 @@ func (ps *PushStatus) Message() string {
 	case http.StatusOK:
 		buf.WriteString("Successfully pushed the account configuration to the remote server.\n")
 		if hasPushMessage {
-			buf.WriteString("Please review the following operator message:\n")
+			buf.WriteString("Please review the following operator message:\n\n")
 			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n")
+			buf.WriteString("\n\n")
 		}
 
 	case http.StatusAccepted:
 		buf.WriteString("The account configuration was accepted by the remote server.\n")
 		if hasPushMessage {
 			buf.WriteString("Please review the following operator message, as it may contain additional information\n")
-			buf.WriteString("required to finalize your account setup:\n")
+			buf.WriteString("required to finalize your account setup:\n\n")
 			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n")
+			buf.WriteString("\n\n")
 		}
 	default:
 		buf.WriteString("Failed to push the account to the remote server.\n")
 		if hasPushMessage {
-			buf.WriteString("Please review the following operator message for additional information:\n")
+			buf.WriteString("Please review the following operator message for additional information:\n\n")
 			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n")
+			buf.WriteString("\n\n")
 		}
 	}
 	return buf.String()

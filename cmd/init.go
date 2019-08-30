@@ -48,11 +48,14 @@ func createInitCmd() *cobra.Command {
 			}
 
 			if params.CreateOperator {
-				cmd.Printf("Success!! created a new operator, account and user named %q.\n", params.Name)
+				cmd.Printf("Successfully created a new operator, account and user named %q.\n", params.Name)
 			} else {
-				cmd.Printf("Success!! created an account and user named %q under managed operator %q.\n", params.Name, GetConfig().Operator)
+				cmd.Printf("Successfully created an account and user named %q under managed operator %q.\n", params.Name, GetConfig().Operator)
 			}
-			cmd.Printf("User creds file stored in %q\n", params.User.CredsPath)
+			if params.Dir != "" {
+				cmd.Printf("Project JWT files created in %q\n", AbbrevHomePaths(params.Dir))
+			}
+			cmd.Printf("User creds file stored in %q\n", AbbrevHomePaths(params.User.CredsPath))
 
 			if params.CreateOperator {
 				cmd.Printf("\nTo run a local server using this configuration, enter:\n")
