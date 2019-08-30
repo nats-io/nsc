@@ -44,12 +44,18 @@ func createDefaultToolOptions(name string, ctx ActionCtx) []nats.Option {
 		if err != nil {
 			ctx.CurrentCmd().Printf("Disconnected: error: %v\n", err)
 		}
+		if nc.Status() == nats.CLOSED {
+			return
+		}
 		ctx.CurrentCmd().Printf("Disconnected: will attempt reconnects for %.0fm", totalWait.Minutes())
 	}))
 	opts = append(opts, nats.ReconnectHandler(func(nc *nats.Conn) {
 		ctx.CurrentCmd().Printf("Reconnected [%s]", nc.ConnectedUrl())
 	}))
 	opts = append(opts, nats.ClosedHandler(func(nc *nats.Conn) {
+		if nc.Status() == nats.CLOSED {
+			return
+		}
 		ctx.CurrentCmd().Printf("Exiting, no servers available, or connection closed")
 	}))
 	return opts
