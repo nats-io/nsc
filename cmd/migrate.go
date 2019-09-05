@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/nats-io/nkeys"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -210,6 +211,35 @@ func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
 func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
 	p.operator = ctx.StoreCtx().Operator.Name
+	if p.isFileImport && ctx.StoreCtx().Store.IsManaged() {
+		token, err := jwt.ParseDecoratedJWT([]byte(p.accountToken))
+		if err != nil {
+			return nil, err
+		}
+		ac, err := jwt.DecodeAccountClaims(token)
+		if err != nil {
+			return nil, err
+		}
+		var keys []string
+		keys = append(keys, ac.Subject)
+		keys = append(keys, ac.SigningKeys...)
+
+		// need to sign it with any key we can get
+		var kp nkeys.KeyPair
+		for _, k := range keys {
+			kp, _ = ctx.StoreCtx().KeyStore.GetKeyPair(k)
+			if kp != nil {
+				break
+			}
+		}
+		if kp == nil {
+			return nil, fmt.Errorf("unable to find any account keys - need any of %s", strings.Join(keys, ", "))
+		}
+		p.accountToken, err = ac.Encode(kp)
+		if err != nil {
+			return nil, err
+		}
+	}
 	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.accountToken))
 	if err != nil {
 		return rs, err
