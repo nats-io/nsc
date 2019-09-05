@@ -211,7 +211,7 @@ func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
 func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
 	p.operator = ctx.StoreCtx().Operator.Name
-	if p.isFileImport && ctx.StoreCtx().Store.IsManaged() {
+	if ctx.StoreCtx().Store.IsManaged() {
 		token, err := jwt.ParseDecoratedJWT([]byte(p.accountToken))
 		if err != nil {
 			return nil, err
