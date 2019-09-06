@@ -17,6 +17,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -123,4 +125,14 @@ func Test_ListKeysFilter(t *testing.T) {
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "O", opk))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "U", ts.GetUserPublicKey(t, "A", "U")))
+}
+
+func Test_ListKeysNoKeyStore(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	require.NoError(t, os.Remove(filepath.Join(ts.Dir, "keys")))
+	_, _, err := ExecuteCmd(createListKeysCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not exist")
 }

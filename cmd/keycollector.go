@@ -59,6 +59,11 @@ func (p *KeyCollectorParams) SetDefaults(ctx ActionCtx) error {
 func (p *KeyCollectorParams) handleOperator(ctx ActionCtx) (KeyList, error) {
 	var keys KeyList
 	sctx := ctx.StoreCtx()
+
+	// if we don't have a store - ignore this operator details
+	if sctx.Operator.Name == "" {
+		return nil, nil
+	}
 	oc, err := sctx.Store.ReadOperatorClaim()
 	if err != nil {
 		return nil, err
@@ -159,35 +164,38 @@ func (p *KeyCollectorParams) Run(ctx ActionCtx) (KeyList, error) {
 		return nil, err
 	}
 
-	var accounts []string
-	if p.Account != "" {
-		accounts = append(accounts, p.Account)
-	} else {
-		an, err := GetConfig().ListAccounts()
-		if err != nil {
-			return nil, err
-		}
-		accounts = append(accounts, an...)
-	}
-	for _, a := range accounts {
-		akeys, err := p.handleAccount(ctx, keys[0].Pub, a)
-		if err != nil {
-			return nil, err
-		}
-		keys = append(keys, akeys...)
-
-		if p.User != "" {
-			uk, err := p.handleUser(ctx, a, p.User)
-			if err != nil {
-				return nil, err
-			}
-			keys = append(keys, uk)
+	// if we have an operator, we can resolve other things
+	if keys != nil {
+		var accounts []string
+		if p.Account != "" {
+			accounts = append(accounts, p.Account)
 		} else {
-			ukeys, err := p.handleUsers(ctx, a)
+			an, err := GetConfig().ListAccounts()
 			if err != nil {
 				return nil, err
 			}
-			keys = append(keys, ukeys...)
+			accounts = append(accounts, an...)
+		}
+		for _, a := range accounts {
+			akeys, err := p.handleAccount(ctx, keys[0].Pub, a)
+			if err != nil {
+				return nil, err
+			}
+			keys = append(keys, akeys...)
+
+			if p.User != "" {
+				uk, err := p.handleUser(ctx, a, p.User)
+				if err != nil {
+					return nil, err
+				}
+				keys = append(keys, uk)
+			} else {
+				ukeys, err := p.handleUsers(ctx, a)
+				if err != nil {
+					return nil, err
+				}
+				keys = append(keys, ukeys...)
+			}
 		}
 	}
 
