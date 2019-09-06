@@ -177,3 +177,13 @@ func Test_ExportRemove(t *testing.T) {
 	requireEmptyDir(t, filepath.Join(kr, "A"))
 	requireEmptyDir(t, filepath.Join(kr, "U"))
 }
+
+func Test_ExportNoKeyStore(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	require.NoError(t, os.Remove(filepath.Join(ts.Dir, "keys")))
+	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", ts.Dir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not exist")
+}

@@ -33,7 +33,7 @@ func createGenerateNKeyCmd() *cobra.Command {
 		Use:   "nkey",
 		Short: "Generates an nkey",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunAction(cmd, args, &params)
+			return RunMaybeStorelessAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().BoolVarP(&params.operator.generate, "operator", "o", false, "operator")

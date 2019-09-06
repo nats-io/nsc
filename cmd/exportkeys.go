@@ -58,7 +58,7 @@ nsc export keys --account <name> (changes the account context to the specified a
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return nil
@@ -108,6 +108,11 @@ func (p *ExportKeysParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *ExportKeysParams) Validate(ctx ActionCtx) error {
+	kdir := store.GetKeysDir()
+	_, err := os.Stat(kdir)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("keystore %q does not exist", kdir)
+	}
 	return nil
 }
 

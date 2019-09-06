@@ -38,7 +38,7 @@ nsc import keys --recursive --dir <path>
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return nil
