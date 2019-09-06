@@ -91,3 +91,34 @@ func Test_MigrateSingleInteractive(t *testing.T) {
 	_, err = oos.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 }
+
+func Test_MigrateManaged(t *testing.T) {
+	_, opk, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
+
+	// create the managed operator store
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
+
+	// add a local operator with account/user
+	ts.AddOperator(t, "O")
+	ts.AddAccount(t, "A")
+	apk := ts.GetAccountPublicKey(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	// switch back to managed
+	ts.SwitchOperator(t, "T")
+
+	// migrate the local operator
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.Dir, "store", "O"))
+	require.NoError(t, err)
+	require.NotNil(t, m[apk])
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.Equal(t, opk, ac.Issuer)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc)
+}
