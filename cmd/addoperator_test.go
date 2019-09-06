@@ -184,3 +184,34 @@ func Test_AddOperatorWithKeyInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pub, oc.Subject)
 }
+
+func Test_AddWellKnownOperator(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// create the managed operator store
+	_, opk, okp := CreateOperatorKey(t)
+	as, _ := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	ourl.Path = "/jwt/v1/operator"
+
+	var twko KnownOperator
+	twko.AccountServerURL = ourl.String()
+	twko.Name = "T"
+
+	ops, _ := GetWellKnownOperators()
+	ops = append(ops, twko)
+	wellKnownOperators = ops
+
+	// add the well known operator
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", "T")
+	require.NoError(t, err)
+
+	ts.SwitchOperator(t, "T")
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, opk, oc.Subject)
+}

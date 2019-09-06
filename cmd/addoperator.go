@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -51,7 +52,7 @@ func createAddOperatorCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
-	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url or file")
+	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url, file, or well known operator")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -87,7 +88,21 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 	if ok {
-		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, true, cli.PathOrURLValidator())
+		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, true, func(v string) error {
+			// is it is an URL or path
+			pv := cli.PathOrURLValidator()
+			if err := pv(v); err != nil {
+				// if it doesn't exist - could it be the name of well known operator
+				if os.IsNotExist(err) {
+					wko, _ := FindKnownOperator(v)
+					if wko != nil {
+						return nil
+					}
+					return nil
+				}
+			}
+			return nil
+		})
 
 		if err != nil {
 			return err
@@ -106,6 +121,17 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddOperatorParams) Load(ctx ActionCtx) error {
+	// change the value of the source to be a well-known
+	// operator if that is what they gave us
+	if p.jwtPath != "" {
+		pv := cli.PathOrURLValidator()
+		if err := pv(p.jwtPath); os.IsNotExist(err) {
+			ko, _ := FindKnownOperator(p.jwtPath)
+			if ko != nil {
+				p.jwtPath = ko.AccountServerURL
+			}
+		}
+	}
 	if p.jwtPath != "" {
 		var err error
 		var data []byte

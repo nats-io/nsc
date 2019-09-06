@@ -124,12 +124,10 @@ func PathOrURLValidator() Validator {
 		if err != nil {
 			return err
 		}
-
-		info, err := os.Lstat(v)
-		if err != nil && !os.IsNotExist(err) {
+		info, err := os.Stat(v)
+		if err != nil {
 			return err
 		}
-
 		if !info.Mode().IsRegular() {
 			return errors.New("path is not a file")
 		}
