@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/AlecAivazis/survey"
+	survey "gopkg.in/AlecAivazis/survey.v1"
 )
 
 type SurveyUI struct{}

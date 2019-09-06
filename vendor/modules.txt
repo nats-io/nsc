@@ -1,5 +1,3 @@
-# github.com/AlecAivazis/survey v1.7.0
-github.com/AlecAivazis/survey
 # github.com/blang/semver v3.5.1+incompatible
 github.com/blang/semver
 # github.com/briandowns/spinner v0.0.0-20181029155426-195c31b675a7
@@ -22,13 +20,13 @@ github.com/google/go-github/github
 github.com/google/go-querystring/query
 # github.com/hashicorp/hcl v1.0.0
 github.com/hashicorp/hcl
-github.com/hashicorp/hcl/hcl/printer
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser
-github.com/hashicorp/hcl/hcl/token
-github.com/hashicorp/hcl/json/parser
+github.com/hashicorp/hcl/hcl/printer
 github.com/hashicorp/hcl/hcl/scanner
 github.com/hashicorp/hcl/hcl/strconv
+github.com/hashicorp/hcl/hcl/token
+github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
 # github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
@@ -56,9 +54,9 @@ github.com/mitchellh/mapstructure
 # github.com/nats-io/jwt v0.2.13-0.20190726194050-829b612a49c3
 github.com/nats-io/jwt
 # github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
-github.com/nats-io/nats-server/v2/server
 github.com/nats-io/nats-server/v2/conf
 github.com/nats-io/nats-server/v2/logger
+github.com/nats-io/nats-server/v2/server
 github.com/nats-io/nats-server/v2/server/pse
 # github.com/nats-io/nats.go v1.8.1
 github.com/nats-io/nats.go
@@ -91,48 +89,49 @@ github.com/spf13/pflag
 # github.com/spf13/viper v1.2.1
 github.com/spf13/viper
 # github.com/stretchr/testify v1.2.2
-github.com/stretchr/testify/require
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
 # github.com/tcnksm/go-gitconfig v0.1.2
 github.com/tcnksm/go-gitconfig
 # github.com/ulikunitz/xz v0.5.5
 github.com/ulikunitz/xz
+github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-github.com/ulikunitz/xz/internal/hash
 # github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
 github.com/xlab/tablewriter
 # golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
-golang.org/x/crypto/ed25519
-golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
+golang.org/x/crypto/ed25519
+golang.org/x/crypto/ed25519/internal/edwards25519
 # golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
-golang.org/x/net/context/ctxhttp
 golang.org/x/net/context
+golang.org/x/net/context/ctxhttp
 # golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
 # golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e
 golang.org/x/sys/unix
-golang.org/x/sys/windows/svc
-golang.org/x/sys/windows/svc/debug
-golang.org/x/sys/windows/svc/mgr
-golang.org/x/sys/windows/svc/eventlog
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
+golang.org/x/sys/windows/svc
+golang.org/x/sys/windows/svc/debug
+golang.org/x/sys/windows/svc/eventlog
+golang.org/x/sys/windows/svc/mgr
 # golang.org/x/text v0.3.2
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
 # google.golang.org/appengine v1.3.0
-google.golang.org/appengine/urlfetch
 google.golang.org/appengine/internal
-google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/internal/base
 google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
+google.golang.org/appengine/internal/urlfetch
+google.golang.org/appengine/urlfetch
 # gopkg.in/AlecAivazis/survey.v1 v1.7.0
+gopkg.in/AlecAivazis/survey.v1
 gopkg.in/AlecAivazis/survey.v1/core
 gopkg.in/AlecAivazis/survey.v1/terminal
 # gopkg.in/yaml.v2 v2.2.2
