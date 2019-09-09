@@ -91,19 +91,18 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, true, func(v string) error {
 			// is it is an URL or path
 			pv := cli.PathOrURLValidator()
-			if err := pv(v); err != nil {
+			if perr := pv(v); perr != nil {
 				// if it doesn't exist - could it be the name of well known operator
-				if os.IsNotExist(err) {
+				if os.IsNotExist(perr) {
 					wko, _ := FindKnownOperator(v)
 					if wko != nil {
 						return nil
 					}
-					return nil
 				}
+				return perr
 			}
 			return nil
 		})
-
 		if err != nil {
 			return err
 		}

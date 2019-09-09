@@ -215,3 +215,12 @@ func Test_AddWellKnownOperator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, opk, oc.Subject)
 }
+
+func Test_AddNotWellKnownOperator(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// add the well known operator
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--url", "X")
+	require.Error(t, err)
+}
