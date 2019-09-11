@@ -31,8 +31,8 @@ type TimeParams struct {
 }
 
 func (p *TimeParams) BindFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&p.Start, "start", "", "0", "valid from ('0' is always) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
-	cmd.Flags().StringVarP(&p.Expiry, "expiry", "", "0", "valid until ('0' is always) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
+	cmd.Flags().StringVarP(&p.Start, "start", "", "0", "valid from ('0' is always, '3d' is three days) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
+	cmd.Flags().StringVarP(&p.Expiry, "expiry", "", "0", "valid until ('0' is always, '2M' is two months) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
 }
 
 func (p *TimeParams) valid(value string, label string, oldOK bool) error {
