@@ -192,6 +192,10 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("user name is required")
 	}
 
+	if p.name == "*" {
+		p.name = GetRandomName(0)
+	}
+
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}

@@ -178,6 +178,10 @@ func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("account name is required")
 	}
 
+	if p.name == "*" {
+		p.name = GetRandomName(0)
+	}
+
 	names, err := GetConfig().ListAccounts()
 	if err != nil {
 		return err
