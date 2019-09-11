@@ -846,6 +846,8 @@ var (
 	}
 )
 
+var lastRandomName = ""
+
 // GetRandomName generates a random name from the list of adjectives and surnames in this package
 // formatted as "adjective_surname". For example 'focused_turing'. If retry is non-zero, a random
 // integer between 0 and 10 will be added to the end of the name, e.g `focused_turing3`
@@ -859,5 +861,12 @@ begin:
 	if retry > 0 {
 		name = fmt.Sprintf("%s%d", name, rand.Intn(10))
 	}
+
+	lastRandomName = name
 	return name
+}
+
+// GetLastRandomName returns the last generated name, useful for testing
+func GetLastRandomName() string {
+	return lastRandomName
 }
