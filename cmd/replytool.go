@@ -71,6 +71,11 @@ func (p *RepParams) PreInteractive(ctx ActionCtx) error {
 
 func (p *RepParams) Load(ctx ActionCtx) error {
 	p.credsPath = ctx.StoreCtx().KeyStore.CalcUserCredsPath(p.AccountContextParams.Name, p.UserContextParams.Name)
+	if natsURLFlag != "" {
+		p.natsURLs = []string{natsURLFlag}
+		return nil
+	}
+
 	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 	if err != nil {
 		return err

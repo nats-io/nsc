@@ -27,7 +27,10 @@ var toolCmd = &cobra.Command{
 	Short: "NATS tools: pub, sub, req, rep, rtt",
 }
 
+var natsURLFlag = ""
+
 func init() {
+	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
 	GetRootCmd().AddCommand(toolCmd)
 }
 
