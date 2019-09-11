@@ -63,6 +63,27 @@ func Test_InitDeploy(t *testing.T) {
 	ts.VerifyUser(t, "T", "O", "O", true)
 }
 
+func Test_InitRandomName(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	as, _ := RunTestAccountServer(t)
+	defer as.Close()
+
+	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
+	ourl.Path = "/jwt/v1/operator"
+
+	_, _, err = ExecuteCmd(createInitCmd(), "--url", ourl.String())
+	require.NoError(t, err)
+
+	name := GetLastRandomName()
+
+	ts.VerifyOperator(t, "T", true) // Operator name comes from the URL
+	ts.VerifyAccount(t, "T", name, true)
+	ts.VerifyUser(t, "T", name, name, true)
+}
+
 func Test_InitWellKnown(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
