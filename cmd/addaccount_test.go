@@ -41,6 +41,8 @@ func Test_AddAccount(t *testing.T) {
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"generated and stored account key", "added account"}, false},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, nil, []string{"Generated account key", "added account"}, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, nil, []string{"Generated account key", "added account"}, false}, // should make a new name
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"specified key is not a valid account nkey"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
