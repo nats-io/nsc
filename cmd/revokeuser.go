@@ -37,7 +37,7 @@ func createRevokeUserCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return  RunAction(cmd, args, &params)
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
