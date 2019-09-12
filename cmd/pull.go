@@ -37,42 +37,7 @@ func createPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull an operator or account jwt replacing the local jwt with the server's version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := RunAction(cmd, args, &params)
-			for _, j := range params.Jobs {
-				m := j.Message()
-				cmd.Println(m)
-			}
-
-			jc := len(params.Jobs)
-			if err != nil {
-				// print errors specific to a job
-				for _, j := range params.Jobs {
-					err := j.Error()
-					if err != nil {
-						cmd.Println(err.Error())
-					}
-				}
-				// if they all failed, the returned error has info
-				if jc == params.Jobs.ErrorCount() {
-					r := err.Error()
-					m := "all pull jobs failed"
-					if r != "" {
-						m = fmt.Sprintf("%s - %s", m, r)
-					}
-					return fmt.Errorf(m)
-				}
-				if jc > 1 {
-					return fmt.Errorf("%d of %d pull jobs failed\n", params.Jobs.ErrorCount(), jc)
-				}
-				return fmt.Errorf("pull job failed\n")
-			}
-
-			if jc > 1 {
-				cmd.Println("Success!! all pull jobs succeeded")
-			} else {
-				cmd.Println("Success!! all pull job succeeded")
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -302,31 +267,29 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	wg.Wait()
 
+	r := store.NewDetailedReport(true)
 	for _, j := range p.Jobs {
 		if err := j.Error(); err != nil {
+			r.AddFromError(err)
 			continue
 		}
 		token, _ := j.Token()
 		remoteClaim, err := jwt.DecodeGeneric(token)
 		if err != nil {
-			j.Err = fmt.Errorf("error decoding remote token: %v", err)
+			r.AddError("error decoding remote token for %q: %v", j.Name, err)
 			continue
 		}
 		orig := j.LocalClaim.Claims().IssuedAt
 		remote := remoteClaim.IssuedAt
 		if (orig > remote) && !p.Overwrite {
-			j.Err = errors.New("local jwt is newer than remote version - specify --force to overwrite")
+			r.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", j.Name)
 			continue
 		}
 		if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
-			j.StoreErr = err
+			r.AddError("error storing %q: %v", j.Name, err)
+			continue
 		}
+		r.AddOK("pulled %s %q from the remote server", remoteClaim.Type, j.Name)
 	}
-
-	err := p.Jobs.Error()
-	if err != nil {
-		// description will show actual error
-		return nil, errors.New("")
-	}
-	return nil, nil
+	return r, nil
 }

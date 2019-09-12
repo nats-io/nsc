@@ -41,29 +41,7 @@ func CreateAddUserCmd() *cobra.Command {
 		SilenceUsage: true,
 		Example:      params.longHelp(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			if params.generated && !QuietMode() {
-				cmd.Printf("Generated user key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
-				s, err := GetStore()
-				if err == nil {
-					ctx, err := s.GetContext()
-					if err == nil {
-						fp := ctx.KeyStore.GetUserCredsPath(params.AccountContextParams.Name, params.name)
-						if fp != "" {
-							cmd.Printf("Generated user creds file %q\n", AbbrevHomePaths(fp))
-						}
-					}
-				}
-			}
-
-			if !QuietMode() {
-				cmd.Printf("Success! - added user %q to %q\n", params.name, params.AccountContextParams.Name)
-			}
-
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -228,27 +206,44 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err := p.Entity.StoreKeys(p.AccountContextParams.Name); err != nil {
 		return nil, err
 	}
+
+	r := store.NewDetailedReport(false)
 	rs, err = p.Entity.GenerateClaim(p.signerKP, ctx)
+	if rs != nil {
+		r.Add(rs)
+	}
 	if err != nil {
-		return nil, err
+		r.AddFromError(err)
+	}
+	if rs != nil {
+		r.Add(rs)
 	}
 
+	pk, _ := p.kp.PublicKey()
+	if p.generated {
+		r.AddOK("generated and stored user key %q", pk)
+	}
+	// if they gave us a seed, it stored - try to get it
 	ks := ctx.StoreCtx().KeyStore
-	if p.kp == nil {
-		ctx.CurrentCmd().Println("unable to save creds - user key not found")
-	}
-
-	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, p.kp)
-	if err != nil {
-		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
-	} else {
-		p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+	if ks.HasPrivateKey(pk) {
+		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, p.kp)
 		if err != nil {
-			ctx.CurrentCmd().Println(err.Error())
+			r.AddError("unable to save creds: %v", err)
+		} else {
+			p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+			if err != nil {
+				r.AddError("error storing creds: %v", err)
+			} else {
+				r.AddOK("generated user creds file %q", AbbrevHomePaths(p.credsFilePath))
+			}
 		}
+	} else {
+		r.AddOK("skipped generating creds file - user private key is not available")
 	}
-
-	return rs, nil
+	if r.HasNoErrors() {
+		r.AddOK("added user %q to account %q", p.name, p.AccountContextParams.Name)
+	}
+	return r, nil
 }
 
 func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {

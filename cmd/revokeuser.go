@@ -37,14 +37,7 @@ func createRevokeUserCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			if !QuietMode() {
-				cmd.Printf("Revoked user %s with public key %s\n", params.user, params.userPubKey)
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
@@ -167,5 +160,11 @@ func (p *RevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+
+	r := store.NewDetailedReport(true)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("revoked user %s", p.userPubKey)
+	}
+	return r, nil
 }

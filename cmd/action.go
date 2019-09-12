@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -143,6 +144,19 @@ func run(ctx ActionCtx, action interface{}) error {
 	rs, err := e.Run(ctx)
 	if rs != nil {
 		ctx.CurrentCmd().Println(rs.Message())
+		sum, ok := rs.(store.Summarizer)
+		if ok {
+			m, err := sum.Summary()
+			if err != nil {
+				return err
+			}
+			if m != "" {
+				if strings.HasSuffix(m, "\n") {
+					m = m[:len(m)-1]
+				}
+				ctx.CurrentCmd().Println(m)
+			}
+		}
 	}
 	return err
 }

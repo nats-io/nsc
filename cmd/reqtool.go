@@ -112,7 +112,7 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		payload = ctx.Args()[1]
 	}
 
-	ctx.CurrentCmd().Printf("Published request: [%s] : '%s'\n", subj, payload)
+	ctx.CurrentCmd().Printf("published request: [%s] : '%s'\n", subj, payload)
 	msg, err := nc.Request(subj, []byte(payload), 5*time.Second)
 	if err == nats.ErrTimeout {
 		ctx.CurrentCmd().Println("request timed out")
@@ -122,6 +122,6 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	ctx.CurrentCmd().Printf("Received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
+	ctx.CurrentCmd().Printf("received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
 	return nil, nil
 }

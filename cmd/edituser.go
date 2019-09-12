@@ -292,7 +292,7 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 
 func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
-	p.GenericClaimsParams.Run(ctx, p.claim)
+	p.GenericClaimsParams.Run(ctx, p.claim, nil)
 
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubs...)
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubsub...)

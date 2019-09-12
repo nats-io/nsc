@@ -206,23 +206,13 @@ func newDefaultAction() actionResponse {
 	return ar
 }
 
-type testStatus struct {
-	message string
-}
-
-func (m *testStatus) Message() string {
-	return m.message
-}
-
 func TestActionMessage(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	ar := newDefaultAction()
 	ar.run = func(ctx ActionCtx) (store.Status, error) {
-		var m testStatus
-		m.message = "This is a test message"
-		return &m, nil
+		return store.OKStatus("this is a test message"), nil
 	}
 
 	cmd := &cobra.Command{

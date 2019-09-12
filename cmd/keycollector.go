@@ -297,6 +297,10 @@ func (keys Keys) Message() string {
 
 type KeyList []*Key
 
+func (ks KeyList) Code() store.StatusCode {
+	return store.OK
+}
+
 func (ks KeyList) Len() int {
 	return len(ks)
 }

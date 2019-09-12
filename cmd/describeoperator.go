@@ -117,5 +117,12 @@ func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, Write(p.outputFile, p.raw)
 	}
 	v := NewOperatorDescriber(p.claim).Describe()
-	return nil, Write(p.outputFile, []byte(v))
+	if err := Write(p.outputFile, []byte(v)); err != nil {
+		return nil, err
+	}
+	var s store.Status
+	if !IsStdOut(p.outputFile) {
+		s = store.OKStatus("wrote account description to %q", AbbrevHomePaths(p.outputFile))
+	}
+	return s, nil
 }

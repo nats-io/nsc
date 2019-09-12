@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -45,34 +46,6 @@ func createInitCmd() *cobra.Command {
 
 			if err := RunAction(cmd, args, &params); err != nil {
 				return fmt.Errorf("init failed: %v", err)
-			}
-
-			if params.CreateOperator {
-				cmd.Printf("Successfully created a new operator, account and user named %q.\n", params.Name)
-			} else {
-				cmd.Printf("Successfully created an account and user named %q under managed operator %q.\n", params.Name, GetConfig().Operator)
-			}
-			if params.Dir != "" {
-				cmd.Printf("Project JWT files created in %q\n", AbbrevHomePaths(params.Dir))
-			}
-			cmd.Printf("User creds file stored in %q\n", AbbrevHomePaths(params.User.CredsPath))
-
-			if params.CreateOperator {
-				cmd.Printf("\nTo run a local server using this configuration, enter:\n")
-				cmd.Printf("> nsc generate config --mem-resolver --config-file <path/server.conf>\n")
-				cmd.Printf("start a nats-server using the generated config:\n")
-				cmd.Printf("> nats-server -c <path/server.conf>\n")
-			}
-
-			if len(params.ServiceURLs) > 0 {
-				cmd.Printf("\noperator has service URL(s) set to:\n")
-				for _, v := range params.ServiceURLs {
-					cmd.Printf("  %s\n", v)
-				}
-				cmd.Printf("\nTo listen for messages enter:\n")
-				cmd.Printf("> nsc tools sub \">\"\n")
-				cmd.Printf("\nTo publish your first message enter:\n")
-				cmd.Printf("> nsc tools pub hello \"Hello World\"\n\n")
 			}
 
 			return nil
@@ -394,21 +367,56 @@ func (p *InitCmdParams) createUser(ctx ActionCtx) error {
 
 func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 	ctx.CurrentCmd().SilenceUsage = true
+	r := store.NewDetailedReport(true)
 	if p.CreateOperator {
 		if err := p.setOperatorDefaults(ctx); err != nil {
 			return nil, err
 		}
+		r.AddOK("created operator %s", p.Name)
+	} else {
+		r.AddOK("add managed operator %s", GetConfig().Operator)
 	}
 	rs, err := p.createAccount(ctx)
-	if err != nil {
-		return rs, err
+	if rs != nil {
+		r.Add(rs)
 	}
+	if err != nil {
+		r.AddFromError(err)
+		return r, err
+	}
+	r.AddOK("created account %s", p.Name)
 	if err := GetConfig().SetAccount(p.Name); err != nil {
-		return rs, err
+		r.AddFromError(err)
+		return r, err
 	}
 
 	if err := p.createUser(ctx); err != nil {
-		return rs, err
+		r.AddFromError(err)
+		return r, err
 	}
-	return rs, nil
+	r.AddOK("created user %q", p.Name)
+	r.AddOK("project jwt files created in %q", AbbrevHomePaths(p.Dir))
+	r.AddOK("user creds file stored in %q", AbbrevHomePaths(p.User.CredsPath))
+
+	if p.CreateOperator {
+		local := `to run a local server using this configuration, enter:
+cmd.Printf("> nsc generate config --mem-resolver --config-file <path/server.conf>
+cmd.Printf("start a nats-server using the generated config:
+cmd.Printf("> nats-server -c <path/server.conf>`
+		r.Add(store.NewServerMessage(local))
+	}
+	if len(p.ServiceURLs) > 0 {
+		var buf bytes.Buffer
+		buf.WriteString("operator has service URL(s) set to:\n")
+		for _, v := range p.ServiceURLs {
+			buf.WriteString(fmt.Sprintf("  %s\n", v))
+		}
+		buf.WriteRune('\n')
+		buf.WriteString("To listen for messages enter:\n")
+		buf.WriteString(fmt.Sprintf("> nsc tools sub \">\"\n"))
+		buf.WriteString(fmt.Sprintf("\nTo publish your first message enter:\n"))
+		buf.WriteString(fmt.Sprintf("> nsc tools pub hello \"Hello World\"\n"))
+		r.Add(store.NewServerMessage(buf.String()))
+	}
+	return r, nil
 }

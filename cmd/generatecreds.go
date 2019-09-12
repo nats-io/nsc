@@ -132,20 +132,26 @@ func (p *GenerateCredsParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
+	if p.entityKP == nil {
+		return fmt.Errorf("user was not found - please specify it")
+	}
+
 	return nil
 }
 
 func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
-	if p.entityKP == nil {
-		return nil, fmt.Errorf("user was not found - please specify it")
-	}
-
 	d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.user, p.entityKP)
 	if err != nil {
 		return nil, err
 	}
-
-	return nil, Write(p.out, d)
+	if err := Write(p.out, d); err != nil {
+		return nil, err
+	}
+	var s store.Status
+	if !IsStdOut(p.out) {
+		s = store.OKStatus("wrote credentials to %q", AbbrevHomePaths(p.out))
+	}
+	return s, nil
 }
 
 func GenerateConfig(s *store.Store, account string, user string, userKey nkeys.KeyPair) ([]byte, error) {

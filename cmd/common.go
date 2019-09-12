@@ -459,3 +459,75 @@ func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
 	}
 	return ok, nil
 }
+
+func diffDates(format string, a, b int64) store.Status {
+	if a != b {
+		as := "always"
+		if a != 0 {
+			as = UnixToDate(a)
+		}
+		bs := "always"
+		if b != 0 {
+			bs = UnixToDate(b)
+		}
+		v := fmt.Sprintf("from %s to %s", as, bs)
+		return store.NewServerMessage(format, v)
+	}
+	return nil
+}
+
+func limitToString(v int64) string {
+	switch v {
+	case -1:
+		return "unlimited"
+	default:
+		return fmt.Sprintf("%d", v)
+	}
+}
+
+func diffNumber(format string, a, b int64) store.Status {
+	if a != b {
+		as := limitToString(a)
+		bs := limitToString(b)
+		v := fmt.Sprintf("from %s to %s", as, bs)
+		return store.NewServerMessage(format, v)
+	}
+	return nil
+}
+
+func diffBool(format string, a, b bool) store.Status {
+	if a != b {
+		v := fmt.Sprintf("from %t to %t", a, b)
+		return store.NewServerMessage(format, v)
+	}
+	return nil
+}
+
+func DiffAccountLimits(a *jwt.AccountClaims, b *jwt.AccountClaims) store.Status {
+	r := store.NewReport(store.WARN, "account server modifications")
+	r.Add(diffDates("jwt start changed %s", a.NotBefore, b.NotBefore))
+	r.Add(diffDates("jwt expiry changed %s", a.NotBefore, b.NotBefore))
+	r.Add(diffNumber("max subscriptions changed %s", a.Limits.Subs, b.Limits.Subs))
+	r.Add(diffNumber("max connections changed %s", a.Limits.Conn, b.Limits.Conn))
+	r.Add(diffNumber("max leaf node connections changed %s", a.Limits.LeafNodeConn, b.Limits.LeafNodeConn))
+	r.Add(diffNumber("max imports changed %s", a.Limits.Imports, b.Limits.Imports))
+	r.Add(diffNumber("max exports changed %s", a.Limits.Exports, b.Limits.Exports))
+	r.Add(diffNumber("max data changed %s", a.Limits.Data, b.Limits.Data))
+	r.Add(diffNumber("max message payload changed %s", a.Limits.Payload, b.Limits.Payload))
+	r.Add(diffBool("allow wildcard exports changed %s", a.Limits.WildcardExports, b.Limits.WildcardExports))
+	if len(r.Details) == 0 {
+		return nil
+	}
+	return r
+}
+
+func StoreAccountAndUpdateStatus(ctx ActionCtx, token string, status *store.Report) {
+	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	// the order of the messages benefits from adding the status first
+	if rs != nil {
+		status.Add(rs)
+	}
+	if err != nil {
+		status.AddFromError(err)
+	}
+}

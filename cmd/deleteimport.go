@@ -36,11 +36,7 @@ func createDeleteImportCmd() *cobra.Command {
 		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-			cmd.Printf("Success! - deleted %s import %q\n", params.importKind(), params.deletedImport.Subject)
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
@@ -57,11 +53,10 @@ func init() {
 type DeleteImportParams struct {
 	AccountContextParams
 	SignerParams
-	claim         *jwt.AccountClaims
-	deletedImport *jwt.Import
-	index         int
-	subject       string
-	service       bool
+	claim   *jwt.AccountClaims
+	index   int
+	subject string
+	service bool
 }
 
 func (p *DeleteImportParams) longHelp() string {
@@ -186,12 +181,21 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *DeleteImportParams) Run(ctx ActionCtx) (store.Status, error) {
-	p.deletedImport = p.claim.Imports[p.index]
+	din := p.claim.Imports[p.index]
 	p.claim.Imports = append(p.claim.Imports[:p.index], p.claim.Imports[p.index+1:]...)
-
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+
+	r := store.NewDetailedReport(true)
+	r.AddOK("deleted %s import %q", din.Type, din.Subject)
+	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	if rs != nil {
+		r.Add(rs)
+	}
+	if err != nil {
+		r.Add(store.FromError(err))
+	}
+	return r, nil
 }

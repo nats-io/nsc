@@ -223,5 +223,10 @@ func (p *RevokeActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	r := store.NewDetailedReport(true)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("revoked activation %s for account %s", p.export.Name, p.accountKey.publicKey)
+	}
+	return r, nil
 }

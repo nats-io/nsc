@@ -108,10 +108,10 @@ func (p *ExportKeysParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *ExportKeysParams) Validate(ctx ActionCtx) error {
-	kdir := store.GetKeysDir()
-	_, err := os.Stat(kdir)
+	d := store.GetKeysDir()
+	_, err := os.Stat(d)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("keystore %q does not exist", kdir)
+		return fmt.Errorf("keystore %q does not exist", d)
 	}
 	return nil
 }
@@ -124,11 +124,12 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 	var keys Keys
 
 	ks := ctx.StoreCtx().KeyStore
-
 	p.Dir, err = Expand(p.Dir)
 	if err != nil {
 		return nil, err
 	}
+
+	sr := store.NewDetailedReport(true)
 	keys.KeyList, err = p.KeyCollectorParams.Run(ctx)
 	for _, k := range keys.KeyList {
 		var j ExportJob
@@ -136,14 +137,16 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 		if k.HasKey() {
 			s, err := ks.GetSeed(k.Pub)
 			if err != nil {
-				return nil, fmt.Errorf("error reading seed for %s", k.Pub)
+				sr.AddError("error reading seed for %s", k.Pub)
+				continue
 			}
 			j.filepath = filepath.Join(p.Dir, fmt.Sprintf("%s.nk", k.Pub))
 			_, err = os.Stat(j.filepath)
 			if os.IsNotExist(err) || (err == nil && p.Force) {
 				j.data = []byte(s)
 			} else {
-				return nil, fmt.Errorf("%q already exists - specify --force to overwrite", j.filepath)
+				sr.AddError("%q already exists - specify --force to overwrite", j.filepath)
+				continue
 			}
 		}
 		wj = append(wj, j)
@@ -157,36 +160,29 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	var js store.MultiJob
 	for _, j := range wj {
-		var status store.JobStatus
 		if j.filepath != "" {
 			j.err = ioutil.WriteFile(j.filepath, j.data, 0700)
 			if j.err != nil {
-				status.Err = fmt.Errorf("error exporting %q: %v", j.description, j.err)
+				sr.AddError("error exporting %q: %v", j.description, j.err)
 			} else {
-				status.OK = fmt.Sprintf("exported %q", j.description)
 				if p.Remove {
 					err := ks.Remove(j.description)
 					if err != nil {
-						status.Err = fmt.Errorf("exported %q but failed to delete original file: %v", j.description, err)
+						sr.AddError("exported %q but failed to delete original file: %v", j.description, err)
+						continue
 					} else {
-						status.OK = fmt.Sprintf("moved %q", j.description)
+						sr.AddOK("moved %q", j.description)
+						continue
 					}
 				}
+				sr.AddOK("exported %q", j.description)
 			}
 		} else {
-			status.Warn = fmt.Sprintf("skipped %q - no seed available", j.description)
+			sr.AddWarning("skipped %q - no seed available", j.description)
 		}
-		js = append(js, status)
 	}
-
-	m, err := js.Summary()
-	if m != "" {
-		ctx.CurrentCmd().Println(m)
-	}
-
-	return js, err
+	return sr, err
 }
 
 type ExportJob struct {

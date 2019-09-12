@@ -19,6 +19,9 @@ package cmd
 
 import (
 	"sort"
+	"strings"
+
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/nats-io/jwt"
 )
@@ -45,18 +48,41 @@ func (sp *GenericClaimsParams) Valid() error {
 	return nil
 }
 
-func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims) error {
+func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Report) error {
 	cd := claim.Claims()
 	if sp.TimeParams.IsStartChanged() {
 		cd.NotBefore, _ = sp.TimeParams.StartDate()
+		if r != nil {
+			if cd.NotBefore == 0 {
+				r.AddOK("changed jwt start to not have a start date")
+			} else {
+				r.AddOK("changed jwt valid start to %s - %s", UnixToDate(cd.NotBefore), strings.ToLower(HumanizedDate(cd.NotBefore)))
+			}
+		}
 	}
 
 	if sp.TimeParams.IsExpiryChanged() {
 		cd.Expires, _ = sp.TimeParams.ExpiryDate()
+		if r != nil {
+			if cd.Expires == 0 {
+				r.AddOK("changed jwt expiry to never expire")
+			} else {
+				r.AddOK("changed jwt expiry to %s - %s", UnixToDate(cd.Expires), strings.ToLower(HumanizedDate(cd.Expires)))
+			}
+		}
 	}
 
 	cd.Tags.Add(sp.tags...)
 	cd.Tags.Remove(sp.rmTags...)
+
+	if r != nil {
+		for _, t := range sp.tags {
+			r.AddOK("added tag %q", strings.ToLower(t))
+		}
+		for _, t := range sp.rmTags {
+			r.AddOK("removed tag %q", strings.ToLower(t))
+		}
+	}
 	sort.Strings(cd.Tags)
 	return nil
 }

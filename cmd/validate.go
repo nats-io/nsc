@@ -228,7 +228,7 @@ func (p *ValidateCmdParams) render(name string, issues *jwt.ValidationResults) s
 	table.UTF8Box()
 	table.AddTitle(fmt.Sprintf(name))
 	if issues != nil {
-		table.AddHeaders("#", "", "Description")
+		table.AddHeaders("#", " ", "Description")
 		for i, v := range issues.Issues {
 			fatal := ""
 			if v.Blocking || v.TimeCheck {

@@ -41,12 +41,6 @@ func CreateAddAccountCmd() *cobra.Command {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if !QuietMode() {
-				if params.generate {
-					cmd.Printf("Generated account key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
-				}
-				cmd.Printf("Success! - added account %q\n", params.name)
-			}
 			return GetConfig().SetAccount(params.name)
 		},
 	}
@@ -257,5 +251,13 @@ func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	r := store.NewDetailedReport(false)
+	if p.generate {
+		r.AddOK("generated and stored account key %q", pk)
+	}
+	StoreAccountAndUpdateStatus(ctx, p.token, r)
+	if r.HasNoErrors() {
+		r.AddOK("added account %q", p.name)
+	}
+	return r, err
 }

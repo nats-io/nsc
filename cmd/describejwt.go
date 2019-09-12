@@ -143,5 +143,12 @@ func (p *DescribeFile) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, fmt.Errorf("describer for %q is not implemented", p.kind)
 	}
 
-	return nil, Write(p.outputFile, []byte(describer.Describe()))
+	if err := Write(p.outputFile, []byte(describer.Describe())); err != nil {
+		return nil, err
+	}
+	var s store.Status
+	if !IsStdOut(p.outputFile) {
+		s = store.OKStatus("wrote account description to %q", AbbrevHomePaths(p.outputFile))
+	}
+	return s, nil
 }

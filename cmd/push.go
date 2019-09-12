@@ -38,40 +38,10 @@ push -a <accountName>
 push -A (all accounts)`,
 		Args: MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				// this error was not during the sync operation return as it is
-				return fmt.Errorf("aborted push - %v", err)
-			}
-			ec := len(params.errors)
-			ta := len(params.targeted)
-			ok := len(params.succeeded)
-
-			if !params.allAccounts && ok == ta {
-				cmd.Printf("successfully pushed account %q\n", params.succeeded[0])
-				return nil
-			}
-
-			if ok == ta {
-				cmd.Printf("successfully pushed all accounts [%s]\n", strings.Join(params.succeeded, ", "))
-				return nil
-			}
-
-			if ok == 0 {
-				cmd.Printf("unable to push any of the account(s)\n")
-			} else if ok < ta {
-				cmd.Printf("successfully pushed %d out of %d accounts [%s]\n", ta-ec, ta, strings.Join(params.succeeded, ", "))
-			}
-
-			if ec > 0 {
-				for i, v := range params.errors {
-					cmd.Printf("\t%d: %v\n\n", i+1, v)
-				}
-				return fmt.Errorf("push operation finished with errors")
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().BoolVarP(&params.allAccounts, "all-accounts", "A", false, "push all accounts under the current operator (exclusive of -a)")
+	cmd.Flags().BoolVarP(&params.allAccounts, "all", "A", false, "push all accounts under the current operator (exclusive of -a)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "push regardless of validation issues")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
@@ -86,9 +56,7 @@ type PushCmdParams struct {
 	ASU         string
 	allAccounts bool
 	force       bool
-	succeeded   []string
 	targeted    []string
-	errors      []error
 }
 
 func (p *PushCmdParams) SetDefaults(ctx ActionCtx) error {
@@ -239,23 +207,23 @@ func (p *PushCmdParams) getSelectedAccounts() ([]string, error) {
 }
 
 func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
+	ctx.CurrentCmd().SilenceUsage = true
 	var err error
-
 	p.targeted, err = p.getSelectedAccounts()
 	if err != nil {
 		return nil, err
 	}
 
+	r := store.NewDetailedReport(true)
 	for _, v := range p.targeted {
 		if err := p.pushAccount(v, ctx); err != nil {
-			p.errors = append(p.errors, fmt.Errorf("failed to push account %q: %v", v, err))
-
+			r.AddError("failed to push account %q: %v", v, err)
 		} else {
-			p.succeeded = append(p.succeeded, v)
+			r.AddOK("pushed %q", v)
 		}
 	}
 
-	return nil, nil
+	return r, nil
 }
 
 func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) error {

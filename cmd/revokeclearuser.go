@@ -144,10 +144,14 @@ func (p *ClearRevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	p.claim.ClearRevocation(p.userPubKey)
-
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	r := store.NewDetailedReport(true)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("cleared user revocation for account %s", p.userPubKey)
+	}
+	return r, nil
 }

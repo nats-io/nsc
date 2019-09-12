@@ -34,11 +34,7 @@ func createDeleteExportCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-			cmd.Printf("Success! - deleted export of %q\n", params.deletedExport.Subject)
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
@@ -54,10 +50,9 @@ func init() {
 type DeleteExportParams struct {
 	AccountContextParams
 	SignerParams
-	claim         *jwt.AccountClaims
-	deletedExport *jwt.Export
-	index         int
-	subject       string
+	claim   *jwt.AccountClaims
+	index   int
+	subject string
 }
 
 func (p *DeleteExportParams) SetDefaults(ctx ActionCtx) error {
@@ -140,12 +135,21 @@ func (p *DeleteExportParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *DeleteExportParams) Run(ctx ActionCtx) (store.Status, error) {
-	p.deletedExport = p.claim.Exports[p.index]
+	dex := p.claim.Exports[p.index]
 	p.claim.Exports = append(p.claim.Exports[:p.index], p.claim.Exports[p.index+1:]...)
-
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+
+	r := store.NewDetailedReport(true)
+	r.AddOK("deleted %s export %q", dex.Type, dex.Subject)
+	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	if rs != nil {
+		r.Add(rs)
+	}
+	if err != nil {
+		r.AddFromError(err)
+	}
+	return r, nil
 }

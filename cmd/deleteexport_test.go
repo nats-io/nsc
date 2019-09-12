@@ -33,8 +33,8 @@ func Test_DeleteExport(t *testing.T) {
 	tests := CmdTests{
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A"}, nil, []string{"subject is required"}, true},
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "a"}, nil, []string{"no export matching \"a\" found"}, true},
-		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "foo"}, nil, []string{"deleted export of \"foo\""}, false},
-		{createDeleteExportCmd(), []string{"delete", "export", "--account", "B"}, nil, []string{"deleted export of \"bar\""}, false},
+		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "foo"}, nil, []string{"deleted stream export \"foo\""}, false},
+		{createDeleteExportCmd(), []string{"delete", "export", "--account", "B"}, nil, []string{"deleted service export \"bar\""}, false},
 	}
 
 	tests.Run(t, "root", "delete")
