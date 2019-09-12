@@ -167,5 +167,11 @@ func (p *RevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+
+	r := store.NewDetailedReport(true)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("revoked user %s", p.userPubKey)
+	}
+	return r, nil
 }

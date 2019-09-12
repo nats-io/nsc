@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -50,12 +51,12 @@ and display only those keys that match provided the --operator,
 nsc list keys --all (same as specifying --operator --accounts --users)
 nsc list keys --operator --not-referenced (shows all other operator keys)
 nsc list keys --all --filter VSVMGA (shows all keys containing the filter)
-nsc list keys --account A (
+nsc list keys --account A (changes the account context to the specified account)
 `,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return nil
@@ -102,6 +103,14 @@ func (p *ListKeysParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *ListKeysParams) Validate(ctx ActionCtx) error {
+	kdir := store.GetKeysDir()
+	_, err := os.Stat(kdir)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("keystore %q does not exist", kdir)
+	}
+	if ctx.StoreCtx().Operator.Name == "" && !p.Unreferenced {
+		return errors.New("operator is not set -- set an operator first or try --not-referenced to list all keys not in the context")
+	}
 	if p.Unreferenced && p.Seeds {
 		return errors.New("specify one of --show-seeds or --not-referenced")
 	}

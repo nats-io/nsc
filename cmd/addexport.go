@@ -37,17 +37,7 @@ func createAddExportCmd() *cobra.Command {
 		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-			if !QuietMode() {
-				visibility := "public"
-				if params.export.TokenReq {
-					visibility = "private"
-				}
-				cmd.Printf("Success! - added %s %s export %q\n", visibility, params.export.Type, params.export.Name)
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
@@ -220,5 +210,15 @@ func (p *AddExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+
+	visibility := "public"
+	if p.export.TokenReq {
+		visibility = "private"
+	}
+	r := store.NewDetailedReport(false)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("added %s %s export %q", visibility, p.export.Type, p.export.Name)
+	}
+	return r, err
 }

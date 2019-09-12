@@ -137,36 +137,6 @@ func (p *RevokeClearActivationParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeClearActivationParams) Validate(ctx ActionCtx) error {
-
-	if len(p.possibleExports) == 1 && p.subject == "" {
-		p.subject = string(p.possibleExports[0].Subject)
-	}
-
-	if p.subject == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("a subject is required")
-	}
-
-	if err := p.accountKey.Valid(); err != nil {
-		return err
-	}
-
-	sub := jwt.Subject(p.subject)
-	for _, e := range p.possibleExports {
-		if sub.IsContainedIn(e.Subject) {
-			p.export = e
-			break
-		}
-	}
-
-	if err := p.SignerParams.Resolve(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 	var choices []string
 	if p.subject == "" {
@@ -199,16 +169,49 @@ func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeClearActivationParams) Run(ctx ActionCtx) (store.Status, error) {
-	if p.export == nil {
-		return nil, fmt.Errorf("unable to locate export")
+func (p *RevokeClearActivationParams) Validate(ctx ActionCtx) error {
+
+	if len(p.possibleExports) == 1 && p.subject == "" {
+		p.subject = string(p.possibleExports[0].Subject)
 	}
 
-	p.export.ClearRevocation(p.accountKey.publicKey)
+	if p.subject == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("a subject is required")
+	}
 
+	if err := p.accountKey.Valid(); err != nil {
+		return err
+	}
+
+	sub := jwt.Subject(p.subject)
+	for _, e := range p.possibleExports {
+		if sub.IsContainedIn(e.Subject) {
+			p.export = e
+			break
+		}
+	}
+	if p.export == nil {
+		return fmt.Errorf("unable to locate export")
+	}
+
+	if err := p.SignerParams.Resolve(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *RevokeClearActivationParams) Run(ctx ActionCtx) (store.Status, error) {
+	p.export.ClearRevocation(p.accountKey.publicKey)
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	r := store.NewDetailedReport(true)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("cleared export revocation %s for account %s", p.export.Name, p.accountKey.publicKey)
+	}
+	return r, nil
 }

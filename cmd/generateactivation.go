@@ -37,38 +37,7 @@ func createGenerateActivationCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			d, err := jwt.DecorateJWT(params.Token)
-			if err != nil {
-				return err
-			}
-			if err := Write(params.out, d); err != nil {
-				return err
-			}
-
-			if QuietMode() {
-				cmd.Printf("Success! - generated %q activation for account %q.\nJTI is %q\n",
-					params.export.Name, params.accountKey.publicKey, params.activation.ID)
-			} else {
-				cmd.Printf("generated %q activation for account %q.\nJTI is %q\n",
-					params.export.Name, params.accountKey.publicKey, params.activation.ID)
-			}
-
-			if params.activation.NotBefore > 0 {
-				cmd.Printf("Token valid on %s - %s\n",
-					UnixToDate(params.activation.NotBefore),
-					HumanizedDate(params.activation.NotBefore))
-			}
-			if params.activation.Expires > 0 {
-				cmd.Printf("Token expires on %s - %s\n",
-					UnixToDate(params.activation.Expires),
-					HumanizedDate(params.activation.Expires))
-			}
-
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
@@ -98,6 +67,7 @@ type GenerateActivationParams struct {
 	accountKey     PubKeyParams
 	timeParams     TimeParams
 	Token          string
+	Write          bool
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
@@ -288,5 +258,27 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	return nil, nil
+	d, err := jwt.DecorateJWT(p.Token)
+	if err != nil {
+		return nil, err
+	}
+	// if some command embeds, the output will be blank
+	// in that case don't generate the output
+	if p.out != "" {
+		if err := Write(p.out, d); err != nil {
+			return nil, err
+		}
+	}
+	r := store.NewDetailedReport(true)
+	if !IsStdOut(p.out) {
+		r.AddOK("generated %q activation for account %q", p.export.Name, p.accountKey.publicKey)
+		if p.activation.NotBefore > 0 {
+			r.AddOK("token valid %s - %s", UnixToDate(p.activation.NotBefore), HumanizedDate(p.activation.NotBefore))
+		}
+		if p.activation.Expires > 0 {
+			r.AddOK("token expires %s - %s", UnixToDate(p.activation.Expires), HumanizedDate(p.activation.Expires))
+		}
+		r.AddOK("wrote account description to %q", AbbrevHomePaths(p.out))
+	}
+	return r, nil
 }

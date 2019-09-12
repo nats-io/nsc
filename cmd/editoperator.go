@@ -198,7 +198,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 
 func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
-	if err = p.GenericClaimsParams.Run(ctx, p.claim); err != nil {
+	if err = p.GenericClaimsParams.Run(ctx, p.claim, nil); err != nil {
 		return nil, err
 	}
 	keys, _ := p.signingKeys.PublicKeys()

@@ -33,35 +33,7 @@ func createEditAccount() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			if !QuietMode() {
-				cmd.Printf("Success! - edited account %q\n", params.AccountContextParams.Name)
-				d, err := jwt.DecorateJWT(string(params.token))
-				if err != nil {
-					return err
-				}
-				_ = Write("--", d)
-
-				if params.claim.NotBefore > 0 {
-					cmd.Printf("Token valid on %s - %s\n",
-						UnixToDate(params.claim.NotBefore),
-						HumanizedDate(params.claim.NotBefore))
-				}
-				if params.claim.Expires > 0 {
-					cmd.Printf("Token expires on %s - %s\n",
-						UnixToDate(params.claim.Expires),
-						HumanizedDate(params.claim.Expires))
-				}
-				if params.claim.Limits.Conn > 0 {
-					cmd.Printf("Maximum active connections set to %d\n",
-						params.claim.Limits.Conn)
-				}
-			}
-
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
@@ -234,34 +206,87 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
+	r := store.NewDetailedReport(true)
+	r.ReportSum = false
+
 	var err error
 	keys, _ := p.signingKeys.PublicKeys()
 	if len(keys) > 0 {
 		p.claim.SigningKeys.Add(keys...)
+		for _, k := range keys {
+			r.AddOK("added signing key %q", k)
+		}
 	}
 	p.claim.SigningKeys.Remove(p.rmSigningKeys...)
+	for _, k := range p.rmSigningKeys {
+		r.AddOK("removed signing key %q", k)
+	}
 
-	if err := p.GenericClaimsParams.Run(ctx, p.claim); err != nil {
+	if err := p.GenericClaimsParams.Run(ctx, p.claim, r); err != nil {
 		return nil, err
 	}
 
+	flags := ctx.CurrentCmd().Flags()
 	p.claim.Limits.Conn = p.conns.NumberValue
+	if flags.Changed("conns") {
+		r.AddOK("changed max connections to %d", p.claim.Limits.Conn)
+	}
+
 	p.claim.Limits.LeafNodeConn = p.leafConns.NumberValue
+	if flags.Changed("leaf-conns") {
+		r.AddOK("changed leaf node connections to %d", p.claim.Limits.LeafNodeConn)
+	}
+
 	p.claim.Limits.Data, err = p.data.NumberValue()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
 	}
+	if flags.Changed("data") {
+		r.AddOK("changed max data to %d bytes", p.claim.Limits.Data)
+	}
+
 	p.claim.Limits.Exports = p.exports.NumberValue
+	if flags.Changed("exports") {
+		r.AddOK("changed max exports to %d", p.claim.Limits.Exports)
+	}
+
 	p.claim.Limits.WildcardExports = p.exportsWc
+	if flags.Changed("wildcard-exports") {
+		r.AddOK("changed wild card exports to %t", p.claim.Limits.WildcardExports)
+	}
+
 	p.claim.Limits.Imports = p.imports.NumberValue
+	if flags.Changed("imports") {
+		r.AddOK("changed max imports to %d", p.claim.Limits.Imports)
+	}
+
 	p.claim.Limits.Payload, err = p.payload.NumberValue()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing %s: %s", "payload", p.data.Value)
 	}
+	if flags.Changed("payload") {
+		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
+	}
+
 	p.claim.Limits.Subs = p.subscriptions.NumberValue
+	if flags.Changed("subscriptions") {
+		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
+	}
+
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	StoreAccountAndUpdateStatus(ctx, p.token, r)
+	if ctx.StoreCtx().Store.IsManaged() {
+		bc, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+		if err != nil {
+			r.AddWarning("unable to read account %q: %v", p.AccountContextParams.Name, err)
+		} else {
+			r.Add(DiffAccountLimits(p.claim, bc))
+		}
+	}
+	r.AddOK("edited account %q", p.AccountContextParams.Name)
+
+	return r, err
 }

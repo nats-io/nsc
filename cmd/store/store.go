@@ -334,34 +334,32 @@ func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
 	return &gc.Type, nil
 }
 
-func (s *Store) pullRemoteAccount(u string) (PullStatus, error) {
+func (s *Store) pullRemoteAccount(u string) (Status, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(u)
 	if err != nil {
-		return PullStatus{}, fmt.Errorf("error pulling %q: %v", u, err)
+		return nil, fmt.Errorf("error pulling %q: %v", u, err)
 	}
 	defer r.Body.Close()
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r.Body)
 	if err != nil {
-		return PullStatus{}, fmt.Errorf("error reading response from %q: %v", u, err)
+		return nil, fmt.Errorf("error reading response from %q: %v", u, err)
 	}
-	return PullStatus{HttpStatus: HttpStatus{Status: r.StatusCode}, Data: buf.Bytes()}, nil
+	return PullReport(r.StatusCode, buf.Bytes()), nil
 }
 
-func (s *Store) pushRemoteAccount(u string, data []byte) (PushStatus, error) {
+func (s *Store) pushRemoteAccount(u string, data []byte) (Status, error) {
 	resp, err := http.Post(u, "application/jwt", bytes.NewReader(data))
 	if err != nil {
-		return PushStatus{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	message, err := ioutil.ReadAll(resp.Body)
-
-	return PushStatus{HttpStatus: HttpStatus{Status: resp.StatusCode}, OperatorMessage: message}, err
+	return PushReport(resp.StatusCode, message), err
 }
 
-func (s *Store) handleManagedAccount(data []byte) (*PushPullStatus, error) {
-	var status PushPullStatus
+func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	ac, err := jwt.DecodeAccountClaims(string(data))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding account claim")
@@ -379,19 +377,24 @@ func (s *Store) handleManagedAccount(data []byte) (*PushPullStatus, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
 	}
-	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
-	status.Push, err = s.pushRemoteAccount(u.String(), data)
-	if err != nil {
-		return nil, err
-	}
 
-	if status.Push.OK() {
-		status.Pull, err = s.pullRemoteAccount(u.String())
-		if err != nil {
-			return &status, err
-		}
+	r := NewDetailedReport(false)
+	r.Label = "synchronized account jwt with account server"
+	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
+	push, err := s.pushRemoteAccount(u.String(), data)
+	if err != nil {
+		r.AddError("error pushing account %q: %v", ac.Name, err)
+		return r, nil
 	}
-	return &status, nil
+	r.Add(push)
+	if push.Code() == OK {
+		pull, err := s.pullRemoteAccount(u.String())
+		if err != nil {
+			r.AddError("error pulling account %q: %v", ac.Name, err)
+		}
+		r.Add(pull)
+	}
+	return r, nil
 }
 
 func (s *Store) StoreClaim(data []byte) (Status, error) {
@@ -400,16 +403,37 @@ func (s *Store) StoreClaim(data []byte) (Status, error) {
 		return nil, err
 	}
 	if *ct == jwt.AccountClaim && s.IsManaged() {
-		rs, err := s.handleManagedAccount(data)
-		if err != nil {
-			return rs, err
-		}
-		if rs.Push.OK() || rs.Push.Pending() {
-			if err := s.StoreRaw(rs.Pull.Data); err != nil {
-				return rs, err
+		var pull Report
+		var push Report
+		pp, err := s.handleManagedAccount(data)
+		if pp != nil {
+			if len(pp.Details) >= 1 {
+				push = *pp.Details[0].(*Report)
+			}
+			if len(pp.Details) >= 2 {
+				pull = *pp.Details[1].(*Report)
 			}
 		}
-		return rs, nil
+		if err != nil {
+			return pp, err
+		}
+
+		if pull.Code() == OK {
+			// the pull succeeded so we have a JWT
+			if err := s.StoreRaw(pull.Data); err != nil {
+				pp.AddError("failed to store jwt: %v", err)
+				return pp, err
+			}
+		} else if push.Code() == OK || push.Code() == WARN {
+			// Push OK but failed pull, store self-signed
+			if err := s.StoreRaw(data); err != nil {
+				pp.AddError("failed to store self-signed jwt: %v", err)
+				return pp, err
+			}
+		} else {
+			return pp, fmt.Errorf("error pushing to the remote operator")
+		}
+		return pp, nil
 	} else {
 		return nil, s.StoreRaw(data)
 	}

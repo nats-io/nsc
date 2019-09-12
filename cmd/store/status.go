@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,100 +20,366 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
+type StatusCode int
+
+const (
+	NONE StatusCode = iota
+	OK
+	WARN
+	ERR
+)
+
+type PrintOption int
+
+const (
+	ALL PrintOption = iota
+	DetailsOnly
+	DetailsOnErrorOrWarning
+)
+
+const okTemplate = "[ OK ] %s"
+const warnTemplate = "[WARN] %s"
+const errTemplate = "[ERR ] %s"
+
 type Status interface {
+	Code() StatusCode
 	Message() string
 }
 
-type HttpStatus struct {
-	Status int
+type Summarizer interface {
+	Summary() (string, error)
 }
 
-func (s *HttpStatus) OK() bool {
-	return s.Status == http.StatusOK
+type Formatter interface {
+	Format(indent string) string
 }
 
-func (s *HttpStatus) Pending() bool {
-	return s.Status == http.StatusAccepted
+type Report struct {
+	Label      string
+	StatusCode StatusCode
+	Details    []Status
+	Opt        PrintOption
+	Data       []byte
+	ReportSum  bool
 }
 
-type PushStatus struct {
-	HttpStatus
-	OperatorMessage []byte
+func IsReport(s Status) bool {
+	_, ok := s.(*Report)
+	return ok
 }
 
-func (ps *PushStatus) Message() string {
-	buf := bytes.NewBufferString("")
+func ToReport(s Status) *Report {
+	si, ok := s.(*Report)
+	if ok {
+		return si
+	}
+	return nil
+}
 
-	hasPushMessage := len(ps.OperatorMessage) > 0
-	switch ps.Status {
-	case http.StatusOK:
-		buf.WriteString("Successfully pushed the account configuration to the remote server.\n")
-		if hasPushMessage {
-			buf.WriteString("Please review the following operator message:\n\n")
-			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n\n")
+func NewReport(code StatusCode, format string, args ...interface{}) *Report {
+	return &Report{StatusCode: code, Label: fmt.Sprintf(format, args...)}
+}
+
+func NewDetailedReport(summary bool) *Report {
+	return &Report{Opt: DetailsOnly, ReportSum: summary}
+}
+
+func FromError(err error) Status {
+	return &Report{StatusCode: ERR, Label: err.Error()}
+}
+
+func OKStatus(format string, args ...interface{}) Status {
+	return &Report{StatusCode: OK, Label: fmt.Sprintf(format, args...)}
+}
+
+func WarningStatus(format string, args ...interface{}) Status {
+	return &Report{StatusCode: WARN, Label: fmt.Sprintf(format, args...)}
+}
+
+func ErrorStatus(format string, args ...interface{}) Status {
+	return &Report{StatusCode: ERR, Label: fmt.Sprintf(format, args...)}
+}
+
+func (r *Report) AddStatus(code StatusCode, format string, args ...interface{}) *Report {
+	c := NewReport(code, format, args...)
+	r.Add(c)
+	return c
+}
+
+func (r *Report) AddOK(format string, args ...interface{}) *Report {
+	return r.AddStatus(OK, format, args...)
+}
+
+func (r *Report) AddWarning(format string, args ...interface{}) *Report {
+	return r.AddStatus(WARN, format, args...)
+}
+
+func (r *Report) AddError(format string, args ...interface{}) *Report {
+	return r.AddStatus(ERR, format, args...)
+}
+
+func (r *Report) AddFromError(err error) {
+	r.Add(FromError(err))
+}
+
+func (r *Report) Add(status ...Status) {
+	for _, s := range status {
+		if s != nil {
+			r.Details = append(r.Details, s)
 		}
+	}
+	r.updateCode()
+}
 
+func (r *Report) Code() StatusCode {
+	return r.StatusCode
+}
+
+func (r *Report) OK() bool {
+	r.updateCode()
+	return r.StatusCode == OK
+}
+
+func (r *Report) HasErrors() bool {
+	r.updateCode()
+	return r.StatusCode == ERR
+}
+
+func (r *Report) HasNoErrors() bool {
+	r.updateCode()
+	return r.StatusCode != ERR
+}
+
+func (r *Report) updateCode() StatusCode {
+	if len(r.Details) == 0 {
+		return r.StatusCode
+	}
+	r.StatusCode = NONE
+	for _, d := range r.Details {
+		cc := d.Code()
+		if cc > r.StatusCode {
+			r.StatusCode = cc
+		}
+	}
+	return r.StatusCode
+}
+
+func (r *Report) Message() string {
+	r.updateCode()
+	return r.Format("")
+}
+
+func (r *Report) printsSummary() bool {
+	switch r.Opt {
+	case ALL:
+		return true
+	case DetailsOnly:
+		return false
+	case DetailsOnErrorOrWarning:
+		return r.StatusCode == OK
+	}
+	return false
+}
+
+func (r *Report) printsDetails() bool {
+	switch r.Opt {
+	case ALL:
+		return true
+	case DetailsOnly:
+		return true
+	case DetailsOnErrorOrWarning:
+		return r.StatusCode != OK
+	}
+	return false
+}
+
+func (r *Report) Format(indent string) string {
+	var buf bytes.Buffer
+	var t string
+	switch r.StatusCode {
+	case NONE:
+		return ""
+	case OK:
+		t = okTemplate
+	case WARN:
+		t = warnTemplate
+	case ERR:
+		t = errTemplate
+	}
+	if r.printsSummary() {
+		m := fmt.Sprintf(t, r.Label)
+		m = IndentMessage(m, indent)
+		buf.WriteString(m)
+		if len(r.Details) > 0 && r.printsDetails() {
+			buf.WriteString(":\n")
+			indent = fmt.Sprintf("%s       ", indent)
+		}
+	}
+	if r.printsDetails() {
+		for i, c := range r.Details {
+			if i > 0 {
+				buf.WriteRune('\n')
+			}
+			fm, ok := c.(Formatter)
+			if ok {
+				m := fm.Format(indent)
+				buf.WriteString(m)
+			} else {
+				m := c.Message()
+				m = IndentMessage(m, indent)
+				buf.WriteString(m)
+			}
+		}
+	}
+	return buf.String()
+}
+
+func (r *Report) Summary() (string, error) {
+	c := len(r.Details)
+	var ok, warn, err int
+	for _, j := range r.Details {
+		switch j.Code() {
+		case OK:
+			ok++
+		case WARN:
+			warn++
+		case ERR:
+			err++
+		}
+	}
+
+	ov := "job"
+	if ok > 1 {
+		ov = "jobs"
+	}
+	wv := "a warning"
+	if warn > 1 {
+		wv = "warnings"
+	}
+	ev := "job"
+	if err > 1 {
+		ev = "jobs"
+	}
+
+	// always return an error if we failed
+	if err > 0 {
+		m := "all jobs failed"
+		if err != c {
+			m = fmt.Sprintf("%d %s failed - %d %s succeeded and %d had %s", err, ev, ok, ov, warn, wv)
+		}
+		return "", errors.New(m)
+	}
+	if r.ReportSum {
+		if ok == 1 && ok == c {
+			// report says it worked
+			return "", nil
+		}
+		if ok == c {
+			return "all jobs succeeded", nil
+		}
+		if warn == 1 && warn == c {
+			// report says it has a warning
+			return "", nil
+		}
+		if warn == c {
+			return "all jobs had warnings", nil
+		}
+		return fmt.Sprintf("%d %s succeeded - %d have %s", ok, ov, warn, wv), nil
+	} else {
+		return "", nil
+	}
+}
+
+type ServerMessage struct {
+	SrvMessage string
+}
+
+func NewServerMessage(format string, args ...interface{}) Status {
+	m := fmt.Sprintf(format, args...)
+	m = strings.TrimSpace(m)
+	return &ServerMessage{SrvMessage: m}
+}
+
+func (s *ServerMessage) Code() StatusCode {
+	return OK
+}
+
+func (s *ServerMessage) Message() string {
+	return s.Format("> ")
+}
+
+func (s *ServerMessage) Format(prefix string) string {
+	pf := fmt.Sprintf("%s> ", prefix)
+	return IndentMessage(s.SrvMessage, pf)
+}
+
+func IndentMessage(s string, prefix string) string {
+	lines := strings.Split(s, "\n")
+	for i, v := range lines {
+		vv := strings.TrimSpace(v)
+		if vv == "" {
+			continue
+		}
+		lines[i] = fmt.Sprintf("%s%s", prefix, v)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func httpCodeToStatusCode(code int) StatusCode {
+	switch code {
+	case 0:
+		return NONE
+	case http.StatusOK:
+		return OK
+	case http.StatusCreated:
+		fallthrough
 	case http.StatusAccepted:
-		buf.WriteString("The account configuration was accepted by the remote server.\n")
-		if hasPushMessage {
-			buf.WriteString("Please review the following operator message, as it may contain additional information\n")
-			buf.WriteString("required to finalize your account setup:\n\n")
-			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n\n")
-		}
+		return WARN
 	default:
-		buf.WriteString("Failed to push the account to the remote server.\n")
-		if hasPushMessage {
-			buf.WriteString("Please review the following operator message for additional information:\n\n")
-			buf.Write(ps.OperatorMessage)
-			buf.WriteString("\n\n")
-		}
+		return ERR
 	}
-	return buf.String()
 }
 
-type PullStatus struct {
-	HttpStatus
-	Data []byte
+func PushReport(code int, data []byte) Status {
+	sc := httpCodeToStatusCode(code)
+	m := "failed to push account to remote server"
+	switch sc {
+	case OK:
+		m = "pushed account jwt to the account server"
+	case WARN:
+		m = "pushed account jwt was accepted by the account server"
+	}
+	r := NewReport(sc, m)
+	if len(data) > 0 {
+		r.Add(NewServerMessage(string(data)))
+	}
+	return r
 }
 
-func (ps *PullStatus) Message() string {
-	buf := bytes.NewBufferString("")
-
-	switch ps.Status {
-	case http.StatusOK:
-		buf.WriteString("The account configuration was successfully pulled from the operator.\n")
-		buf.WriteString("The operator may have set some limits or added imports to your account.\n")
-		buf.WriteString("Please enter nsc describe account to review your account configuration.\n")
+func PullReport(code int, data []byte) Status {
+	sc := httpCodeToStatusCode(code)
+	m := fmt.Sprintf("failed to pull account jwt from the account server: : [%d - %s]", code, http.StatusText(code))
+	switch sc {
+	case OK:
+		m = "pulled account jwt from the account server"
 	default:
-		buf.WriteString(fmt.Sprintf("Failed to pull the account configuration from the operator: [%d - %s].\n",
-			ps.Status, http.StatusText(ps.Status)))
+		// nothing - didn't get this far
 	}
-
-	return buf.String()
+	r := NewReport(sc, m)
+	r.Data = data
+	return r
 }
 
-type PushPullStatus struct {
-	Push PushStatus
-	Pull PullStatus
-}
+type Statuses []Status
 
-func (r *PushPullStatus) Message() string {
-	buf := bytes.NewBufferString("")
-
-	pushMsg := r.Push.Message()
-	if pushMsg != "" {
-		buf.WriteString(pushMsg)
+func (ms Statuses) Message() string {
+	var buf bytes.Buffer
+	for _, s := range ms {
+		buf.WriteString(s.Message())
 	}
-
-	pullMsg := r.Pull.Message()
-	if pullMsg != "" {
-		buf.WriteString(pullMsg)
-	}
-
 	return buf.String()
 }
 
@@ -133,23 +399,24 @@ func (js *JobStatus) Message() string {
 	return js.OK
 }
 
-type MultiJob []JobStatus
+type MultiJob []Status
+
+func (mj MultiJob) Code() StatusCode {
+	code := NONE
+	for _, j := range mj {
+		c := j.Code()
+		if c > code {
+			code = c
+		}
+	}
+	return code
+}
 
 func (mj MultiJob) Message() string {
-	ok := "[ OK ] "
-	warn := "[WARN] "
-	err := "[ERR ] "
 	var buf bytes.Buffer
 	for _, j := range mj {
 		if buf.Len() > 0 {
 			buf.WriteString("\n")
-		}
-		if j.Err != nil {
-			buf.WriteString(err)
-		} else if j.Warn != "" {
-			buf.WriteString(warn)
-		} else {
-			buf.WriteString(ok)
 		}
 		buf.WriteString(j.Message())
 	}
@@ -160,11 +427,12 @@ func (mj MultiJob) Summary() (string, error) {
 	c := len(mj)
 	var ok, warn, err int
 	for _, j := range mj {
-		if j.OK != "" {
+		switch j.Code() {
+		case OK:
 			ok++
-		} else if j.Warn != "" {
+		case WARN:
 			warn++
-		} else {
+		case ERR:
 			err++
 		}
 	}

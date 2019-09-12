@@ -38,15 +38,6 @@ func createAddOperatorCmd() *cobra.Command {
 			if err := RunStoreLessAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if params.generate && params.keyPath != "" {
-				cmd.Printf("Generated operator key - private key stored %q\n", AbbrevHomePaths(params.keyPath))
-			}
-			verb := "added"
-			if params.jwtPath != "" {
-				verb = "imported"
-			}
-			cmd.Printf("Success! - %s operator %q\n", verb, params.name)
-
 			return GetConfig().SetOperator(params.name)
 		},
 	}
@@ -268,5 +259,26 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 			}
 		}
 	}
-	return s.StoreClaim([]byte(p.token))
+
+	r := store.NewDetailedReport(false)
+	if p.generate && p.signerKP != nil {
+		pk, _ := p.signerKP.PublicKey()
+		r.AddOK("generated and stored operator key %q", pk)
+	}
+	// not in an action ctx - storing on self-created store
+	rs, err := s.StoreClaim([]byte(p.token))
+	if rs != nil {
+		r.Add(rs)
+	}
+	if err != nil {
+		r.AddFromError(err)
+	}
+	if r.HasNoErrors() {
+		verb := "added"
+		if p.jwtPath != "" {
+			verb = "imported"
+		}
+		r.AddOK("%s operator %q", verb, p.name)
+	}
+	return r, err
 }

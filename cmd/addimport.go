@@ -38,17 +38,7 @@ func createAddImportCmd() *cobra.Command {
 		Example:      params.longHelp(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-			if !QuietMode() {
-				kind := jwt.Stream
-				if params.service {
-					kind = jwt.Service
-				}
-				cmd.Printf("Success! - added %s import %q\n", kind, params.remote)
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.tokenSrc, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
@@ -510,7 +500,17 @@ func (p *AddImportParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, errs[0]
 	}
 
-	return ctx.StoreCtx().Store.StoreClaim([]byte(token))
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+
+	r := store.NewDetailedReport(false)
+	StoreAccountAndUpdateStatus(ctx, token, r)
+	if r.HasNoErrors() {
+		r.AddOK("added %s import %q", kind, p.remote)
+	}
+	return r, err
 }
 
 func (p *AddImportParams) createImport() *jwt.Import {

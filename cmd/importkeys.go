@@ -38,7 +38,7 @@ nsc import keys --recursive --dir <path>
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
+			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return nil
@@ -126,25 +126,16 @@ func (p *ImportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 	if len(a) == 0 {
 		return nil, errors.New("no nkey (.nk) files found")
 	}
-
-	var jobs store.MultiJob
+	r := store.NewDetailedReport(true)
 	for _, j := range a {
-		var js store.JobStatus
 		if j.err != nil {
-			js.Err = fmt.Errorf("failed to import %q: %v", j.filepath, j.err)
+			r.AddError("failed to import %q: %v", j.filepath, j.err)
 			continue
 		} else {
-			js.OK = fmt.Sprintf("%s was added to the keystore", j.description)
+			r.AddOK("%s was added to the keystore", j.description)
 		}
-		jobs = append(jobs, js)
 	}
-
-	m, err := jobs.Summary()
-	if m != "" {
-		ctx.CurrentCmd().Println(m)
-	}
-
-	return jobs, err
+	return r, err
 }
 
 type ImportNKeyJob struct {

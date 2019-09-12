@@ -266,6 +266,15 @@ func (k *KeyStore) GetPublicKey(pubkey string) (string, error) {
 	return k.getPublicKey(k.GetKeyPair(pubkey))
 }
 
+func (k *KeyStore) HasPrivateKey(pubkey string) bool {
+	kp, err := k.GetKeyPair(pubkey)
+	if kp == nil || err != nil {
+		return false
+	}
+	_, err = kp.Seed()
+	return err == nil
+}
+
 func (k *KeyStore) GetSeed(pubkey string) (string, error) {
 	return k.getSeed(k.GetKeyPair(pubkey))
 }

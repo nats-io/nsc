@@ -34,7 +34,7 @@ func Test_AddUser(t *testing.T) {
 
 	tests := CmdTests{
 		{CreateAddUserCmd(), []string{"add", "user"}, nil, []string{"user name is required"}, true},
-		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"Generated user key", "added user"}, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"generated and stored user key", "added user"}, false},
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "foo"}, nil, []string{"the user \"foo\" already exists"}, true},
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "bar", "--public-key", bar}, nil, nil, false},

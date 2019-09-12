@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -25,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -32,7 +32,6 @@ import (
 
 func createMigrateCmd() *cobra.Command {
 	var params MigrateCmdParams
-	var storeDir string
 	var cmd = &cobra.Command{
 		Hidden: true,
 
@@ -41,70 +40,14 @@ func createMigrateCmd() *cobra.Command {
 		Use:     `migrate`,
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-			if params.url != "" && storeDir != "" {
-				return fmt.Errorf("specify one of --url or --store-dir")
-			}
-			var all []MigrateCmdParams
-			if InteractiveFlag {
-				ok, err := cli.PromptYN("migrate all accounts under a particular operator")
-				if err != nil {
-					return err
-				}
-				if ok {
-					storeDir, err = cli.Prompt("specify the directory for the operator", "", true, func(v string) error {
-						_, err := store.LoadStore(v)
-						return err
-					})
-					if err != nil {
-						return err
-					}
-				}
-			}
-			if storeDir != "" {
-				storeDir, err = Expand(storeDir)
-				if err != nil {
-					return err
-				}
-				s, err := store.LoadStore(storeDir)
-				if err != nil {
-					return fmt.Errorf("error loading operator %q: %v", storeDir, err)
-				}
-				names, err := s.ListSubContainers(store.Accounts)
-				if err != nil {
-					return fmt.Errorf("error listing accounts in %q: %v", storeDir, err)
-				}
-				for _, n := range names {
-					fp := filepath.Join(storeDir, store.Accounts, n, store.JwtName(n))
-					var ip MigrateCmdParams
-					ip.url = fp
-					ip.overwrite = params.overwrite
-					all = append(all, ip)
-				}
-			} else {
-				all = append(all, params)
-			}
-
-			for _, p := range all {
-				if err := RunAction(cmd, args, &p); err != nil {
-					return err
-				}
-
-				m := fmt.Sprintf("migrated %q to operator %q", p.claim.Name, p.operator)
-				um := fmt.Sprintf("%d users migrated", len(p.migratedUsers))
-				if len(p.migratedUsers) == 0 {
-					um = "no users migrated"
-				}
-				if !p.isFileImport {
-					um = ""
-				}
-				cmd.Printf("%s [%s]\n", m, um)
+			if err := RunAction(cmd, args, &params); err != nil {
+				return err
 			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&params.url, "url", "u", "", "path or url to import jwt from")
-	cmd.Flags().StringVarP(&storeDir, "operator-dir", "", "", "path to an operator dir - all accounts are migrated")
+	cmd.Flags().StringVarP(&params.storeDir, "operator-dir", "", "", "path to an operator dir - all accounts are migrated")
 	cmd.Flags().BoolVarP(&params.overwrite, "force", "F", false, "overwrite accounts with the same name")
 	return cmd
 }
@@ -114,6 +57,114 @@ func init() {
 }
 
 type MigrateCmdParams struct {
+	url       string
+	storeDir  string
+	overwrite bool
+	Jobs      []*MigrateJob
+}
+
+func (p *MigrateCmdParams) SetDefaults(ctx ActionCtx) error {
+	if p.url != "" && p.storeDir != "" {
+		return fmt.Errorf("specify one of --url or --store-dir")
+	}
+	return nil
+}
+
+func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
+	ok, err := cli.PromptYN("migrate all accounts under a particular operator")
+	if err != nil {
+		return err
+	}
+	if ok {
+		p.storeDir, err = cli.Prompt("specify the directory for the operator", "", true, func(v string) error {
+			_, err := store.LoadStore(v)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		p.url, err = cli.Prompt("account jwt url/or path ", p.url, true, func(v string) error {
+			// we expect either a file or url
+			if u, err := url.Parse(v); err == nil && u.Scheme != "" {
+				return nil
+			}
+			v, err := Expand(v)
+			if err != nil {
+				return err
+			}
+			_, err = os.Stat(v)
+			return err
+		})
+	}
+	return nil
+}
+
+func (p *MigrateCmdParams) Load(ctx ActionCtx) error {
+	var err error
+	if p.storeDir != "" {
+		p.storeDir, err = Expand(p.storeDir)
+		if err != nil {
+			return err
+		}
+
+		s, err := store.LoadStore(p.storeDir)
+		if err != nil {
+			return fmt.Errorf("error loading operator %q: %v", p.storeDir, err)
+		}
+		names, err := s.ListSubContainers(store.Accounts)
+		if err != nil {
+			return fmt.Errorf("error listing accounts in %q: %v", p.storeDir, err)
+		}
+		for _, n := range names {
+			mj := NewMigrateJob(filepath.Join(p.storeDir, store.Accounts, n, store.JwtName(n)), p.overwrite)
+			p.Jobs = append(p.Jobs, &mj)
+		}
+	} else {
+		mj := NewMigrateJob(p.url, p.overwrite)
+		p.Jobs = append(p.Jobs, &mj)
+	}
+
+	for _, j := range p.Jobs {
+		j.Load(ctx)
+	}
+	return nil
+}
+
+func (p *MigrateCmdParams) PostInteractive(ctx ActionCtx) error {
+	for _, j := range p.Jobs {
+		if j.OK() {
+			j.PostInteractive(ctx)
+		}
+	}
+	return nil
+}
+
+func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
+	for _, j := range p.Jobs {
+		if j.OK() {
+			j.Validate(ctx)
+		}
+	}
+	return nil
+}
+
+func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
+	var jobs store.MultiJob
+	for _, j := range p.Jobs {
+		if j.OK() {
+			j.Run(ctx)
+		}
+		jobs = append(jobs, j.status)
+	}
+	m, err := jobs.Summary()
+	if m != "" {
+		ctx.CurrentCmd().Println(m)
+	}
+	return jobs, err
+}
+
+type MigrateJob struct {
 	accountToken  string
 	claim         *jwt.AccountClaims
 	url           string
@@ -121,107 +172,157 @@ type MigrateCmdParams struct {
 	operator      string
 	migratedUsers []*jwt.UserClaims
 	overwrite     bool
+
+	status store.Status
 }
 
-func (p *MigrateCmdParams) SetDefaults(ctx ActionCtx) error {
-	return nil
+func NewMigrateJob(url string, overwrite bool) MigrateJob {
+	return MigrateJob{url: url, overwrite: overwrite, status: &store.Report{}}
 }
 
-func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
-	var err error
-	p.url, err = cli.Prompt("account jwt url/or path ", p.url, true, func(v string) error {
-		// we expect either a file or url
-		if u, err := url.Parse(v); err == nil && u.Scheme != "" {
-			return nil
-		}
-		v, err := Expand(v)
-		if err != nil {
-			return err
-		}
-		_, err = os.Stat(v)
-		return err
-	})
-	return err
+func (j *MigrateJob) OK() bool {
+	code := j.status.Code()
+	return code == store.OK || code == store.NONE
 }
 
-func (p *MigrateCmdParams) getAccountKeys() []string {
+func (j *MigrateJob) getAccountKeys() []string {
 	var keys []string
-	keys = append(keys, p.claim.Subject)
-	keys = append(keys, p.claim.SigningKeys...)
+	keys = append(keys, j.claim.Subject)
+	keys = append(keys, j.claim.SigningKeys...)
 	return keys
 }
 
-func (p *MigrateCmdParams) Load(ctx ActionCtx) error {
-	if p.url == "" {
-		return errors.New("an url or path to the account jwt is required")
+func (j *MigrateJob) Load(ctx ActionCtx) {
+	if j.url == "" {
+		j.status = store.ErrorStatus("an url or path to the account jwt is required")
+		return
 	}
-	data, err := LoadFromFileOrURL(p.url)
+	data, err := LoadFromFileOrURL(j.url)
 	if err != nil {
-		return fmt.Errorf("error loading from %q: %v", p.url, err)
+		j.status = store.ErrorStatus(fmt.Sprintf("error loading from %q: %v", j.url, err))
+		return
 	}
-	p.isFileImport = !IsURL(p.url)
+	j.isFileImport = !IsURL(j.url)
 
-	p.accountToken, err = jwt.ParseDecoratedJWT(data)
+	j.accountToken, err = jwt.ParseDecoratedJWT(data)
 	if err != nil {
-		return fmt.Errorf("error parsing JWT: %v", err)
+		j.status = store.ErrorStatus(fmt.Sprintf("error parsing JWT: %v", err))
+		return
 	}
-	p.claim, err = jwt.DecodeAccountClaims(p.accountToken)
+	j.claim, err = jwt.DecodeAccountClaims(j.accountToken)
 	if err != nil {
-		return fmt.Errorf("error decoding JWT: %v", err)
+		j.status = store.ErrorStatus(fmt.Sprintf("error decoding JWT: %v", err))
+		return
 	}
-
-	return nil
 }
 
-func (p *MigrateCmdParams) PostInteractive(ctx ActionCtx) error {
-	if ctx.StoreCtx().Store.HasAccount(p.claim.Name) && !p.overwrite {
-		aac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.claim.Name)
+func (j *MigrateJob) PostInteractive(ctx ActionCtx) {
+	if ctx.StoreCtx().Store.HasAccount(j.claim.Name) && !j.overwrite {
+		aac, err := ctx.StoreCtx().Store.ReadAccountClaim(j.claim.Name)
 		if err != nil {
-			return err
+
+			j.status = store.ErrorStatus(fmt.Sprintf("error reading account JWT: %v", err))
+			return
 		}
-		p.overwrite = aac.Subject == p.claim.Subject
-		if !p.overwrite {
-			p.overwrite, err = cli.PromptBoolean("account %q already exists under the current operator, replace it", false)
+		j.overwrite = aac.Subject == j.claim.Subject
+		if !j.overwrite {
+			j.overwrite, err = cli.PromptBoolean("account %q already exists under the current operator, replace it", false)
+			if err != nil {
+				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+				return
+			}
 		}
 	}
-	return nil
 }
 
-func (p *MigrateCmdParams) Validate(ctx ActionCtx) error {
-	if p.isFileImport {
+func (j *MigrateJob) Validate(ctx ActionCtx) {
+	if j.isFileImport {
 		parent := ctx.StoreCtx().Store.Dir
 		// it is already determined to be a file
-		fp, err := Expand(p.url)
+		fp, err := Expand(j.url)
 		if err != nil {
-			return err
+			j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+			return
 		}
 		if strings.HasPrefix(fp, parent) {
-			return fmt.Errorf("cannot migrate %q onto itself", fp)
+			j.status = store.ErrorStatus(fmt.Sprintf("cannot migrate %q onto itself", fp))
+			return
 		}
 	}
 
-	if !p.overwrite && ctx.StoreCtx().Store.HasAccount(p.claim.Name) {
-		return fmt.Errorf("account %q already exists, specify --force to overwrite", p.claim.Name)
+	if !j.overwrite && ctx.StoreCtx().Store.HasAccount(j.claim.Name) {
+		j.status = store.ErrorStatus(fmt.Sprintf("account %q already exists, specify --force to overwrite", j.claim.Name))
+		return
 	}
 
-	return nil
+	keys := j.getAccountKeys()
+	var hasOne bool
+	for _, k := range keys {
+		kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(k)
+		if kp != nil {
+			hasOne = true
+			break
+		}
+	}
+	if !hasOne {
+		j.status = store.ErrorStatus(fmt.Sprintf("unable to find an account key for %q - need one of %s", j.claim.Name, strings.Join(keys, ", ")))
+		return
+	}
 }
 
-func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
+func (j *MigrateJob) Run(ctx ActionCtx) {
 	ctx.CurrentCmd().SilenceUsage = true
-	p.operator = ctx.StoreCtx().Operator.Name
-	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.accountToken))
+	j.operator = ctx.StoreCtx().Operator.Name
+
+	token, err := jwt.ParseDecoratedJWT([]byte(j.accountToken))
 	if err != nil {
-		return rs, err
+		j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+		return
+	}
+	ac, err := jwt.DecodeAccountClaims(token)
+	if err != nil {
+		j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+		return
 	}
 
-	if p.isFileImport {
-		udir := filepath.Join(filepath.Dir(p.url), store.Users)
+	if ctx.StoreCtx().Store.IsManaged() {
+		var keys []string
+		keys = append(keys, ac.Subject)
+		keys = append(keys, ac.SigningKeys...)
+
+		// need to sign it with any key we can get
+		var kp nkeys.KeyPair
+		for _, k := range keys {
+			kp, _ = ctx.StoreCtx().KeyStore.GetKeyPair(k)
+			if kp != nil {
+				break
+			}
+		}
+		if kp == nil {
+			j.status = store.ErrorStatus(fmt.Sprintf("unable to find any account keys - need any of %s", strings.Join(keys, ", ")))
+			return
+		}
+		j.accountToken, err = ac.Encode(kp)
+		if err != nil {
+			j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+			return
+		}
+	}
+
+	remote, err := ctx.StoreCtx().Store.StoreClaim([]byte(j.accountToken))
+	if err != nil {
+		j.status = store.ErrorStatus(fmt.Sprintf("failed to migrate %q: %v", ac.Name, err))
+		return
+	}
+
+	if j.isFileImport {
+		udir := filepath.Join(filepath.Dir(j.url), store.Users)
 		fi, err := os.Stat(udir)
 		if err == nil && fi.IsDir() {
 			infos, err := ioutil.ReadDir(udir)
 			if err != nil {
-				return nil, err
+				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+				return
 			}
 			for _, v := range infos {
 				n := v.Name()
@@ -229,20 +330,39 @@ func (p *MigrateCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 					up := filepath.Join(udir, n)
 					d, err := Read(up)
 					if err != nil {
-						return nil, err
+						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						return
 					}
 					s, err := jwt.ParseDecoratedJWT(d)
 					if err != nil {
-						return nil, err
+						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						return
 					}
 					uc, err := jwt.DecodeUserClaims(s)
 					if err := ctx.StoreCtx().Store.StoreRaw([]byte(s)); err != nil {
-						return rs, err
+						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						return
 					}
-					p.migratedUsers = append(p.migratedUsers, uc)
+					j.migratedUsers = append(j.migratedUsers, uc)
 				}
 			}
 		}
 	}
-	return rs, nil
+
+	m := fmt.Sprintf("migrated %q to operator %q", j.claim.Name, j.operator)
+	um := fmt.Sprintf("%d users migrated", len(j.migratedUsers))
+	if len(j.migratedUsers) == 0 {
+		um = "no users migrated"
+	}
+	if !j.isFileImport {
+		um = ""
+	}
+
+	j.status = store.OKStatus(fmt.Sprintf("%s [%s]", m, um))
+	if remote != nil {
+		si, ok := j.status.(*store.Report)
+		if ok {
+			si.Details = append(si.Details, remote)
+		}
+	}
 }

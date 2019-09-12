@@ -138,9 +138,9 @@ func (p *RepParams) Run(ctx ActionCtx) (store.Status, error) {
 		if err := sub.AutoUnsubscribe(p.maxMessages); err != nil {
 			return nil, err
 		}
-		ctx.CurrentCmd().Printf("Listening on [%s] for %d messages\n", subj, p.maxMessages)
+		ctx.CurrentCmd().Printf("listening on [%s] for %d messages\n", subj, p.maxMessages)
 	} else {
-		ctx.CurrentCmd().Printf("Listening on [%s]\n", subj)
+		ctx.CurrentCmd().Printf("listening on [%s]\n", subj)
 	}
 
 	if err := nc.Flush(); err != nil {
@@ -169,13 +169,13 @@ func (p *RepParams) Run(ctx ActionCtx) (store.Status, error) {
 			payload = resp
 		}
 		if msg.Reply == "" {
-			ctx.CurrentCmd().Printf("[#%d] Ignoring request on [%s]: no reply subject\n", i, msg.Subject)
+			ctx.CurrentCmd().Printf("[#%d] ignoring request on [%s]: no reply subject\n", i, msg.Subject)
 			continue
 		}
-		ctx.CurrentCmd().Printf("[#%d] Received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
+		ctx.CurrentCmd().Printf("[#%d] received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
 
 		if err := nc.Publish(msg.Reply, []byte(payload)); err != nil {
-			ctx.CurrentCmd().Printf("[#%d] Error responding: '%v'\n", i, err)
+			ctx.CurrentCmd().Printf("[#%d] error responding: '%v'\n", i, err)
 			return nil, err
 		}
 	}

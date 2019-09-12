@@ -40,8 +40,8 @@ nsc generate config --mem-resolver --config-file <outfile> --force
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if !QuietMode() && params.configOut != "" && params.configOut != "--" {
-				cmd.Printf("Success!! - generated %q\n", AbbrevHomePaths(params.configOut))
+			if !QuietMode() && params.outputFile != "" && params.outputFile != "--" {
+				cmd.Printf("Success!! - generated %q\n", AbbrevHomePaths(params.outputFile))
 			}
 			if !QuietMode() && params.dirOut != "" {
 				cmd.Printf("Success!! - generated  %q\n", AbbrevHomePaths(filepath.Join(params.dirOut, "resolver.conf")))
@@ -51,7 +51,7 @@ nsc generate config --mem-resolver --config-file <outfile> --force
 	}
 	cmd.Flags().BoolVarP(&params.nkeyConfig, "nkey", "", false, "generates an nkey account server configuration")
 	cmd.Flags().BoolVarP(&params.memResolverConfig, "mem-resolver", "", false, "generates a mem resolver server configuration")
-	cmd.Flags().StringVarP(&params.configOut, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
+	cmd.Flags().StringVarP(&params.outputFile, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
 	cmd.Flags().StringVarP(&params.dirOut, "dir", "", "", "output configuration dir (only valid when --mem-resolver is specified)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "overwrite output files if they exist")
 	cmd.Flags().StringVarP(&params.sysAccount, "sys-account", "", "", "system account name")
@@ -67,7 +67,7 @@ func init() {
 type GenerateServerConfigParams struct {
 	sysAccount        string
 	dirOut            string
-	configOut         string
+	outputFile        string
 	force             bool
 	nkeyConfig        bool
 	memResolverConfig bool
@@ -85,7 +85,7 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 		return fmt.Errorf("--dir is not valid with nkey configuration")
 	}
 
-	if p.dirOut != "" && p.configOut != "--" {
+	if p.dirOut != "" && p.outputFile != "--" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is exclusive of --config-file")
 	}
@@ -153,8 +153,8 @@ func (p *GenerateServerConfigParams) checkDir(fp string) (string, error) {
 
 func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 	var err error
-	if p.configOut != "" {
-		p.configOut, err = p.checkFile(p.configOut)
+	if p.outputFile != "" {
+		p.outputFile, err = p.checkFile(p.outputFile)
 		if err != nil {
 			return err
 		}
@@ -223,11 +223,12 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if p.configOut != "" {
-		return nil, Write(p.configOut, d)
+	if err := Write(p.outputFile, d); err != nil {
+		return nil, err
 	}
-
+	if !IsStdOut(p.outputFile) {
+		return store.OKStatus("wrote server configuration to %q", AbbrevHomePaths(p.outputFile)), nil
+	}
 	return nil, err
 }
 
