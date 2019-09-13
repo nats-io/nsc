@@ -213,6 +213,16 @@ func (p *InitCmdParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *InitCmdParams) Validate(ctx ActionCtx) error {
+	var err error
+	accounts, err := GetConfig().ListAccounts()
+	if err != nil {
+		return err
+	}
+	for _, a := range accounts {
+		if a == p.Name {
+			return fmt.Errorf("an account named %q already exists", p.Name)
+		}
+	}
 	return nil
 }
 

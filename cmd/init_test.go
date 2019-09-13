@@ -237,3 +237,28 @@ func Test_InitCustomInteractive(t *testing.T) {
 	ts.VerifyAccount(t, "T", "A", true)
 	ts.VerifyUser(t, "T", "A", "A", true)
 }
+
+func Test_InitDuplicate(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
+
+	ourl, err := url.Parse(as.URL)
+	ourl.Path = "/jwt/v1/operator"
+	u := ourl.String()
+
+	// get the managed operator on the first
+	_, _, err = ExecuteCmd(createInitCmd(), "--url", u, "--name", "A")
+	require.NoError(t, err)
+
+	ts.VerifyOperator(t, "T", true)
+	ts.VerifyAccount(t, "T", "A", true)
+	ts.VerifyUser(t, "T", "A", "A", true)
+
+	// try to do it again with the same name
+	_, _, err = ExecuteCmd(createInitCmd(), "--url", u, "--name", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "an account named \"A\" already exists")
+}
