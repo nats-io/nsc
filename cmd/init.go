@@ -57,7 +57,7 @@ func createInitCmd() *cobra.Command {
 		sr = conf.StoreRoot
 	}
 	cmd.Flags().StringVarP(&params.Dir, "dir", "d", sr, "directory where the operator directory will be created")
-	cmd.Flags().StringVarP(&params.Name, "name", "n", "Test", "name used for the operator, account and user")
+	cmd.Flags().StringVarP(&params.Name, "name", "n", "", "name used for the operator, account and user")
 	cmd.Flags().StringVarP(&params.AccountServerURL, "url", "u", "", "operator account server url")
 	cmd.Flags().StringVarP(&params.ManagedOperatorName, "remote-operator", "o", "", "remote well-known operator")
 	HoistRootFlags(cmd)
@@ -96,6 +96,10 @@ func (p *InitCmdParams) init(cmd *cobra.Command) error {
 		!cmd.Flag("url").Changed &&
 		!cmd.Flag("remote-operator").Changed {
 		p.Prompt = true
+	}
+
+	if p.Name == "" {
+		p.Name = GetRandomName(0)
 	}
 
 	tc := GetConfig()
