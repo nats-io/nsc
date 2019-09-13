@@ -34,16 +34,7 @@ func createEditOperatorCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			cmd.Printf("Success! - edited operator\n")
-			d, err := jwt.DecorateJWT(params.token)
-			if err != nil {
-				return err
-			}
-			return Write("--", d)
+			return RunAction(cmd, args, &params)
 		},
 	}
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteOperator, cmd)
@@ -197,28 +188,52 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
+	r := store.NewDetailedReport(true)
+	r.ReportSum = false
+
 	var err error
-	if err = p.GenericClaimsParams.Run(ctx, p.claim, nil); err != nil {
+	if err = p.GenericClaimsParams.Run(ctx, p.claim, r); err != nil {
 		return nil, err
 	}
 	keys, _ := p.signingKeys.PublicKeys()
 	if len(keys) > 0 {
 		p.claim.SigningKeys.Add(keys...)
+		for _, k := range keys {
+			r.AddOK("added signing key %q", k)
+		}
 	}
 	p.claim.SigningKeys.Remove(p.rmSigningKeys...)
+	for _, k := range p.rmSigningKeys {
+		r.AddOK("removed signing key %q", k)
+	}
 
+	flags := ctx.CurrentCmd().Flags()
 	p.claim.AccountServerURL = p.asu
+	if flags.Changed("account-jwt-server-url") {
+		r.AddOK("set account jwt server url to %q", p.asu)
+	}
 
 	for _, v := range p.serviceURLs {
 		p.claim.OperatorServiceURLs.Add(strings.ToLower(v))
+		r.AddOK("added service url %q", v)
 	}
 	for _, v := range p.rmServiceURLs {
 		p.claim.OperatorServiceURLs.Remove(strings.ToLower(v))
+		r.AddOK("removed service url %q", v)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	s, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
+	if s != nil {
+		r.Add(s)
+	}
+	if err != nil {
+		r.AddFromError(err)
+	}
+	r.AddOK("edited operator %q", p.claim.Name)
+
+	return r, nil
 }
