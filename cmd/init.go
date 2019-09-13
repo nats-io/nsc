@@ -98,7 +98,7 @@ func (p *InitCmdParams) init(cmd *cobra.Command) error {
 		p.Prompt = true
 	}
 
-	if p.Name == "" {
+	if p.Name == "" || p.Name == "*" {
 		p.Name = GetRandomName(0)
 	}
 
