@@ -309,6 +309,11 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddImportParams) loadImport() ([]byte, error) {
+	var err error
+	p.tokenSrc, err = jwt.ParseDecoratedJWT([]byte(p.tokenSrc))
+	if err != nil {
+		return nil, fmt.Errorf("error stripping jwt decorations: %v", err)
+	}
 	ac, err := jwt.DecodeActivationClaims(p.tokenSrc)
 	if ac != nil && err == nil {
 		return []byte(p.tokenSrc), nil
