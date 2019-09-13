@@ -32,13 +32,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
-				return err
-			}
-			if !IsStdOut(params.outputFile) {
-				cmd.Printf("Success! - wrote operator description to %q\n", params.outputFile)
-			}
-			return nil
+			return RunMaybeStorelessAction(cmd, args, &params)
 		},
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
@@ -113,16 +107,31 @@ func (p *DescribeOperatorParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	if Raw {
+		if !IsStdOut(p.outputFile) {
+			var err error
+			p.raw, err = jwt.DecorateJWT(string(p.raw))
+			if err != nil {
+				return nil, err
+			}
+		}
 		p.raw = append(p.raw, '\n')
-		return nil, Write(p.outputFile, p.raw)
-	}
-	v := NewOperatorDescriber(p.claim).Describe()
-	if err := Write(p.outputFile, []byte(v)); err != nil {
-		return nil, err
+		if err := Write(p.outputFile, p.raw); err != nil {
+			return nil, err
+		}
+	} else {
+		v := NewOperatorDescriber(p.claim).Describe()
+		data := []byte(v)
+		if err := Write(p.outputFile, data); err != nil {
+			return nil, err
+		}
 	}
 	var s store.Status
 	if !IsStdOut(p.outputFile) {
-		s = store.OKStatus("wrote account description to %q", AbbrevHomePaths(p.outputFile))
+		k := "description"
+		if Raw {
+			k = "jwt"
+		}
+		s = store.OKStatus("wrote operator %s to %q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }
