@@ -51,8 +51,9 @@ func (sp *GenericClaimsParams) Valid() error {
 func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Report) error {
 	cd := claim.Claims()
 	if sp.TimeParams.IsStartChanged() {
+		ov := cd.NotBefore
 		cd.NotBefore, _ = sp.TimeParams.StartDate()
-		if r != nil {
+		if r != nil && ov != cd.NotBefore {
 			if cd.NotBefore == 0 {
 				r.AddOK("changed jwt start to not have a start date")
 			} else {
@@ -62,8 +63,9 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 	}
 
 	if sp.TimeParams.IsExpiryChanged() {
+		ov := cd.Expires
 		cd.Expires, _ = sp.TimeParams.ExpiryDate()
-		if r != nil {
+		if r != nil && ov != cd.Expires {
 			if cd.Expires == 0 {
 				r.AddOK("changed jwt expiry to never expire")
 			} else {
@@ -74,6 +76,7 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 
 	cd.Tags.Add(sp.tags...)
 	cd.Tags.Remove(sp.rmTags...)
+	sort.Strings(cd.Tags)
 
 	if r != nil {
 		for _, t := range sp.tags {

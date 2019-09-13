@@ -38,42 +38,7 @@ func createEditUserCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			s, err := GetStore()
-			if err == nil {
-				ctx, err := s.GetContext()
-				if err == nil {
-					creds := ctx.KeyStore.GetUserCredsPath(params.AccountContextParams.Name, params.name)
-					if creds != "" {
-						fmt.Printf("Updated user creds file %q\n", AbbrevHomePaths(creds))
-					}
-				}
-			}
-
-			cmd.Printf("Success! - edited user %q in account %q\n", params.name, params.AccountContextParams.Name)
-			cmd.Println()
-
-			d, err := jwt.DecorateJWT(params.token)
-			if err != nil {
-				return err
-			}
-			Write("--", d)
-
-			if params.claim.NotBefore > 0 {
-				cmd.Printf("Token valid on %s - %s\n",
-					UnixToDate(params.claim.NotBefore),
-					HumanizedDate(params.claim.NotBefore))
-			}
-			if params.claim.Expires > 0 {
-				cmd.Printf("Token expires on %s - %s\n",
-					UnixToDate(params.claim.Expires),
-					HumanizedDate(params.claim.Expires))
-			}
-
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -291,22 +256,52 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	var err error
-	p.GenericClaimsParams.Run(ctx, p.claim, nil)
+	r := store.NewDetailedReport(true)
+	r.ReportSum = false
 
+	var err error
+	p.GenericClaimsParams.Run(ctx, p.claim, r)
+
+	var ap []string
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubs...)
+	ap = append(ap, p.allowPubs...)
 	p.claim.Permissions.Pub.Allow.Add(p.allowPubsub...)
+	ap = append(ap, p.allowPubsub...)
+	for _, v := range ap {
+		r.AddOK("added pub pub %q", v)
+	}
 	p.claim.Permissions.Pub.Allow.Remove(p.remove...)
+	for _, v := range p.remove {
+		r.AddOK("removed pub %q", v)
+	}
 	sort.Strings(p.claim.Pub.Allow)
 
+	var dp []string
 	p.claim.Permissions.Pub.Deny.Add(p.denyPubs...)
+	dp = append(dp, p.denyPubs...)
 	p.claim.Permissions.Pub.Deny.Add(p.denyPubsub...)
+	dp = append(dp, p.denyPubsub...)
+	for _, v := range dp {
+		r.AddOK("added deny pub %q", v)
+	}
 	p.claim.Permissions.Pub.Deny.Remove(p.remove...)
+	for _, v := range p.remove {
+		r.AddOK("removed deny pub %q", v)
+	}
 	sort.Strings(p.claim.Permissions.Pub.Deny)
 
+	var sa []string
 	p.claim.Permissions.Sub.Allow.Add(p.allowSubs...)
+	sa = append(sa, p.allowSubs...)
 	p.claim.Permissions.Sub.Allow.Add(p.allowPubsub...)
+	sa = append(sa, p.allowPubsub...)
+	for _, v := range sa {
+		r.AddOK("added sub %q", v)
+	}
 	p.claim.Permissions.Sub.Allow.Remove(p.remove...)
+	for _, v := range p.remove {
+		r.AddOK("removed sub %q", v)
+	}
 	sort.Strings(p.claim.Permissions.Sub.Allow)
 
 	p.claim.Permissions.Sub.Deny.Add(p.denySubs...)
@@ -314,20 +309,29 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Permissions.Sub.Deny.Remove(p.remove...)
 	sort.Strings(p.claim.Permissions.Sub.Deny)
 
+	flags := ctx.CurrentCmd().Flags()
 	p.claim.Limits.Payload = p.payload.Number
-
-	sort.Strings(p.claim.Tags)
+	if flags.Changed("payload") {
+		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
+	}
 
 	src := strings.Split(p.claim.Src, ",")
 	var srcList jwt.StringList
 	srcList.Add(src...)
 	srcList.Add(p.src...)
+	for _, v := range p.src {
+		r.AddOK("added src network %s", v)
+	}
 	srcList.Remove(p.rmSrc...)
+	for _, v := range p.rmSrc {
+		r.AddOK("removed src network %s", v)
+	}
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
 	if p.rmResp && p.claim.Resp != nil {
 		p.claim.Resp = nil
+		r.AddOK("removed response setting")
 	} else {
 		if p.respMax != "" {
 			v, err := strconv.ParseInt(p.respMax, 10, 32)
@@ -339,7 +343,6 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 			}
 			p.claim.Resp.MaxMsgs = int(v)
 		}
-
 		if p.respTTL != "" {
 			v, err := time.ParseDuration(p.respTTL)
 			if err != nil {
@@ -349,6 +352,10 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 				p.claim.Resp = &jwt.ResponsePermission{MaxMsgs: 1}
 			}
 			p.claim.Resp.Expires = v
+		}
+		if p.respTTL != "" || p.respMax != "" {
+			r.AddOK("set max responses to %d", p.claim.Resp.MaxMsgs)
+			r.AddOK("set response ttl to %v", p.claim.Resp.Expires)
 		}
 	}
 
@@ -376,30 +383,37 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	// if the signer is not allowed, the store will reject
 	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(p.token))
-	if err != nil {
-		return nil, err
+	if rs != nil {
+		r.Add(rs)
 	}
-
-	// FIXME: super hack
+	if err != nil {
+		r.AddFromError(err)
+	}
+	if rs != nil {
+		r.Add(rs)
+	}
 	ks := ctx.StoreCtx().KeyStore
-	ukp, err := ks.GetKeyPair(p.claim.Subject)
-	if err != nil {
-		ctx.CurrentCmd().Printf("unable to save creds: %v", err)
-	}
-	if ukp == nil {
-		ctx.CurrentCmd().Println("unable to save creds - user key not found")
-	}
-	if ukp != nil {
+	if ks.HasPrivateKey(p.claim.Subject) {
+		ukp, err := ks.GetKeyPair(p.claim.Subject)
+		if err != nil {
+			r.AddError("unable to read keypair: %v", err)
+		}
 		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, ukp)
 		if err != nil {
-			ctx.CurrentCmd().Printf("unable to save creds: %v", err)
+			r.AddError("unable to save creds: %v", err)
 		} else {
 			p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
 			if err != nil {
-				ctx.CurrentCmd().Println(err.Error())
+				r.AddError("error storing creds: %v", err)
+			} else {
+				r.AddOK("generated user creds file %q", AbbrevHomePaths(p.credsFilePath))
 			}
 		}
+	} else {
+		r.AddOK("skipped generating creds file - user private key is not available")
 	}
-
-	return rs, nil
+	if r.HasNoErrors() {
+		r.AddOK("edited user %q", p.name)
+	}
+	return r, nil
 }
