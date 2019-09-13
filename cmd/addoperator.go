@@ -64,6 +64,9 @@ type AddOperatorParams struct {
 }
 
 func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
+	if p.name == "*" {
+		p.name = GetRandomName(0)
+	}
 	p.generate = KeyPathFlag == ""
 	p.keyPath = KeyPathFlag
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
