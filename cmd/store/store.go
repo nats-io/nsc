@@ -40,8 +40,6 @@ const NSCFile = ".nsc"
 
 const Users = "users"
 const Accounts = "accounts"
-const Clusters = "clusters"
-const Servers = "servers"
 
 var standardDirs = []string{Accounts}
 
@@ -688,7 +686,6 @@ type Entity struct {
 type Context struct {
 	Operator Entity
 	Account  Entity
-	Cluster  Entity
 	KeyStore KeyStore
 	Store    *Store
 }
@@ -752,16 +749,6 @@ func (s *Store) GetContext() (*Context, error) {
 	if ac != nil {
 		c.SetContext(ac.Name, ac.Subject)
 	}
-
-	// try to set a default cluster
-	cc, err := s.LoadDefaultEntity(Clusters)
-	if err != nil {
-		return nil, err
-	}
-	if cc != nil {
-		c.SetContext(cc.Name, cc.Subject)
-	}
-
 	return &c, nil
 }
 

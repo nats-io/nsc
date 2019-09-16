@@ -180,10 +180,6 @@ func (c *ContextConfig) ListAccounts() ([]string, error) {
 	return c.getSubContainers(store.Accounts)
 }
 
-func (c *ContextConfig) ListClusters() ([]string, error) {
-	return c.getSubContainers(store.Clusters)
-}
-
 func (c *ContextConfig) getSubContainers(kind string) ([]string, error) {
 	s, err := store.LoadStore(filepath.Join(c.StoreRoot, c.Operator))
 	if err != nil {

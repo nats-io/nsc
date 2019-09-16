@@ -27,7 +27,7 @@ func Test_AddUser(t *testing.T) {
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "c")
-	require.NoError(t, err, "cluster creation")
+	require.NoError(t, err)
 
 	_, bar, _ := CreateUserKey(t)
 	_, badBar, _ := CreateAccountKey(t)

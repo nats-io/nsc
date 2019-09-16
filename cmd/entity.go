@@ -77,10 +77,6 @@ func (c *Entity) Valid() error {
 		exists = s.Has(store.Accounts, c.name, store.JwtName(c.name))
 	case nkeys.PrefixByteUser:
 		exists = s.Has(store.Accounts, ctx.Account.Name, store.Users, store.JwtName(c.name))
-	case nkeys.PrefixByteCluster:
-		exists = s.Has(store.Clusters, c.name, store.JwtName(c.name))
-	case nkeys.PrefixByteServer:
-		exists = s.Has(store.Clusters, ctx.Cluster.Name, store.Servers, store.JwtName(c.name))
 	default:
 		return fmt.Errorf("unexpected type of entity")
 	}
