@@ -29,7 +29,7 @@ func createDescribeUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Describes an user",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
@@ -55,6 +55,7 @@ type DescribeUserParams struct {
 }
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
+	p.user = NameFlagOrArgument(p.user, ctx)
 	p.AccountContextParams.SetDefaults(ctx)
 	return nil
 }

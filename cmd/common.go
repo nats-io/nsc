@@ -365,6 +365,17 @@ func AbbrevHomePaths(fp string) string {
 	return fp
 }
 
+func NameFlagOrArgument(name string, ctx ActionCtx) string {
+	return nameFlagOrArgument(name, ctx.Args())
+}
+
+func nameFlagOrArgument(name string, args []string) string {
+	if name == "" && len(args) > 0 {
+		return args[0]
+	}
+	return name
+}
+
 func MaxArgs(max int) cobra.PositionalArgs {
 	// if we are running in a test, remove the limit
 	if strings.Contains(strings.Join(os.Args, " "), "-test.v") {

@@ -29,7 +29,7 @@ func createDescribeOperatorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "operator",
 		Short:        "Describes the operator",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunMaybeStorelessAction(cmd, args, &params)
@@ -53,6 +53,7 @@ type DescribeOperatorParams struct {
 }
 
 func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
+	p.name = NameFlagOrArgument(p.name, ctx)
 	if p.name != "" {
 		actx, ok := ctx.(*Actx)
 		if !ok {

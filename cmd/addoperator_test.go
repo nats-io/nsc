@@ -224,3 +224,16 @@ func Test_AddNotWellKnownOperator(t *testing.T) {
 	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--url", "X")
 	require.Error(t, err)
 }
+
+func Test_AddOperatorNameArg(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(HoistRootFlags(createAddOperatorCmd()), "X")
+	require.NoError(t, err)
+	ts.SwitchOperator(t, "X")
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, "X", oc.Name)
+}

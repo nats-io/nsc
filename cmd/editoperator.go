@@ -30,7 +30,7 @@ func createEditOperatorCmd() *cobra.Command {
 	var params EditOperatorParams
 	cmd := &cobra.Command{
 		Use:          "operator",
-		Short:        "Edit an operator",
+		Short:        "Edit the operator",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

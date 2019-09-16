@@ -202,3 +202,17 @@ func Test_AddUser_InteractiveResp(t *testing.T) {
 	require.Equal(t, 100, up.Resp.MaxMsgs)
 	require.Equal(t, time.Millisecond*1000, up.Resp.Expires)
 }
+
+func Test_AddUserNameArg(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "U")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, "U", uc.Name)
+}

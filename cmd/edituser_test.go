@@ -205,7 +205,7 @@ func Test_EditUserSK(t *testing.T) {
 
 	s, p, _ := CreateAccountKey(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "-a", "A", "--sk", p)
+	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "--name", "A", "--sk", p)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -232,7 +232,7 @@ func Test_EditUserAddedWithSK(t *testing.T) {
 
 	s, p, sk := CreateAccountKey(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "-a", "A", "--sk", p)
+	_, _, err := ExecuteCmd(HoistRootFlags(createEditAccount()), "--name", "A", "--sk", p)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

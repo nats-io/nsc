@@ -34,7 +34,7 @@ func CreateAddAccountCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Add an account",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,6 +66,10 @@ type AddAccountParams struct {
 }
 
 func (p *AddAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.name = NameFlagOrArgument(p.name, ctx)
+	if p.name == "*" {
+		p.name = GetRandomName(0)
+	}
 	p.generate = p.keyPath == ""
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil

@@ -457,3 +457,22 @@ func TestPushAccount(t *testing.T) {
 	require.Equal(t, apk, ac.Subject)
 	require.Equal(t, opk, ac.Issuer)
 }
+
+func Test_NameFlagArgOnlyOnEmpty(t *testing.T) {
+	var tests = []struct {
+		n   string
+		a   []string
+		out string
+	}{
+		{"", nil, ""},
+		{"a", nil, "a"},
+		{"a", []string{}, "a"},
+		{"a", []string{"b", "c"}, "a"},
+		{"", []string{"b", "c"}, "b"},
+	}
+
+	for i, v := range tests {
+		r := nameFlagOrArgument(v.n, v.a)
+		require.Equal(t, v.out, r, "failed test %d", i)
+	}
+}
