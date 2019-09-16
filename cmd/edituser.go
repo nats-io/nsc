@@ -35,7 +35,7 @@ func createEditUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Edit an user",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
@@ -66,8 +66,6 @@ func createEditUserCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
 
-	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
-
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
 
@@ -85,7 +83,6 @@ type EditUserParams struct {
 	claim         *jwt.UserClaims
 	name          string
 	token         string
-	out           string
 	credsFilePath string
 
 	allowPubs   []string
@@ -104,6 +101,7 @@ type EditUserParams struct {
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
+	p.name = NameFlagOrArgument(p.name, ctx)
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 

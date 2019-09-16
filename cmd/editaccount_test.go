@@ -32,7 +32,7 @@ func Test_EditAccount(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditAccount(), []string{"edit", "account"}, nil, []string{"specify an edit option"}, true},
-		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--account", "A"}, nil, []string{"edited account \"A\""}, false},
+		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--name", "A"}, nil, []string{"edited account \"A\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")

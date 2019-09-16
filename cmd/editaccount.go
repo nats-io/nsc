@@ -30,7 +30,7 @@ func createEditAccount() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Edit an account",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
@@ -48,7 +48,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 
-	params.AccountContextParams.BindFlags(cmd)
+	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
 
@@ -78,6 +78,7 @@ type EditAccountParams struct {
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.Name = NameFlagOrArgument(p.AccountContextParams.Name, ctx)
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}

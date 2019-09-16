@@ -26,7 +26,7 @@ func createDescribeAccountCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Describes an account",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
@@ -50,6 +50,7 @@ type DescribeAccountParams struct {
 }
 
 func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {
+	p.AccountContextParams.Name = NameFlagOrArgument(p.AccountContextParams.Name, ctx)
 	p.AccountContextParams.SetDefaults(ctx)
 	return nil
 }

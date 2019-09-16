@@ -33,6 +33,7 @@ func createAddOperatorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "operator",
 		Short:        "Add an operator",
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,6 +65,7 @@ type AddOperatorParams struct {
 }
 
 func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
+	p.name = NameFlagOrArgument(p.name, ctx)
 	if p.name == "*" {
 		p.name = GetRandomName(0)
 	}

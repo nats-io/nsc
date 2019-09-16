@@ -148,3 +148,14 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	require.True(t, oc.DidSign(ac))
 	require.Equal(t, pk1, ac.Issuer)
 }
+
+func Test_AddAccountNameArg(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "A")
+	require.NoError(t, err)
+
+	_, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+}

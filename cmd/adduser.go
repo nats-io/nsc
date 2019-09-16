@@ -37,7 +37,7 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Add an user to the account",
-		Args:         MaxArgs(0),
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		Example:      params.longHelp(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,6 +102,10 @@ toolName add user --name u --tag test,service_a`
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
+	p.name = NameFlagOrArgument(p.name, ctx)
+	if p.name == "*" {
+		p.name = GetRandomName(0)
+	}
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}
