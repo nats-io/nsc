@@ -91,6 +91,13 @@ func (p *DescribeAccountParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	if Raw {
+		if !IsStdOut(p.outputFile) {
+			var err error
+			p.raw, err = jwt.DecorateJWT(string(p.raw))
+			if err != nil {
+				return nil, err
+			}
+		}
 		p.raw = append(p.raw, '\n')
 		if err := Write(p.outputFile, p.raw); err != nil {
 			return nil, err
@@ -103,7 +110,11 @@ func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	var s store.Status
 	if !IsStdOut(p.outputFile) {
-		s = store.OKStatus("wrote account description to %q", AbbrevHomePaths(p.outputFile))
+		k := "description"
+		if Raw {
+			k = "jwt"
+		}
+		s = store.OKStatus("wrote account %s to %q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }
