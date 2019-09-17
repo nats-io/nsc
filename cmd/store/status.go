@@ -135,6 +135,7 @@ func (r *Report) Add(status ...Status) {
 }
 
 func (r *Report) Code() StatusCode {
+	r.updateCode()
 	return r.StatusCode
 }
 
@@ -179,7 +180,7 @@ func (r *Report) printsSummary() bool {
 	case DetailsOnly:
 		return false
 	case DetailsOnErrorOrWarning:
-		return r.StatusCode == OK
+		return true
 	}
 	return false
 }
@@ -255,7 +256,7 @@ func (r *Report) Summary() (string, error) {
 	if ok > 1 {
 		ov = "jobs"
 	}
-	wv := "a warning"
+	wv := "warnings"
 	if warn > 1 {
 		wv = "warnings"
 	}
@@ -291,6 +292,17 @@ func (r *Report) Summary() (string, error) {
 	} else {
 		return "", nil
 	}
+}
+
+func HoistChildren(s Status) []Status {
+	r, ok := s.(*Report)
+	if !ok {
+		return []Status{s}
+	}
+	if len(r.Details) == 0 {
+		return []Status{s}
+	}
+	return r.Details
 }
 
 type ServerMessage struct {
@@ -344,6 +356,9 @@ func httpCodeToStatusCode(code int) StatusCode {
 }
 
 func PushReport(code int, data []byte) Status {
+	r := NewDetailedReport(true)
+	r.Label = "push jwt to account server"
+	r.Opt = DetailsOnErrorOrWarning
 	sc := httpCodeToStatusCode(code)
 	m := "failed to push account to remote server"
 	switch sc {
@@ -352,7 +367,7 @@ func PushReport(code int, data []byte) Status {
 	case WARN:
 		m = "pushed account jwt was accepted by the account server"
 	}
-	r := NewReport(sc, m)
+	r.AddStatus(sc, m)
 	if len(data) > 0 {
 		r.Add(NewServerMessage(string(data)))
 	}
@@ -360,15 +375,18 @@ func PushReport(code int, data []byte) Status {
 }
 
 func PullReport(code int, data []byte) Status {
+	r := NewDetailedReport(true)
+	r.Label = "pull jwt from account server"
+	r.Opt = DetailsOnErrorOrWarning
 	sc := httpCodeToStatusCode(code)
-	m := fmt.Sprintf("failed to pull account jwt from the account server: : [%d - %s]", code, http.StatusText(code))
+	m := fmt.Sprintf("failed to pull jwt from the account server: : [%d - %s]", code, http.StatusText(code))
 	switch sc {
 	case OK:
-		m = "pulled account jwt from the account server"
+		m = "pulled jwt from the account server"
 	default:
 		// nothing - didn't get this far
 	}
-	r := NewReport(sc, m)
+	r.AddStatus(sc, m)
 	r.Data = data
 	return r
 }

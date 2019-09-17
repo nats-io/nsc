@@ -216,31 +216,36 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	r := store.NewDetailedReport(true)
 	for _, v := range p.targeted {
-		if err := p.pushAccount(v, ctx); err != nil {
-			r.AddError("failed to push account %q: %v", v, err)
-		} else {
-			r.AddOK("pushed %q", v)
+		sub := store.NewReport(store.OK, "push %s to account server", v)
+		sub.Opt = store.DetailsOnErrorOrWarning
+		r.Add(sub)
+		ps, err := p.pushAccount(v, ctx)
+		if ps != nil {
+			sub.Add(store.HoistChildren(ps)...)
+		}
+		if err != nil {
+			sub.AddError("failed to push account %q: %v", v, err)
+		}
+		if sub.OK() {
+			sub.Label = fmt.Sprintf("pushed %q to account server", v)
 		}
 	}
 
 	return r, nil
 }
 
-func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) error {
+func (p *PushCmdParams) pushAccount(n string, ctx ActionCtx) (store.Status, error) {
 	raw, err := ctx.StoreCtx().Store.Read(store.Accounts, n, store.JwtName(n))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	c, err := jwt.DecodeAccountClaims(string(raw))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	u, err := AccountJwtURLFromString(p.ASU, c.Subject)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// FIXME the push could return useful information that should be aggregated.
-	_, _, err = PushAccount(u, raw)
-	return err
+	return store.PushAccount(u, raw)
 }

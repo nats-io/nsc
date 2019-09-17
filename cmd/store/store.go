@@ -332,7 +332,7 @@ func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
 	return &gc.Type, nil
 }
 
-func (s *Store) pullRemoteAccount(u string) (Status, error) {
+func PullAccount(u string) (Status, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(u)
 	if err != nil {
@@ -347,7 +347,7 @@ func (s *Store) pullRemoteAccount(u string) (Status, error) {
 	return PullReport(r.StatusCode, buf.Bytes()), nil
 }
 
-func (s *Store) pushRemoteAccount(u string, data []byte) (Status, error) {
+func PushAccount(u string, data []byte) (Status, error) {
 	resp, err := http.Post(u, "application/jwt", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -379,14 +379,14 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	r := NewDetailedReport(false)
 	r.Label = "synchronized account jwt with account server"
 	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
-	push, err := s.pushRemoteAccount(u.String(), data)
+	push, err := PushAccount(u.String(), data)
 	if err != nil {
 		r.AddError("error pushing account %q: %v", ac.Name, err)
 		return r, nil
 	}
 	r.Add(push)
 	if push.Code() == OK {
-		pull, err := s.pullRemoteAccount(u.String())
+		pull, err := PullAccount(u.String())
 		if err != nil {
 			r.AddError("error pulling account %q: %v", ac.Name, err)
 		}
@@ -428,8 +428,6 @@ func (s *Store) StoreClaim(data []byte) (Status, error) {
 				pp.AddError("failed to store self-signed jwt: %v", err)
 				return pp, err
 			}
-		} else {
-			return pp, fmt.Errorf("error pushing to the remote operator")
 		}
 		return pp, nil
 	} else {

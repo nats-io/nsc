@@ -90,10 +90,11 @@ func Test_ReportChildrenOnError(t *testing.T) {
 	m := s.Message()
 	t.Log(m)
 	lines := strings.Split(m, "\n")
-	require.Len(t, lines, 3)
-	require.Contains(t, lines[0], fmt.Sprintf(okTemplate, "A"))
-	require.Contains(t, lines[1], fmt.Sprintf(errTemplate, "B"))
-	require.Contains(t, lines[2], fmt.Sprintf(warnTemplate, "C"))
+	require.Len(t, lines, 4)
+	require.Contains(t, lines[0], fmt.Sprintf(errTemplate, "main"))
+	require.Contains(t, lines[1], fmt.Sprintf(okTemplate, "A"))
+	require.Contains(t, lines[2], fmt.Sprintf(errTemplate, "B"))
+	require.Contains(t, lines[3], fmt.Sprintf(warnTemplate, "C"))
 }
 
 func Test_ReportNoChildrenOnOK(t *testing.T) {
@@ -125,4 +126,38 @@ func TestHttpCodeConversion(t *testing.T) {
 		out := httpCodeToStatusCode(c.in)
 		require.Equal(t, c.out, out, "test %v failed", c)
 	}
+}
+
+func Test_StatusPromotesError(t *testing.T) {
+	s := NewReport(NONE, "main")
+	s.Opt = DetailsOnly
+	s.Details = append(s.Details, OKStatus("A"), ErrorStatus("B"), WarningStatus("C"))
+	require.True(t, s.HasErrors())
+
+	t.Log(s.Message())
+}
+
+func Test_Nested(t *testing.T) {
+	s := NewReport(NONE, "main")
+	s.Opt = DetailsOnly
+	a := NewReport(OK, "A")
+	a.Opt = DetailsOnErrorOrWarning
+	a.AddOK("something ok")
+	s.Add(a)
+
+	b := NewReport(OK, "B")
+	b.Opt = DetailsOnErrorOrWarning
+	b.AddOK("something ok")
+	b.AddWarning("something not so great")
+	b.AddError("some error")
+	s.Add(b)
+
+	m := s.Message()
+	lines := strings.Split(m, "\n")
+	require.Len(t, lines, 5)
+	require.Contains(t, lines[0], fmt.Sprintf(okTemplate, "A"))
+	require.Contains(t, lines[1], fmt.Sprintf(errTemplate, "B"))
+	require.Contains(t, lines[2], fmt.Sprintf(okTemplate, "something ok"))
+	require.Contains(t, lines[3], fmt.Sprintf(warnTemplate, "something not so great"))
+	require.Contains(t, lines[4], fmt.Sprintf(errTemplate, "some error"))
 }
