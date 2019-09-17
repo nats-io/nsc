@@ -52,7 +52,7 @@ func Test_EditUserInteractive(t *testing.T) {
 
 	cli.LogFn = t.Log
 
-	inputs := []interface{}{false, "-1", "2018-01-01", "2050-01-01"}
+	inputs := []interface{}{false, "-1", "2018-01-01", "2050-01-01", false}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
@@ -74,7 +74,7 @@ func Test_EditUserEditReply(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddUser(t, "A", "U")
 
-	inputs := []interface{}{true, "100", "1000ms", "-1", "0", "0"}
+	inputs := []interface{}{true, "100", "1000ms", "-1", "0", "0", false}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
