@@ -206,7 +206,7 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 	if p.claim.Expires > 0 {
 		p.GenericClaimsParams.Expiry = UnixToDate(p.claim.Expires)
 	}
-	if err = p.GenericClaimsParams.Edit(); err != nil {
+	if err = p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
 		return err
 	}
 

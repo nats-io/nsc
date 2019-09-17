@@ -113,8 +113,8 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	u1 := "nats://localhost:4222"
 	u2 := "tls://localhost:4333"
 
-	// valid from, valid until, acc jwt server, add service url, url, add another, url, add another, add signing key
-	inputs := []interface{}{"0", "0", "", true, u1, true, u2, false, false}
+	// valid from, valid until, add tags, acc jwt server, add service url, url, add another, url, add another, add signing key
+	inputs := []interface{}{"0", "0", true, "xxx", false, "", true, u1, true, u2, false, false}
 
 	_, _, err := ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
 	require.NoError(t, err)
@@ -123,13 +123,15 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, oc.OperatorServiceURLs, u1)
 	require.Contains(t, oc.OperatorServiceURLs, u2)
+	require.Contains(t, oc.Tags, "xxx")
 
 	// valid from, valid until, acc jwt server, add service url, remove server urls, add signing key
-	inputs = []interface{}{"0", "0", "", false, true, []int{0}, false}
+	inputs = []interface{}{"0", "0", true, []int{0}, false, "", false, true, []int{0}, false}
 
 	_, _, err = ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
 	oc, err = ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.NotContains(t, oc.OperatorServiceURLs, u1)
 	require.Contains(t, oc.OperatorServiceURLs, u2)
+	require.NotContains(t, oc.Tags, "xxx")
 }

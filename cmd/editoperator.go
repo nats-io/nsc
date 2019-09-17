@@ -113,7 +113,7 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	if p.claim.Expires > 0 {
 		p.TimeParams.Expiry = UnixToDate(p.claim.Expires)
 	}
-	if err = p.GenericClaimsParams.Edit(); err != nil {
+	if err = p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
 		return err
 	}
 	p.asu, err = cli.Prompt("account jwt server url", p.asu, true, nil)

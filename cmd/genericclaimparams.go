@@ -18,8 +18,11 @@
 package cmd
 
 import (
+	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/nats-io/nsc/cli"
 
 	"github.com/nats-io/nsc/cmd/store"
 
@@ -33,12 +36,63 @@ type GenericClaimsParams struct {
 	rmTags []string
 }
 
-func (sp *GenericClaimsParams) Edit() error {
+func (sp *GenericClaimsParams) Edit(current []string) error {
+	var err error
 	if err := sp.TimeParams.Edit(); err != nil {
 		return err
 	}
-
+	sp.rmTags, err = sp.remove("tags", current)
+	sp.tags, err = sp.add("tags", current)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (sp *GenericClaimsParams) add(label string, current []string) ([]string, error) {
+	first := true
+	var values []string
+	for {
+		m := fmt.Sprintf("add a %s", label)
+		if !first || len(current) > 0 {
+			m = fmt.Sprintf("add another %s", label)
+		}
+		first = false
+		ok, err := cli.PromptBoolean(m, false)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			break
+		}
+		v, err := cli.Prompt(fmt.Sprintf("enter a %s", label), "", true, nil)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+	}
+	return values, nil
+}
+
+func (sp *GenericClaimsParams) remove(label string, values []string) ([]string, error) {
+	var remove []string
+	if len(values) == 0 {
+		return nil, nil
+	}
+	ok, err := cli.PromptBoolean("remove tags", false)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		idx, err := cli.PromptMultipleChoices(fmt.Sprintf("select %s to remove", label), values)
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range idx {
+			remove = append(remove, values[v])
+		}
+	}
+	return remove, nil
 }
 
 func (sp *GenericClaimsParams) Valid() error {
