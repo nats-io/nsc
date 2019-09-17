@@ -16,13 +16,9 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/nats-io/nsc/cmd/store"
 
@@ -66,36 +62,18 @@ type PullJob struct {
 	StoreErr   error
 	LocalClaim jwt.Claims
 
-	Data       []byte
-	StatusCode int
-}
-
-func (j *PullJob) Error() error {
-	if j.StoreErr != nil {
-		return fmt.Errorf("storing %q failed - %v", j.Name, j.StoreErr)
-	}
-	if j.Err != nil {
-		return fmt.Errorf("reading %q failed - %v", j.Name, j.Err)
-	}
-	if j.StatusCode != http.StatusOK {
-		return fmt.Errorf("request for %q failed - %s", j.Name, http.StatusText(j.StatusCode))
-	}
-	_, err := j.Token()
-	if err != nil {
-		return fmt.Errorf("decoding %q failed - %v", j.Name, err)
-	}
-	return nil
+	PullStatus *store.Report
 }
 
 func (j *PullJob) Token() (string, error) {
-	if len(j.Data) == 0 {
+	if len(j.PullStatus.Data) == 0 {
 		return "", errors.New("no data")
 	}
-	token, err := jwt.ParseDecoratedJWT(j.Data)
+	token, err := jwt.ParseDecoratedJWT(j.PullStatus.Data)
 	if err != nil {
 		return "", err
 	}
-	j.Data = []byte(token)
+	j.PullStatus.Data = []byte(token)
 	gc, err := jwt.DecodeGeneric(token)
 	if err != nil {
 		return "", err
@@ -118,51 +96,21 @@ func (j *PullJob) Token() (string, error) {
 	}
 }
 
-func (j *PullJob) Message() string {
-	if err := j.Error(); err != nil {
-		return err.Error()
-	}
-	return fmt.Sprintf("%q was sync'ed successfully", j.Name)
-}
-
 func (j *PullJob) Run() {
-	c := &http.Client{Timeout: time.Second * 5}
-	r, err := c.Get(j.ASU)
+	s, err := store.PullAccount(j.ASU)
 	if err != nil {
 		j.Err = err
 		return
 	}
-	defer r.Body.Close()
-	j.StatusCode = r.StatusCode
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r.Body)
-	if err != nil {
-		j.Err = err
+	ps, ok := s.(*store.Report)
+	if !ok {
+		j.Err = errors.New("unable to convert pull status")
 		return
 	}
-	j.Data = buf.Bytes()
+	j.PullStatus = ps
 }
 
 type PullJobs []*PullJob
-
-func (jobs PullJobs) Error() error {
-	for _, j := range jobs {
-		if err := j.Error(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (jobs PullJobs) ErrorCount() int {
-	i := 0
-	for _, j := range jobs {
-		if err := j.Error(); err != nil {
-			i++
-		}
-	}
-	return i
-}
 
 func (p *PullParams) SetDefaults(ctx ActionCtx) error {
 	return p.AccountContextParams.SetDefaults(ctx)
@@ -269,27 +217,38 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	r := store.NewDetailedReport(true)
 	for _, j := range p.Jobs {
-		if err := j.Error(); err != nil {
-			r.AddFromError(err)
+		sub := store.NewReport(store.OK, "pull %q from the account server", j.Name)
+		sub.Opt = store.DetailsOnErrorOrWarning
+		r.Add(sub)
+		if j.PullStatus != nil {
+			sub.Add(store.HoistChildren(j.PullStatus)...)
+		}
+		if j.Err != nil {
+			sub.AddFromError(j.Err)
 			continue
 		}
-		token, _ := j.Token()
-		remoteClaim, err := jwt.DecodeGeneric(token)
-		if err != nil {
-			r.AddError("error decoding remote token for %q: %v", j.Name, err)
-			continue
+		if j.PullStatus.OK() {
+			token, _ := j.Token()
+			remoteClaim, err := jwt.DecodeGeneric(token)
+			if err != nil {
+				sub.AddError("error decoding remote token for %q: %v", j.Name, err)
+				continue
+			}
+			orig := j.LocalClaim.Claims().IssuedAt
+			remote := remoteClaim.IssuedAt
+			if (orig > remote) && !p.Overwrite {
+				sub.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", j.Name)
+				continue
+			}
+			if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
+				sub.AddError("error storing %q: %v", j.Name, err)
+				continue
+			}
+			sub.AddOK("stored %s %q", remoteClaim.Type, j.Name)
+			if sub.OK() {
+				sub.Label = fmt.Sprintf("pulled %q from the account server", j.Name)
+			}
 		}
-		orig := j.LocalClaim.Claims().IssuedAt
-		remote := remoteClaim.IssuedAt
-		if (orig > remote) && !p.Overwrite {
-			r.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", j.Name)
-			continue
-		}
-		if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
-			r.AddError("error storing %q: %v", j.Name, err)
-			continue
-		}
-		r.AddOK("pulled %s %q from the remote server", remoteClaim.Type, j.Name)
 	}
 	return r, nil
 }
