@@ -161,3 +161,22 @@ func Test_Nested(t *testing.T) {
 	require.Contains(t, lines[3], fmt.Sprintf(warnTemplate, "something not so great"))
 	require.Contains(t, lines[4], fmt.Sprintf(errTemplate, "some error"))
 }
+
+func Test_ServerMessagesAllwaysShow(t *testing.T) {
+	s := NewReport(OK, "summary")
+	s.Opt = DetailsOnErrorOrWarning
+	s.AddOK("one")
+
+	m := s.Message()
+	lines := strings.Split(m, "\n")
+	require.Len(t, lines, 1)
+	require.Contains(t, lines[0], "summary")
+
+	s.Add(NewServerMessage("server says"))
+	m = s.Message()
+	lines = strings.Split(m, "\n")
+	require.Len(t, lines, 3)
+	require.Contains(t, lines[0], "summary")
+	require.Contains(t, lines[1], "one")
+	require.Contains(t, lines[2], "server says")
+}

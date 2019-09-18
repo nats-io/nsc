@@ -192,7 +192,17 @@ func (r *Report) printsDetails() bool {
 	case DetailsOnly:
 		return true
 	case DetailsOnErrorOrWarning:
-		return r.StatusCode != OK
+		return r.StatusCode != OK || r.HasServerMessages()
+	}
+	return false
+}
+
+func (r *Report) HasServerMessages() bool {
+	for _, v := range r.Details {
+		_, ok := v.(*ServerMessage)
+		if ok {
+			return true
+		}
 	}
 	return false
 }
