@@ -147,3 +147,22 @@ func TestDescribeAccount_Interactive(t *testing.T) {
 	_, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
 	require.NoError(t, err)
 }
+
+func TestDescribeAccount_Latency(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", true)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	ac.Exports[0].Latency = &jwt.ServiceLatency{Sampling: 10, Results: "lat"}
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	_, err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+
+	out, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
+	require.NoError(t, err)
+	require.Contains(t, out, "lat (10%)")
+}

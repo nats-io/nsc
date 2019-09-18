@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/nats-io/nsc/cmd/store"
@@ -44,6 +45,8 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
+	cmd.Flags().StringVarP(&params.latSubject, "lat-report", "", "", "latency report subject (services only)")
+	cmd.Flags().IntVarP(&params.latSampling, "lat-freq", "", 0, "latency report frequency [1-100] (services only)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -55,12 +58,15 @@ func init() {
 
 type AddExportParams struct {
 	AccountContextParams
-	claim   *jwt.AccountClaims
-	export  jwt.Export
+	claim  *jwt.AccountClaims
+	export jwt.Export
+
 	private bool
 	service bool
 	SignerParams
-	subject string
+	subject     string
+	latSubject  string
+	latSampling int
 }
 
 func (p *AddExportParams) longHelp() string {
@@ -107,7 +113,7 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		p.export.Type = jwt.Service
 	}
 
-	p.subject, err = cli.Prompt("subject", p.subject, true, func(s string) error {
+	svFn := func(s string) error {
 		p.export.Subject = jwt.Subject(s)
 		var vr jwt.ValidationResults
 		p.export.Validate(&vr)
@@ -115,14 +121,18 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 			return errors.New(vr.Issues[0].Description)
 		}
 		return nil
-	})
+	}
+
+	p.subject, err = cli.Prompt("subject", p.subject, true, svFn)
 	if err != nil {
 		return err
 	}
+	p.export.Subject = jwt.Subject(p.subject)
 
 	if p.export.Name == "" {
 		p.export.Name = p.subject
 	}
+
 	p.export.Name, err = cli.Prompt("name", p.export.Name, true, cli.LengthValidator(1))
 	if err != nil {
 		return err
@@ -131,6 +141,40 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
 	if err != nil {
 		return err
+	}
+
+	if p.export.IsService() {
+		ok, err := cli.PromptBoolean("track service latency", false)
+		if err != nil {
+			return err
+		}
+		if ok {
+			_, err = cli.Prompt("sampling frequency percentage [1-100]", "", false, func(s string) error {
+				v, err := strconv.Atoi(s)
+				if err != nil {
+					return err
+				}
+				if v < 1 || v > 100 {
+					return errors.New("sampling must be between 1 and 100 inclusive")
+				}
+				p.latSampling = v
+				return nil
+			})
+			p.latSubject, err = cli.Prompt("subject to send latency information", "", true, func(s string) error {
+				var lat jwt.ServiceLatency
+				lat.Results = jwt.Subject(s)
+				lat.Sampling = p.latSampling
+				var vr jwt.ValidationResults
+				lat.Validate(&vr)
+				if len(vr.Issues) > 0 {
+					return errors.New(vr.Issues[0].Description)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if err := p.SignerParams.Edit(ctx); err != nil {
@@ -172,8 +216,14 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	// add the new claim
+	// if we have a latency report subject create it
+	if p.latSubject != "" {
+		p.export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: p.latSampling}
+	}
+
+	// add the new export
 	p.claim.Exports.Add(&p.export)
+
 	var vr2 jwt.ValidationResults
 	if err = p.claim.Exports.Validate(&vr2); err != nil {
 		return err

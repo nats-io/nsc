@@ -148,3 +148,43 @@ func TestAddExportInteractive(t *testing.T) {
 	require.Equal(t, "Foo Stream", ac.Exports[0].Name)
 	require.Equal(t, "foo.>", string(ac.Exports[0].Subject))
 }
+
+func TestAddServiceLatency(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	cmd := createAddExportCmd()
+
+	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--lat-report", "q.lat", "--lat-freq", "100")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "q", string(ac.Exports[0].Subject))
+	require.NotNil(t, ac.Exports[0].Latency)
+	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
+	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+}
+
+func TestAddServiceLatencyInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	cmd := createAddExportCmd()
+
+	// service, subject, name, private, track, freq
+	args := []interface{}{1, "q", "q", false, true, "100", "q.lat"}
+	_, _, err := ExecuteInteractiveCmd(cmd, args)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "q", string(ac.Exports[0].Subject))
+	require.NotNil(t, ac.Exports[0].Latency)
+	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
+	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+}
