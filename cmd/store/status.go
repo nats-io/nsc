@@ -199,8 +199,7 @@ func (r *Report) printsDetails() bool {
 
 func (r *Report) HasServerMessages() bool {
 	for _, v := range r.Details {
-		_, ok := v.(*ServerMessage)
-		if ok {
+		if _, ok := v.(*ServerMessage); ok {
 			return true
 		}
 	}
