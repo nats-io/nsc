@@ -206,8 +206,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 			}
 			p.remote = subject
 			p.local = subject
-
-			// FIXME - when no token required, import is not it not initialized
+			p.service = c.Selection.IsService()
 			if c.Selection.TokenReq {
 				if err := p.generateToken(ctx, c); err != nil {
 					return false, err
@@ -399,11 +398,22 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-
 	if p.local == "" {
 		p.local = p.remote
 	}
-	p.local, err = cli.Prompt("local subject", p.local, true, func(s string) error {
+
+	// services have to have a local subject - streams can be blank and import on source subject
+	m := "stream prefix subject"
+	prefix := ""
+	if p.service {
+		m = "local subject"
+		prefix = p.local
+	}
+
+	p.local, err = cli.Prompt(m, prefix, true, func(s string) error {
+		if !p.service && s == "" {
+			return nil
+		}
 		vr := jwt.CreateValidationResults()
 		sub := jwt.Subject(s)
 		sub.Validate(vr)

@@ -257,12 +257,13 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
 
-func Test_AddImport_PublicStreamInteractive(t *testing.T) {
+func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Service, "q", true)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -284,8 +285,22 @@ func Test_AddImport_PublicStreamInteractive(t *testing.T) {
 	require.Equal(t, "test", ac.Imports[0].Name)
 	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
-	require.Equal(t, jwt.Stream, ac.Imports[0].Type)
+	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
+
+	// B, don't pick, public, A's pubkey, remote sub, service, name test, local subj "test.foobar.>, key
+	input = []interface{}{1, false, true, apub, "q", true, "q", "qq", 0}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 2)
+	require.Equal(t, "q", ac.Imports[1].Name)
+	require.Equal(t, "q", string(ac.Imports[1].To))
+	require.Equal(t, "qq", string(ac.Imports[1].Subject))
+	require.True(t, ac.Imports[1].IsService())
+	require.Equal(t, apub, ac.Imports[1].Account)
 }
 
 func Test_AddImportWithSigningKeyToken(t *testing.T) {
@@ -349,4 +364,51 @@ func Test_AddDecoratedToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, acb.Imports, 1)
 	require.Equal(t, string(acb.Imports[0].Subject), "foobar.>")
+}
+
+func Test_AddImport_LocalImportsInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Service, "q", true)
+
+	akp := ts.GetAccountKey(t, "A")
+	require.NotNil(t, akp)
+	apub, err := akp.PublicKey()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "B")
+
+	cmd := createAddImportCmd()
+	HoistRootFlags(cmd)
+
+	// B, pick, stream foobar, name test, local subj "test.foobar.>, key
+	input := []interface{}{1, true, 1, "test", "test.foobar.>"}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
+	require.Equal(t, "test", ac.Imports[0].Name)
+	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
+	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
+	require.True(t, ac.Imports[0].IsStream())
+	require.Equal(t, apub, ac.Imports[0].Account)
+
+	// B, pick, service q, name q service, local subj qq
+	input = []interface{}{1, true, 2, "q service", "qq"}
+	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 2)
+	require.Equal(t, "q service", ac.Imports[1].Name)
+	require.Equal(t, "q", string(ac.Imports[1].To))
+	require.Equal(t, "qq", string(ac.Imports[1].Subject))
+	require.True(t, ac.Imports[1].IsService())
+	require.Equal(t, apub, ac.Imports[1].Account)
 }
