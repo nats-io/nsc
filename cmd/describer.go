@@ -156,13 +156,21 @@ func (e *ExportsDescriber) Describe() string {
 	table.UTF8Box()
 
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations")
+	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Monitoring")
 	for _, v := range e.Exports {
 		public := "Yes"
 		if v.TokenReq {
 			public = "No"
 		}
-		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public, len(v.Revocations))
+		mon := "N/A"
+		if v.Type == jwt.Service {
+			if v.Latency != nil {
+				mon = fmt.Sprintf("%s (%d%%)", v.Latency.Results, v.Latency.Sampling)
+			} else {
+				mon = "-"
+			}
+		}
+		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public, len(v.Revocations), mon)
 	}
 	return table.Render()
 }
