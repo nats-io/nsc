@@ -19,6 +19,8 @@ fmt:
 	goimports -w cmd/*.go
 	goimports -w cmd/store/*.go
 
+	go mod tidy
+
 compile:
 	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 12
 

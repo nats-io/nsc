@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -156,7 +156,7 @@ func TestAddServiceLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	cmd := createAddExportCmd()
 
-	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--lat-report", "q.lat", "--lat-freq", "100")
+	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--latency", "q.lat", "--sampling", "100")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
