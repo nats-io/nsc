@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,8 +45,8 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
-	cmd.Flags().StringVarP(&params.latSubject, "lat-report", "", "", "latency report subject (services only)")
-	cmd.Flags().IntVarP(&params.latSampling, "lat-freq", "", 0, "latency report frequency [1-100] (services only)")
+	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
+	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -149,18 +149,18 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if ok {
-			_, err = cli.Prompt("sampling frequency percentage [1-100]", "", false, func(s string) error {
+			_, err = cli.Prompt("sampling percentage [0-100] (0 disables)", "", false, func(s string) error {
 				v, err := strconv.Atoi(s)
 				if err != nil {
 					return err
 				}
-				if v < 1 || v > 100 {
-					return errors.New("sampling must be between 1 and 100 inclusive")
+				if v < 0 || v > 100 {
+					return errors.New("sampling must be between 0 and 100 inclusive")
 				}
 				p.latSampling = v
 				return nil
 			})
-			p.latSubject, err = cli.Prompt("subject to send latency information", "", true, func(s string) error {
+			p.latSubject, err = cli.Prompt("latency metrics subject", "", true, func(s string) error {
 				var lat jwt.ServiceLatency
 				lat.Results = jwt.Subject(s)
 				lat.Sampling = p.latSampling
