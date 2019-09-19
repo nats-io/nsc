@@ -282,14 +282,7 @@ func (p *ResponsePermsParams) parseMaxResponse(s string) (int, error) {
 	if s == "" {
 		return 0, nil
 	}
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, err
-	}
-	if v < 0 {
-		return 0, errors.New("value must be greater than 0")
-	}
-	return v, nil
+	return strconv.Atoi(s)
 }
 
 func (p *ResponsePermsParams) ttlValidator(s string) error {
@@ -301,11 +294,7 @@ func (p *ResponsePermsParams) parseTTL(s string) (time.Duration, error) {
 	if s == "" {
 		return time.Duration(0), nil
 	}
-	d, err := time.ParseDuration(s)
-	if err != nil {
-		return time.Duration(0), err
-	}
-	return d, nil
+	return time.ParseDuration(s)
 }
 
 func (p *ResponsePermsParams) Edit(hasPerm bool) error {
