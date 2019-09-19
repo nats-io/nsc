@@ -274,25 +274,38 @@ type ResponsePermsParams struct {
 }
 
 func (p *ResponsePermsParams) maxResponseValidator(s string) error {
+	_, err := p.parseMaxResponse(s)
+	return err
+}
+
+func (p *ResponsePermsParams) parseMaxResponse(s string) (int, error) {
 	if s == "" {
-		return nil
+		return 0, nil
 	}
-	_, err := strconv.Atoi(s)
+	v, err := strconv.Atoi(s)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	if v < 0 {
+		return 0, errors.New("value must be greater than 0")
+	}
+	return v, nil
 }
 
 func (p *ResponsePermsParams) ttlValidator(s string) error {
+	_, err := p.parseTTL(s)
+	return err
+}
+
+func (p *ResponsePermsParams) parseTTL(s string) (time.Duration, error) {
 	if s == "" {
-		return nil
+		return time.Duration(0), nil
 	}
-	_, err := time.ParseDuration(s)
+	d, err := time.ParseDuration(s)
 	if err != nil {
-		return err
+		return time.Duration(0), err
 	}
-	return nil
+	return d, nil
 }
 
 func (p *ResponsePermsParams) Edit(hasPerm bool) error {
@@ -337,7 +350,7 @@ func (p *ResponsePermsParams) Run(uc *jwt.UserClaims) (*store.Report, error) {
 		return r, nil
 	}
 	if p.respMax != "" {
-		v, err := strconv.Atoi(p.respMax)
+		v, err := p.parseMaxResponse(p.respMax)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +362,7 @@ func (p *ResponsePermsParams) Run(uc *jwt.UserClaims) (*store.Report, error) {
 	}
 
 	if p.respTTL != "" {
-		v, err := time.ParseDuration(p.respTTL)
+		v, err := p.parseTTL(p.respTTL)
 		if err != nil {
 			return nil, err
 		}
