@@ -18,11 +18,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
-
-	"github.com/nats-io/nsc/cli"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -54,7 +50,7 @@ func createEditUserCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests for user)")
 	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
-	cmd.Flags().BoolVarP(&params.rmResp, "rm-response", "", false, "remove response settings")
+	cmd.Flags().BoolVarP(&params.rmResp, "rm-response-perms", "", false, "remove response settings")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
@@ -80,6 +76,7 @@ type EditUserParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
+	ResponsePermsParams
 	claim         *jwt.UserClaims
 	name          string
 	token         string
@@ -95,9 +92,6 @@ type EditUserParams struct {
 	rmSrc       []string
 	src         []string
 	payload     DataParams
-	respTTL     string
-	respMax     string
-	rmResp      bool
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -107,7 +101,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response", "max-responses", "response-ttl") {
+		"rm-response-perms", "max-responses", "response-ttl") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -166,54 +160,25 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 }
 
 func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
-	var err error
-	var ok bool
-	if p.claim.Resp == nil {
-		ok, err = cli.PromptYN("Set response permissions")
-		if err != nil {
-			return err
-		}
-	} else {
-		ok = true
-	}
-	if p.claim.Resp != nil {
-		p.rmResp, err = cli.PromptBoolean("Delete response permissions", p.rmResp)
-	}
-	if ok && !p.rmResp {
-		p.respMax, err = cli.Prompt("Number of max responses", p.respMax, true, func(v string) error {
-			_, err := strconv.ParseInt(v, 10, 32)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		p.respTTL, err = cli.Prompt("Response TTL duration", p.respTTL, true, func(v string) error {
-			_, err := time.ParseDuration(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-
+	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
+	//if err := p.ResponsePermsParams.Edit(p.claim.Resp != nil); err != nil {
+	//	return err
+	//}
 	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
 		return err
 	}
-
 	if p.claim.NotBefore > 0 {
 		p.GenericClaimsParams.Start = UnixToDate(p.claim.NotBefore)
 	}
 	if p.claim.Expires > 0 {
 		p.GenericClaimsParams.Expiry = UnixToDate(p.claim.Expires)
 	}
-	if err = p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
+	if err := p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
 		return err
 	}
-
-	if err = p.SignerParams.Edit(ctx); err != nil {
+	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -234,20 +199,8 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if !p.rmResp {
-		if p.respMax != "" {
-			_, err := strconv.ParseInt(p.respMax, 10, 32)
-			if err != nil {
-				return err
-			}
-		}
-
-		if p.respTTL != "" {
-			_, err := time.ParseDuration(p.respTTL)
-			if err != nil {
-				return err
-			}
-		}
+	if err := p.ResponsePermsParams.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -327,34 +280,12 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
-	if p.rmResp && p.claim.Resp != nil {
-		p.claim.Resp = nil
-		r.AddOK("removed response setting")
-	} else {
-		if p.respMax != "" {
-			v, err := strconv.ParseInt(p.respMax, 10, 32)
-			if err != nil {
-				return nil, err
-			}
-			if p.claim.Resp == nil {
-				p.claim.Resp = &jwt.ResponsePermission{Expires: time.Millisecond * 5000}
-			}
-			p.claim.Resp.MaxMsgs = int(v)
-		}
-		if p.respTTL != "" {
-			v, err := time.ParseDuration(p.respTTL)
-			if err != nil {
-				return nil, err
-			}
-			if p.claim.Resp == nil {
-				p.claim.Resp = &jwt.ResponsePermission{MaxMsgs: 1}
-			}
-			p.claim.Resp.Expires = v
-		}
-		if p.respTTL != "" || p.respMax != "" {
-			r.AddOK("set max responses to %d", p.claim.Resp.MaxMsgs)
-			r.AddOK("set response ttl to %v", p.claim.Resp.Expires)
-		}
+	s, err := p.ResponsePermsParams.Run(p.claim)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil {
+		r.Add(s.Details...)
 	}
 
 	// get the account JWT - must have since we resolved the user based on it

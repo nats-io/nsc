@@ -50,9 +50,8 @@ func Test_EditUserInteractive(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddUser(t, "A", "U")
 
+	inputs := []interface{}{"-1", "2018-01-01", "2050-01-01", false}
 	cli.LogFn = t.Log
-
-	inputs := []interface{}{false, "-1", "2018-01-01", "2050-01-01", false}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
@@ -69,12 +68,13 @@ func Test_EditUserInteractive(t *testing.T) {
 	require.Nil(t, uc.Resp)
 }
 
-func Test_EditUserEditReply(t *testing.T) {
+func Test_EditUserEditResponsePermissions(t *testing.T) {
+	t.Skip("response permissions not interactive")
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddUser(t, "A", "U")
 
-	inputs := []interface{}{true, "100", "1000ms", "-1", "0", "0", false}
+	inputs := []interface{}{true, 100, "1000ms", -1, 0, 0, false}
 	_, _, err := ExecuteInteractiveCmd(createEditUserCmd(), inputs)
 	require.NoError(t, err)
 
@@ -274,4 +274,34 @@ func Test_EditUser_Payload(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cc)
 	require.Equal(t, int64(jwt.NoLimit), cc.Limits.Payload)
+}
+
+func Test_EditUserResponsePermissions(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "U", "--max-responses", "100", "--response-ttl", "2ms")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--max-responses", "1000", "--response-ttl", "4ms")
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 1000, uc.Resp.MaxMsgs)
+	d, _ := time.ParseDuration("4ms")
+	require.Equal(t, d, uc.Resp.Expires)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-response-perms")
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Nil(t, uc.Resp)
 }

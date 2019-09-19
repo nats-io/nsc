@@ -53,7 +53,7 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-permission-ttl", "", "", "max response permission ttl for responding to requests (global to all requests for user)")
+	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max response permission ttl for responding to requests (global to all requests for user)")
 	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
@@ -79,8 +79,7 @@ type AddUserParams struct {
 	SignerParams
 	Entity
 	TimeParams
-	respTTL       string
-	respMax       string
+	ResponsePermsParams
 	allowPubs     []string
 	allowPubsub   []string
 	allowSubs     []string
@@ -119,34 +118,18 @@ func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	if err = p.Entity.Edit(); err != nil {
-		return err
-	}
-
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
 
-	ok, err := cli.PromptYN("Set response permissions?")
-	if err != nil {
+	if err = p.Entity.Edit(); err != nil {
 		return err
 	}
-	if ok {
-		p.respMax, err = cli.Prompt("Number of max responses", p.respMax, true, func(v string) error {
-			_, err := strconv.ParseInt(v, 10, 32)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, true, func(v string) error {
-			_, err := time.ParseDuration(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-	}
+
+	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
+	//if err := p.ResponsePermsParams.Edit(false); err != nil {
+	//	return err
+	//}
 
 	if err = p.TimeParams.Edit(); err != nil {
 		return err
@@ -190,18 +173,8 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.respMax != "" {
-		_, err := strconv.ParseInt(p.respMax, 10, 32)
-		if err != nil {
-			return err
-		}
-	}
-
-	if p.respTTL != "" {
-		_, err := time.ParseDuration(p.respTTL)
-		if err != nil {
-			return err
-		}
+	if err := p.ResponsePermsParams.Validate(); err != nil {
+		return err
 	}
 
 	return p.Entity.Valid()
@@ -268,26 +241,8 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 		uc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	if p.respMax != "" {
-		v, err := strconv.ParseInt(p.respMax, 10, 32)
-		if err != nil {
-			return err
-		}
-		if uc.Resp == nil {
-			uc.Resp = &jwt.ResponsePermission{Expires: time.Millisecond * 5000}
-		}
-		uc.Resp.MaxMsgs = int(v)
-	}
-
-	if p.respTTL != "" {
-		v, err := time.ParseDuration(p.respTTL)
-		if err != nil {
-			return err
-		}
-		if uc.Resp == nil {
-			uc.Resp = &jwt.ResponsePermission{MaxMsgs: 1}
-		}
-		uc.Resp.Expires = v
+	if _, err := p.ResponsePermsParams.Run(uc); err != nil {
+		return err
 	}
 
 	uc.Permissions.Pub.Allow.Add(p.allowPubs...)
@@ -310,4 +265,101 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 	sort.Strings(uc.Tags)
 
 	return nil
+}
+
+type ResponsePermsParams struct {
+	respTTL string
+	respMax string
+	rmResp  bool
+}
+
+func (p *ResponsePermsParams) maxResponseValidator(s string) error {
+	_, err := p.parseMaxResponse(s)
+	return err
+}
+
+func (p *ResponsePermsParams) parseMaxResponse(s string) (int, error) {
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.Atoi(s)
+}
+
+func (p *ResponsePermsParams) ttlValidator(s string) error {
+	_, err := p.parseTTL(s)
+	return err
+}
+
+func (p *ResponsePermsParams) parseTTL(s string) (time.Duration, error) {
+	if s == "" {
+		return time.Duration(0), nil
+	}
+	return time.ParseDuration(s)
+}
+
+func (p *ResponsePermsParams) Edit(hasPerm bool) error {
+	verb := "Set"
+	if hasPerm {
+		verb = "Edit"
+	}
+	ok, err := cli.PromptBoolean(fmt.Sprintf("%s response permissions?", verb), false)
+	if err != nil {
+		return err
+	}
+	if ok {
+		if hasPerm {
+			p.rmResp, err = cli.PromptBoolean("delete response permissions", p.rmResp)
+			if err != nil {
+				return err
+			}
+		}
+		if !p.rmResp {
+			p.respMax, err = cli.Prompt("Number of max responses", p.respMax, true, p.maxResponseValidator)
+			p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, true, p.ttlValidator)
+		}
+	}
+	return nil
+}
+
+func (p *ResponsePermsParams) Validate() error {
+	if err := p.maxResponseValidator(p.respMax); err != nil {
+		return err
+	}
+	if err := p.ttlValidator(p.respTTL); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *ResponsePermsParams) Run(uc *jwt.UserClaims) (*store.Report, error) {
+	r := store.NewDetailedReport(true)
+	if p.rmResp {
+		uc.Resp = nil
+		r.AddOK("removed response permissions")
+		return r, nil
+	}
+	if p.respMax != "" {
+		v, err := p.parseMaxResponse(p.respMax)
+		if err != nil {
+			return nil, err
+		}
+		if uc.Resp == nil {
+			uc.Resp = &jwt.ResponsePermission{}
+		}
+		uc.Resp.MaxMsgs = v
+		r.AddOK("set max responses to %d", v)
+	}
+
+	if p.respTTL != "" {
+		v, err := p.parseTTL(p.respTTL)
+		if err != nil {
+			return nil, err
+		}
+		if uc.Resp == nil {
+			uc.Resp = &jwt.ResponsePermission{}
+		}
+		uc.Resp.Expires = v
+		r.AddOK("set response ttl to %v", v)
+	}
+	return r, nil
 }
