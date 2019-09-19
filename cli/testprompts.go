@@ -79,7 +79,10 @@ func (t *TestPrompts) PromptMultipleChoices(m string, choices []string) ([]int, 
 }
 
 func (t *TestPrompts) prompt(label string, value string, edit bool, validator Validator) (string, error) {
-	val := t.inputs[t.count].(string)
+	val, ok := t.inputs[t.count].(string)
+	if !ok {
+		val = fmt.Sprintf("%v", val)
+	}
 	t.count = t.count + 1
 
 	if validator != nil {

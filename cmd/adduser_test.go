@@ -74,7 +74,7 @@ func Test_AddUserInteractive(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err, "account creation")
 
-	inputs := []interface{}{"U", true, false, "2018-01-01", "2050-01-01", 0}
+	inputs := []interface{}{"U", true, "2018-01-01", "2050-01-01", 0}
 
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)
@@ -131,17 +131,14 @@ func Test_AddUserManagedStore(t *testing.T) {
 }
 
 func Test_AddUser_Account(t *testing.T) {
-	ts := NewTestStore(t, "test")
+	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "B", "--start", "2018-01-01", "--expiry", "2050-01-01")
-	require.NoError(t, err)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
 
 	config := GetConfig()
-	err = config.SetAccount("A")
+	err := config.SetAccount("A")
 	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--name", "bb", "--account", "B")
@@ -156,15 +153,10 @@ func Test_AddUser_WithSK(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
-	require.NoError(t, err)
-
-	config := GetConfig()
-	err = config.SetAccount("A")
-	require.NoError(t, err)
+	ts.AddAccount(t, "A")
 
 	sk, pk, _ := CreateAccountKey(t)
-	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
 	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "bb", "--account", "A", "-K", string(sk))
@@ -177,11 +169,11 @@ func Test_AddUser_WithSK(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, u)
 	require.Equal(t, u.Issuer, pk)
-
 	require.True(t, ac.DidSign(u))
 }
 
 func Test_AddUser_InteractiveResp(t *testing.T) {
+	t.Skip("interactive resp permissions")
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
@@ -189,7 +181,6 @@ func Test_AddUser_InteractiveResp(t *testing.T) {
 	require.NoError(t, err, "account creation")
 
 	inputs := []interface{}{"U", true, true, "100", "1000ms", "2018-01-01", "2050-01-01", 0}
-
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)
 	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
@@ -206,7 +197,6 @@ func Test_AddUser_InteractiveResp(t *testing.T) {
 func Test_AddUserNameArg(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
-
 	ts.AddAccount(t, "A")
 
 	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "U")
@@ -215,4 +205,20 @@ func Test_AddUserNameArg(t *testing.T) {
 	uc, err := ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, "U", uc.Name)
+}
+
+func Test_AddUserWithResponsePerms(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "U", "--max-responses", "100", "--response-ttl", "2ms")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 100, uc.Resp.MaxMsgs)
+	d, _ := time.ParseDuration("2ms")
+	require.Equal(t, d, uc.Resp.Expires)
 }
