@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -39,7 +39,6 @@ func createDeleteExportCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	params.AccountContextParams.BindFlags(cmd)
-
 	return cmd
 }
 
@@ -90,7 +89,6 @@ func (p *DeleteExportParams) Load(ctx ActionCtx) error {
 			p.subject = string(p.claim.Exports[0].Subject)
 		}
 	}
-
 	for i, e := range p.claim.Exports {
 		if string(e.Subject) == p.subject {
 			p.index = i
@@ -104,11 +102,13 @@ func (p *DeleteExportParams) Load(ctx ActionCtx) error {
 func (p *DeleteExportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	var choices []string
-	for _, c := range p.claim.Exports {
-		choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
+	choices, err := GetAccountExports(p.claim)
+	if err != nil {
+		return err
 	}
-	p.index, err = cli.PromptChoices("select export to delete", "", choices)
+	labels := AccountExportChoices(choices).String()
+
+	p.index, err = cli.PromptChoices("select export to delete", "", labels)
 	if err != nil {
 		return err
 	}
@@ -121,14 +121,13 @@ func (p *DeleteExportParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *DeleteExportParams) Validate(ctx ActionCtx) error {
-	var err error
 	if p.subject == "" && p.index == -1 {
 		return fmt.Errorf("subject is required")
 	}
 	if p.index == -1 {
 		return fmt.Errorf("no export matching %q found", p.subject)
 	}
-	if p.SignerParams.Resolve(ctx); err != nil {
+	if err := p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
 	return nil

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -37,7 +37,7 @@ func Test_DeleteImport(t *testing.T) {
 	tests := CmdTests{
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "A"}, nil, []string{"account \"A\" doesn't have imports"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B"}, nil, []string{"subject is required"}, true},
-		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no stream import matching \"baz\" found"}, true},
+		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no import matching \"baz\" found"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "foo"}, nil, []string{"deleted stream import \"foo\""}, false},
 	}
 
@@ -71,7 +71,7 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	ts.AddImport(t, "A", "foo", "B")
 	ts.AddImport(t, "A", "bar", "B")
 
-	input := []interface{}{1, false, 0, 0}
+	input := []interface{}{1, 0, 0}
 	cmd := createDeleteImportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input)
@@ -82,40 +82,43 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 }
 
-func Test_DeleteImportInteractiveNoService(t *testing.T) {
+func Test_DeleteAmbiguousImport(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo", false)
-	ts.AddExport(t, "A", jwt.Stream, "bar", false)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 
-	ts.AddAccount(t, "B")
-	ts.AddImport(t, "A", "foo", "B")
-	ts.AddImport(t, "A", "bar", "B")
+	_, apk, _ := CreateAccountKey(t)
+	_, bpk, _ := CreateAccountKey(t)
+	_, cpk, _ := CreateAccountKey(t)
 
-	input := []interface{}{1, true, 0, ts.OperatorKeyPath}
-	cmd := createDeleteImportCmd()
-	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input)
-	require.Contains(t, err.Error(), "no service imports defined")
-}
+	ac.Imports.Add(&jwt.Import{Account: apk, Subject: "x", Type: jwt.Stream})
+	ac.Imports.Add(&jwt.Import{Account: bpk, Subject: "x", Type: jwt.Stream})
 
-func Test_DeleteImportInteractiveNoStreams(t *testing.T) {
-	ts := NewTestStore(t, "test")
-	defer ts.Done(t)
+	vr := jwt.CreateValidationResults()
+	ac.Validate(vr)
+	require.False(t, vr.IsBlocking(true))
 
-	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
-	ts.AddExport(t, "A", jwt.Service, "bar", false)
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	_, err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
 
-	ts.AddAccount(t, "B")
-	ts.AddImport(t, "A", "foo", "B")
-	ts.AddImport(t, "A", "bar", "B")
+	// fail because there are two with 'x'
+	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x")
+	require.Error(t, err)
 
-	input := []interface{}{1, false, 0, ts.OperatorKeyPath}
-	cmd := createDeleteImportCmd()
-	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input)
-	require.Contains(t, err.Error(), "no stream imports defined")
+	// fail because no import for x from the specified account
+	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x", "--src-account", cpk)
+	require.Error(t, err)
+
+	// finally the right args
+	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x", "--src-account", apk)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
 }
