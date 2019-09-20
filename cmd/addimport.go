@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,7 +44,7 @@ func createAddImportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.tokenSrc, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "import name")
-	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject")
+	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject or prefix")
 	params.srcAccount.BindFlags("src-account", "", nkeys.PrefixByteAccount, cmd)
 	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
@@ -102,12 +102,12 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if p.local == "" {
-		p.local = p.remote
+	if p.name == "" {
+		p.name = p.remote
 	}
 
-	if p.name == "" {
-		p.name = p.local
+	if p.service && p.local == "" {
+		p.local = p.remote
 	}
 
 	return nil
@@ -145,7 +145,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 
 	if len(available) > 0 {
 		// we have some exports that they may want
-		ok, err := cli.PromptYN("pick from locally available exports?")
+		ok, err := cli.PromptYN("pick from locally available exports")
 		if err != nil {
 			return false, err
 		}
@@ -205,8 +205,10 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 				})
 			}
 			p.remote = subject
-			p.local = subject
 			p.service = c.Selection.IsService()
+			if p.service && p.local == "" {
+				p.local = subject
+			}
 			if c.Selection.TokenReq {
 				if err := p.generateToken(ctx, c); err != nil {
 					return false, err
@@ -391,8 +393,29 @@ func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *AddImportParams) checkServiceSubject(s string) error {
+	// if we are not dealing with a service ignore
+	if !p.service {
+		return nil
+	}
+	for _, v := range p.claim.Imports {
+		// ignore streams
+		if v.IsStream() {
+			continue
+		}
+		if s == string(v.Subject) {
+			return fmt.Errorf("%s is already in use by a different service import", s)
+		}
+	}
+	return nil
+}
+
 func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
+
+	if p.name == "" {
+		p.name = p.remote
+	}
 
 	p.name, err = cli.Prompt("name", p.name, true, cli.LengthValidator(1))
 	if err != nil {
@@ -414,6 +437,10 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		if !p.service && s == "" {
 			return nil
 		}
+		if err := p.checkServiceSubject(s); err != nil {
+			return err
+		}
+
 		vr := jwt.CreateValidationResults()
 		sub := jwt.Subject(s)
 		sub.Validate(vr)
@@ -499,6 +526,7 @@ func (p *AddImportParams) filter(kind jwt.ExportType, imports jwt.Imports) jwt.I
 func (p *AddImportParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.claim.Imports.Add(p.createImport())
+
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
@@ -508,6 +536,7 @@ func (p *AddImportParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var vr jwt.ValidationResults
 	ac.Validate(&vr)
 	errs := vr.Errors()

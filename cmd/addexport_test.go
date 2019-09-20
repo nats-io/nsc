@@ -65,27 +65,31 @@ func validateAddExports(t *testing.T, ts *TestStore) {
 	require.NoError(t, err)
 
 	require.Len(t, ac.Exports, 4)
+	m := make(map[string]*jwt.Export)
+	for _, v := range ac.Exports {
+		m[v.Name] = v
+	}
 
-	pubfoo := ac.Exports[0]
-	require.Equal(t, "pubfoo", pubfoo.Name)
+	pubfoo := m["pubfoo"]
+	require.NotNil(t, pubfoo)
 	require.Equal(t, "pubfoo", string(pubfoo.Subject))
 	require.Equal(t, jwt.Stream, pubfoo.Type)
 	require.False(t, pubfoo.TokenReq)
 
-	privfoo := ac.Exports[1]
-	require.Equal(t, "privfoo", privfoo.Name)
+	privfoo := m["privfoo"]
+	require.NotNil(t, privfoo)
 	require.Equal(t, "privfoo", string(privfoo.Subject))
 	require.Equal(t, jwt.Stream, privfoo.Type)
 	require.True(t, privfoo.TokenReq)
 
-	pubbar := ac.Exports[2]
-	require.Equal(t, "pubbar", pubbar.Name)
+	pubbar := m["pubbar"]
+	require.NotNil(t, pubbar)
 	require.Equal(t, "pubbar", string(pubbar.Subject))
 	require.Equal(t, jwt.Service, pubbar.Type)
 	require.False(t, pubbar.TokenReq)
 
-	privbar := ac.Exports[3]
-	require.Equal(t, "privbar", privbar.Name)
+	privbar := m["privbar"]
+	require.NotNil(t, privbar)
 	require.Equal(t, "privbar", string(privbar.Subject))
 	require.Equal(t, jwt.Service, privbar.Type)
 	require.True(t, privbar.TokenReq)

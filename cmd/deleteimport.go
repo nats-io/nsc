@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -39,8 +39,8 @@ func createDeleteImportCmd() *cobra.Command {
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
-	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
+	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "stream/service subject")
+	cmd.Flags().StringVarP(&params.srcAccount, "src-account", "", "", "source account (only if subject is ambiguous)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -53,10 +53,11 @@ func init() {
 type DeleteImportParams struct {
 	AccountContextParams
 	SignerParams
-	claim   *jwt.AccountClaims
-	index   int
-	subject string
-	service bool
+	claim      *jwt.AccountClaims
+	index      int
+	subject    string
+	picked     bool
+	srcAccount string
 }
 
 func (p *DeleteImportParams) longHelp() string {
@@ -76,23 +77,12 @@ func (p *DeleteImportParams) SetDefaults(ctx ActionCtx) error {
 }
 
 func (p *DeleteImportParams) PreInteractive(ctx ActionCtx) error {
+	p.picked = true
 	var err error
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	p.service, err = cli.PromptYN("is service")
-	if err != nil {
-		return err
-	}
 	return nil
-}
-
-func (p *DeleteImportParams) importKind() jwt.ExportType {
-	kind := jwt.Stream
-	if p.service {
-		kind = jwt.Service
-	}
-	return kind
 }
 
 func (p *DeleteImportParams) Load(ctx ActionCtx) error {
@@ -116,46 +106,42 @@ func (p *DeleteImportParams) Load(ctx ActionCtx) error {
 		}
 	}
 
+	// if auto-selecting there can only be one
+	count := 0
+	last := -1
 	for i, e := range p.claim.Imports {
-		if string(e.Subject) == p.subject && e.Type == p.importKind() {
-			p.index = i
-			break
+		if string(e.Subject) == p.subject {
+			count++
+			last = i
 		}
 	}
-
+	if count == 1 {
+		p.index = last
+	}
+	// if we have more than one, both the subject and src account must match
+	if count > 1 {
+		for i, e := range p.claim.Imports {
+			if string(e.Subject) == p.subject && p.srcAccount == e.Account {
+				p.index = i
+				break
+			}
+		}
+	}
 	return nil
 }
 
 func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	var choices []string
-	var origidx []int
-
-	// when running interactive filter the list of imports to the right kind
-	// tracking the original index in the import list
-	kind := p.importKind()
-	for i, c := range p.claim.Imports {
-		if c.Type == kind {
-			choices = append(choices, fmt.Sprintf("[%s] %s - %s", c.Type, c.Name, c.Subject))
-			origidx = append(origidx, i)
-		}
-	}
-
-	if len(choices) == 0 {
-		return fmt.Errorf("no %s imports defined in account %s", kind, p.AccountContextParams.Name)
-	}
-
-	v := ""
-	if p.index != -1 {
-		v = choices[p.index]
-	}
-
-	p.index, err = cli.PromptChoices("select import to delete", v, choices)
+	choices, err := GetAccountImports(p.claim)
 	if err != nil {
 		return err
 	}
-	p.index = origidx[p.index]
+	labels := choices.String()
+	p.index, err = cli.PromptChoices("select import to delete", "", labels)
+	if err != nil {
+		return err
+	}
 
 	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
@@ -170,10 +156,26 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("subject is required")
 	}
 
-	kind := p.importKind()
-	if p.index == -1 {
-		return fmt.Errorf("no %s import matching %q found", kind, p.subject)
+	if p.index == -1 && p.srcAccount == "" && !p.picked {
+		var accounts []string
+		for _, e := range p.claim.Imports {
+			if string(e.Subject) == p.subject {
+				accounts = append(accounts, e.Account)
+			}
+		}
+		if len(accounts) > 1 && p.srcAccount == "" {
+			return fmt.Errorf("more than one import %q found - specify --src-account with one of %s", p.subject, strings.Join(accounts, ", "))
+		}
 	}
+
+	if p.index == -1 {
+		m := fmt.Sprintf("no import matching %q found", p.subject)
+		if p.srcAccount != "" {
+			m = fmt.Sprintf("%s from account %s", m, p.srcAccount)
+		}
+		return fmt.Errorf(m)
+	}
+
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}

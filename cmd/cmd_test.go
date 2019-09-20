@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2019 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -72,19 +72,19 @@ func (c *CmdTest) RunTest(t *testing.T, chain []string, index int) {
 	stdout, stderr, err := ExecuteCmd(root, c.args...)
 	for _, v := range c.hasOutput {
 		if !strings.Contains(stdout, v) {
-			t.Fatalf("%d command '%v' stdout doesn't have %q\nstdout:\n%s\nstderr:\n%s\n", index, c, v, stdout, stderr)
+			t.Fatalf("test %d command '%v' stdout doesn't have %q\nstdout:\n%s\nstderr:\n%s\n", index, c, v, stdout, stderr)
 		}
 	}
 	for _, v := range c.hasError {
 		if !strings.Contains(stderr, v) {
-			t.Fatalf("%d command '%v' stderr doesn't have %q\nstdout:\n%s\nstderr:\n%s\n", index, c, v, stdout, stderr)
+			t.Fatalf("test %d command '%v' stderr doesn't have %q\nstdout:\n%s\nstderr:\n%s\n", index, c, v, stdout, stderr)
 		}
 	}
 	if c.shouldFail && err == nil {
-		t.Fatalf("%d command '%v' should have failed but didn't\nstdout:\n%s\nstderr:\n%s\n", index, c, stdout, stderr)
+		t.Fatalf("test %d command '%v' should have failed but didn't\nstdout:\n%s\nstderr:\n%s\n", index, c, stdout, stderr)
 	}
 	if !c.shouldFail && err != nil {
-		t.Fatalf("%d command '%v' should have not failed: %v", index, c, err)
+		t.Fatalf("test %d command '%v' should have not failed: %v", index, c, err)
 	}
 }
 
