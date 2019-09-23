@@ -160,7 +160,7 @@ func Test_NkeyResolverMapsImporter(t *testing.T) {
 	require.Contains(t, conf, "{stream:stream.a,accounts:[B]}")
 
 	require.Contains(t, conf, "{service:{account:A,subject:service.b},to:service.b}")
-	require.Contains(t, conf, "{stream:{account:A,subject:stream.a},prefix:stream.a}")
+	require.Contains(t, conf, "{stream:{account:A,subject:stream.a}}")
 }
 
 func Test_NkeyResolverAddsSigningKeyUser(t *testing.T) {

@@ -412,3 +412,51 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.True(t, ac.Imports[1].IsService())
 	require.Equal(t, apub, ac.Imports[1].Account)
 }
+
+func Test_ImportStreamHandlesDecorations(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+
+	ts.AddAccount(t, "B")
+	ac := ts.GenerateActivation(t, "A", "foobar.>", "B")
+	// test util removed the decoration
+	d, err := jwt.DecorateJWT(ac)
+	require.NoError(t, err)
+
+	ap := filepath.Join(ts.Dir, "activation.jwt")
+	Write(ap, d)
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ap)
+	require.NoError(t, err)
+
+	bc, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, bc.Imports, 1)
+	require.Empty(t, bc.Imports[0].To)
+}
+
+func Test_ImportServiceHandlesDecorations(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	ts.AddAccount(t, "B")
+	ac := ts.GenerateActivation(t, "A", "q", "B")
+	// test util removed the decoration
+	d, err := jwt.DecorateJWT(ac)
+	require.NoError(t, err)
+
+	ap := filepath.Join(ts.Dir, "activation.jwt")
+	Write(ap, d)
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ap)
+	require.NoError(t, err)
+
+	bc, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	require.Len(t, bc.Imports, 1)
+	require.Equal(t, bc.Imports[0].To, bc.Imports[0].Subject)
+}
