@@ -310,18 +310,13 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddImportParams) loadImport() ([]byte, error) {
-	var err error
-	p.tokenSrc, err = jwt.ParseDecoratedJWT([]byte(p.tokenSrc))
-	if err != nil {
-		return nil, fmt.Errorf("error stripping jwt decorations: %v", err)
-	}
-	ac, err := jwt.DecodeActivationClaims(p.tokenSrc)
-	if ac != nil && err == nil {
-		return []byte(p.tokenSrc), nil
-	}
-
 	if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
-		return LoadFromURL(p.tokenSrc)
+		data, err := LoadFromURL(p.tokenSrc)
+		if err != nil {
+			return nil, err
+		}
+		s, err := jwt.ParseDecoratedJWT(data)
+		return []byte(s), err
 	}
 
 	data, err := Read(p.tokenSrc)
@@ -373,14 +368,10 @@ func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
 	if p.name == "" {
 		p.name = ac.Name
 	}
-
 	p.remote = string(ac.ImportSubject)
-	if p.local == "" {
+	p.service = ac.ImportType == jwt.Service
+	if p.service && p.local == "" {
 		p.local = p.remote
-	}
-
-	if ac.ImportType == jwt.Service {
-		p.service = true
 	}
 
 	p.srcAccount.publicKey = ac.Issuer
