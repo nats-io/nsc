@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2019 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -98,7 +96,7 @@ func Test_GenerateActivationNoPrivateExports(t *testing.T) {
 
 	_, _, err := ExecuteCmd(createGenerateActivationCmd())
 	require.Error(t, err)
-	require.Equal(t, "account \"A\" doesn't have stream exports that require token generation", err.Error())
+	require.Equal(t, "account \"A\" doesn't have exports that require an activation token", err.Error())
 }
 
 func Test_GenerateActivationOutputsFile(t *testing.T) {
@@ -111,7 +109,7 @@ func Test_GenerateActivationOutputsFile(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "--service", "--target-account", pub, "--output-file", outpath)
+	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "--target-account", pub, "--output-file", outpath)
 	require.NoError(t, err)
 	testExternalToken(t, outpath)
 }
@@ -149,7 +147,7 @@ func Test_InteractiveGenerate(t *testing.T) {
 	_, pub, _ := CreateAccountKey(t)
 
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	inputs := []interface{}{true, 0, "foo", pub, "0", "0", 0}
+	inputs := []interface{}{0, "foo", pub, "0", "0"}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -170,7 +168,7 @@ func Test_InteractiveExternalKeyGenerate(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	inputs := []interface{}{true, 0, "foo", pub, "0", "0", 0}
+	inputs := []interface{}{0, "foo", pub, "0", "0"}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -191,8 +189,7 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 	outpath := filepath.Join(ts.Dir, "token.jwt")
 
 	_, pub, _ := CreateAccountKey(t)
-
-	inputs := []interface{}{0, true, 0, "foo", pub, "0", "0", 0}
+	inputs := []interface{}{0, 0, "foo", pub, "0", "0"}
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs, "-i", "--output-file", outpath)
 	require.NoError(t, err)
 
@@ -211,11 +208,8 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 
 	_, tpk, _ := CreateAccountKey(t)
 
-	cmd := createGenerateActivationCmd()
-	HoistRootFlags(cmd)
-
 	outpath := filepath.Join(ts.Dir, "token.jwt")
-	_, _, err = ExecuteCmd(cmd, "-t", tpk, "-s", "foo", "-o", outpath, "-K", string(sk))
+	_, _, err = ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), "-t", tpk, "-s", "foo", "-o", outpath, "-K", string(sk))
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -231,4 +225,37 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 	require.Equal(t, actc.Issuer, pk)
 	require.True(t, ac.DidSign(actc))
 	require.Equal(t, actc.IssuerAccount, ac.Subject)
+}
+
+func Test_InteractiveGenerateActivationPush(t *testing.T) {
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	defer ts.Done(t)
+	err := ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	_, apk, _ := CreateAccountKey(t)
+
+	tf := filepath.Join(ts.Dir, "token.jwt")
+	inputs := []interface{}{0, "q", apk, "0", "0", true}
+	_, _, err = ExecuteInteractiveCmd(createGenerateActivationCmd(), inputs, "--output-file", tf)
+	require.NoError(t, err)
+
+	d, err := Read(tf)
+	require.NoError(t, err)
+	tok, err := jwt.ParseDecoratedJWT(d)
+	require.NoError(t, err)
+
+	ac, err := jwt.DecodeActivationClaims(tok)
+	require.NoError(t, err)
+	id, err := ac.HashID()
+	require.NoError(t, err)
+	require.Contains(t, m, id)
+	require.Equal(t, []byte(tok), m[id])
 }

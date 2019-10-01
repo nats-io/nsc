@@ -230,7 +230,6 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 	var ap GenerateActivationParams
 	ap.Name = c.Name
 	ap.claims = srcAC
-	ap.service = c.Selection.IsService()
 	ap.accountKey.publicKey = ctx.StoreCtx().Account.PublicKey
 	ap.export = *c.Selection
 	ap.subject = p.remote
@@ -249,7 +248,7 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 		return err
 	}
 
-	p.token = []byte(ap.Token)
+	p.token = []byte(ap.Token())
 	return p.initFromActivation(ctx)
 }
 
