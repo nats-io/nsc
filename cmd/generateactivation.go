@@ -20,12 +20,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
-
-	"github.com/nats-io/nsc/cmd/store"
+	"net/url"
+	"path"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cli"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -41,8 +42,8 @@ func createGenerateActivationCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
-	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	cmd.Flags().StringVarP(&params.out, "output-file", "o", "--", "output file '--' is stdout")
+	cmd.Flags().BoolVarP(&params.push, "push", "", false, "push activation token to operator's account server (exclusive of output-file")
 	params.accountKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, cmd)
 	params.timeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
@@ -57,23 +58,21 @@ func init() {
 type GenerateActivationParams struct {
 	AccountContextParams
 	SignerParams
+	accountKey     PubKeyParams
 	activation     *jwt.ActivationClaims
 	claims         *jwt.AccountClaims
 	export         jwt.Export
-	out            string
-	privateExports jwt.Exports
-	service        bool
-	subject        string
-	accountKey     PubKeyParams
+	privateExports []AccountExportChoice
 	timeParams     TimeParams
-	Token          string
-	Write          bool
+	token          string
+	out            string
+	push           bool
+	subject        string
 }
 
 func (p *GenerateActivationParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, false, ctx)
-
 	return nil
 }
 
@@ -82,18 +81,11 @@ func (p *GenerateActivationParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-
-	p.service, err = cli.PromptBoolean("is service", p.service)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
@@ -107,23 +99,21 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("account %q doesn't have exports", p.AccountContextParams.Name)
 	}
 
-	kind := jwt.Stream
-	if p.service {
-		kind = jwt.Service
+	choices, err := GetAccountExports(p.claims)
+	if err != nil {
+		return err
 	}
-
-	for _, v := range p.claims.Exports {
-		if v.Type != kind {
-			continue
-		}
-		if v.TokenReq {
-			p.privateExports.Add(v)
+	for _, e := range choices {
+		if e.Selection.TokenReq {
+			p.privateExports = append(p.privateExports, e)
 		}
 	}
-
 	if len(p.privateExports) == 0 {
-		return fmt.Errorf("account %q doesn't have %s exports that require token generation",
-			p.AccountContextParams.Name, kind.String())
+		return fmt.Errorf("account %q doesn't have exports that require an activation token", p.AccountContextParams.Name)
+	}
+
+	if len(p.privateExports) == 1 && p.subject == "" {
+		p.subject = string(p.privateExports[0].Selection.Subject)
 	}
 
 	return nil
@@ -132,25 +122,21 @@ func (p *GenerateActivationParams) Load(ctx ActionCtx) error {
 func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	var err error
 
-	var choices []string
-	if p.export.Subject == "" {
-		for _, v := range p.privateExports {
-			choices = append(choices, string(v.Subject))
-		}
+	labels := AccountExportChoices(p.privateExports).String()
+	choice := ""
+	if len(labels) == 1 {
+		choice = labels[0]
 	}
-	kind := jwt.Stream
-	if p.service {
-		kind = jwt.Service
-	}
-
-	i, err := cli.PromptChoices(fmt.Sprintf("select %s export", kind.String()), "", choices)
+	i, err := cli.PromptChoices("select the export", choice, labels)
 	if err != nil {
 		return err
 	}
-	p.export = *p.privateExports[i]
+
+	p.export = *p.privateExports[i].Selection
 	if p.subject == "" {
 		p.subject = string(p.export.Subject)
 	}
+	kind := p.export.Type
 
 	p.subject, err = cli.Prompt("subject", p.subject, true, func(v string) error {
 		t := jwt.Subject(v)
@@ -174,13 +160,20 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if err = p.accountKey.Edit(); err != nil {
 		return err
 	}
-
 	if err := p.timeParams.Edit(); err != nil {
 		return err
 	}
-
 	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
+	}
+
+	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return err
+	}
+	if oc.AccountServerURL != "" {
+		m := fmt.Sprintf("push the activation to %q", oc.AccountServerURL)
+		p.push, err = cli.PromptBoolean(m, false)
 	}
 
 	return nil
@@ -188,10 +181,6 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	var err error
-
-	if len(p.privateExports) == 1 && p.subject == "" {
-		p.subject = string(p.privateExports[0].Subject)
-	}
 
 	if p.subject == "" {
 		ctx.CurrentCmd().SilenceUsage = false
@@ -215,18 +204,18 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 	}
 
 	for _, e := range p.privateExports {
-		if sub.IsContainedIn(e.Subject) {
-			p.export = *e
+		if sub.IsContainedIn(e.Selection.Subject) {
+			p.export = *e.Selection
 			break
 		}
 	}
 
-	if p.service && sub.HasWildCards() {
+	if p.export.Type == jwt.Service && sub.HasWildCards() {
 		return fmt.Errorf("services cannot have wildcards %q", p.subject)
 	}
 
 	if p.export.Subject == "" {
-		return fmt.Errorf("an export containing %q was not found in account %q", p.subject, p.AccountContextParams.Name)
+		return fmt.Errorf("a private export for %q was not found in account %q", p.subject, p.AccountContextParams.Name)
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {
@@ -253,32 +242,74 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 		p.activation.IssuerAccount = p.claims.Subject
 	}
 
-	p.Token, err = p.activation.Encode(p.signerKP)
+	p.token, err = p.activation.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
 
-	d, err := jwt.DecorateJWT(p.Token)
+	d, err := jwt.DecorateJWT(p.token)
 	if err != nil {
 		return nil, err
 	}
+	r := store.NewDetailedReport(true)
+	r.AddOK("generated %q activation for account %q", p.export.Name, p.accountKey.publicKey)
+	if p.activation.NotBefore > 0 {
+		r.AddOK("token valid %s - %s", UnixToDate(p.activation.NotBefore), HumanizedDate(p.activation.NotBefore))
+	}
+	if p.activation.Expires > 0 {
+		r.AddOK("token expires %s - %s", UnixToDate(p.activation.Expires), HumanizedDate(p.activation.Expires))
+	}
+
 	// if some command embeds, the output will be blank
 	// in that case don't generate the output
 	if p.out != "" {
 		if err := Write(p.out, d); err != nil {
 			return nil, err
 		}
-	}
-	r := store.NewDetailedReport(true)
-	if !IsStdOut(p.out) {
-		r.AddOK("generated %q activation for account %q", p.export.Name, p.accountKey.publicKey)
-		if p.activation.NotBefore > 0 {
-			r.AddOK("token valid %s - %s", UnixToDate(p.activation.NotBefore), HumanizedDate(p.activation.NotBefore))
+		if !IsStdOut(p.out) {
+			r.AddOK("wrote account description to %q", AbbrevHomePaths(p.out))
 		}
-		if p.activation.Expires > 0 {
-			r.AddOK("token expires %s - %s", UnixToDate(p.activation.Expires), HumanizedDate(p.activation.Expires))
-		}
-		r.AddOK("wrote account description to %q", AbbrevHomePaths(p.out))
 	}
+
+	if p.push {
+		oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+		if err != nil {
+			return nil, err
+		}
+		if oc.AccountServerURL == "" {
+			return nil, fmt.Errorf("operator %s doesn't have an account server url configured", oc.Name)
+		}
+		u, err := url.Parse(oc.AccountServerURL)
+		if err != nil {
+			return nil, err
+		}
+		u.Path = path.Join(u.Path, "activations")
+		s, err := store.PushAccount(u.String(), []byte(p.token))
+		if s != nil {
+			r.Add(s)
+		}
+		if err != nil {
+			return s, err
+		}
+
+		hid, err := p.activation.HashID()
+		if err != nil {
+			r.AddError("error calculating activation hash id: %v", err)
+			return r, err
+		}
+
+		gu, err := url.Parse(oc.AccountServerURL)
+		if err != nil {
+			return nil, err
+		}
+
+		u.Path = path.Join(gu.Path, "activations", hid)
+		r.AddOK("activation accessible at %q", u.String())
+	}
+
 	return r, nil
+}
+
+func (p *GenerateActivationParams) Token() string {
+	return p.token
 }

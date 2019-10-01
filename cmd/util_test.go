@@ -317,20 +317,15 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 
 func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject string, targetAccount string) string {
 	tpub := ts.GetAccountPublicKey(t, targetAccount)
-	service := false
 	ac, err := ts.Store.ReadAccountClaim(srcAccount)
 	require.NoError(t, err)
 	for _, i := range ac.Exports {
 		if subject == string(i.Subject) {
-			service = i.Type == jwt.Service
 			break
 		}
 	}
 
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
-	if service {
-		flags = append(flags, "--service")
-	}
 	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
 	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
@@ -683,7 +678,7 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 			w.Write(data)
 		}
 
-		updateHandler := func(w http.ResponseWriter, r *http.Request) {
+		updateAccountHandler := func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
@@ -721,17 +716,44 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 				}
 				storage[ac.Subject] = []byte(token)
 
-				w.WriteHeader(200)
+				w.WriteHeader(http.StatusOK)
 			} else {
 				errHandler(w, fmt.Errorf("account %q not self-signed nor by a signer - issuer %q", ac.Subject, ac.Issuer))
 			}
+		}
+
+		updateActivationHandler := func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+			body, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				errHandler(w, err)
+				return
+			}
+
+			ac, err := jwt.DecodeActivationClaims(string(body))
+			if err != nil {
+				errHandler(w, err)
+				return
+			}
+			hid, err := ac.HashID()
+			if err != nil {
+				errHandler(w, err)
+				return
+			}
+			storage[hid] = body
+			w.WriteHeader(http.StatusOK)
 		}
 
 		switch r.Method {
 		case http.MethodGet:
 			getHandler(w, r)
 		case http.MethodPost:
-			updateHandler(w, r)
+			p := r.URL.Path
+			if strings.Contains(p, "/accounts/") {
+				updateAccountHandler(w, r)
+			} else if strings.HasSuffix(p, "/activations") {
+				updateActivationHandler(w, r)
+			}
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 		}
