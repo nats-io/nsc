@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/blang/semver"
@@ -28,15 +27,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func updateHelp() string {
-	v := `toolName update
-toolName update --release-notes`
-	return strings.Replace(v, "toolName", GetToolName(), -1)
-}
-
 func createUpdateCommand() *cobra.Command {
 	var cmd = &cobra.Command{
-		Example: updateHelp(),
+		Example: "nsc update",
 		Use:     "update",
 		Short:   "Update this tool to latest version",
 		Args:    MaxArgs(0),
