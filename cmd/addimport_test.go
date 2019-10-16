@@ -117,7 +117,7 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", 0}
+	input := []interface{}{1, false, false, fp, "my import", "barfoo", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -125,7 +125,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo.>", string(ac.Imports[0].To))
+	require.Equal(t, "barfoo", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -146,7 +146,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "my import", "barfoo.>", 0}
+	input := []interface{}{1, true, 1, "my import", "barfoo", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -154,7 +154,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo.>", string(ac.Imports[0].To))
+	require.Equal(t, "barfoo", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -275,7 +275,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, don't pick, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
+	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -283,7 +283,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "test", ac.Imports[0].Name)
-	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
+	require.Equal(t, "test.foobar", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
@@ -385,7 +385,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	HoistRootFlags(cmd)
 
 	// B, pick, stream foobar, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, true, 1, "test", "test.foobar.>"}
+	input := []interface{}{1, true, 1, "test", "test.foobar"}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -393,7 +393,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "test", ac.Imports[0].Name)
-	require.Equal(t, "test.foobar.>", string(ac.Imports[0].To))
+	require.Equal(t, "test.foobar", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
@@ -459,4 +459,32 @@ func Test_ImportServiceHandlesDecorations(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bc.Imports, 1)
 	require.Equal(t, bc.Imports[0].To, bc.Imports[0].Subject)
+}
+
+func Test_ImportServiceLocalWildcards(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q.>", true)
+	apk := ts.GetAccountPublicKey(t, "A")
+
+	ts.AddAccount(t, "B")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--service", "--src-account", apk, "--remote-subject", "q.a", "--local-subject", "q.>")
+	require.Error(t, err)
+	require.Contains(t, "local subject cannot have wildcards", err.Error())
+}
+
+func Test_ImportStreamLocalWildcards(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "s.>", true)
+	apk := ts.GetAccountPublicKey(t, "A")
+
+	ts.AddAccount(t, "B")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", apk, "--remote-subject", "s.>", "--local-subject", "t.>")
+	require.Error(t, err)
+	require.Contains(t, "stream prefix subject cannot have wildcards", err.Error())
 }
