@@ -8,6 +8,8 @@ release:
 builds:
 - main: ./main.go
   ldflags: "-X main.version={{.Tag}}"
+  env:
+    - CGO_ENABLED=0
   binary: nsc
   goos:
   - darwin
