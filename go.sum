@@ -64,8 +64,8 @@ github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQz
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/nats-io/jwt v0.2.6 h1:eAyoYvGgGLXR2EpnsBUvi/FcFrBqN6YKFVbOoEfPN4k=
 github.com/nats-io/jwt v0.2.6/go.mod h1:mQxQ0uHQ9FhEVPIcTSKwx2lqZEpXWWcCgA7R6NrWvvY=
-github.com/nats-io/jwt v0.3.1-0.20190920180816-3289d6f980ad h1:3JS/Fxo8s+wfFdaYeIMPgIYDq2WsgTvjFEjXAUoUXtI=
-github.com/nats-io/jwt v0.3.1-0.20190920180816-3289d6f980ad/go.mod h1:fRYCDE99xlTsqUzISS1Bi75UBJ6ljOJQOAAu5VglpSg=
+github.com/nats-io/jwt v0.3.1-0.20191114202535-c8e28d0a0300 h1:Mj4nNFFcrFHsTp9mH5/lWRwS6UGGy0dq28Zl2HyJ3iw=
+github.com/nats-io/jwt v0.3.1-0.20191114202535-c8e28d0a0300/go.mod h1:fRYCDE99xlTsqUzISS1Bi75UBJ6ljOJQOAAu5VglpSg=
 github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329 h1:RjMdWlS/avIVeXLjWxrHmxoiNPcvLXVWqpO7Bp6hyTk=
 github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329/go.mod h1:RyVdsHHvY4B6c9pWG+uRLpZ0h0XsqiuKp2XCTurP5LI=
 github.com/nats-io/nats.go v1.8.1 h1:6lF/f1/NN6kzUDBz6pyvQDEXO39jqXcWRLu/tKjtOUQ=

@@ -153,6 +153,26 @@ func TestAddExportInteractive(t *testing.T) {
 	require.Equal(t, "foo.>", string(ac.Exports[0].Subject))
 }
 
+func TestAddExportNonInteractive(t *testing.T) {
+	ts := NewTestStore(t, t.Name())
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	cmd := createAddExportCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteCmd(cmd, "--service", "--name", "q", "--subject", "q", "--response-type", jwt.ResponseTypeChunked)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, jwt.Service, ac.Exports[0].Type)
+	require.Equal(t, "q", ac.Exports[0].Name)
+	require.Equal(t, "q", string(ac.Exports[0].Subject))
+	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
+}
+
 func TestAddServiceLatency(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -160,7 +180,7 @@ func TestAddServiceLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	cmd := createAddExportCmd()
 
-	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--latency", "q.lat", "--sampling", "100")
+	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--latency", "q.lat", "--sampling", "100", "--response-type", jwt.ResponseTypeStream)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -170,6 +190,19 @@ func TestAddServiceLatency(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
 	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
+}
+
+func Test_AddExportBadResponseType(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	cmd := createAddExportCmd()
+
+	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--response-type", "foo")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid response type")
 }
 
 func TestAddServiceLatencyInteractive(t *testing.T) {
@@ -180,7 +213,7 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	cmd := createAddExportCmd()
 
 	// service, subject, name, private, track, freq
-	args := []interface{}{1, "q", "q", false, true, "100", "q.lat"}
+	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1}
 	_, _, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
@@ -191,4 +224,5 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
 	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
 }

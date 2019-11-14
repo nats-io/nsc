@@ -47,6 +47,8 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
 	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
+	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
+	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -64,9 +66,10 @@ type AddExportParams struct {
 	private bool
 	service bool
 	SignerParams
-	subject     string
-	latSubject  string
-	latSampling int
+	subject      string
+	latSubject   string
+	latSampling  int
+	responseType string
 }
 
 func (p *AddExportParams) longHelp() string {
@@ -86,6 +89,7 @@ func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 	p.export.Type = jwt.Stream
 	if p.service {
 		p.export.Type = jwt.Service
+		p.export.ResponseType = jwt.ResponseType(p.responseType)
 	}
 
 	if p.export.Name == "" {
@@ -175,6 +179,13 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 				return err
 			}
 		}
+
+		choices := []string{jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked}
+		s, err := cli.PromptChoices("service response type", string(p.export.ResponseType), choices)
+		if err != nil {
+			return err
+		}
+		p.export.ResponseType = jwt.ResponseType(choices[s])
 	}
 
 	if err := p.SignerParams.Edit(ctx); err != nil {
@@ -246,6 +257,16 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 	// fail validation
 	if len(uvr.Issues) > 0 {
 		return errors.New(uvr.Issues[0].Error())
+	}
+
+	if p.service {
+		rt := jwt.ResponseType(p.responseType)
+		if rt != jwt.ResponseTypeSingleton &&
+			rt != jwt.ResponseTypeStream &&
+			rt != jwt.ResponseTypeChunked {
+			return fmt.Errorf("unknown response type %q", p.responseType)
+		}
+		p.export.ResponseType = rt
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {
