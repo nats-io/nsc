@@ -20,7 +20,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
-	"encoding/base32"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +38,6 @@ var toolCmd = &cobra.Command{
 
 var natsURLFlag = ""
 var encryptFlag bool
-var decryptFlag bool
 
 func init() {
 	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
@@ -78,7 +77,7 @@ func createDefaultToolOptions(name string, ctx ActionCtx) []nats.Option {
 func createCypher(pk string) (cipher.AEAD, error) {
 	// hash the provided private nkey into 32 bytes
 	hash := sha256.Sum256([]byte(pk))
-	c, err := aes.NewCipher(hash[0:32])
+	c, err := aes.NewCipher(hash[:32])
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate cypher: %v", err)
 	}
@@ -124,9 +123,9 @@ func Encrypt(pk string, data []byte) ([]byte, error) {
 	raw := g.Seal(nonce, nonce, data, nil)
 
 	// encode the data
-	var b32Enc = base32.StdEncoding.WithPadding(base32.NoPadding)
-	buf := make([]byte, b32Enc.EncodedLen(len(raw)))
-	b32Enc.Encode(buf, raw)
+	var codec = base64.StdEncoding.WithPadding(base64.NoPadding)
+	buf := make([]byte, codec.EncodedLen(len(raw)))
+	codec.Encode(buf, raw)
 	return buf[:], nil
 }
 
@@ -148,11 +147,11 @@ func Decrypt(pk string, data []byte) ([]byte, error) {
 }
 
 func decrypt(pk string, data []byte) ([]byte, error) {
-	var b32Enc = base32.StdEncoding.WithPadding(base32.NoPadding)
-	raw := make([]byte, b32Enc.DecodedLen(len(data)))
-	n, err := b32Enc.Decode(raw, data)
+	var codec = base64.StdEncoding.WithPadding(base64.NoPadding)
+	raw := make([]byte, codec.DecodedLen(len(data)))
+	n, err := codec.Decode(raw, data)
 	if err != nil {
-		if _, ok := err.(base32.CorruptInputError); ok {
+		if _, ok := err.(base64.CorruptInputError); ok {
 			// possibly not encrypted - so just return what we got
 			return data, nil
 		}

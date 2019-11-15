@@ -41,7 +41,7 @@ func createSubCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.queue, "queue", "q", "", "subscription queue name")
 	cmd.Flags().IntVarP(&params.maxMessages, "max-messages", "", -1, "max messages")
-	cmd.Flags().BoolVarP(&decryptFlag, "decrypt", "D", false, "decrypt inbound payload")
+	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypted payload")
 	cmd.Flags().MarkHidden("max-messages")
 	cmd.Flags().MarkHidden("decrypt")
 
@@ -152,7 +152,7 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	var seed string
-	if decryptFlag {
+	if encryptFlag {
 		// cannot fail if we are here
 		seed, err = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
 		if err != nil {
@@ -177,7 +177,7 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 
 		i++
-		if decryptFlag {
+		if encryptFlag {
 			msg = maybeDecryptMessage(seed, msg)
 		}
 		ctx.CurrentCmd().Printf("[#%d] received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))

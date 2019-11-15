@@ -39,8 +39,7 @@ func createToolReqCmd() *cobra.Command {
 		},
 	}
 	params.BindFlags(cmd)
-	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypt outbound payload")
-	cmd.Flags().BoolVarP(&decryptFlag, "decrypt", "D", false, "decrypt inbound payload")
+	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypt payload")
 	cmd.Flags().MarkHidden("encrypt")
 	cmd.Flags().MarkHidden("decrypt")
 
@@ -94,7 +93,7 @@ func (p *ReqParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if encryptFlag || decryptFlag {
+	if encryptFlag {
 		_, err := ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
 		if err != nil {
 			return fmt.Errorf("unable to get the account private key to encrypt/decrypt the payload: %v", err)
@@ -130,7 +129,7 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	var seed string
-	if encryptFlag || decryptFlag {
+	if encryptFlag {
 		// cannot fail if we are here
 		seed, _ = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
 	}
@@ -154,7 +153,7 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	if decryptFlag {
+	if encryptFlag {
 		msg = maybeDecryptMessage(seed, msg)
 	}
 	ctx.CurrentCmd().Printf("received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))

@@ -128,7 +128,7 @@ func TestSub(t *testing.T) {
 		t.Log(r.stderr)
 		t.Log(r.err)
 		require.NoError(t, r.err)
-		require.Contains(t, r.stderr, fmt.Sprintf("Received on [%s]: '%s'", v, v))
+		require.Contains(t, r.stderr, fmt.Sprintf("received on [%s]: '%s'", v, v))
 	case <-time.After(25 * time.Second):
 		t.Fatal("timed out")
 	}
