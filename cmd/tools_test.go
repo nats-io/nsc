@@ -224,3 +224,16 @@ func TestReply(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, v, string(m.Data))
 }
+
+func Test_EncryptDecrypt(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	k := ts.GetOperatorPublicKey(t)
+	text := "this is a test"
+	et, err := Encrypt(k, []byte(text))
+	require.NoError(t, err)
+	od, err := Decrypt(k, et)
+	require.NoError(t, err)
+	require.Equal(t, text, string(od))
+}

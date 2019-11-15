@@ -39,6 +39,11 @@ func createToolReqCmd() *cobra.Command {
 		},
 	}
 	params.BindFlags(cmd)
+	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypt outbound payload")
+	cmd.Flags().BoolVarP(&decryptFlag, "decrypt", "D", false, "decrypt inbound payload")
+	cmd.Flags().MarkHidden("encrypt")
+	cmd.Flags().MarkHidden("decrypt")
+
 	return cmd
 }
 
@@ -89,6 +94,13 @@ func (p *ReqParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
+	if encryptFlag || decryptFlag {
+		_, err := ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
+		if err != nil {
+			return fmt.Errorf("unable to get the account private key to encrypt/decrypt the payload: %v", err)
+		}
+	}
+
 	if p.credsPath == "" {
 		return fmt.Errorf("a creds file for account %q/%q was not found", p.AccountContextParams.Name, p.UserContextParams.Name)
 	}
@@ -117,8 +129,23 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		payload = ctx.Args()[1]
 	}
 
-	ctx.CurrentCmd().Printf("published request: [%s] : '%s'\n", subj, payload)
-	msg, err := nc.Request(subj, []byte(payload), 5*time.Second)
+	var seed string
+	if encryptFlag || decryptFlag {
+		// cannot fail if we are here
+		seed, _ = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
+	}
+
+	out := []byte(payload)
+	if encryptFlag {
+		out, err = EncryptKV(seed, out)
+	}
+
+	if encryptFlag {
+		ctx.CurrentCmd().Printf("published encrypted request: [%s] : '%s'\n", subj, payload)
+	} else {
+		ctx.CurrentCmd().Printf("published request: [%s] : '%s'\n", subj, payload)
+	}
+	msg, err := nc.Request(subj, out, 5*time.Second)
 	if err == nats.ErrTimeout {
 		ctx.CurrentCmd().Println("request timed out")
 		return nil, nil
@@ -127,6 +154,9 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
+	if decryptFlag {
+		msg = maybeDecryptMessage(seed, msg)
+	}
 	ctx.CurrentCmd().Printf("received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
 	return nil, nil
 }

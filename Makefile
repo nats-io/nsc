@@ -25,7 +25,7 @@ compile:
 	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 12
 
 install: compile build
-	cp $(BUILD_DIR)/$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
+	cp $(BUILD_DIR)/nsc_$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
 
 cover: test
 	go tool cover -html=./coverage.out

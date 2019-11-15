@@ -41,7 +41,10 @@ func createSubCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.queue, "queue", "q", "", "subscription queue name")
 	cmd.Flags().IntVarP(&params.maxMessages, "max-messages", "", -1, "max messages")
+	cmd.Flags().BoolVarP(&decryptFlag, "decrypt", "D", false, "decrypt inbound payload")
 	cmd.Flags().MarkHidden("max-messages")
+	cmd.Flags().MarkHidden("decrypt")
+
 	params.BindFlags(cmd)
 	return cmd
 }
@@ -148,6 +151,15 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
+	var seed string
+	if decryptFlag {
+		// cannot fail if we are here
+		seed, err = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get the account private key to encrypt/decrypt the payload: %v", err)
+		}
+	}
+
 	i := 0
 	for {
 		msg, err := sub.NextMsg(10 * time.Second)
@@ -165,8 +177,31 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 
 		i++
-		ctx.CurrentCmd().Printf("[#%d] Received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
+		if decryptFlag {
+			msg = maybeDecryptMessage(seed, msg)
+		}
+		ctx.CurrentCmd().Printf("[#%d] received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
 	}
 
 	return nil, nil
+}
+
+func maybeDecryptMessage(seed string, msg *nats.Msg) *nats.Msg {
+	var dmsg nats.Msg
+	// last part of the subject will be encrypted
+	tokens := strings.Split(msg.Subject, ".")
+	k := tokens[len(tokens)-1]
+	kk, err := Decrypt(seed, []byte(k))
+	if err != nil {
+		dmsg.Subject = msg.Subject
+	} else {
+		tokens[len(tokens)-1] = string(kk)
+		dmsg.Subject = strings.Join(tokens, ".")
+	}
+
+	dmsg.Data, err = Decrypt(seed, msg.Data)
+	if err != nil {
+		dmsg.Data = msg.Data
+	}
+	return &dmsg
 }
