@@ -45,6 +45,9 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
 	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
+
+	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
+	cmd.Flags().StringVarP(&params.responseType, "response-type", "", string(jwt.ResponseTypeSingleton), hm)
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -61,16 +64,17 @@ type EditExportParams struct {
 	index   int
 	subject string
 
-	name        string
-	latSampling int
-	latSubject  string
-	service     bool
-	private     bool
+	name         string
+	latSampling  int
+	latSubject   string
+	service      bool
+	private      bool
+	responseType string
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {
 	if !InteractiveFlag {
-		if ctx.NothingToDo("name", "subject", "service", "private", "latency", "sampling") {
+		if ctx.NothingToDo("name", "subject", "service", "private", "latency", "sampling", "response-type") {
 			return errors.New("please specify some options")
 		}
 	}
@@ -117,6 +121,7 @@ func (p *EditExportParams) Load(ctx ActionCtx) error {
 			break
 		}
 	}
+
 	// if we are not running in interactive set the option default the non-set values
 	if !InteractiveFlag {
 		p.syncOptions(ctx)
@@ -226,6 +231,13 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 				return err
 			}
 		}
+
+		choices := []string{jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked}
+		s, err := cli.PromptChoices("service response type", string(p.responseType), choices)
+		if err != nil {
+			return err
+		}
+		p.responseType = choices[s]
 	}
 
 	if err = p.SignerParams.Edit(ctx); err != nil {
@@ -245,6 +257,15 @@ func (p *EditExportParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("no export with subject %q found", p.subject)
 	}
 
+	if p.service {
+		rt := jwt.ResponseType(p.responseType)
+		if rt != jwt.ResponseTypeSingleton &&
+			rt != jwt.ResponseTypeStream &&
+			rt != jwt.ResponseTypeChunked {
+			return fmt.Errorf("unknown response type %q", p.responseType)
+		}
+	}
+
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
@@ -261,6 +282,12 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 	cmd := ctx.CurrentCmd()
 	if !cmd.Flag("service").Changed {
 		p.service = old.Type == jwt.Service
+	}
+	if !cmd.Flag("response-type").Changed {
+		if old.ResponseType == "" {
+			old.ResponseType = jwt.ResponseTypeSingleton
+		}
+		p.responseType = string(old.ResponseType)
 	}
 	if !(cmd.Flag("name").Changed) {
 		p.name = old.Name
@@ -329,6 +356,12 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 				r.AddOK("changed service latency subject to %s", export.Latency.Results)
 				r.AddWarning("changed latency subject will break consumers of the report")
 			}
+		}
+
+		rt := jwt.ResponseType(p.responseType)
+		if export.ResponseType != rt {
+			export.ResponseType = rt
+			r.AddOK("changed response type to %s", p.responseType)
 		}
 	}
 

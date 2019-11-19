@@ -29,11 +29,12 @@ func Test_EditExport_Private(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--private")
+	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--private", "--response-type", jwt.ResponseTypeChunked)
 	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.True(t, ac.Exports[0].TokenReq)
+	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
 }
 
 func Test_EditExport_Latency(t *testing.T) {
@@ -64,13 +65,14 @@ func Test_EditExportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 	ts.AddExport(t, "A", jwt.Service, "b", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Len(t, ac.Exports, 2)
 	require.Equal(t, jwt.Subject("c"), ac.Exports[1].Subject)
+	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[1].ResponseType)
 }
 
 func Test_EditExportInteractiveLatency(t *testing.T) {
@@ -80,7 +82,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "100", "lat"})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "100", "lat", 2})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -90,6 +92,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
+	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
 }
 
 func Test_EditExportNoExports(t *testing.T) {

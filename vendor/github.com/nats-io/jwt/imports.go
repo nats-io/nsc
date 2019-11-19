@@ -63,10 +63,11 @@ func (i *Import) Validate(actPubKey string, vr *ValidationResults) {
 
 	i.Subject.Validate(vr)
 
-	if i.IsService() {
-		if i.Subject.HasWildCards() {
-			vr.AddWarning("services cannot have wildcard subject: %q", i.Subject)
-		}
+	if i.IsService() && i.Subject.HasWildCards() {
+		vr.AddError("services cannot have wildcard subject: %q", i.Subject)
+	}
+	if i.IsStream() && i.To.HasWildCards() {
+		vr.AddError("streams cannot have wildcard to subject: %q", i.Subject)
 	}
 
 	var act *ActivationClaims
