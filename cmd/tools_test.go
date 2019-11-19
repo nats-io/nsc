@@ -128,7 +128,7 @@ func TestSub(t *testing.T) {
 		t.Log(r.stderr)
 		t.Log(r.err)
 		require.NoError(t, r.err)
-		require.Contains(t, r.stderr, fmt.Sprintf("Received on [%s]: '%s'", v, v))
+		require.Contains(t, r.stderr, fmt.Sprintf("received on [%s]: '%s'", v, v))
 	case <-time.After(25 * time.Second):
 		t.Fatal("timed out")
 	}
@@ -223,4 +223,17 @@ func TestReply(t *testing.T) {
 	m, err := nc.Request(v, []byte(v), 15*time.Second)
 	require.NoError(t, err)
 	require.Equal(t, v, string(m.Data))
+}
+
+func Test_EncryptDecrypt(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	k := ts.GetOperatorPublicKey(t)
+	text := "this is a test"
+	et, err := Encrypt(k, []byte(text))
+	require.NoError(t, err)
+	od, err := Decrypt(k, et)
+	require.NoError(t, err)
+	require.Equal(t, text, string(od))
 }

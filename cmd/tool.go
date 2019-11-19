@@ -16,6 +16,15 @@
 package cmd
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
 	"time"
 
 	nats "github.com/nats-io/nats.go"
@@ -28,6 +37,7 @@ var toolCmd = &cobra.Command{
 }
 
 var natsURLFlag = ""
+var encryptFlag bool
 
 func init() {
 	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
@@ -62,4 +72,101 @@ func createDefaultToolOptions(name string, ctx ActionCtx) []nats.Option {
 		ctx.CurrentCmd().Printf("Exiting, no servers available, or connection closed")
 	}))
 	return opts
+}
+
+func createCypher(pk string) (cipher.AEAD, error) {
+	// hash the provided private nkey into 32 bytes
+	hash := sha256.Sum256([]byte(pk))
+	c, err := aes.NewCipher(hash[:32])
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate cypher: %v", err)
+	}
+
+	// create the symmetric key cipher
+	return cipher.NewGCM(c)
+}
+
+func EncryptKV(pk string, data []byte) ([]byte, error) {
+	// source data is <k><space><v>
+	i := bytes.IndexByte(data, ' ')
+	if i == -1 {
+		k, err := Encrypt(pk, data)
+		if err != nil {
+			return nil, err
+		}
+		return k, nil
+	}
+	// kv pair
+	k, err := Encrypt(pk, data[:i])
+	if err != nil {
+		return nil, err
+	}
+	v, err := Encrypt(pk, data[i+1:])
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Join([][]byte{k, v}, []byte(" ")), nil
+}
+
+func Encrypt(pk string, data []byte) ([]byte, error) {
+	g, err := createCypher(pk)
+	if err != nil {
+		return nil, err
+	}
+	// creates a byte array the size of the nonce required
+	nonce := make([]byte, g.NonceSize())
+	// seed the nonce with the same seed so that we have predictable encryption
+	if _, err = io.ReadFull(strings.NewReader(pk), nonce); err != nil {
+		return nil, fmt.Errorf("error generating random sequence: %v", err)
+	}
+	// encrypt the data
+	raw := g.Seal(nonce, nonce, data, nil)
+
+	// encode the data
+	var codec = base64.StdEncoding.WithPadding(base64.NoPadding)
+	buf := make([]byte, codec.EncodedLen(len(raw)))
+	codec.Encode(buf, raw)
+	return buf[:], nil
+}
+
+func Decrypt(pk string, data []byte) ([]byte, error) {
+	// response payloads may be encrypted or may be lists of values separated by a space
+	if bytes.IndexByte(data, ' ') != -1 {
+		var decoded [][]byte
+		for _, a := range bytes.Split(data, []byte(" ")) {
+			d, err := decrypt(pk, a)
+			if err != nil {
+				return nil, err
+			}
+			decoded = append(decoded, d)
+		}
+		return bytes.Join(decoded, []byte(" ")), nil
+	} else {
+		return decrypt(pk, data)
+	}
+}
+
+func decrypt(pk string, data []byte) ([]byte, error) {
+	var codec = base64.StdEncoding.WithPadding(base64.NoPadding)
+	raw := make([]byte, codec.DecodedLen(len(data)))
+	n, err := codec.Decode(raw, data)
+	if err != nil {
+		if _, ok := err.(base64.CorruptInputError); ok {
+			// possibly not encrypted - so just return what we got
+			return data, nil
+		}
+		return nil, err
+	}
+	raw = raw[:n]
+
+	g, err := createCypher(pk)
+	if err != nil {
+		return nil, err
+	}
+	nonceLen := g.NonceSize()
+	if nonceLen > len(raw) {
+		return nil, errors.New("unexpected data length")
+	}
+	nonce, cypher := raw[:nonceLen], raw[nonceLen:]
+	return g.Open(nil, nonce, cypher, nil)
 }
