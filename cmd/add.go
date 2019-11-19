@@ -23,6 +23,7 @@ import (
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add assets such as accounts, imports, users",
+	Aliases: []string{"create"},
 }
 
 func init() {
