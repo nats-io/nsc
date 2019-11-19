@@ -161,14 +161,24 @@ func (e *ExportsDescriber) Describe() string {
 			public = "No"
 		}
 		mon := "N/A"
+		rt := ""
 		if v.Type == jwt.Service {
 			if v.Latency != nil {
 				mon = fmt.Sprintf("%s (%d%%)", v.Latency.Results, v.Latency.Sampling)
 			} else {
 				mon = "-"
 			}
+			switch v.ResponseType {
+			case jwt.ResponseTypeStream:
+				rt = fmt.Sprintf(" [%s]", jwt.ResponseTypeStream)
+			case jwt.ResponseTypeChunked:
+				rt = fmt.Sprintf(" [%s]", jwt.ResponseTypeChunked)
+			}
 		}
-		table.AddRow(v.Name, strings.Title(v.Type.String()), v.Subject, public, len(v.Revocations), mon)
+
+		st := strings.Title(v.Type.String())
+		k := fmt.Sprintf("%s%s", st, rt)
+		table.AddRow(v.Name, k, v.Subject, public, len(v.Revocations), mon)
 	}
 	return table.Render()
 }
