@@ -276,7 +276,7 @@ func (s *Store) List(path ...string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(fp)
 }
 
-// Read reads the specified file name or subpath from the store
+// Delete the specified file name or subpath from the store
 func (s *Store) Delete(name ...string) error {
 	s.Lock()
 	defer s.Unlock()
