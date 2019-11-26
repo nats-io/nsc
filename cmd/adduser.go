@@ -62,8 +62,6 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
 
-	cmd.Flags().StringVarP(&params.out, "output-file", "o", "", "output file '--' is stdout")
-
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -86,7 +84,6 @@ type AddUserParams struct {
 	denyPubs      []string
 	denyPubsub    []string
 	denySubs      []string
-	out           string
 	src           []string
 	tags          []string
 	credsFilePath string
