@@ -20,8 +20,8 @@ import (
 	"os"
 	"strings"
 
+	cli "github.com/nats-io/cliprompts"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 )
 
 // SignerParams is shared UI for a signer (-K flag). The key

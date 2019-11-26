@@ -47,12 +47,14 @@ github.com/mattn/go-colorable
 github.com/mattn/go-isatty
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
-# github.com/mitchellh/go-homedir v1.0.0
+# github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/go-wordwrap v1.0.0
 github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
+# github.com/nats-io/cliprompts v0.3.16
+github.com/nats-io/cliprompts
 # github.com/nats-io/jwt v0.3.2
 github.com/nats-io/jwt
 # github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
@@ -132,7 +134,7 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# gopkg.in/AlecAivazis/survey.v1 v1.7.0
+# gopkg.in/AlecAivazis/survey.v1 v1.8.7
 gopkg.in/AlecAivazis/survey.v1/core
 gopkg.in/AlecAivazis/survey.v1/terminal
 # gopkg.in/yaml.v2 v2.2.2

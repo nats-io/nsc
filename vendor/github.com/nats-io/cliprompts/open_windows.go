@@ -1,6 +1,6 @@
-// +build !windows,!darwin
+// +build windows
 
-package cli
+package cliprompts
 
 import "os/exec"
 

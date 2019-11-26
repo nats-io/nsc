@@ -1,6 +1,6 @@
 // +build darwin
 
-package cli
+package cliprompts
 
 import "os/exec"
 

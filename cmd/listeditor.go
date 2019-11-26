@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nats-io/nsc/cli"
+	cli "github.com/nats-io/cliprompts"
 )
 
 type ListEditorParam struct {
