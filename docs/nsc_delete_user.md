@@ -1,29 +1,30 @@
-## nsc delete import
+## nsc delete user
 
-Delete an import
+Delete an user
 
 ### Synopsis
 
-Delete an import
+Delete an user
 
 ```
-nsc delete import [flags]
+nsc delete user [flags]
 ```
 
 ### Examples
 
 ```
-nsc delete import -i
-nsc delete import -s "bar.>"
+nsc delete user -n name
+nsc delete user -i
 ```
 
 ### Options
 
 ```
-  -a, --account string       account name
-  -h, --help                 help for import
-      --src-account string   source account (only if subject is ambiguous)
-  -s, --subject string       stream/service subject
+  -h, --help           help for user
+  -n, --name strings   name of user(s) to delete
+  -R, --revoke         revoke user before deleting
+  -C, --rm-creds       delete the user creds
+  -D, --rm-nkey        delete the user key
 ```
 
 ### Options inherited from parent commands
