@@ -20,8 +20,8 @@ package cmd
 import (
 	"fmt"
 
+	cli "github.com/nats-io/cliprompts"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )

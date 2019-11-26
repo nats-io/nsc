@@ -16,7 +16,7 @@
 package cmd
 
 import (
-	"github.com/nats-io/nsc/cli"
+	cli "github.com/nats-io/cliprompts"
 )
 
 type DataParams struct {

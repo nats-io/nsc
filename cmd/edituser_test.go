@@ -20,10 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/nsc/cli"
-
+	cli "github.com/nats-io/cliprompts"
 	"github.com/nats-io/jwt"
-
 	"github.com/stretchr/testify/require"
 )
 

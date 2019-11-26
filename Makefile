@@ -10,12 +10,10 @@ build: compile
 
 fmt:
 	gofmt -s -w *.go
-	gofmt -s -w cli/*.go
 	gofmt -s -w cmd/*.go
 	gofmt -s -w cmd/store/*.go
 
 	goimports -w *.go
-	goimports -w cli/*.go
 	goimports -w cmd/*.go
 	goimports -w cmd/store/*.go
 

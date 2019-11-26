@@ -33,9 +33,9 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
+	cli "github.com/nats-io/cliprompts"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cli"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )

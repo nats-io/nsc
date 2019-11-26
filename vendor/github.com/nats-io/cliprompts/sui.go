@@ -1,4 +1,4 @@
-package cli
+package cliprompts
 
 import (
 	"github.com/AlecAivazis/survey"
