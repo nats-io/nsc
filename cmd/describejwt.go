@@ -22,7 +22,7 @@ import (
 
 	"github.com/nats-io/nsc/cmd/store"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/spf13/cobra"
 )
@@ -65,9 +65,7 @@ func (p *DescribeFile) SetDefaults(ctx ActionCtx) error {
 
 func (p *DescribeFile) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.file, err = cli.Prompt("token file or url", p.file, true, func(s string) error {
-		return nil
-	})
+	p.file, err = cli.Prompt("token file or url", p.file)
 	return err
 }
 

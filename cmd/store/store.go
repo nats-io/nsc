@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 )
@@ -799,7 +799,7 @@ func (ctx *Context) PickAccount(name string) (string, error) {
 		name = accounts[0]
 	}
 	if len(accounts) > 1 {
-		i, err := cli.PromptChoices("select account", name, accounts)
+		i, err := cli.Select("select account", name, accounts)
 		if err != nil {
 			return "", err
 		}
@@ -850,7 +850,7 @@ func (ctx *Context) PickUser(accountName string) (string, error) {
 		return users[0], nil
 	}
 	if len(users) > 1 {
-		i, err := cli.PromptChoices("select user", "", users)
+		i, err := cli.Select("select user", "", users)
 		if err != nil {
 			return "", err
 		}

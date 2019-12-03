@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -94,7 +94,7 @@ func (p *RevokeActivationParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.service, err = cli.PromptBoolean("is service", p.service)
+	p.service, err = cli.Confirm("is service", p.service)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (p *RevokeActivationParams) PostInteractive(ctx ActionCtx) error {
 		kind = jwt.Service
 	}
 
-	i, err := cli.PromptChoices(fmt.Sprintf("select %s export", kind.String()), "", choices)
+	i, err := cli.Select(fmt.Sprintf("select %s export", kind.String()), "", choices)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (p *RevokeActivationParams) PostInteractive(ctx ActionCtx) error {
 
 	if p.at == 0 {
 		at := fmt.Sprintf("%d", p.at)
-		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, true, p.canParse)
+		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
 		p.at, err = strconv.Atoi(at)
 	}
 

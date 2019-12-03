@@ -488,3 +488,20 @@ func Test_ImportStreamLocalWildcards(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, "stream prefix subject cannot have wildcards", err.Error())
 }
+
+func Test_AddImportToAccount(t *testing.T) {
+	ts := NewTestStore(t, t.Name())
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	bpk := ts.GetAccountPublicKey(t, "B")
+
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "A", "--src-account", bpk, "--remote-subject", "s.>")
+	require.NoError(t, err)
+
+	bc, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, bc.Imports, 1)
+}

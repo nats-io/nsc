@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +43,7 @@ func (p *TimeParams) valid(value string, label string, oldOK bool) error {
 	}
 	if InteractiveFlag && !oldOK && when != 0 && now > when {
 		m := fmt.Sprintf("%s %q is in the past (%s) - are you sure?", label, value, HumanizedDate(when))
-		ok, err := cli.PromptBoolean(m, false)
+		ok, err := cli.Confirm(m, false)
 		if err != nil {
 			return err
 		}
@@ -97,12 +97,12 @@ func (p *TimeParams) canParse(s string) error {
 func (p *TimeParams) Edit() error {
 	var err error
 	format := "valid from ('0' is always) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)"
-	p.Start, err = cli.PromptWithHelp("valid", p.Start, true, p.canParse, format)
+	p.Start, err = cli.Prompt("valid", p.Start, cli.Val(p.canParse), cli.Help(format))
 	if err != nil {
 		return err
 	}
 
-	p.Expiry, err = cli.PromptWithHelp("valid until (0 is always)", p.Expiry, true, p.canParse, format)
+	p.Expiry, err = cli.Prompt("valid until (0 is always)", p.Expiry, cli.Val(p.canParse), cli.Help(format))
 	return err
 }
 

@@ -45,6 +45,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 	require.Nil(t, ac.Exports[0].Latency)
 
 	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "lat")
@@ -93,6 +94,26 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
 	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
+}
+
+func Test_EditExportRmLatencySampling(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "a", true)
+
+	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "metrics.a")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac.Exports[0].Latency)
+
+	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--rm-latency-sampling")
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Nil(t, ac.Exports[0].Latency)
 }
 
 func Test_EditExportNoExports(t *testing.T) {

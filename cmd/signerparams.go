@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 )
 
@@ -78,7 +78,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 		if p.prompt == "" {
 			p.prompt = "select the key to use for signing"
 		}
-		choice, err := cli.PromptChoices(p.prompt, choices[0], choices)
+		choice, err := cli.Select(p.prompt, choices[0], choices)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 		if idx != -1 && choice == idx {
 			label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
 			// key must be one from signing keys
-			KeyPathFlag, err = cli.Prompt(label, "", true, SeedNKeyValidatorMatching(p.kind, signers))
+			KeyPathFlag, err = cli.Prompt(label, "", cli.Val(SeedNKeyValidatorMatching(p.kind, signers)))
 			if err != nil {
 				return err
 			}

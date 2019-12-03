@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -88,7 +88,7 @@ func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
 	}
 	if p.at == 0 {
 		at := fmt.Sprintf("%d", p.at)
-		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, true, p.canParse)
+		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
 		p.at, err = strconv.Atoi(at)
 	}
 	if err := p.SignerParams.Edit(ctx); err != nil {

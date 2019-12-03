@@ -21,11 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nats-io/nsc/cmd/store"
-
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +45,7 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
-	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
+	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [1-100]  (services only)")
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
@@ -107,7 +106,7 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 	}
 
 	choices := []string{jwt.Stream.String(), jwt.Service.String()}
-	i, err := cli.PromptChoices("export type", p.export.Type.String(), choices)
+	i, err := cli.Select("export type", p.export.Type.String(), choices)
 	if err != nil {
 		return err
 	}
@@ -127,7 +126,7 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		return nil
 	}
 
-	p.subject, err = cli.Prompt("subject", p.subject, true, svFn)
+	p.subject, err = cli.Prompt("subject", p.subject, cli.Val(svFn))
 	if err != nil {
 		return err
 	}
@@ -137,51 +136,37 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		p.export.Name = p.subject
 	}
 
-	p.export.Name, err = cli.Prompt("name", p.export.Name, true, cli.LengthValidator(1))
+	p.export.Name, err = cli.Prompt("name", p.export.Name, cli.NewLengthValidator(1))
 	if err != nil {
 		return err
 	}
 
-	p.export.TokenReq, err = cli.PromptBoolean(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
+	p.export.TokenReq, err = cli.Confirm(fmt.Sprintf("private %s", p.export.Type.String()), p.export.TokenReq)
 	if err != nil {
 		return err
 	}
 
 	if p.export.IsService() {
-		ok, err := cli.PromptBoolean("track service latency", false)
+		ok, err := cli.Confirm("track service latency", false)
 		if err != nil {
 			return err
 		}
 		if ok {
-			_, err = cli.Prompt("sampling percentage [0-100] (0 disables)", "", false, func(s string) error {
-				v, err := strconv.Atoi(s)
-				if err != nil {
-					return err
-				}
-				if v < 0 || v > 100 {
-					return errors.New("sampling must be between 0 and 100 inclusive")
-				}
-				p.latSampling = v
-				return nil
-			})
-			p.latSubject, err = cli.Prompt("latency metrics subject", "", true, func(s string) error {
-				var lat jwt.ServiceLatency
-				lat.Results = jwt.Subject(s)
-				lat.Sampling = p.latSampling
-				var vr jwt.ValidationResults
-				lat.Validate(&vr)
-				if len(vr.Issues) > 0 {
-					return errors.New(vr.Issues[0].Description)
-				}
-				return nil
-			})
+			samp, err := cli.Prompt("sampling percentage [1-100]", "", cli.Val(SamplingValidator))
+			if err != nil {
+				return err
+			}
+			// cannot fail
+			p.latSampling, _ = strconv.Atoi(samp)
+
+			p.latSubject, err = cli.Prompt("latency metrics subject", "", cli.Val(LatencyMetricsSubjectValidator))
 			if err != nil {
 				return err
 			}
 		}
 
 		choices := []string{jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked}
-		s, err := cli.PromptChoices("service response type", string(p.export.ResponseType), choices)
+		s, err := cli.Select("service response type", string(p.export.ResponseType), choices)
 		if err != nil {
 			return err
 		}
@@ -192,6 +177,30 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	return nil
+}
+
+func SamplingValidator(s string) error {
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	if v < 1 || v > 100 {
+		return errors.New("sampling must be between 1 and 100 inclusive")
+	}
+	return nil
+}
+
+func LatencyMetricsSubjectValidator(s string) error {
+	var lat jwt.ServiceLatency
+	// bogus freq just to get a value into the validation
+	lat.Sampling = 100
+	lat.Results = jwt.Subject(s)
+	var vr jwt.ValidationResults
+	lat.Validate(&vr)
+	if len(vr.Issues) > 0 {
+		return errors.New(vr.Issues[0].Description)
+	}
 	return nil
 }
 
@@ -210,7 +219,7 @@ func (p *AddExportParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddExportParams) PostInteractive(ctx ActionCtx) error {
+func (p *AddExportParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 

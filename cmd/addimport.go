@@ -21,11 +21,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/nats-io/nsc/cmd/store"
-
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -145,7 +144,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 
 	if len(available) > 0 {
 		// we have some exports that they may want
-		ok, err := cli.PromptYN("pick from locally available exports")
+		ok, err := cli.Confirm("pick from locally available exports", true)
 		if err != nil {
 			return false, err
 		}
@@ -159,7 +158,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 
 			var c *AccountExportChoice
 			for {
-				idx, err := cli.PromptChoices("select the export", "", labels)
+				idx, err := cli.Select("select the export", "", labels)
 				if err != nil {
 					return false, err
 				}
@@ -191,7 +190,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 					}
 				}
 				subject = strings.Join(a, ".")
-				subject, err = cli.Prompt("export subject", subject, true, func(s string) error {
+				subject, err = cli.Prompt("export subject", subject, cli.Val(func(s string) error {
 					sub := jwt.Subject(s)
 					if sub.HasWildCards() {
 						return errors.New("services cannot have wildcard subjects")
@@ -202,7 +201,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 						return errors.New(vr.Issues[0].Description)
 					}
 					return nil
-				})
+				}))
 			}
 			p.remote = subject
 			p.service = c.Selection.IsService()
@@ -254,7 +253,7 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 
 func (p *AddImportParams) addManualExport(ctx ActionCtx) error {
 	var err error
-	p.public, err = cli.PromptYN("is the export public?")
+	p.public, err = cli.Confirm("is the export public?", true)
 	if err != nil {
 		return err
 	}
@@ -262,7 +261,7 @@ func (p *AddImportParams) addManualExport(ctx ActionCtx) error {
 		if err := p.srcAccount.Edit(); err != nil {
 			return err
 		}
-		p.remote, err = cli.Prompt("remote subject", p.remote, true, func(v string) error {
+		p.remote, err = cli.Prompt("remote subject", p.remote, cli.Val(func(v string) error {
 			t := jwt.Subject(v)
 			var vr jwt.ValidationResults
 			t.Validate(&vr)
@@ -270,20 +269,20 @@ func (p *AddImportParams) addManualExport(ctx ActionCtx) error {
 				return errors.New(vr.Issues[0].Description)
 			}
 			return nil
-		})
-		p.service, err = cli.PromptYN("is import a service")
+		}))
+		p.service, err = cli.Confirm("is import a service", true)
 		if err != nil {
 			return err
 		}
 	} else {
-		p.tokenSrc, err = cli.Prompt("token path or url", p.tokenSrc, true, func(s string) error {
+		p.tokenSrc, err = cli.Prompt("token path or url", p.tokenSrc, cli.Val(func(s string) error {
 			p.tokenSrc = s
 			p.token, err = p.loadImport()
 			if err != nil {
 				return err
 			}
 			return nil
-		})
+		}))
 		if err != nil {
 			return err
 		}
@@ -407,7 +406,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		p.name = p.remote
 	}
 
-	p.name, err = cli.Prompt("name", p.name, true, cli.LengthValidator(1))
+	p.name, err = cli.Prompt("name", p.name, cli.NewLengthValidator(1))
 	if err != nil {
 		return err
 	}
@@ -422,8 +421,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		m = "local subject"
 		prefix = p.local
 	}
-
-	p.local, err = cli.Prompt(m, prefix, true, func(s string) error {
+	p.local, err = cli.Prompt(m, prefix, cli.Val(func(s string) error {
 		if !p.service && s == "" {
 			return nil
 		}
@@ -443,7 +441,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		}
 
 		return nil
-	})
+	}))
 	if err != nil {
 		return err
 	}

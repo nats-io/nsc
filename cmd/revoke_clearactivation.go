@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strconv"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -91,7 +91,7 @@ func (p *RevokeClearActivationParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.service, err = cli.PromptBoolean("is service", p.service)
+	p.service, err = cli.Confirm("is service", p.service)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 		kind = jwt.Service
 	}
 
-	i, err := cli.PromptChoices(fmt.Sprintf("select %s export", kind.String()), "", choices)
+	i, err := cli.Select(fmt.Sprintf("select %s export", kind.String()), "", choices)
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -116,17 +116,17 @@ func (c *Entity) Edit() error {
 	var err error
 	label := c.kind.String()
 
-	c.name, err = cli.Prompt(fmt.Sprintf("%s name", label), c.name, true, cli.LengthValidator(1))
+	c.name, err = cli.Prompt(fmt.Sprintf("%s name", label), c.name, cli.NewLengthValidator(1))
 	if err != nil {
 		return err
 	}
 
-	ok, err := cli.PromptYN(fmt.Sprintf("generate an %s nkey", label))
+	ok, err := cli.Confirm(fmt.Sprintf("generate an %s nkey", label), true)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to an %s nkey or nkey", label), c.keyPath, true, c.ValidateNKey())
+		c.keyPath, err = cli.Prompt(fmt.Sprintf("path to an %s nkey or nkey", label), c.keyPath, cli.Val(c.ValidateNKey()))
 		if err != nil {
 			return err
 		}

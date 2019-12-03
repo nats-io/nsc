@@ -1,5 +1,7 @@
-# github.com/AlecAivazis/survey v1.7.0
-github.com/AlecAivazis/survey
+# github.com/AlecAivazis/survey/v2 v2.0.4
+github.com/AlecAivazis/survey/v2
+github.com/AlecAivazis/survey/v2/core
+github.com/AlecAivazis/survey/v2/terminal
 # github.com/blang/semver v3.5.1+incompatible
 github.com/blang/semver
 # github.com/briandowns/spinner v0.0.0-20181029155426-195c31b675a7
@@ -41,9 +43,9 @@ github.com/inconshreveable/mousetrap
 github.com/kballard/go-shellquote
 # github.com/magiconair/properties v1.8.0
 github.com/magiconair/properties
-# github.com/mattn/go-colorable v0.0.9
+# github.com/mattn/go-colorable v0.1.2
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.4
+# github.com/mattn/go-isatty v0.0.8
 github.com/mattn/go-isatty
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
@@ -53,8 +55,8 @@ github.com/mitchellh/go-homedir
 github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
-# github.com/nats-io/cliprompts v0.3.16
-github.com/nats-io/cliprompts
+# github.com/nats-io/cliprompts/v2 v2.0.0-20191203200115-ae8d3743105d
+github.com/nats-io/cliprompts/v2
 # github.com/nats-io/jwt v0.3.2
 github.com/nats-io/jwt
 # github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
@@ -134,8 +136,5 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# gopkg.in/AlecAivazis/survey.v1 v1.8.7
-gopkg.in/AlecAivazis/survey.v1/core
-gopkg.in/AlecAivazis/survey.v1/terminal
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2

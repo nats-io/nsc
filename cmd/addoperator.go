@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"os"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -79,12 +79,12 @@ func (p *AddOperatorParams) SetDefaults(ctx ActionCtx) error {
 func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 
-	ok, err := cli.PromptYN("import operator from a JWT")
+	ok, err := cli.Confirm("import operator from a JWT", true)
 	if err != nil {
 		return err
 	}
 	if ok {
-		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, true, func(v string) error {
+		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, cli.Val(func(v string) error {
 			// is it is an URL or path
 			pv := cli.PathOrURLValidator()
 			if perr := pv(v); perr != nil {
@@ -98,12 +98,12 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 				return perr
 			}
 			return nil
-		})
+		}))
 		if err != nil {
 			return err
 		}
 	} else {
-		p.name, err = cli.Prompt("operator name", p.name, true, cli.LengthValidator(1))
+		p.name, err = cli.Prompt("operator name", p.name, cli.NewLengthValidator(1))
 		if err != nil {
 			return err
 		}
@@ -193,12 +193,12 @@ func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if p.signerKP == nil {
-		p.generate, err = cli.PromptYN("generate an operator nkey")
+		p.generate, err = cli.Confirm("generate an operator nkey", true)
 		if err != nil {
 			return err
 		}
 		if !p.generate {
-			p.keyPath, err = cli.Prompt("path to an operator nkey or nkey", p.keyPath, true, p.validateOperatorNKey)
+			p.keyPath, err = cli.Prompt("path to an operator nkey or nkey", p.keyPath, cli.Val(p.validateOperatorNKey))
 			if err != nil {
 				return err
 			}

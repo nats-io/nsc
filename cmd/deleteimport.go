@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -137,7 +137,7 @@ func (p *DeleteImportParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 	labels := choices.String()
-	p.index, err = cli.PromptChoices("select import to delete", "", labels)
+	p.index, err = cli.Select("select import to delete", "", labels)
 	if err != nil {
 		return err
 	}

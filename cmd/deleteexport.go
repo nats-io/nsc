@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -107,7 +107,7 @@ func (p *DeleteExportParams) PostInteractive(ctx ActionCtx) error {
 	}
 	labels := AccountExportChoices(choices).String()
 
-	p.index, err = cli.PromptChoices("select export to delete", "", labels)
+	p.index, err = cli.Select("select export to delete", "", labels)
 	if err != nil {
 		return err
 	}
