@@ -16,7 +16,7 @@
 package cmd
 
 import (
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 )
 
 type DataParams struct {
@@ -32,10 +32,10 @@ func (e *DataParams) Valid() error {
 func (e *DataParams) Edit(prompt string) error {
 	var err error
 	var nv int64
-	sv, err := cli.Prompt(prompt, e.Value, true, func(s string) error {
+	sv, err := cli.Prompt(prompt, e.Value, cli.Val(func(s string) error {
 		nv, err = ParseNumber(s)
 		return err
-	})
+	}))
 	if err != nil {
 		return err
 	}

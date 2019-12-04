@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 )
 
 type NumberParams struct {
@@ -34,10 +34,10 @@ func (e *NumberParams) Edit(prompt string) error {
 	var err error
 	var nv int64
 	sv := fmt.Sprintf("%d", e.NumberValue)
-	_, err = cli.Prompt(prompt, sv, true, func(s string) error {
+	_, err = cli.Prompt(prompt, sv, cli.Val(func(s string) error {
 		nv, err = ParseNumber(s)
 		return err
-	})
+	}))
 	if err != nil {
 		return err
 	}

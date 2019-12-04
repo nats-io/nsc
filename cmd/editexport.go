@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strconv"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -45,9 +45,10 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
 	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
+	cmd.Flags().BoolVarP(&params.rmLatencySampling, "rm-latency-sampling", "", false, "remove latency sampling")
 
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
-	cmd.Flags().StringVarP(&params.responseType, "response-type", "", string(jwt.ResponseTypeSingleton), hm)
+	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -64,12 +65,13 @@ type EditExportParams struct {
 	index   int
 	subject string
 
-	name         string
-	latSampling  int
-	latSubject   string
-	service      bool
-	private      bool
-	responseType string
+	name              string
+	latSampling       int
+	latSubject        string
+	service           bool
+	private           bool
+	responseType      string
+	rmLatencySampling bool
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {
@@ -142,7 +144,7 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 	if index == -1 {
 		index = 0
 	}
-	p.index, err = cli.PromptChoices("select export to edit", labels[index], labels)
+	p.index, err = cli.Select("select export to edit", labels[index], labels)
 	if err != nil {
 		return err
 	}
@@ -154,7 +156,7 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 	if sel.Type == jwt.Service {
 		k = kinds[1]
 	}
-	i, err := cli.PromptChoices("export type", k, kinds)
+	i, err := cli.Select("export type", k, kinds)
 	if err != nil {
 		return err
 	}
@@ -175,7 +177,7 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 		return nil
 	}
 
-	p.subject, err = cli.Prompt("subject", string(sel.Subject), true, svFn)
+	p.subject, err = cli.Prompt("subject", string(sel.Subject), cli.Val(svFn))
 	if err != nil {
 		return err
 	}
@@ -183,18 +185,18 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 	if p.name == "" {
 		p.name = sel.Name
 	}
-	p.name, err = cli.Prompt("name", p.name, true, cli.LengthValidator(1))
+	p.name, err = cli.Prompt("name", p.name, cli.NewLengthValidator(1))
 	if err != nil {
 		return err
 	}
 
-	p.private, err = cli.PromptBoolean(fmt.Sprintf("private %s", k), sel.TokenReq)
+	p.private, err = cli.Confirm(fmt.Sprintf("private %s", k), sel.TokenReq)
 	if err != nil {
 		return err
 	}
 
 	if p.service {
-		ok, err := cli.PromptBoolean("track service latency", false)
+		ok, err := cli.Confirm("track service latency", false)
 		if err != nil {
 			return err
 		}
@@ -205,35 +207,23 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 				cls = sel.Latency.Sampling
 				results = sel.Latency.Results
 			}
-			_, err = cli.Prompt("sampling percentage [0-100] (0 disables)", strconv.Itoa(cls), false, func(s string) error {
-				v, err := strconv.Atoi(s)
-				if err != nil {
-					return err
-				}
-				if v < 0 || v > 100 {
-					return errors.New("sampling must be between 0 and 100 inclusive")
-				}
-				p.latSampling = v
-				return nil
-			})
-			p.latSubject, err = cli.Prompt("latency metrics subject", string(results), true, func(s string) error {
-				var lat jwt.ServiceLatency
-				lat.Results = jwt.Subject(s)
-				lat.Sampling = p.latSampling
-				var vr jwt.ValidationResults
-				lat.Validate(&vr)
-				if len(vr.Issues) > 0 {
-					return errors.New(vr.Issues[0].Description)
-				}
-				return nil
-			})
+			samp, err := cli.Prompt("sampling percentage [1-100]", fmt.Sprintf("%d", cls), cli.Val(SamplingValidator))
 			if err != nil {
 				return err
 			}
+			// cannot fail
+			p.latSampling, _ = strconv.Atoi(samp)
+
+			p.latSubject, err = cli.Prompt("latency metrics subject", string(results), cli.Val(LatencyMetricsSubjectValidator))
+			if err != nil {
+				return err
+			}
+		} else {
+			p.rmLatencySampling = true
 		}
 
 		choices := []string{jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked}
-		s, err := cli.PromptChoices("service response type", string(p.responseType), choices)
+		s, err := cli.Select("service response type", p.responseType, choices)
 		if err != nil {
 			return err
 		}
@@ -307,6 +297,11 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 	if !(cmd.Flag("sampling").Changed) {
 		p.latSampling = sampling
 	}
+
+	if !(cmd.Flag("response-type").Changed) {
+		p.responseType = string(old.ResponseType)
+	}
+
 }
 
 func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
@@ -341,25 +336,39 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	if export.Type == jwt.Service {
-		oldSampling := 0
-		oldReport := jwt.Subject("")
-		if old.Latency != nil {
-			oldSampling = old.Latency.Sampling
-			oldReport = old.Latency.Results
+		// old response type may be blank
+		if old.ResponseType == "" {
+			old.ResponseType = jwt.ResponseTypeSingleton
 		}
-		if p.latSubject != "" {
-			export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: p.latSampling}
-			if oldSampling != export.Latency.Sampling {
-				r.AddOK("changed service latency to %d%%", export.Latency.Sampling)
+
+		if p.rmLatencySampling {
+			export.Latency = nil
+			if old.Latency != nil {
+				r.AddOK("removed latency tracking")
+			} else {
+				r.AddOK("no need to remove latency tracking as it was not set")
 			}
-			if oldReport != export.Latency.Results {
-				r.AddOK("changed service latency subject to %s", export.Latency.Results)
-				r.AddWarning("changed latency subject will break consumers of the report")
+		} else {
+			oldSampling := 0
+			oldReport := jwt.Subject("")
+			if old.Latency != nil {
+				oldSampling = old.Latency.Sampling
+				oldReport = old.Latency.Results
+			}
+			if p.latSubject != "" {
+				export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: p.latSampling}
+				if oldSampling != export.Latency.Sampling {
+					r.AddOK("changed service latency to %d%%", export.Latency.Sampling)
+				}
+				if oldReport != "" && oldReport != export.Latency.Results {
+					r.AddOK("changed service latency subject to %s", export.Latency.Results)
+					r.AddWarning("changed latency subject will break consumers of the report")
+				}
 			}
 		}
 
 		rt := jwt.ResponseType(p.responseType)
-		if export.ResponseType != rt {
+		if old.ResponseType != rt {
 			export.ResponseType = rt
 			r.AddOK("changed response type to %s", p.responseType)
 		}

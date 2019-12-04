@@ -19,7 +19,7 @@ import (
 	"net/url"
 	"testing"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/stretchr/testify/require"
 )
 

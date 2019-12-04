@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
 )
@@ -56,14 +56,14 @@ func (sp *GenericClaimsParams) add(label string, current []string) ([]string, er
 			m = fmt.Sprintf("add another %s", label)
 		}
 		first = false
-		ok, err := cli.PromptBoolean(m, false)
+		ok, err := cli.Confirm(m, false)
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
 			break
 		}
-		v, err := cli.Prompt(fmt.Sprintf("enter a %s", label), "", true, nil)
+		v, err := cli.Prompt(fmt.Sprintf("enter a %s", label), "")
 		if err != nil {
 			return nil, err
 		}
@@ -77,12 +77,12 @@ func (sp *GenericClaimsParams) remove(label string, values []string) ([]string, 
 	if len(values) == 0 {
 		return nil, nil
 	}
-	ok, err := cli.PromptBoolean("remove tags", false)
+	ok, err := cli.Confirm("remove tags", false)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		idx, err := cli.PromptMultipleChoices(fmt.Sprintf("select %s to remove", label), values)
+		idx, err := cli.MultiSelect(fmt.Sprintf("select %s to remove", label), values)
 		if err != nil {
 			return nil, err
 		}

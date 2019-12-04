@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -100,17 +100,17 @@ func (p *AddAccountParams) validateAccountNKey(s string) error {
 
 func (p *AddAccountParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	p.name, err = cli.Prompt("account name", p.name, true, cli.LengthValidator(1))
+	p.name, err = cli.Prompt("account name", p.name, cli.NewLengthValidator(1))
 	if err != nil {
 		return err
 	}
 
-	p.generate, err = cli.PromptYN("generate an account nkey")
+	p.generate, err = cli.Confirm("generate an account nkey", true)
 	if err != nil {
 		return err
 	}
 	if !p.generate {
-		p.keyPath, err = cli.Prompt("path to an account nkey or nkey", p.keyPath, true, p.validateAccountNKey)
+		p.keyPath, err = cli.Prompt("path to an account nkey or nkey", p.keyPath, cli.Val(p.validateAccountNKey))
 		if err != nil {
 			return err
 		}

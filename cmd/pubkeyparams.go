@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -53,7 +53,7 @@ func (e *PubKeyParams) Valid() error {
 }
 
 func (e *PubKeyParams) Edit() error {
-	sv, err := cli.Prompt(fmt.Sprintf("%s public key", e.flagName), e.publicKey, true, e.valid)
+	sv, err := cli.Prompt(fmt.Sprintf("%s public key", e.flagName), e.publicKey, cli.Val(e.valid))
 	if err != nil {
 		return err
 	}

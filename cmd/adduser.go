@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -297,20 +297,20 @@ func (p *ResponsePermsParams) Edit(hasPerm bool) error {
 	if hasPerm {
 		verb = "Edit"
 	}
-	ok, err := cli.PromptBoolean(fmt.Sprintf("%s response permissions?", verb), false)
+	ok, err := cli.Confirm(fmt.Sprintf("%s response permissions?", verb), false)
 	if err != nil {
 		return err
 	}
 	if ok {
 		if hasPerm {
-			p.rmResp, err = cli.PromptBoolean("delete response permissions", p.rmResp)
+			p.rmResp, err = cli.Confirm("delete response permissions", p.rmResp)
 			if err != nil {
 				return err
 			}
 		}
 		if !p.rmResp {
-			p.respMax, err = cli.Prompt("Number of max responses", p.respMax, true, p.maxResponseValidator)
-			p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, true, p.ttlValidator)
+			p.respMax, err = cli.Prompt("Number of max responses", p.respMax, cli.Val(p.maxResponseValidator))
+			p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, cli.Val(p.ttlValidator))
 		}
 	}
 	return nil

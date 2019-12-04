@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -129,7 +129,7 @@ func (p *PushCmdParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 	}
-	p.ASU, err = cli.Prompt("Account Server URL", p.ASU, true, p.validURL)
+	p.ASU, err = cli.Prompt("Account Server URL", p.ASU, cli.Val(p.validURL))
 	return err
 }
 

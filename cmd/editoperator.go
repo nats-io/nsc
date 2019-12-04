@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -116,25 +116,25 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
 		return err
 	}
-	p.asu, err = cli.Prompt("account jwt server url", p.asu, true, nil)
+	p.asu, err = cli.Prompt("account jwt server url", p.asu)
 	if err != nil {
 		return err
 	}
 	p.asu = strings.TrimSpace(p.asu)
 
-	ok, err := cli.PromptYN("add a service url")
+	ok, err := cli.Confirm("add a service url", true)
 	if err != nil {
 		return err
 	}
 	if ok {
 		for {
-			v, err := cli.Prompt("operator service url", "", true, jwt.ValidateOperatorServiceURL)
+			v, err := cli.Prompt("operator service url", "", cli.Val(jwt.ValidateOperatorServiceURL))
 			if err != nil {
 				return err
 			}
 			// the list will prune empty urls
 			p.serviceURLs = append(p.serviceURLs, v)
-			ok, err := cli.PromptYN("add another service url")
+			ok, err := cli.Confirm("add another service url", true)
 			if err != nil {
 				return err
 			}
@@ -144,12 +144,12 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 		}
 	}
 	if len(p.claim.OperatorServiceURLs) > 0 {
-		ok, err = cli.PromptYN("remove any service urls")
+		ok, err = cli.Confirm("remove any service urls", true)
 		if err != nil {
 			return err
 		}
 		if ok {
-			idx, err := cli.PromptMultipleChoices("select service urls to remove", p.claim.OperatorServiceURLs)
+			idx, err := cli.MultiSelect("select service urls to remove", p.claim.OperatorServiceURLs)
 			if err != nil {
 				return err
 			}

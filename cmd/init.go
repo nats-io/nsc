@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -104,10 +104,10 @@ func (p *InitCmdParams) init(cmd *cobra.Command) error {
 
 	tc := GetConfig()
 	if p.Prompt {
-		p.Dir, err = cli.Prompt("enter a configuration directory", tc.StoreRoot, true, func(v string) error {
+		p.Dir, err = cli.Prompt("enter a configuration directory", tc.StoreRoot, cli.Val(func(v string) error {
 			_, err := Expand(v)
 			return err
-		})
+		}))
 	}
 	p.Dir, err = Expand(p.Dir)
 	if err != nil {
@@ -141,7 +141,7 @@ func (p *InitCmdParams) resolveOperator() error {
 		if defsel == "" {
 			defsel = "Create Operator"
 		}
-		sel, err := cli.PromptChoices("Select an operator", defsel, choices)
+		sel, err := cli.Select("Select an operator", defsel, choices)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (p *InitCmdParams) resolveOperator() error {
 		case local:
 			p.CreateOperator = true
 		case custom:
-			p.OperatorJwtURL, err = cli.Prompt("Operator URL", "", true, cli.URLValidator("http", "https"))
+			p.OperatorJwtURL, err = cli.Prompt("Operator URL", "", cli.NewURLValidator("http", "https"))
 			if err != nil {
 				return err
 			}
@@ -163,7 +163,7 @@ func (p *InitCmdParams) resolveOperator() error {
 		if p.CreateOperator {
 			q = "name your operator, account and user"
 		}
-		p.Name, err = cli.Prompt(q, p.Name, true, OperatorNameValidator)
+		p.Name, err = cli.Prompt(q, p.Name, cli.Val(OperatorNameValidator))
 		if err != nil {
 			return err
 		}

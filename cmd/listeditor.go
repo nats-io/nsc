@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 )
 
 type ListEditorParam struct {
@@ -53,21 +53,21 @@ func (e *ListEditorParam) Edit() error {
 		e.AddMessage = fmt.Sprintf("add %s", e.FlagName)
 	}
 	for i, v := range e.Values {
-		sv, err := cli.Prompt(e.PromptMessage, v, true, e.ValidatorFn)
+		sv, err := cli.Prompt(e.PromptMessage, v, cli.Val(e.ValidatorFn))
 		if err != nil {
 			return err
 		}
 		e.Values[i] = sv
 	}
 	for {
-		ok, err := cli.PromptYN(e.AddMessage)
+		ok, err := cli.Confirm(e.AddMessage, true)
 		if err != nil {
 			return err
 		}
 		if !ok {
 			break
 		}
-		sv, err := cli.Prompt(e.PromptMessage, "", true, e.ValidatorFn)
+		sv, err := cli.Prompt(e.PromptMessage, "", cli.Val(e.ValidatorFn))
 		if err != nil {
 			return err
 		}

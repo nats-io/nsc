@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/spf13/cobra"
 )
 

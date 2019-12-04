@@ -22,7 +22,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/briandowns/spinner"
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
 )

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -86,7 +86,7 @@ func (p *DeleteUserParams) PreInteractive(ctx ActionCtx) error {
 		return fmt.Errorf("account %q doesn't have any users - add one first", p.AccountContextParams.Name)
 	}
 	if len(users) > 0 {
-		sel, err := cli.PromptMultipleChoices("select users", users)
+		sel, err := cli.MultiSelect("select users", users)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (p *DeleteUserParams) PreInteractive(ctx ActionCtx) error {
 	if len(p.names) > 1 {
 		m = "revoke users before deleting"
 	}
-	p.revoke, err = cli.PromptBoolean(m, false)
+	p.revoke, err = cli.Confirm(m, false)
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (p *DeleteUserParams) PreInteractive(ctx ActionCtx) error {
 	if len(p.names) > 1 {
 		m = "delete associated nkeys"
 	}
-	p.rmNKey, err = cli.PromptBoolean(m, false)
+	p.rmNKey, err = cli.Confirm(m, false)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (p *DeleteUserParams) PreInteractive(ctx ActionCtx) error {
 	if len(p.names) > 1 {
 		m = "delete associated creds files"
 	}
-	p.rmCreds, err = cli.PromptBoolean(m, false)
+	p.rmCreds, err = cli.Confirm(m, false)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (p *DeleteUserParams) PostInteractive(ctx ActionCtx) error {
 	if len(p.names) > 1 {
 		m = "deleting users, nkeys or creds files cannot be undone - continue"
 	}
-	ok, err := cli.PromptBoolean(m, false)
+	ok, err := cli.Confirm(m, false)
 	if err != nil {
 		return err
 	}

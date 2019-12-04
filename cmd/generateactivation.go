@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"path"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -127,7 +127,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if len(labels) == 1 {
 		choice = labels[0]
 	}
-	i, err := cli.PromptChoices("select the export", choice, labels)
+	i, err := cli.Select("select the export", choice, labels)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	}
 	kind := p.export.Type
 
-	p.subject, err = cli.Prompt("subject", p.subject, true, func(v string) error {
+	p.subject, err = cli.Prompt("subject", p.subject, cli.Val(func(v string) error {
 		t := jwt.Subject(v)
 		var vr jwt.ValidationResults
 		t.Validate(&vr)
@@ -152,7 +152,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 			return fmt.Errorf("%q doesn't contain %q", string(p.export.Subject), string(t))
 		}
 		return nil
-	})
+	}))
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	}
 	if oc.AccountServerURL != "" {
 		m := fmt.Sprintf("push the activation to %q", oc.AccountServerURL)
-		p.push, err = cli.PromptBoolean(m, false)
+		p.push, err = cli.Confirm(m, false)
 	}
 
 	return nil

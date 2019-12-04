@@ -20,7 +20,7 @@ package cmd
 import (
 	"fmt"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -89,7 +89,7 @@ func (e *SigningKeysParams) PublicKeys() ([]string, error) {
 func (e *SigningKeysParams) Edit() error {
 	// verify any keys that were added via flags
 	for i, v := range e.paths {
-		sv, err := cli.Prompt(fmt.Sprintf("path to %s nkey or nkey", e.flagName), v, true, e.valid)
+		sv, err := cli.Prompt(fmt.Sprintf("path to %s nkey or nkey", e.flagName), v, cli.Val(e.valid))
 		if err != nil {
 			return err
 		}
@@ -103,14 +103,14 @@ func (e *SigningKeysParams) Edit() error {
 		}
 		first = false
 
-		ok, err := cli.PromptBoolean(m, false)
+		ok, err := cli.Confirm(m, false)
 		if err != nil {
 			return err
 		}
 		if !ok {
 			break
 		}
-		sv, err := cli.Prompt(fmt.Sprintf("path to %s nkey or nkey", e.flagName), "", true, e.valid)
+		sv, err := cli.Prompt(fmt.Sprintf("path to %s nkey or nkey", e.flagName), "", cli.Val(e.valid))
 		if err != nil {
 			return err
 		}

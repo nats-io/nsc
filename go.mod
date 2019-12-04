@@ -10,11 +10,9 @@ require (
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/kr/pty v1.1.3 // indirect
-	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/nats-io/cliprompts v0.3.16
+	github.com/nats-io/cliprompts/v2 v2.0.0-20191203200115-ae8d3743105d
 	github.com/nats-io/jwt v0.3.2
 	github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
 	github.com/nats-io/nats.go v1.8.1

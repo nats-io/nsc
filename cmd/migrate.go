@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -71,20 +71,20 @@ func (p *MigrateCmdParams) SetDefaults(ctx ActionCtx) error {
 }
 
 func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
-	ok, err := cli.PromptYN("migrate all accounts under a particular operator")
+	ok, err := cli.Confirm("migrate all accounts under a particular operator", true)
 	if err != nil {
 		return err
 	}
 	if ok {
-		p.storeDir, err = cli.Prompt("specify the directory for the operator", "", true, func(v string) error {
+		p.storeDir, err = cli.Prompt("specify the directory for the operator", "", cli.Val(func(v string) error {
 			_, err := store.LoadStore(v)
 			return err
-		})
+		}))
 		if err != nil {
 			return err
 		}
 	} else {
-		p.url, err = cli.Prompt("account jwt url/or path ", p.url, true, func(v string) error {
+		p.url, err = cli.Prompt("account jwt url/or path ", p.url, cli.Val(func(v string) error {
 			// we expect either a file or url
 			if u, err := url.Parse(v); err == nil && u.Scheme != "" {
 				return nil
@@ -95,7 +95,7 @@ func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
 			}
 			_, err = os.Stat(v)
 			return err
-		})
+		}))
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func (j *MigrateJob) PostInteractive(ctx ActionCtx) {
 		}
 		j.overwrite = aac.Subject == j.claim.Subject
 		if !j.overwrite {
-			j.overwrite, err = cli.PromptBoolean("account %q already exists under the current operator, replace it", false)
+			j.overwrite, err = cli.Confirm("account %q already exists under the current operator, replace it", false)
 			if err != nil {
 				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
 				return

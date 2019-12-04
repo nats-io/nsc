@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/stretchr/testify/require"
 )

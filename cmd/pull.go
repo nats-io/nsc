@@ -22,7 +22,7 @@ import (
 
 	"github.com/nats-io/nsc/cmd/store"
 
-	cli "github.com/nats-io/cliprompts"
+	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
 	"github.com/spf13/cobra"
 )
@@ -119,7 +119,7 @@ func (p *PullParams) SetDefaults(ctx ActionCtx) error {
 func (p *PullParams) PreInteractive(ctx ActionCtx) error {
 	var err error
 	tc := GetConfig()
-	p.All, err = cli.PromptYN(fmt.Sprintf("pull operator %q and all accounts", tc.Operator))
+	p.All, err = cli.Confirm(fmt.Sprintf("pull operator %q and all accounts", tc.Operator), true)
 	if err != nil {
 		return err
 	}
