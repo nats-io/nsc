@@ -265,7 +265,7 @@ func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	StoreAccountAndUpdateStatus(ctx, p.token, r)
 	if r.HasNoErrors() {
-		r.AddOK("added account %q", p.name)
+		r.AddOK("added account %q to operator %q", p.name, ctx.StoreCtx().Operator.Name)
 	}
 	return r, err
 }

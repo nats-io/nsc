@@ -95,6 +95,10 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 		}
 	}
 
+	if err := p.srcAccount.SetDefaults(ctx); err != nil {
+		return err
+	}
+
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}

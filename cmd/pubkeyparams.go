@@ -17,11 +17,11 @@ package cmd
 
 import (
 	"fmt"
-
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 type PubKeyParams struct {
@@ -58,5 +58,35 @@ func (e *PubKeyParams) Edit() error {
 		return err
 	}
 	e.publicKey = sv
+	return nil
+}
+
+func (e *PubKeyParams) SetDefaults(ctx ActionCtx) error {
+	// this doesn't fail, it just tries to help by translating an account name into a public key - we'll defer to validation
+	if e.kind != nkeys.PrefixByteAccount || e.publicKey == "" {
+		return nil
+	}
+	// test if the key is an account or nkey
+	_, err := nkeys.FromPublicKey(e.publicKey)
+	if err != nil {
+		// try to see if we match an account name
+		config := GetConfig()
+		a, err := config.ListAccounts()
+		if err != nil {
+			return nil
+		}
+		maybeAccount := strings.ToLower(e.publicKey)
+		for _, n := range a {
+			nn := strings.ToLower(n)
+			if maybeAccount == nn {
+				ac, err := ctx.StoreCtx().Store.ReadAccountClaim(n)
+				if err != nil {
+					return nil
+				}
+				e.publicKey = ac.Subject
+				break
+			}
+		}
+	}
 	return nil
 }
