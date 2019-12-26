@@ -66,6 +66,8 @@ github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQz
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/nats-io/cliprompts/v2 v2.0.0-20191203200115-ae8d3743105d h1:2+6rW0YuYCNV3BOB5iHI+85pLB29CBWrS1RPsQsfyCE=
 github.com/nats-io/cliprompts/v2 v2.0.0-20191203200115-ae8d3743105d/go.mod h1:oweZn7AeaVJYKlNHfCIhznJVsdySLSng55vfuINE/d0=
+github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768 h1:sdr8zfPeN/b4/TDoxbD9ARAtyP92zDFDvj87MeAAyjk=
+github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768/go.mod h1:oweZn7AeaVJYKlNHfCIhznJVsdySLSng55vfuINE/d0=
 github.com/nats-io/jwt v0.2.6 h1:eAyoYvGgGLXR2EpnsBUvi/FcFrBqN6YKFVbOoEfPN4k=
 github.com/nats-io/jwt v0.2.6/go.mod h1:mQxQ0uHQ9FhEVPIcTSKwx2lqZEpXWWcCgA7R6NrWvvY=
 github.com/nats-io/jwt v0.3.2 h1:+RB5hMpXUUA2dfxuhBTEkMOrYmM+gKIZYS1KjSostMI=
