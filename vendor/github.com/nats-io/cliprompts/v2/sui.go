@@ -40,7 +40,9 @@ func (sui *SurveyUI) Prompt(label string, value string, o ...Opt) (string, error
 
 func (sui *SurveyUI) wrap(validator Validator) survey.Validator {
 	if validator == nil {
-		return nil
+		validator = func(_ string) error {
+			return nil
+		}
 	}
 	return func(input interface{}) error {
 		s := input.(string)
