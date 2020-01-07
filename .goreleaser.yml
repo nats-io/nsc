@@ -6,7 +6,8 @@ release:
   name_template: '{{.Tag}}'
   draft: true
 builds:
-- main: ./main.go
+- id: nsc
+  main: ./main.go
   ldflags: "-X main.version={{.Tag}}"
   env:
     - CGO_ENABLED=0
@@ -33,5 +34,22 @@ checksum:
 
 snapshot:
   name_template: 'dev'
+
+
+brews:
+  - name: nsc
+    folder: Formula
+    github:
+      owner: nats-io
+      name: homebrew-nats-tools
+    url_template: "https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}.zip"
+    homepage: "https://github.com/nats-io/nsc"
+    description: "A tool for creating NATS account and user access configurations"
+    skip_upload: true
+    test: |
+      system "#{bin}/nsc --version"
+    install: |
+      bin.install "nsc"
+
 
 
