@@ -62,6 +62,8 @@ func createEditUserCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
 
+	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
+
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
 
@@ -92,6 +94,7 @@ type EditUserParams struct {
 	rmSrc       []string
 	src         []string
 	payload     DataParams
+	bearer      bool
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -101,7 +104,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl") {
+		"rm-response-perms", "max-responses", "response-ttl", "bearer") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -264,6 +267,11 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Payload = p.payload.Number
 	if flags.Changed("payload") {
 		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
+	}
+
+	if flags.Changed("bearer") {
+		p.claim.BearerToken = p.bearer
+		r.AddOK("changed bearer to %t", p.bearer)
 	}
 
 	src := strings.Split(p.claim.Src, ",")

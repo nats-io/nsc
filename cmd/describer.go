@@ -149,6 +149,14 @@ func NewExportsDescriber(exports jwt.Exports) *ExportsDescriber {
 	return &e
 }
 
+func toYesNo(tf bool) string {
+	v := "Yes"
+	if !tf {
+		v = "No"
+	}
+	return v
+}
+
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
@@ -156,10 +164,6 @@ func (e *ExportsDescriber) Describe() string {
 	table.AddTitle("Exports")
 	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
 	for _, v := range e.Exports {
-		public := "Yes"
-		if v.TokenReq {
-			public = "No"
-		}
 		mon := "N/A"
 		rt := ""
 		if v.Type == jwt.Service {
@@ -178,7 +182,7 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := strings.Title(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, public, len(v.Revocations), mon)
+		table.AddRow(v.Name, k, v.Subject, toYesNo(v.TokenReq), len(v.Revocations), mon)
 	}
 	return table.Render()
 }
@@ -377,6 +381,7 @@ func (u *UserDescriber) Describe() string {
 	table.UTF8Box()
 	table.AddTitle("User")
 	AddStandardClaimInfo(table, &u.UserClaims)
+	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
 
 	if len(u.Pub.Allow) > 0 || len(u.Pub.Deny) > 0 ||
 		len(u.Sub.Allow) > 0 || len(u.Sub.Deny) > 0 {

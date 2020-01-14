@@ -222,3 +222,23 @@ func Test_AddUserWithResponsePerms(t *testing.T) {
 	d, _ := time.ParseDuration("2ms")
 	require.Equal(t, d, uc.Resp.Expires)
 }
+
+func Test_AddUser_BearerToken(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UB", "--bearer")
+	require.NoError(t, err)
+
+	u, err := ts.Store.ReadUserClaim("A", "UA")
+	require.NoError(t, err)
+	require.False(t, u.BearerToken)
+
+	u, err = ts.Store.ReadUserClaim("A", "UB")
+	require.NoError(t, err)
+	require.True(t, u.BearerToken)
+}

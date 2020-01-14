@@ -60,6 +60,8 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
 
+	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
+
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -85,6 +87,7 @@ type AddUserParams struct {
 	src           []string
 	tags          []string
 	credsFilePath string
+	bearer        bool
 }
 
 func (p *AddUserParams) longHelp() string {
@@ -258,6 +261,8 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
+
+	uc.BearerToken = p.bearer
 
 	return nil
 }
