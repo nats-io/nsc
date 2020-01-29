@@ -44,7 +44,7 @@ nsc edit user --name <n> --deny-sub <subject>,...
 # Remove a previously set permissions
 nsc edit user --name <n> --rm <subject>,...
 
-# To dynamically allow publishing to reply subjects
+# To dynamically allow publishing to reply subjects, this works well for service responders:
 nsc edit user --name <n> --allow-pub-response
 
 # A permission to publish a response can be removed after a duration from when 
