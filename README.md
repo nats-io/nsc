@@ -33,3 +33,24 @@ Download your platform binary from [here.](https://github.com/nats-io/nsc/releas
 
 NSC uses go modules. If your project source is in `$GOPATH`, you must define set the environment variable `GO111MODULE` to `on`.
 
+## Running with Docker
+
+The NATS team maintains a lightweight Docker image with many of the NATS utilities called [nats-box](https://github.com/nats-io/nats-box) where `nsc` is included. You can mount a local volume to get `nsc` accounts, nkeys, and other config back on the host using Docker as follows:
+
+```sh
+docker run --rm -it -v $(pwd)/nsc:/nsc synadia/nats-box:latest
+
+# In case NSC not initialized already:
+nats-box:~# nsc init
+nats-box:~# chmod -R 1000:1000 /nsc
+$ tree -L 2 nsc/
+nsc/
+├── accounts
+│   ├── nats
+│   └── nsc.json
+└── nkeys
+    ├── creds
+    └── keys
+
+5 directories, 1 file
+```
