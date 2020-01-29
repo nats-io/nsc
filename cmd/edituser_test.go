@@ -303,3 +303,31 @@ func Test_EditUserResponsePermissions(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, uc.Resp)
 }
+
+func Test_EditUserResponsePermissions2(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "U", "--allow-pub-response", "--response-ttl", "2ms")
+	require.NoError(t, err)
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 1, uc.Resp.MaxMsgs)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "U", "--allow-pub-response=100", "--response-ttl", "2ms")
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 100, uc.Resp.MaxMsgs)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-response-perms")
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Nil(t, uc.Resp)
+}

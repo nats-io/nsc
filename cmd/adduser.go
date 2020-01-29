@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -37,7 +37,32 @@ func CreateAddUserCmd() *cobra.Command {
 		Short:        "Add an user to the account",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
-		Example:      params.longHelp(),
+		Example: `# Add user with a previously generated public key:
+nsc add user --name <n> --public-key <nkey>
+# Note: that unless you specify the seed, the key won't be stored in the keyring.'
+
+# Set permissions so that the user can publish and/or subscribe to the specified subjects or wildcards:
+nsc add user --name <n> --allow-pubsub <subject>,...
+nsc add user --name <n> --allow-pub <subject>,...
+nsc add user --name <n> --allow-sub <subject>,...
+
+# Set permissions so that the user cannot publish nor subscribe to the specified subjects or wildcards:
+nsc add user --name <n> --deny-pubsub <subject>,...
+nsc add user --name <n> --deny-pub <subject>,...
+nsc add user --name <n> --deny-sub <subject>,...
+
+# To dynamically allow publishing to reply subjects
+nsc add user --name <n> --allow-pub-response
+
+# A permission to publish a response can be removed after a duration from when 
+# the message was received:
+nsc add user --name <n> --allow-pub-response --response-ttl 5s
+
+# If the service publishes multiple response messages, you can specify:
+nsc add user --name <n> --allow-pub-response=5
+# See 'nsc edit export --response-type --help' to enable multiple
+# responses between accounts
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
@@ -51,9 +76,6 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max response permission ttl for responding to requests (global to all requests for user)")
-	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
@@ -62,6 +84,7 @@ func CreateAddUserCmd() *cobra.Command {
 
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
+	params.ResponsePermsParams.bindSetFlags(cmd)
 
 	return cmd
 }
@@ -236,7 +259,7 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 		uc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	if _, err := p.ResponsePermsParams.Run(uc); err != nil {
+	if _, err := p.ResponsePermsParams.Run(uc, ctx); err != nil {
 		return err
 	}
 
@@ -264,8 +287,23 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 
 type ResponsePermsParams struct {
 	respTTL string
-	respMax string
+	respMax int
 	rmResp  bool
+}
+
+func (p *ResponsePermsParams) bindSetFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&p.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)]")
+
+	cmd.Flags().IntVarP(&p.respMax, "allow-pub-response", "", 0, "client can publish only to requests up-to n responses (global)")
+	cmd.Flag("allow-pub-response").NoOptDefVal = "1"
+
+	cmd.Flags().IntVarP(&p.respMax, "max-responses", "", 0, "client can publish only to requests up-to n responses (global)")
+	cmd.Flag("max-responses").Hidden = true
+	cmd.Flag("max-responses").Deprecated = "use --allow-pub-n-responses or --allow-pub-response"
+}
+
+func (p *ResponsePermsParams) bindRemoveFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&p.rmResp, "rm-response-perms", "", false, "remove response settings")
 }
 
 func (p *ResponsePermsParams) maxResponseValidator(s string) error {
@@ -303,46 +341,46 @@ func (p *ResponsePermsParams) Edit(hasPerm bool) error {
 	}
 	if ok {
 		if hasPerm {
-			p.rmResp, err = cli.Confirm("delete response permissions", p.rmResp)
+			p.rmResp, err = cli.Confirm("delete response permission", p.rmResp)
 			if err != nil {
 				return err
 			}
 		}
 		if !p.rmResp {
-			p.respMax, err = cli.Prompt("Number of max responses", p.respMax, cli.Val(p.maxResponseValidator))
-			p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, cli.Val(p.ttlValidator))
+			s, err := cli.Prompt("Max number of responses", fmt.Sprintf("%d", p.respMax), cli.Val(p.maxResponseValidator))
+			if err != nil {
+				return err
+			}
+			p.respMax, _ = p.parseMaxResponse(s)
+			p.respTTL, err = cli.Prompt("Response TTL", p.respTTL, cli.Val(p.ttlValidator))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (p *ResponsePermsParams) Validate() error {
-	if err := p.maxResponseValidator(p.respMax); err != nil {
-		return err
-	}
 	if err := p.ttlValidator(p.respTTL); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *ResponsePermsParams) Run(uc *jwt.UserClaims) (*store.Report, error) {
+func (p *ResponsePermsParams) Run(uc *jwt.UserClaims, ctx ActionCtx) (*store.Report, error) {
 	r := store.NewDetailedReport(true)
 	if p.rmResp {
 		uc.Resp = nil
 		r.AddOK("removed response permissions")
 		return r, nil
 	}
-	if p.respMax != "" {
-		v, err := p.parseMaxResponse(p.respMax)
-		if err != nil {
-			return nil, err
-		}
+	if ctx.CurrentCmd().Flag("max-responses").Changed || p.respMax != 0 {
 		if uc.Resp == nil {
 			uc.Resp = &jwt.ResponsePermission{}
 		}
-		uc.Resp.MaxMsgs = v
-		r.AddOK("set max responses to %d", v)
+		uc.Resp.MaxMsgs = p.respMax
+		r.AddOK("set max responses to %d", p.respMax)
 	}
 
 	if p.respTTL != "" {

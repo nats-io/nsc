@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -219,6 +219,22 @@ func Test_AddUserWithResponsePerms(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, uc.Resp)
 	require.Equal(t, 100, uc.Resp.MaxMsgs)
+	d, _ := time.ParseDuration("2ms")
+	require.Equal(t, d, uc.Resp.Expires)
+}
+
+func Test_AddUserWithResponsePerms2(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "U", "--allow-pub-response", "--response-ttl", "2ms")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.NotNil(t, uc.Resp)
+	require.Equal(t, 1, uc.Resp.MaxMsgs)
 	d, _ := time.ParseDuration("2ms")
 	require.Equal(t, d, uc.Resp.Expires)
 }
