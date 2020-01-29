@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,6 +31,35 @@ func createEditUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Edit an user",
+		Long: `# Allow or deny subjects (or wildcards) that a client can publish and subscribe to:
+nsc edit user --name <n> --allow-pubsub <subject>,...
+nsc edit user --name <n> --deny-pubsub <subject>,...
+
+# Permissions can that only allow or deny subjects that a client publish or subscribe to:
+nsc edit user --name <n> --allow-pub <subject>,...
+nsc edit user --name <n> --deny-sub <subject>,...
+
+# To remove all permissions associated with a particular subject:
+nsc edit user --name <n> --rm <subject>
+
+# By default, an user can reply to any message that it received that has a reply subject.
+# In some cases you may want to prevent publishing on any subject unless it is a 
+# reply to a received request. In this case the user can only send a single response 
+# for all requests:
+nsc edit user --name <n> --deny-pub ">" --max-responses 1
+
+# The permission to send a response out can be removed after a duration from when 
+# the message was received:
+nsc edit user --name <n> --max-responses 1 --response-ttl 5s
+
+# If the service publishes to a stream, you may need to send multiple responses, you can
+# specify a larger count. See 'nsc edit export --response-type --help' to enable multiple
+# responses between accounts:
+nsc edit user --name <n> --max-responses 5
+
+# To remove response limitations:
+nsc edit user --name <n> --rm-response-perms
+`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -48,8 +77,8 @@ func createEditUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "add deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "add deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests for user)")
-	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
+	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests to user) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)]")
+	cmd.Flags().IntVarP(&params.respMax, "max-responses", "", 0, "client can only publish max number of responses to a request (global)")
 	cmd.Flags().BoolVarP(&params.rmResp, "rm-response-perms", "", false, "remove response settings")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
@@ -280,7 +309,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
-	s, err := p.ResponsePermsParams.Run(p.claim)
+	s, err := p.ResponsePermsParams.Run(p.claim, ctx)
 	if err != nil {
 		return nil, err
 	}

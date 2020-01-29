@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,6 +35,32 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "user",
 		Short:        "Add an user to the account",
+		Long: `# Add user with a previously generated public key:
+nsc add user --name <n> --public-key <nkey>
+# Note: that unless you specify the seed, the key won't be stored in the keyring.'
+
+# Allow or deny subjects (or wildcards) that a client can publish and subscribe to:
+nsc add user --name <n> --allow-pubsub <subject>,...
+
+# Permissions can that only allow or deny subjects that a client publish or subscribe to:
+nsc add user --name <n> --allow-pub <subject>,...
+nsc add user --name <n> --deny-sub <subject>,...
+
+# By default, an user can reply to any message that it received that has a reply subject.
+# In some cases you may want to prevent publishing on any subject unless it is a 
+# reply to a received request. In this case the user can only send a single response 
+# for all requests:
+nsc add user --name <n> --deny-pub ">" --max-responses 1
+
+# The permission to send a response out can be removed after a duration from when 
+# the message was received:
+nsc add user --name <n> --max-responses 1 --response-ttl 5s
+
+# If the service publishes to a stream, you may need to send multiple responses, you can
+# specify a larger count. See 'nsc edit export --response-type --help' to enable multiple
+# responses between accounts:
+nsc add user --name <n> --max-responses 5
+`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		Example:      params.longHelp(),
@@ -51,8 +77,8 @@ func CreateAddUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max response permission ttl for responding to requests (global to all requests for user)")
-	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
+	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests to user) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)]")
+	cmd.Flags().IntVarP(&params.respMax, "max-responses", "", 0, "client can only publish max number of responses to a request (global)")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
@@ -236,7 +262,7 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 		uc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	if _, err := p.ResponsePermsParams.Run(uc); err != nil {
+	if _, err := p.ResponsePermsParams.Run(uc, ctx); err != nil {
 		return err
 	}
 
@@ -264,7 +290,7 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 
 type ResponsePermsParams struct {
 	respTTL string
-	respMax string
+	respMax int
 	rmResp  bool
 }
 
@@ -309,40 +335,40 @@ func (p *ResponsePermsParams) Edit(hasPerm bool) error {
 			}
 		}
 		if !p.rmResp {
-			p.respMax, err = cli.Prompt("Number of max responses", p.respMax, cli.Val(p.maxResponseValidator))
+			s, err := cli.Prompt("Number of max responses", fmt.Sprintf("%d", p.respMax), cli.Val(p.maxResponseValidator))
+			if err != nil {
+				return err
+			}
+			p.respMax, _ = p.parseMaxResponse(s)
 			p.respTTL, err = cli.Prompt("Response Permission TTL", p.respTTL, cli.Val(p.ttlValidator))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (p *ResponsePermsParams) Validate() error {
-	if err := p.maxResponseValidator(p.respMax); err != nil {
-		return err
-	}
 	if err := p.ttlValidator(p.respTTL); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *ResponsePermsParams) Run(uc *jwt.UserClaims) (*store.Report, error) {
+func (p *ResponsePermsParams) Run(uc *jwt.UserClaims, ctx ActionCtx) (*store.Report, error) {
 	r := store.NewDetailedReport(true)
 	if p.rmResp {
 		uc.Resp = nil
 		r.AddOK("removed response permissions")
 		return r, nil
 	}
-	if p.respMax != "" {
-		v, err := p.parseMaxResponse(p.respMax)
-		if err != nil {
-			return nil, err
-		}
+	if ctx.CurrentCmd().Flag("max-responses").Changed || p.respMax != 0 {
 		if uc.Resp == nil {
 			uc.Resp = &jwt.ResponsePermission{}
 		}
-		uc.Resp.MaxMsgs = v
-		r.AddOK("set max responses to %d", v)
+		uc.Resp.MaxMsgs = p.respMax
+		r.AddOK("set max responses to %d", p.respMax)
 	}
 
 	if p.respTTL != "" {
