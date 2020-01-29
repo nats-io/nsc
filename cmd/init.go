@@ -414,9 +414,9 @@ func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	if p.CreateOperator {
 		local := `to run a local server using this configuration, enter:
-cmd.Printf("> nsc generate config --mem-resolver --config-file <path/server.conf>
-cmd.Printf("start a nats-server using the generated config:
-cmd.Printf("> nats-server -c <path/server.conf>`
+  nsc generate config --mem-resolver --config-file <path/server.conf>
+then start a nats-server using the generated config:
+  nats-server -c <path/server.conf>`
 		r.Add(store.NewServerMessage(local))
 	}
 	if len(p.ServiceURLs) > 0 {
