@@ -17,13 +17,24 @@ With Python:
 curl -L https://raw.githubusercontent.com/nats-io/nsc/master/install.py | python
 ```
 
+With Homebrew:
+
+```bash
+brew tap nats-io/nats-tools
+brew install nats-io/nats-tools/nsc
+
+# to uninstall:
+brew uninstall nats-io/nats-tools/nsc
+brew untap nats-io/nats-tools
+```
+
 Direct Download:
 
 Download your platform binary from [here.](https://github.com/nats-io/nsc/releases/latest)
 
 ## Updates are easy
 
-`nsc update` will download and install the latest version.
+`nsc update` will download and install the latest version. If you installed using Homebrew, `brew update` will update.
 
 ## Documentation
 
