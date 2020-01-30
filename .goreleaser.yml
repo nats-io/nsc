@@ -45,7 +45,7 @@ brews:
     url_template: "https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}.zip"
     homepage: "https://github.com/nats-io/nsc"
     description: "A tool for creating NATS account and user access configurations"
-    skip_upload: true
+    skip_upload: false
     test: |
       system "#{bin}/nsc --version"
     install: |
