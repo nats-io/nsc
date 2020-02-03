@@ -33,7 +33,7 @@ func createGenerateCredsCmd() *cobra.Command {
 		Short:        "Generate a credentials file for an user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example:      `nsc generate creds --account a --user u`,
+		Example:      `nsc generate creds --account a --name u`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
