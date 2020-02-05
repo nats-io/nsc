@@ -160,11 +160,11 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddUserParams) Load(ctx ActionCtx) error {
+func (p *AddUserParams) Load(_ ActionCtx) error {
 	return nil
 }
 
-func (p *AddUserParams) PostInteractive(ctx ActionCtx) error {
+func (p *AddUserParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
@@ -292,12 +292,12 @@ type ResponsePermsParams struct {
 }
 
 func (p *ResponsePermsParams) bindSetFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&p.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)]")
+	cmd.Flags().StringVarP(&p.respTTL, "response-ttl", "", "", "the amount of time the permission is valid (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)] - Default is no time limit.")
 
-	cmd.Flags().IntVarP(&p.respMax, "allow-pub-response", "", 0, "client can publish only to requests up-to n responses (global)")
+	cmd.Flags().IntVarP(&p.respMax, "allow-pub-response", "", 0, "client can publish only to reply subjects [with an optional count] (global)")
 	cmd.Flag("allow-pub-response").NoOptDefVal = "1"
 
-	cmd.Flags().IntVarP(&p.respMax, "max-responses", "", 0, "client can publish only to requests up-to n responses (global)")
+	cmd.Flags().IntVarP(&p.respMax, "max-responses", "", 0, "client can publish only to reply subjects [with an optional count] (global)")
 	cmd.Flag("max-responses").Hidden = true
 	cmd.Flag("max-responses").Deprecated = "use --allow-pub-n-responses or --allow-pub-response"
 }
