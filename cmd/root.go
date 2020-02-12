@@ -146,6 +146,18 @@ func Execute() {
 	}
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+// But writer is decided by the caller function
+// returns error than os.Exit(1)
+func ExecuteWithWriter(out io.Writer) error {
+	cli.SetOutput(out)
+	if err := GetRootCmd().Execute(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 	HoistRootFlags(GetRootCmd())
