@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -140,10 +141,22 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cli.SetOutput(rootCmd.OutOrStderr())
-	if err := GetRootCmd().Execute(); err != nil {
+	err := ExecuteWithWriter(rootCmd.OutOrStderr())
+	if err != nil {
 		os.Exit(1)
 	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+// But writer is decided by the caller function
+// returns error than os.Exit(1)
+func ExecuteWithWriter(out io.Writer) error {
+	cli.SetOutput(out)
+	if err := GetRootCmd().Execute(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {
