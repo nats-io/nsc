@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2018 The NATS Authors
+# Copyright 2018-2020 The NATS Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -31,8 +31,6 @@ except ImportError:
     from urllib2 import urlopen
 
 NSC_REPO_URL = "https://github.com/nats-io/nsc"
-LATEST_RELEASE_URL = NSC_REPO_URL + "/releases/latest"
-TAG_URL = NSC_REPO_URL + "/releases/tag/"
 FILENAME_LOOKUP = {
     "darwin": "nsc-darwin-amd64.zip",
     "linux": "nsc-linux-amd64.zip",
@@ -50,22 +48,10 @@ def release_url(platform, tag):
         print("Unable to locate appropriate filename for", platform)
         sys.exit(1)
 
-    url = TAG_URL + tag if tag else LATEST_RELEASE_URL
-
-    try:
-        html = urlopen(url).read().decode('utf-8')
-    except:
-        print("Unable to find release page for", tag)
-        sys.exit(1)
-
-    urls = re.findall(r'href=[\'"]?([^\'" >]+)', html)
-    matching = [u for u in urls if filename in u]
-
-    if len(matching) != 1:
-        print("Unable to find download url for", filename)
-        sys.exit(1)
-
-    return "https://github.com" + matching[0]
+    release_base = NSC_REPO_URL + '/releases/'
+    if tag:
+        return release_base + 'download/' + tag + '/' + filename
+    return release_base + 'latest/download/' + filename
 
 
 def download_with_progress(url):
@@ -116,6 +102,9 @@ def main():
     os.chmod(exe_fn, 0o744)
 
     print("NSC: " + exe_fn)
+    if maybe_symlink(exe_fn):
+        return
+
     print("Now manually add %s to your $PATH" % bin_dir)
     if windows:
         print("Windows Cmd Prompt Example:")
@@ -123,13 +112,49 @@ def main():
         print()
     else:
         print("Bash Example:")
-        print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bash_profile" % bin_dir)
-        print("  source $HOME/.bash_profile")
+        print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.bashrc" % bin_dir)
+        print("  source $HOME/.bashrc")
         print()
         print("Zsh Example:")
         print("  echo 'export PATH=\"$PATH:%s\"' >> $HOME/.zshrc" % bin_dir)
         print("  source $HOME/.zshrc")
         print()
+
+
+# Returns True if install instructions are not needed
+def maybe_symlink(exe_fn):
+    sym_dir = nsc_symlink_dir()
+    if not sym_dir:
+        return False
+    link_path = os.path.join(sym_dir, os.path.basename(exe_fn))
+    if os.path.exists(link_path):
+        if os.path.islink(link_path):
+            try:
+                os.unlink(link_path)
+            except Exception:
+                return False
+        else:
+            print("Not touching non-symlink: " + link_path)
+            return False
+    try:
+        os.symlink(exe_fn, link_path)
+        print("NSC: " + link_path)
+        if dir_in_PATH(sym_dir):
+            return True
+        return False
+    except Exception:
+        # Python2 does not support symlinks on Windows, amongst other
+        # reasons this might have failed.
+        return False
+
+
+def dir_in_PATH(dirname):
+    try:
+        envPath = os.environ['PATH']
+    except Exception:
+        return False
+    return dirname in envPath.split(os.pathsep)
+
 
 def mkdir(d):
     if not os.path.exists(d):
@@ -144,6 +169,14 @@ def nsc_bin_dir():
     bin_dir = os.path.join(nsccli, "bin")
     mkdir(bin_dir)
     return bin_dir
+
+
+def nsc_symlink_dir():
+    home = os.path.expanduser("~")
+    sym_dir = os.path.join(home, "bin")
+    if os.path.exists(sym_dir):
+        return sym_dir
+    return None
 
 
 if __name__ == '__main__':

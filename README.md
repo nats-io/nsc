@@ -13,8 +13,16 @@ A tool for creating NATS account and user access configurations
 
 With Python:
 
-```python
+```bash
 curl -L https://raw.githubusercontent.com/nats-io/nsc/master/install.py | python
+```
+
+Without Python and with a more cautious mindset:
+
+```bash
+curl -LO https://raw.githubusercontent.com/nats-io/nsc/master/install.sh
+less install.sh
+sh ./install.sh
 ```
 
 With Homebrew:
