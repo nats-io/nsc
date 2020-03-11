@@ -58,11 +58,11 @@ func GetOutput(fp string) (*os.File, error) {
 	} else {
 		afp, err := filepath.Abs(fp)
 		if err != nil {
-			return nil, fmt.Errorf("error calculating abs %q: %v", fp, err)
+			return nil, fmt.Errorf("error calculating abs %#q: %v", fp, err)
 		}
 		_, err = os.Stat(afp)
 		if err == nil {
-			return nil, fmt.Errorf("%q already exists", afp)
+			return nil, fmt.Errorf("%#q already exists", afp)
 		}
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -70,7 +70,7 @@ func GetOutput(fp string) (*os.File, error) {
 
 		f, err = os.Create(afp)
 		if err != nil {
-			return nil, fmt.Errorf("error creating output file %q: %v", afp, err)
+			return nil, fmt.Errorf("error creating output file %#q: %v", afp, err)
 		}
 	}
 	return f, nil
@@ -87,7 +87,7 @@ func WriteJson(fp string, v interface{}) error {
 	}
 
 	if err := ioutil.WriteFile(fp, data, 0600); err != nil {
-		return fmt.Errorf("error writing %q: %v", fp, err)
+		return fmt.Errorf("error writing %#q: %v", fp, err)
 	}
 
 	return nil
@@ -106,7 +106,7 @@ func Write(fp string, data []byte) error {
 	}
 	_, err = f.Write(data)
 	if err != nil {
-		return fmt.Errorf("error writing %q: %v", fp, err)
+		return fmt.Errorf("error writing %#q: %v", fp, err)
 	}
 
 	if !IsStdOut(fp) {
@@ -291,12 +291,16 @@ func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Valid
 
 func IsURL(v string) bool {
 	u, err := url.Parse(v)
-	return err == nil && u.Scheme != ""
+	if err == nil {
+		s := strings.ToLower(u.Scheme)
+		return s == "http" || s == "https"
+	}
+	return false
 }
 
 func LoadFromFileOrURL(v string) ([]byte, error) {
 	// we expect either a file or url
-	if u, err := url.Parse(v); err == nil && u.Scheme != "" {
+	if IsURL(v) {
 		return LoadFromURL(v)
 	}
 	v, err := Expand(v)
@@ -344,12 +348,12 @@ func MaybeMakeDir(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil && os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("error creating %q: %v", dir, err)
+			return fmt.Errorf("error creating %#q: %v", dir, err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("error stat'ing %q: %v", dir, err)
+		return fmt.Errorf("error stat'ing %#q: %v", dir, err)
 	} else if !fi.IsDir() {
-		return fmt.Errorf("%q already exists and it is not a dir", dir)
+		return fmt.Errorf("%#q already exists and it is not a dir", dir)
 	}
 	return nil
 }
@@ -418,7 +422,7 @@ func OperatorNameValidator(v string) error {
 	for _, o := range operators {
 		if o == v {
 			r := GetConfig().StoreRoot
-			return fmt.Errorf("an operator named %q already exists in %q - specify a different directory with --dir", v, r)
+			return fmt.Errorf("an operator named %#q already exists in %#q - specify a different directory with --dir", v, r)
 		}
 	}
 	return nil

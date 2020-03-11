@@ -40,7 +40,7 @@ type ToolConfig struct {
 	LastUpdate    int64  `json:"last_update"`
 }
 
-var toolName = filepath.Base(os.Args[0])
+var toolName = strings.ReplaceAll(filepath.Base(os.Args[0]), ".exe", "")
 
 var config ToolConfig
 var toolHome string
@@ -253,7 +253,7 @@ func initToolHome(envVarName string) (string, error) {
 	}
 
 	if err := MaybeMakeDir(toolHome); err != nil {
-		return "", fmt.Errorf("error creating tool home %q: %v", toolHome, err)
+		return "", fmt.Errorf("error creating tool home %#q: %v", toolHome, err)
 	}
 
 	return toolHome, nil

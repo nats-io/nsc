@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -308,22 +307,13 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *AddImportParams) loadImport() ([]byte, error) {
-	if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
-		data, err := LoadFromURL(p.tokenSrc)
-		if err != nil {
-			return nil, err
-		}
-		s, err := jwt.ParseDecoratedJWT(data)
-		return []byte(s), err
-	}
-
-	data, err := Read(p.tokenSrc)
+	data, err := LoadFromFileOrURL(p.tokenSrc)
 	if err != nil {
-		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
+		return nil, fmt.Errorf("error loading %#q: %v", p.tokenSrc, err)
 	}
 	v, err := jwt.ParseDecoratedJWT(data)
 	if err != nil {
-		return nil, fmt.Errorf("error loading %q: %v", p.tokenSrc, err)
+		return nil, fmt.Errorf("error loading %#q: %v", p.tokenSrc, err)
 	}
 	return []byte(v), nil
 }
@@ -563,7 +553,7 @@ func (p *AddImportParams) createImport() *jwt.Import {
 		im.Subject, im.To = im.To, im.Subject
 	}
 	if p.tokenSrc != "" {
-		if u, err := url.Parse(p.tokenSrc); err == nil && u.Scheme != "" {
+		if IsURL(p.tokenSrc) {
 			im.Token = p.tokenSrc
 		}
 	}

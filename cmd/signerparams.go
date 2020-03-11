@@ -160,7 +160,7 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if p.signerKP == nil {
 		// if they specified a key, the file didn't resolve to a key
 		if KeyPathFlag != "" {
-			err = fmt.Errorf("%q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
+			err = fmt.Errorf("%#q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
 		}
 		signers, err := p.getSigners(ctx)
 		if err != nil {

@@ -106,7 +106,7 @@ func (p *ListKeysParams) Validate(ctx ActionCtx) error {
 	kdir := store.GetKeysDir()
 	_, err := os.Stat(kdir)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("keystore %q does not exist", kdir)
+		return fmt.Errorf("keystore %#q does not exist", kdir)
 	}
 	if ctx.StoreCtx().Operator.Name == "" && !p.Unreferenced {
 		return errors.New("operator is not set -- set an operator first or try --not-referenced to list all keys not in the context")

@@ -18,7 +18,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -236,10 +235,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
-	if u, err := url.Parse(i.Token); err == nil && u.Scheme != "" {
-		return true
-	}
-	return false
+	return IsURL(i.Token)
 }
 
 func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {

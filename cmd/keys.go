@@ -40,7 +40,7 @@ func createMigrateKeysCmd() *cobra.Command {
 				return err
 			}
 			if !migration {
-				cmd.Printf("keystore %q does not need migration\n", AbbrevHomePaths(store.GetKeysDir()))
+				cmd.Printf("keystore %#q does not need migration\n", AbbrevHomePaths(store.GetKeysDir()))
 				return nil
 			}
 
@@ -48,7 +48,7 @@ func createMigrateKeysCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.Printf("keystore %q was migrated - old store was renamed to %q - remove at your convenience\n",
+			cmd.Printf("keystore %#q was migrated - old store was renamed to %#q - remove at your convenience\n",
 				AbbrevHomePaths(store.GetKeysDir()),
 				AbbrevHomePaths(old))
 

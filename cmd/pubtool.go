@@ -97,7 +97,7 @@ func (p *PubParams) Validate(ctx ActionCtx) error {
 
 	_, err := os.Stat(p.credsPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("%v: %q", err, p.credsPath)
+		return fmt.Errorf("%v: %#q", err, p.credsPath)
 	}
 	if len(p.natsURLs) == 0 {
 		return fmt.Errorf("operator %q doesn't have operator_service_urls set", ctx.StoreCtx().Operator.Name)

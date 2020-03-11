@@ -77,10 +77,10 @@ func TestCommon_GetOutput(t *testing.T) {
 			file.Close()
 		}
 		if d.isError && err == nil {
-			t.Errorf("expected error creating %q, but didn't", d.fp)
+			t.Errorf("expected error creating %#q, but didn't", d.fp)
 		}
 		if !d.isError && err != nil {
-			t.Errorf("unexpected error creating %q: %v", d.fp, err)
+			t.Errorf("unexpected error creating %#q: %v", d.fp, err)
 		}
 	}
 }

@@ -151,7 +151,7 @@ func (c *ContextConfig) SetOperator(operator string) error {
 		}
 	}
 	if !ok {
-		return fmt.Errorf("operator %q not in %q", operator, c.StoreRoot)
+		return fmt.Errorf("operator %q not in %#q", operator, c.StoreRoot)
 	}
 
 	c.Operator = operator
@@ -202,5 +202,5 @@ func (c *ContextConfig) hasSubContainer(kind string, name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%q not in %s for operator %q in %q", name, kind, c.Operator, c.StoreRoot)
+	return fmt.Errorf("%q not in %s for operator %q in %#q", name, kind, c.Operator, c.StoreRoot)
 }

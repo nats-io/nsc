@@ -84,7 +84,7 @@ func NewEmptyStore(t *testing.T) *TestStore {
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
 	err = os.Mkdir(nkeysDir, 0700)
-	require.NoError(t, err, "error creating %q", nkeysDir)
+	require.NoError(t, err, "error creating %#q", nkeysDir)
 	require.NoError(t, err)
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
 
@@ -147,13 +147,13 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 	storeRoot := ts.GetStoresRoot()
 	operatorRoot := filepath.Join(storeRoot, operatorName)
 	err := os.MkdirAll(operatorRoot, 0700)
-	require.NoError(t, err, "error creating %q", operatorRoot)
+	require.NoError(t, err, "error creating %#q", operatorRoot)
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
 	_, err = os.Stat(nkeysDir)
 	if err != nil && os.IsNotExist(err) {
 		err = os.Mkdir(nkeysDir, 0700)
-		require.NoError(t, err, "error creating %q", nkeysDir)
+		require.NoError(t, err, "error creating %#q", nkeysDir)
 	}
 	require.NoError(t, err)
 
@@ -674,7 +674,6 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 				w.WriteHeader(http.StatusNotFound)
 			}
 			w.Header().Add("Content-Type", "application/jwt")
-			w.WriteHeader(200)
 			w.Write(data)
 		}
 

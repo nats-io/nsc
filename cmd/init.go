@@ -409,8 +409,8 @@ func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		return r, err
 	}
 	r.AddOK("created user %q", p.Name)
-	r.AddOK("project jwt files created in %q", AbbrevHomePaths(p.Dir))
-	r.AddOK("user creds file stored in %q", AbbrevHomePaths(p.User.CredsPath))
+	r.AddOK("project jwt files created in %#q", AbbrevHomePaths(p.Dir))
+	r.AddOK("user creds file stored in %#q", AbbrevHomePaths(p.User.CredsPath))
 
 	if p.CreateOperator {
 		local := `to run a local server using this configuration, enter:
