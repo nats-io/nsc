@@ -1,3 +1,7 @@
+os:
+- linux
+- windows
+
 language: go
 go:
 - 1.12.x
@@ -15,14 +19,13 @@ install:
 #  - go get -u github.com/client9/misspell/cmd/misspell
 
 before_script:
-- EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/")
-- $(exit $(go fmt $EXCLUDE_VENDOR | wc -l))
-- go vet $EXCLUDE_VENDOR
-#- misspell -error -locale US .
-#- megacheck $EXCLUDE_VENDOR
+  - |
+    if [ "$TRAVIS_OS_NAME" == "linux" ];
+    then EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/") && $(exit $(go fmt $EXCLUDE_VENDOR | wc -l)) && go vet $EXCLUDE_VENDOR
+    fi
 
 script:
-- ./scripts/cov.sh TRAVIS
+    go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
 after_success:
 - git reset --hard
