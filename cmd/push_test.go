@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,7 +75,11 @@ func Test_SyncNoServer(t *testing.T) {
 
 	_, stderr, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
-	require.Contains(t, stderr, "connect: connection refused")
+	if runtime.GOOS == "windows" {
+		require.Contains(t, stderr, "connectex: No connection")
+	} else {
+		require.Contains(t, stderr, "connect: connection refused")
+	}
 }
 
 func Test_SyncManaged(t *testing.T) {

@@ -233,7 +233,7 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 			if err != nil {
 				r.AddError("error storing creds: %v", err)
 			} else {
-				r.AddOK("generated user creds file %q", AbbrevHomePaths(p.credsFilePath))
+				r.AddOK("generated user creds file %#q", AbbrevHomePaths(p.credsFilePath))
 			}
 		}
 	} else {

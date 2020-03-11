@@ -39,7 +39,7 @@ func createGenerateCredsCmd() *cobra.Command {
 				return err
 			}
 			if !QuietMode() && params.out != "--" {
-				cmd.Printf("Success!! - generated %q\n", params.out)
+				cmd.Printf("Success!! - generated %#q\n", params.out)
 			}
 			return nil
 		},
@@ -149,7 +149,7 @@ func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	var s store.Status
 	if !IsStdOut(p.out) {
-		s = store.OKStatus("wrote credentials to %q", AbbrevHomePaths(p.out))
+		s = store.OKStatus("wrote credentials to %#q", AbbrevHomePaths(p.out))
 	}
 	return s, nil
 }

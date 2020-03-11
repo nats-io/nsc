@@ -361,7 +361,7 @@ func (k *KeyStore) Store(kp nkeys.KeyPair) (string, error) {
 		if os.IsNotExist(err) {
 			err := ioutil.WriteFile(fp, seed, 0600)
 			if err != nil {
-				return "", fmt.Errorf("error writing %q: %v", fp, err)
+				return "", fmt.Errorf("error writing %#q: %v", fp, err)
 			}
 			return fp, nil
 		}
@@ -369,10 +369,10 @@ func (k *KeyStore) Store(kp nkeys.KeyPair) (string, error) {
 
 	d, err := ioutil.ReadFile(fp)
 	if err != nil {
-		return "", fmt.Errorf("error reading %q: %v", fp, err)
+		return "", fmt.Errorf("error reading %#q: %v", fp, err)
 	}
 	if string(d) != string(seed) {
-		return "", fmt.Errorf("key %q already exists and is different", fp)
+		return "", fmt.Errorf("key %#q already exists and is different", fp)
 	}
 	return fp, err
 }
@@ -514,7 +514,7 @@ func dirExists(fp string) (bool, error) {
 	if fi.IsDir() {
 		return true, nil
 	} else {
-		return false, fmt.Errorf("%q is not a directory", fp)
+		return false, fmt.Errorf("%#q is not a directory", fp)
 	}
 }
 
@@ -560,16 +560,16 @@ func migrateKey(src string, to string) (string, error) {
 	if filepath.Ext(src) == NKeyExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
-			return "", fmt.Errorf("error processing %q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %v", src, err)
 		}
 		kp, err := nkeys.FromSeed(d)
 		if err != nil {
-			return "", fmt.Errorf("error processing %q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %v", src, err)
 		}
 
 		pk, err := kp.PublicKey()
 		if err != nil {
-			return "", fmt.Errorf("error processing %q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %v", src, err)
 		}
 		kind := pk[0:1]
 		shard := pk[1:3]
@@ -600,7 +600,7 @@ func relCredsPath(ksroot string, p string) (string, error) {
 	if len(a) == 5 {
 		return filepath.Join(CredsDir, a[0], a[2], a[4]), nil
 	}
-	return "", fmt.Errorf("unexpected creds filepath len of %d: %q", len(a), rel)
+	return "", fmt.Errorf("unexpected creds filepath len of %d: %#q", len(a), rel)
 
 }
 
@@ -608,7 +608,7 @@ func migrateCreds(ksroot string, src string, to string) (string, error) {
 	if filepath.Ext(src) == CredsExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
-			return "", fmt.Errorf("error processing %q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %v", src, err)
 		}
 
 		rel, err := relCredsPath(ksroot, src)
@@ -630,12 +630,12 @@ func MaybeMakeDir(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil && os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("error creating %q: %v", dir, err)
+			return fmt.Errorf("error creating %#q: %v", dir, err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("error stat'ing %q: %v", dir, err)
+		return fmt.Errorf("error stat'ing %#q: %v", dir, err)
 	} else if !fi.IsDir() {
-		return fmt.Errorf("%q already exists and it is not a dir", dir)
+		return fmt.Errorf("%#q already exists and it is not a dir", dir)
 	}
 	return nil
 }

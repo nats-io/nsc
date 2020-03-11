@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,12 +18,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/url"
-
-	"github.com/nats-io/nsc/cmd/store"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -75,28 +73,17 @@ func (p *DescribeFile) Load(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("file is required")
 	}
-	if url, err := url.Parse(p.file); err == nil && url.Scheme != "" {
-		d, err := LoadFromURL(p.file)
-		if err != nil {
-			return err
-		}
-		p.token = string(d)
-	} else {
-		d, err := Read(p.file)
-		if err != nil {
-			return err
-		}
+	if d, err := LoadFromFileOrURL(p.file); err == nil {
 		p.token, err = jwt.ParseDecoratedJWT(d)
 		if err != nil {
 			return err
 		}
+		gc, err := jwt.DecodeGeneric(p.token)
+		if err != nil {
+			return err
+		}
+		p.kind = gc.Type
 	}
-
-	gc, err := jwt.DecodeGeneric(p.token)
-	if err != nil {
-		return err
-	}
-	p.kind = gc.Type
 	return nil
 }
 
@@ -146,7 +133,7 @@ func (p *DescribeFile) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	var s store.Status
 	if !IsStdOut(p.outputFile) {
-		s = store.OKStatus("wrote account description to %q", AbbrevHomePaths(p.outputFile))
+		s = store.OKStatus("wrote account description to %#q", AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }

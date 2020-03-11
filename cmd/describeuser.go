@@ -141,7 +141,7 @@ func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		if Raw {
 			k = "jwt"
 		}
-		s = store.OKStatus("wrote user %s to %q", k, AbbrevHomePaths(p.outputFile))
+		s = store.OKStatus("wrote user %s to %#q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }
