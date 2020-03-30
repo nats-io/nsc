@@ -79,7 +79,7 @@ nsc add user --name <n> --allow-pub-response=5
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.name, "name", "n", "", "name to assign the user")
+	cmd.Flags().StringVarP(&params.userName, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
 
 	params.TimeParams.BindFlags(cmd)
@@ -96,7 +96,7 @@ func init() {
 type AddUserParams struct {
 	AccountContextParams
 	SignerParams
-	Entity
+	//Entity
 	TimeParams
 	ResponsePermsParams
 	allowPubs     []string
@@ -108,6 +108,10 @@ type AddUserParams struct {
 	src           []string
 	tags          []string
 	credsFilePath string
+	userName      string
+	create        bool
+	keyPath       string
+	kp            nkeys.KeyPair
 }
 
 func (p *AddUserParams) longHelp() string {
@@ -119,17 +123,15 @@ toolName add user --name u --tag test,service_a`
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
-	p.name = NameFlagOrArgument(p.name, ctx)
-	if p.name == "*" {
-		p.name = GetRandomName(0)
+	p.userName = NameFlagOrArgument(p.userName, ctx)
+	if p.userName == "*" {
+		p.userName = GetRandomName(0)
 	}
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 	p.create = true
-	p.Entity.kind = nkeys.PrefixByteUser
-	p.editFn = p.editUserClaim
 
 	return nil
 }
@@ -140,8 +142,36 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	if err = p.Entity.Edit(); err != nil {
+	p.userName, err = cli.Prompt("user name", p.userName, cli.NewLengthValidator(1))
+	if err != nil {
 		return err
+	}
+
+	ok, err := cli.Confirm("generate an user nkey", true)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		p.keyPath, err = cli.Prompt("path to an user nkey or nkey", p.keyPath, cli.Val(func(v string) error {
+			nk, err := store.ResolveKey(v)
+			if err != nil {
+				return err
+			}
+			if nk == nil {
+				return fmt.Errorf("a key is required")
+			}
+			t, err := store.KeyType(nk)
+			if err != nil {
+				return err
+			}
+			if t != nkeys.PrefixByteUser {
+				return errors.New("specified key is not a valid for an user")
+			}
+			return nil
+		}))
+		if err != nil {
+			return err
+		}
 	}
 
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
@@ -170,13 +200,13 @@ func (p *AddUserParams) PostInteractive(_ ActionCtx) error {
 
 func (p *AddUserParams) Validate(ctx ActionCtx) error {
 	var err error
-	if p.name == "" {
+	if p.userName == "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("user name is required")
 	}
 
-	if p.name == "*" {
-		p.name = GetRandomName(0)
+	if p.userName == "*" {
+		p.userName = GetRandomName(0)
 	}
 
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
@@ -195,41 +225,70 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	return p.Entity.Valid()
+	if p.keyPath != "" {
+		p.kp, err = store.ResolveKey(p.keyPath)
+		if err != nil {
+			return err
+		}
+		if !store.KeyPairTypeOk(nkeys.PrefixByteUser, p.kp) {
+			return errors.New("invalid user key")
+		}
+	} else if p.create {
+		p.kp, err = nkeys.CreatePair(nkeys.PrefixByteUser)
+		if err != nil {
+			return err
+		}
+	}
+
+	s := ctx.StoreCtx().Store
+	if s.Has(store.Accounts, ctx.StoreCtx().Account.Name, store.Users, store.JwtName(p.userName)) {
+		return fmt.Errorf("the user %q already exists", p.userName)
+	}
+
+	return nil
 }
 
 func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	var rs store.Status
-	var err error
+	uc, err := p.generateUserClaim(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	if err := p.Entity.StoreKeys(p.AccountContextParams.Name); err != nil {
+	token, err := uc.Encode(p.signerKP)
+	if err != nil {
 		return nil, err
 	}
 
 	r := store.NewDetailedReport(false)
-	rs, err = p.Entity.GenerateClaim(p.signerKP, ctx)
-	if rs != nil {
-		r.Add(rs)
-	}
+	st, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
 	if err != nil {
 		r.AddFromError(err)
+		return st, err
 	}
-	if rs != nil {
-		r.Add(rs)
+	if st != nil {
+		r.Add(st)
 	}
 
-	pk, _ := p.kp.PublicKey()
-	if p.generated {
-		r.AddOK("generated and stored user key %q", pk)
+	// store the key
+	if p.create && p.keyPath == "" {
+		ks := ctx.StoreCtx()
+		var err error
+		if p.keyPath, err = ks.KeyStore.Store(p.kp); err != nil {
+			r.AddFromError(err)
+			return r, err
+		}
+		r.AddOK("generated and stored user key %q", uc.Subject)
 	}
+
+	pk := uc.Subject
 	// if they gave us a seed, it stored - try to get it
 	ks := ctx.StoreCtx().KeyStore
 	if ks.HasPrivateKey(pk) {
-		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.name, p.kp)
+		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.userName, p.kp)
 		if err != nil {
 			r.AddError("unable to save creds: %v", err)
 		} else {
-			p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.name, d)
+			p.credsFilePath, err = ks.MaybeStoreUserCreds(p.AccountContextParams.Name, p.userName, d)
 			if err != nil {
 				r.AddError("error storing creds: %v", err)
 			} else {
@@ -240,15 +299,25 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("skipped generating creds file - user private key is not available")
 	}
 	if r.HasNoErrors() {
-		r.AddOK("added user %q to account %q", p.name, p.AccountContextParams.Name)
+		r.AddOK("added user %q to account %q", p.userName, p.AccountContextParams.Name)
 	}
 	return r, nil
 }
 
-func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
-	uc, ok := c.(*jwt.UserClaims)
-	if !ok {
-		return errors.New("unable to cast to user claim")
+func (p *AddUserParams) generateUserClaim(ctx ActionCtx) (*jwt.UserClaims, error) {
+	pub, err := p.kp.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	uc := jwt.NewUserClaims(pub)
+	uc.Name = p.userName
+
+	spk, err := p.signerKP.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	if ctx.StoreCtx().Account.PublicKey != spk {
+		uc.IssuerAccount = ctx.StoreCtx().Account.PublicKey
 	}
 
 	if p.TimeParams.IsStartChanged() {
@@ -260,7 +329,7 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 	}
 
 	if _, err := p.ResponsePermsParams.Run(uc, ctx); err != nil {
-		return err
+		return nil, err
 	}
 
 	uc.Permissions.Pub.Allow.Add(p.allowPubs...)
@@ -282,7 +351,7 @@ func (p *AddUserParams) editUserClaim(c interface{}, ctx ActionCtx) error {
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
 
-	return nil
+	return uc, nil
 }
 
 type ResponsePermsParams struct {

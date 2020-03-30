@@ -52,6 +52,7 @@ func Test_AddUserNoStore(t *testing.T) {
 	ngsStore = nil
 	ForceStoreRoot(t, "")
 	_, _, err := ExecuteCmd(CreateAddUserCmd())
+	require.Error(t, err)
 	require.Equal(t, "no stores available", err.Error())
 }
 
@@ -237,4 +238,35 @@ func Test_AddUserWithResponsePerms2(t *testing.T) {
 	require.Equal(t, 1, uc.Resp.MaxMsgs)
 	d, _ := time.ParseDuration("2ms")
 	require.Equal(t, d, uc.Resp.Expires)
+}
+
+func Test_AddUserWithInteractiveAccountCtx(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	// adding to user bb to B
+	inputs := []interface{}{1, "bb", true, "0", "0"}
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	bpk := ts.GetAccountPublicKey(t, "B")
+	uc, err := ts.Store.ReadUserClaim("B", "bb")
+	require.NoError(t, err)
+	require.Equal(t, bpk, uc.Issuer)
+	require.Empty(t, uc.IssuerAccount)
+
+	// adding to user aa to A
+	inputs = []interface{}{0, "aa", true, "0", "0"}
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+	apk := ts.GetAccountPublicKey(t, "A")
+
+	uc, err = ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.Equal(t, apk, uc.Issuer)
+	require.Empty(t, uc.IssuerAccount)
 }
