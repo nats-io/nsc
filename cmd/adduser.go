@@ -80,7 +80,7 @@ nsc add user --name <n> --allow-pub-response=5
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
 	cmd.Flags().StringVarP(&params.userName, "name", "n", "", "name to assign the user")
-	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the user")
+	cmd.Flags().StringVarP(&params.pkOrPath, "public-key", "k", "", "public key identifying the user")
 
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
@@ -96,7 +96,6 @@ func init() {
 type AddUserParams struct {
 	AccountContextParams
 	SignerParams
-	//Entity
 	TimeParams
 	ResponsePermsParams
 	allowPubs     []string
@@ -109,8 +108,7 @@ type AddUserParams struct {
 	tags          []string
 	credsFilePath string
 	userName      string
-	create        bool
-	keyPath       string
+	pkOrPath      string
 	kp            nkeys.KeyPair
 }
 
@@ -131,7 +129,6 @@ func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {
 		return err
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
-	p.create = true
 
 	return nil
 }
@@ -152,7 +149,7 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 	if !ok {
-		p.keyPath, err = cli.Prompt("path to an user nkey or nkey", p.keyPath, cli.Val(func(v string) error {
+		p.pkOrPath, err = cli.Prompt("path to an user nkey or nkey", p.pkOrPath, cli.Val(func(v string) error {
 			nk, err := store.ResolveKey(v)
 			if err != nil {
 				return err
@@ -225,15 +222,15 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.keyPath != "" {
-		p.kp, err = store.ResolveKey(p.keyPath)
+	if p.pkOrPath != "" {
+		p.kp, err = store.ResolveKey(p.pkOrPath)
 		if err != nil {
 			return err
 		}
 		if !store.KeyPairTypeOk(nkeys.PrefixByteUser, p.kp) {
 			return errors.New("invalid user key")
 		}
-	} else if p.create {
+	} else {
 		p.kp, err = nkeys.CreatePair(nkeys.PrefixByteUser)
 		if err != nil {
 			return err
@@ -270,10 +267,10 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	// store the key
-	if p.create && p.keyPath == "" {
+	if p.pkOrPath == "" {
 		ks := ctx.StoreCtx()
 		var err error
-		if p.keyPath, err = ks.KeyStore.Store(p.kp); err != nil {
+		if p.pkOrPath, err = ks.KeyStore.Store(p.kp); err != nil {
 			r.AddFromError(err)
 			return r, err
 		}
