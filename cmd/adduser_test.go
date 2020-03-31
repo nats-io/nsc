@@ -16,8 +16,12 @@
 package cmd
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/stretchr/testify/require"
 )
@@ -50,8 +54,9 @@ func Test_AddUser(t *testing.T) {
 func Test_AddUserNoStore(t *testing.T) {
 	// reset the store
 	ngsStore = nil
-	ForceStoreRoot(t, "")
+	require.NoError(t, ForceStoreRoot(t, ""))
 	_, _, err := ExecuteCmd(CreateAddUserCmd())
+	require.Error(t, err)
 	require.Equal(t, "no stores available", err.Error())
 }
 
@@ -237,4 +242,88 @@ func Test_AddUserWithResponsePerms2(t *testing.T) {
 	require.Equal(t, 1, uc.Resp.MaxMsgs)
 	d, _ := time.ParseDuration("2ms")
 	require.Equal(t, d, uc.Resp.Expires)
+}
+
+func Test_AddUserWithInteractiveAccountCtx(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	// adding to user bb to B
+	inputs := []interface{}{1, "bb", true, "0", "0"}
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	bpk := ts.GetAccountPublicKey(t, "B")
+	uc, err := ts.Store.ReadUserClaim("B", "bb")
+	require.NoError(t, err)
+	require.Equal(t, bpk, uc.Issuer)
+	require.Empty(t, uc.IssuerAccount)
+
+	// adding to user aa to A
+	inputs = []interface{}{0, "aa", true, "0", "0"}
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+	apk := ts.GetAccountPublicKey(t, "A")
+
+	uc, err = ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.Equal(t, apk, uc.Issuer)
+	require.Empty(t, uc.IssuerAccount)
+}
+
+func Test_AddUserWithInteractiveCustomKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	kp, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	sk, err := kp.Seed()
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+
+	inputs := []interface{}{"aa", false, string(sk), "0", "0"}
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.Equal(t, pk, uc.Subject)
+	require.Empty(t, uc.IssuerAccount)
+	require.False(t, ts.KeyStore.HasPrivateKey(pk))
+
+	inputs = []interface{}{"bb", false, pk, "0", "0"}
+	cmd = CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "bb")
+	require.NoError(t, err)
+	require.Equal(t, pk, uc.Subject)
+	require.Empty(t, uc.IssuerAccount)
+	require.False(t, ts.KeyStore.HasPrivateKey(pk))
+
+	fp := filepath.Join(ts.Dir, "key")
+	err = ioutil.WriteFile(fp, sk, 0600)
+	require.NoError(t, err)
+
+	inputs = []interface{}{"cc", false, fp, "0", "0"}
+	cmd = CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "cc")
+	require.NoError(t, err)
+	require.Equal(t, pk, uc.Subject)
+	require.Empty(t, uc.IssuerAccount)
+	require.False(t, ts.KeyStore.HasPrivateKey(pk))
 }
