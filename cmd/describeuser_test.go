@@ -48,15 +48,11 @@ func TestDescribeUser_Single(t *testing.T) {
 func TestDescribeUserRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-	oldRaw := Raw
-	Raw = true
-	defer func() {
-		Raw = oldRaw
-	}()
 
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
+	Raw = true
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
 
@@ -211,8 +207,6 @@ func TestDescribeUser_Json(t *testing.T) {
 	ts.AddUser(t, "A", "aa")
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--json")
-	// reset the global
-	Json = false
 	require.NoError(t, err)
 	m := make(map[string]interface{})
 	err = json.Unmarshal([]byte(out), &m)

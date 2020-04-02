@@ -87,11 +87,7 @@ func TestJsonPath_PrimitiveCannotBeInspected(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
-	d := `{
-		"a":[1,"hello",true], 
-		"b": "hello",
-        "c": {"key": "one","value": "two"}
-}`
+	d := `{"a":[1,"hello",true],"b": "hello","c": {"key": "one","value": "two"}}`
 	ba := []byte(d)
 	v, err := GetField(ba, "a")
 	require.NoError(t, err)

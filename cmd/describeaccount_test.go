@@ -47,14 +47,9 @@ func TestDescribeAccount_Single(t *testing.T) {
 func TestDescribeAccountRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-	oldRaw := Raw
-	Raw = true
-	defer func() {
-		Raw = oldRaw
-	}()
-
 	ts.AddAccount(t, "A")
 
+	Raw = true
 	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 
@@ -175,8 +170,6 @@ func TestDescribeAccount_Json(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
-	// reset the global
-	Json = false
 	require.NoError(t, err)
 	m := make(map[string]interface{})
 	err = json.Unmarshal([]byte(out), &m)

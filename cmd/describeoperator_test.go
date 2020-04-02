@@ -159,8 +159,6 @@ func TestDescribeOperator_Json(t *testing.T) {
 	defer ts.Done(t)
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--json")
-	// reset the global
-	Json = false
 	require.NoError(t, err)
 	m := make(map[string]interface{})
 	err = json.Unmarshal([]byte(out), &m)
