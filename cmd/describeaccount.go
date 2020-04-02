@@ -64,15 +64,21 @@ func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
-	if Json || Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawAccountClaim(p.AccountContextParams.Name)
 		if err != nil {
 			return err
 		}
-		if Json {
+		if Json || JsonPath != "" {
 			p.raw, err = bodyAsJson(p.raw)
 			if err != nil {
 				return err
+			}
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -95,7 +101,7 @@ func (p *DescribeAccountParams) PostInteractive(_ ActionCtx) error {
 }
 
 func (p *DescribeAccountParams) Run(_ ActionCtx) (store.Status, error) {
-	if Raw || Json {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))

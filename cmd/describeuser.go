@@ -92,15 +92,21 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
-	if Json || Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
 		if err != nil {
 			return err
 		}
-		if Json {
+		if Json || JsonPath != "" {
 			p.raw, err = bodyAsJson(p.raw)
 			if err != nil {
 				return err
+			}
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -122,7 +128,7 @@ func (p *DescribeUserParams) PostInteractive(_ ActionCtx) error {
 }
 
 func (p *DescribeUserParams) Run(_ ActionCtx) (store.Status, error) {
-	if Raw || Json {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))
@@ -131,6 +137,7 @@ func (p *DescribeUserParams) Run(_ ActionCtx) (store.Status, error) {
 			}
 		}
 		p.raw = append(p.raw, '\n')
+
 		if err := Write(p.outputFile, p.raw); err != nil {
 			return nil, err
 		}

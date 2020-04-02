@@ -29,6 +29,7 @@ var Raw bool
 var WideFlag bool
 var Wide = noopNameFilter
 var Json bool
+var JsonPath string
 
 type WideFun = func(a string) string
 
@@ -72,6 +73,7 @@ func init() {
 	describeCmd.PersistentFlags().BoolVarP(&Json, "json", "J", false, "display JWT body as JSON")
 	describeCmd.PersistentFlags().BoolVarP(&WideFlag, "long-ids", "W", false, "display account ids on imports")
 	describeCmd.PersistentFlags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
+	describeCmd.PersistentFlags().StringVarP(&JsonPath, "field", "F", "", "extract value from specified field using json structure")
 }
 
 func bodyAsJson(data []byte) ([]byte, error) {

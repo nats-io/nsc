@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -183,4 +184,16 @@ func TestDescribeAccount_Json(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, ac.Subject, m["sub"])
+}
+
+func TestDescribeAccount_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--field", "sub")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)
 }
