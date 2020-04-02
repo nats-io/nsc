@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,12 +16,19 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
 var Raw bool
 var WideFlag bool
 var Wide = noopNameFilter
+var Json bool
 
 type WideFun = func(a string) string
 
@@ -62,6 +69,28 @@ var describeCmd = &cobra.Command{
 
 func init() {
 	GetRootCmd().AddCommand(describeCmd)
+	describeCmd.PersistentFlags().BoolVarP(&Json, "json", "J", false, "display JWT body as JSON")
 	describeCmd.PersistentFlags().BoolVarP(&WideFlag, "long-ids", "W", false, "display account ids on imports")
 	describeCmd.PersistentFlags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
+}
+
+func bodyAsJson(data []byte) ([]byte, error) {
+	chunks := bytes.Split(data, []byte{'.'})
+	if len(chunks) != 3 {
+		return nil, errors.New("data is not a jwt")
+	}
+	body := chunks[1]
+	d, err := base64.RawURLEncoding.DecodeString(string(body))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding base64: %v", err)
+	}
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(d, &m); err != nil {
+		return nil, fmt.Errorf("error parsing json: %v", err)
+	}
+	f, err := json.MarshalIndent(m, "", " ")
+	if err != nil {
+		return nil, fmt.Errorf("error formatting json: %v", err)
+	}
+	return f, nil
 }

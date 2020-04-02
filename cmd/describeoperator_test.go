@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -114,6 +115,8 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 
 	u := "https://asu.com:1234"
 	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotNil(t, oc)
 	oc.AccountServerURL = u
 	token, err := oc.Encode(ts.OperatorKey)
 	require.NoError(t, err)
@@ -148,4 +151,21 @@ func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 	require.Contains(t, stdout, "Operator Service URLs")
 	require.Contains(t, stdout, "nats://localhost:4222")
 	require.Contains(t, stdout, "tls://localhost:4333")
+}
+
+func TestDescribeOperator_Json(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--json")
+	// reset the global
+	Json = false
+	require.NoError(t, err)
+	m := make(map[string]interface{})
+	err = json.Unmarshal([]byte(out), &m)
+	require.NoError(t, err)
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotNil(t, oc)
+	require.Equal(t, oc.Subject, m["sub"])
 }
