@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -47,15 +48,11 @@ func TestDescribeUser_Single(t *testing.T) {
 func TestDescribeUserRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-	oldRaw := Raw
-	Raw = true
-	defer func() {
-		Raw = oldRaw
-	}()
 
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
+	Raw = true
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
 
@@ -210,8 +207,6 @@ func TestDescribeUser_Json(t *testing.T) {
 	ts.AddUser(t, "A", "aa")
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--json")
-	// reset the global
-	Json = false
 	require.NoError(t, err)
 	m := make(map[string]interface{})
 	err = json.Unmarshal([]byte(out), &m)
@@ -220,4 +215,17 @@ func TestDescribeUser_Json(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, uc)
 	require.Equal(t, uc.Subject, m["sub"])
+}
+
+func TestDescribeUser_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "aa")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--field", "sub")
+	uc, err := ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out)
 }

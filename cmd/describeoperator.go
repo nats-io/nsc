@@ -82,15 +82,22 @@ func (p *DescribeOperatorParams) PreInteractive(_ ActionCtx) error {
 
 func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 	var err error
-	if Json || Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawOperatorClaim()
 		if err != nil {
 			return err
 		}
-		if Json {
+		if Json || JsonPath != "" {
 			p.raw, err = bodyAsJson(p.raw)
 			if err != nil {
 				return err
+			}
+
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -112,7 +119,7 @@ func (p *DescribeOperatorParams) PostInteractive(_ ActionCtx) error {
 }
 
 func (p *DescribeOperatorParams) Run(_ ActionCtx) (store.Status, error) {
-	if Raw || Json {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))

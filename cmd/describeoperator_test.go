@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -158,8 +159,6 @@ func TestDescribeOperator_Json(t *testing.T) {
 	defer ts.Done(t)
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--json")
-	// reset the global
-	Json = false
 	require.NoError(t, err)
 	m := make(map[string]interface{})
 	err = json.Unmarshal([]byte(out), &m)
@@ -168,4 +167,14 @@ func TestDescribeOperator_Json(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, oc)
 	require.Equal(t, oc.Subject, m["sub"])
+}
+
+func TestDescribeOperator_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--field", "sub")
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", oc.Subject), out)
 }
