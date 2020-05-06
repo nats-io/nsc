@@ -44,7 +44,7 @@ nsc import keys --recursive --dir <path>
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to export keys to")
+	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to import keys from")
 	cmd.Flags().BoolVarP(&params.Recurse, "recurse", "R", false, "recurse directories")
 	cmd.MarkFlagRequired("dir")
 
