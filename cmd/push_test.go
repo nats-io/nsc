@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/nats-io/jwt"
 	"runtime"
 	"testing"
 
@@ -93,4 +94,36 @@ func Test_SyncManaged(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.False(t, ac.IsSelfSigned())
+}
+
+func Test_SyncManualServer(t *testing.T) {
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
+
+	// remove the account server
+	op, err := jwt.DecodeOperatorClaims(string(m["operator"]))
+	require.NoError(t, err)
+	op.AccountServerURL = ""
+	s, err := op.Encode(okp)
+	require.NoError(t, err)
+	m["operator"] = []byte(s)
+
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	err = ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
+	ts.AddAccount(t, "A")
+
+	// edit the jwt
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	require.NoError(t, err)
+
+	// sync the store
+	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A", "--account-jwt-server-url", as.URL)
+	require.NoError(t, err)
+
+	// verify the tag was stored
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Tags, "a")
 }

@@ -42,6 +42,7 @@ push -A (all accounts)`,
 	}
 	cmd.Flags().BoolVarP(&params.allAccounts, "all", "A", false, "push all accounts under the current operator (exclusive of -a)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "push regardless of validation issues")
+	cmd.Flags().StringVarP(&params.ASU, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https urls supported if updating with nsc)")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
