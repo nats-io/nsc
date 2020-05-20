@@ -281,6 +281,8 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	// if they gave us a seed, it stored - try to get it
 	ks := ctx.StoreCtx().KeyStore
 	if ks.HasPrivateKey(pk) {
+		// we may have it - but the key we got is possibly a pub only - resolve it from the store.
+		p.kp, _ = ks.GetKeyPair(pk)
 		d, err := GenerateConfig(ctx.StoreCtx().Store, p.AccountContextParams.Name, p.userName, p.kp)
 		if err != nil {
 			r.AddError("unable to save creds: %v", err)

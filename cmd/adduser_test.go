@@ -18,6 +18,7 @@ package cmd
 import (
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -326,4 +327,16 @@ func Test_AddUserWithInteractiveCustomKey(t *testing.T) {
 	require.Equal(t, pk, uc.Subject)
 	require.Empty(t, uc.IssuerAccount)
 	require.False(t, ts.KeyStore.HasPrivateKey(pk))
+}
+
+func Test_AddUserWithExistingNkey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--user", "--store")
+	require.NoError(t, err)
+	pk := strings.Split(stderr, "\n")[1]
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "U", "--public-key", pk)
+	require.NoError(t, err)
 }

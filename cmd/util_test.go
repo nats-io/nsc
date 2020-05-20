@@ -701,6 +701,10 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 				ok = ac.SigningKeys.Contains(ac.Issuer)
 			}
 
+			// store a copy of the source jwt that we can inspect
+			orig := fmt.Sprintf("SRC_%s", ac.Subject)
+			storage[orig] = body
+
 			if ok {
 				ac.Limits.Conn = -1
 				ac.Limits.Data = -1
