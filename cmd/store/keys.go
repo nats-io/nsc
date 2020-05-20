@@ -188,6 +188,10 @@ func (k *KeyStore) keyName(n string) string {
 	return fmt.Sprintf("%s%s", n, NKeyExtension)
 }
 
+func (k *KeyStore) CalcAccountCredsDir(account string) string {
+	return filepath.Join(GetKeysDir(), CredsDir, k.Env, account)
+}
+
 func (k *KeyStore) CalcUserCredsPath(account string, user string) string {
 	return filepath.Join(GetKeysDir(), CredsDir, k.Env, account, k.credsName(user))
 }
