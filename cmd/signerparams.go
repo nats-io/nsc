@@ -174,6 +174,28 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 func (p *SignerParams) ForceManagedAccountKey(ctx ActionCtx, kp nkeys.KeyPair) {
 	if ctx.StoreCtx().Store.IsManaged() && p.signerKP == nil {
+		// use the account as the signer
 		p.signerKP = kp
+		// check we have a private key available
+		pk, _ := p.signerKP.PrivateKey()
+		if pk == nil {
+			// try to load it
+			pub, _ := p.signerKP.PublicKey()
+			kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(pub)
+			if err == nil {
+				pk, _ := kp.PrivateKey()
+				if pk != nil {
+					p.signerKP = kp
+				}
+			}
+		}
 	}
+}
+
+func (p *SignerParams) canSign(nk nkeys.KeyPair) bool {
+	if nk == nil {
+		return false
+	}
+	pk, _ := nk.PrivateKey()
+	return pk != nil
 }

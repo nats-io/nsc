@@ -18,6 +18,8 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -158,4 +160,34 @@ func Test_AddAccountNameArg(t *testing.T) {
 
 	_, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
+}
+
+func Test_AddAccountWithExistingKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--account", "--store")
+	require.NoError(t, err)
+	pk := strings.Split(stderr, "\n")[1]
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
+	require.NoError(t, err)
+}
+
+func Test_AddManagedAccountWithExistingKey(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
+
+	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--account", "--store")
+	require.NoError(t, err)
+	pk := strings.Split(stderr, "\n")[1]
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
+	require.NoError(t, err)
+
+	// inspect the pushed JWT before it was resigned
+	ac, err := jwt.DecodeAccountClaims(string(m[fmt.Sprintf("SRC_%s", pk)]))
+	require.NoError(t, err)
+	require.Equal(t, pk, ac.Subject)
+	require.Equal(t, pk, ac.Issuer)
 }
