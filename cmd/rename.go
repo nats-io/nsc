@@ -27,8 +27,8 @@ import (
 )
 
 var renameCmd = &cobra.Command{
-	Use: "rename",
-	Short: "Rename operator, account or user",
+	Use:    "rename",
+	Short:  "Rename operator, account or user",
 	Hidden: true,
 }
 
@@ -39,19 +39,36 @@ func init() {
 
 func createRenameAccountCmd() *cobra.Command {
 	var params RenameAccountParams
-
 	var cmd = &cobra.Command{
-		Use: "account",
-		Short: "renames an account",
-		Args: cobra.ExactArgs(2),
+		Use:          "account",
+		Args:         cobra.ExactArgs(2),
+		Example:      "nsc rename account <name> <newname>",
 		SilenceUsage: true,
-		Example: "nsc rename account <name> <newname>",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !params.yes {
+				conf := GetConfig()
+				stores := AbbrevHomePaths(conf.StoreRoot)
+				keys := AbbrevHomePaths(store.GetKeysDir())
+				cmd.Printf(`This command makes destructive changes to files and keys. The account 
+rename operation requires that the JWT be reissued with a new name, 
+reusing it's previous ID. This command will move the account, and moves
+users and associated credential files under the new account name. 
+Please the following directories:
+
+  %s
+  %s
+
+Run this command with the '--OK' flag, to bypass the warning.
+`, stores, keys)
+				return errors.New("required flag \"OK\" not set")
+			}
+
 			params.from = args[0]
 			params.to = args[1]
 			return RunAction(cmd, args, &params)
 		},
 	}
+
 	cmd.Flags().BoolVarP(&params.yes, "OK", "", false, "backed up")
 	cmd.Flag("OK").Hidden = true
 
@@ -63,19 +80,10 @@ type RenameAccountParams struct {
 	from string
 	to   string
 	ac   *jwt.AccountClaims
-	yes bool
+	yes  bool
 }
 
 func (p *RenameAccountParams) SetDefaults(ctx ActionCtx) error {
-	if !p.yes {
-		conf := GetConfig()
-		stores := AbbrevHomePaths(conf.StoreRoot)
-		keys := AbbrevHomePaths(store.GetKeysDir())
-		ctx.CurrentCmd().Print("This command makes destructive changes to files and keys.\n")
-		ctx.CurrentCmd().Printf("Please backup:\n\t%s\n\t%s\n", stores, keys)
-		ctx.CurrentCmd().Printf("And rerun this command with --OK\n")
-		return errors.New("override flag is required")
-	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
@@ -181,7 +189,7 @@ func (p *RenameAccountParams) moveUser(ctx ActionCtx, u string) (store.Status, e
 	return r, err
 }
 
-func (p *RenameAccountParams) moveCreds(ctx ActionCtx, u string) (store.Status, error) {
+func (p *RenameAccountParams) moveCreds(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
 	fp := ctx.StoreCtx().KeyStore.CalcAccountCredsDir(p.from)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
@@ -209,8 +217,10 @@ func (p *RenameAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	cus, err := p.copyUsers(ctx)
 	r.Add(cus)
 
-	if r.HasNoErrors() {
-		r.AddOK("copied account %q and renamed to %q", p.from, p.to)
+	mcr, err := p.moveCreds(ctx)
+	r.Add(mcr)
+	if err != nil {
+		return r, err
 	}
 	return r, err
 }

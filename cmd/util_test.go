@@ -634,6 +634,11 @@ func (ts *TestStore) VerifyUser(t *testing.T, operator string, account string, u
 	}
 }
 
+func (ts *TestStore) DoesNotExist(t *testing.T, fp string) {
+	_, err := os.Stat(fp)
+	require.False(t, os.IsExist(err))
+}
+
 func Test_Util(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
