@@ -16,8 +16,9 @@
 package cmd
 
 import (
-	"github.com/nats-io/jwt"
 	"testing"
+
+	"github.com/nats-io/jwt"
 
 	"github.com/stretchr/testify/require"
 )

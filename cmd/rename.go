@@ -18,8 +18,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/nats-io/nkeys"
 	"os"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
@@ -94,7 +95,6 @@ func (p *RenameAccountParams) PreInteractive(ctx ActionCtx) error {
 func (p *RenameAccountParams) Load(ctx ActionCtx) error {
 	var err error
 	p.ac, err = ctx.StoreCtx().Store.ReadAccountClaim(p.from)
-
 
 	return err
 }
