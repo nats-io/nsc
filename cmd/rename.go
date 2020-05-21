@@ -121,8 +121,7 @@ func (p *RenameAccountParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *RenameAccountParams) copyAccount(ctx ActionCtx) (store.Status, error) {
-	r := store.NewDetailedReport(false)
-
+	r := store.NewReport(store.NONE, "copy account %q to %q", p.from, p.to)
 	p.ac.Name = p.to
 	token, err := p.ac.Encode(p.signerKP)
 	if err != nil {
@@ -141,12 +140,11 @@ func (p *RenameAccountParams) copyAccount(ctx ActionCtx) (store.Status, error) {
 			r.Add(DiffAccountLimits(p.ac, bc))
 		}
 	}
-	r.AddOK("copied account %q to %q", p.from, p.to)
 	return r, nil
 }
 
 func (p *RenameAccountParams) copyUsers(ctx ActionCtx) (store.Status, error) {
-	r := store.NewDetailedReport(false)
+	r := store.NewReport(store.NONE, "move users")
 	s := ctx.StoreCtx().Store
 	users, err := s.ListEntries(store.Accounts, p.from, store.Users)
 	if err != nil {
@@ -157,66 +155,74 @@ func (p *RenameAccountParams) copyUsers(ctx ActionCtx) (store.Status, error) {
 		s, _ := p.moveUser(ctx, u)
 		r.Add(s)
 	}
-	if err := s.Delete(store.Accounts, p.from, store.Users); err != nil {
-		r.AddWarning("error deleting user directory from account %q", p.from)
-	} else {
-		r.AddOK("deleted user directory from account %q", p.from)
-	}
-	if err := s.Delete(store.Accounts, p.from, store.JwtName(p.from)); err != nil {
-		r.AddWarning("error deleting account %q jwt", p.from)
-	} else {
-		r.AddOK("deleted account %q jwt", p.from)
-	}
-	if err := s.Delete(store.Accounts, p.from); err != nil {
-		r.AddWarning("error deleting account %q dir: %v", p.from, err)
-	} else {
-		r.AddOK("deleted account directory %q", p.from)
-	}
 	return r, nil
 }
 
 func (p *RenameAccountParams) moveUser(ctx ActionCtx, u string) (store.Status, error) {
-	r := store.NewDetailedReport(false)
-	r.Label = fmt.Sprintf("move user %q", u)
+	r := store.NewReport(store.NONE, "move user %q", u)
 	s := ctx.StoreCtx().Store
 	d, err := s.ReadRawUserClaim(p.from, u)
 	if err != nil {
-		r.AddError("Unable to read user: %v", err)
+		r.AddError("unable to read user: %v", err)
 		return r, err
 	}
-
 	if err := s.Write(d, store.Accounts, p.to, store.Users, store.JwtName(u)); err != nil {
-		r.AddError("Unable to write user: %v", err)
+		r.AddError("unable to write user: %v", err)
 		return r, err
 	}
 	r.AddOK("copied user")
 	if err := s.Delete(store.Accounts, p.from, store.Users, store.JwtName(u)); err != nil {
 		r.AddWarning("error deleting user %v", err)
 	}
+	r.AddOK("removed user from the old account")
 	return r, err
 }
 
 func (p *RenameAccountParams) moveCreds(ctx ActionCtx) (store.Status, error) {
-	r := store.NewDetailedReport(false)
-	r.Label = "move creds directory"
+	r := store.NewReport(store.OK, "move creds directory")
 	fp := ctx.StoreCtx().KeyStore.CalcAccountCredsDir(p.from)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
-		r.AddOK("creds directory for %q doesn't exist", p.from)
+		r.AddOK("skipping... no creds directory found")
 		return r, nil
 	}
 	tfp := ctx.StoreCtx().KeyStore.CalcAccountCredsDir(p.to)
 	if err := os.Rename(fp, tfp); err != nil {
-		r.AddError("error renaming creds dir %q: %v", tfp, err)
+		tfp = AbbrevHomePaths(tfp)
+		r.AddError("error renaming dir %q: %v", tfp, err)
 		return r, err
 	}
-	r.AddOK("renamed creds dir for account %q to %q", p.from, p.to)
+	return r, nil
+}
+
+func (p *RenameAccountParams) cleanup(ctx ActionCtx) (store.Status, error) {
+	r := store.NewReport(store.NONE, "cleanup")
+	s := ctx.StoreCtx().Store
+	if err := s.Delete(store.Accounts, p.from, store.Users); err != nil {
+		fp := s.Resolve(store.Accounts, p.from, store.Users)
+		fp = AbbrevHomePaths(fp)
+		r.AddWarning("error deleting directory %s: %v", fp, err)
+	} else {
+		r.AddOK("deleted old users directory")
+	}
+	if err := s.Delete(store.Accounts, p.from, store.JwtName(p.from)); err != nil {
+		fp := s.Resolve(store.Accounts, p.from, store.JwtName(p.from))
+		fp = AbbrevHomePaths(fp)
+		r.AddWarning("error deleting jwt %s: %v", fp, err)
+	} else {
+		r.AddOK("deleted old account jwt")
+	}
+	if err := s.Delete(store.Accounts, p.from); err != nil {
+		fp := s.Resolve(store.Accounts, p.from)
+		fp = AbbrevHomePaths(fp)
+		r.AddWarning("error deleting old account %q dir: %v", fp, err)
+	} else {
+		r.AddOK("deleted old account directory")
+	}
 	return r, nil
 }
 
 func (p *RenameAccountParams) Run(ctx ActionCtx) (store.Status, error) {
-	r := store.NewDetailedReport(false)
-	r.ReportSum = false
-
+	r := store.NewReport(store.NONE, "rename account %q to %q", p.from, p.to)
 	sr, err := p.copyAccount(ctx)
 	r.Add(sr)
 	if err != nil {
@@ -227,8 +233,12 @@ func (p *RenameAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return r, err
 	}
-
 	mcr, err := p.moveCreds(ctx)
 	r.Add(mcr)
+	if err != nil {
+		return r, err
+	}
+	cr, err := p.cleanup(ctx)
+	r.Add(cr)
 	return r, err
 }

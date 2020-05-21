@@ -162,7 +162,7 @@ func Test_Nested(t *testing.T) {
 	require.Contains(t, lines[4], fmt.Sprintf(errTemplate, "some error"))
 }
 
-func Test_ServerMessagesAllwaysShow(t *testing.T) {
+func Test_ServerMessagesAlwaysShow(t *testing.T) {
 	s := NewReport(OK, "summary")
 	s.Opt = DetailsOnErrorOrWarning
 	s.AddOK("one")

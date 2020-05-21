@@ -226,6 +226,10 @@ func (s *Store) resolve(name ...string) string {
 	return filepath.Join(s.Dir, filepath.Join(name...))
 }
 
+func (s *Store) Resolve(name ...string) string {
+	return filepath.Join(s.Dir, filepath.Join(name...))
+}
+
 // Has returns true if the specified asset exists
 func (s *Store) Has(name ...string) bool {
 	fp := s.resolve(name...)
