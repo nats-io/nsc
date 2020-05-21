@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt"
-
 	"github.com/stretchr/testify/require"
 )
 
