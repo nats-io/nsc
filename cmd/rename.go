@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,10 +18,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/nats-io/nkeys"
 	"os"
 
 	"github.com/nats-io/jwt"
-	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +53,7 @@ func createRenameAccountCmd() *cobra.Command {
 rename operation requires that the JWT be reissued with a new name, 
 reusing it's previous ID. This command will move the account, and moves
 users and associated credential files under the new account name. 
-Please the following directories:
+Please backup the following directories:
 
   %s
   %s
@@ -84,7 +84,6 @@ type RenameAccountParams struct {
 }
 
 func (p *RenameAccountParams) SetDefaults(ctx ActionCtx) error {
-	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
 
@@ -95,6 +94,8 @@ func (p *RenameAccountParams) PreInteractive(ctx ActionCtx) error {
 func (p *RenameAccountParams) Load(ctx ActionCtx) error {
 	var err error
 	p.ac, err = ctx.StoreCtx().Store.ReadAccountClaim(p.from)
+
+
 	return err
 }
 
@@ -103,6 +104,11 @@ func (p *RenameAccountParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *RenameAccountParams) Validate(ctx ActionCtx) error {
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.from)
+	ctx.StoreCtx().Account.Name = p.from
+	ctx.StoreCtx().Account.PublicKey = ac.Subject
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+
 	bc, err := ctx.StoreCtx().Store.ReadAccountClaim(p.to)
 	if err == nil || bc != nil {
 		return fmt.Errorf("account %q already exists", p.to)
@@ -171,26 +177,28 @@ func (p *RenameAccountParams) copyUsers(ctx ActionCtx) (store.Status, error) {
 
 func (p *RenameAccountParams) moveUser(ctx ActionCtx, u string) (store.Status, error) {
 	r := store.NewDetailedReport(false)
+	r.Label = fmt.Sprintf("move user %q", u)
 	s := ctx.StoreCtx().Store
 	d, err := s.ReadRawUserClaim(p.from, u)
 	if err != nil {
-		r.AddError("Unable to read user %q: %v", u, err)
+		r.AddError("Unable to read user: %v", err)
 		return r, err
 	}
 
 	if err := s.Write(d, store.Accounts, p.to, store.Users, store.JwtName(u)); err != nil {
-		r.AddError("Unable to write user %q: %v", u, err)
+		r.AddError("Unable to write user: %v", err)
 		return r, err
 	}
-	r.AddOK("copied user %q to account %q", u, p.to)
+	r.AddOK("copied user")
 	if err := s.Delete(store.Accounts, p.from, store.Users, store.JwtName(u)); err != nil {
-		r.AddWarning("error deleting user %q from account %q", u, p.from)
+		r.AddWarning("error deleting user %v", err)
 	}
 	return r, err
 }
 
 func (p *RenameAccountParams) moveCreds(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
+	r.Label = "move creds directory"
 	fp := ctx.StoreCtx().KeyStore.CalcAccountCredsDir(p.from)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		r.AddOK("creds directory for %q doesn't exist", p.from)
@@ -206,7 +214,7 @@ func (p *RenameAccountParams) moveCreds(ctx ActionCtx) (store.Status, error) {
 }
 
 func (p *RenameAccountParams) Run(ctx ActionCtx) (store.Status, error) {
-	r := store.NewDetailedReport(true)
+	r := store.NewDetailedReport(false)
 	r.ReportSum = false
 
 	sr, err := p.copyAccount(ctx)
@@ -216,11 +224,11 @@ func (p *RenameAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	cus, err := p.copyUsers(ctx)
 	r.Add(cus)
-
-	mcr, err := p.moveCreds(ctx)
-	r.Add(mcr)
 	if err != nil {
 		return r, err
 	}
+
+	mcr, err := p.moveCreds(ctx)
+	r.Add(mcr)
 	return r, err
 }

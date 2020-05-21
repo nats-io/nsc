@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/nats-io/jwt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,4 +82,25 @@ func Test_RenameAccountDuplicate(t *testing.T) {
 
 	_, _, err := ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
 	require.Error(t, err)
+}
+
+func Test_RenameManagedAccount(t *testing.T) {
+	as, m := RunTestAccountServer(t)
+	defer as.Close()
+
+	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	pk := ts.GetAccountPublicKey(t, "A")
+	ac, err := jwt.DecodeAccountClaims(string(m[pk]))
+	require.Equal(t, pk, ac.Subject)
+	require.Equal(t, "A", ac.Name)
+
+	_, _, err = ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
+	require.NoError(t, err)
+	bc, err := jwt.DecodeAccountClaims(string(m[pk]))
+	require.NoError(t, err)
+	require.Equal(t, pk, bc.Subject)
+	require.Equal(t, "B", bc.Name)
 }
