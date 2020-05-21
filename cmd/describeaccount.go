@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -51,8 +51,7 @@ type DescribeAccountParams struct {
 
 func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.Name = NameFlagOrArgument(p.AccountContextParams.Name, ctx)
-	p.AccountContextParams.SetDefaults(ctx)
-	return nil
+	return p.AccountContextParams.SetDefaults(ctx)
 }
 
 func (p *DescribeAccountParams) PreInteractive(ctx ActionCtx) error {
@@ -65,11 +64,22 @@ func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
-
-	if Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawAccountClaim(p.AccountContextParams.Name)
 		if err != nil {
 			return err
+		}
+		if Json || JsonPath != "" {
+			p.raw, err = bodyAsJson(p.raw)
+			if err != nil {
+				return err
+			}
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
@@ -82,16 +92,16 @@ func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) Validate(ctx ActionCtx) error {
+func (p *DescribeAccountParams) Validate(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) PostInteractive(ctx ActionCtx) error {
+func (p *DescribeAccountParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
-	if Raw {
+func (p *DescribeAccountParams) Run(_ ActionCtx) (store.Status, error) {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))
@@ -115,7 +125,7 @@ func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		if Raw {
 			k = "jwt"
 		}
-		s = store.OKStatus("wrote account %s to %q", k, AbbrevHomePaths(p.outputFile))
+		s = store.OKStatus("wrote account %s to %#q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }

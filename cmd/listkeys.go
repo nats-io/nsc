@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -106,7 +106,7 @@ func (p *ListKeysParams) Validate(ctx ActionCtx) error {
 	kdir := store.GetKeysDir()
 	_, err := os.Stat(kdir)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("keystore %q does not exist", kdir)
+		return fmt.Errorf("keystore %#q does not exist", kdir)
 	}
 	if ctx.StoreCtx().Operator.Name == "" && !p.Unreferenced {
 		return errors.New("operator is not set -- set an operator first or try --not-referenced to list all keys not in the context")

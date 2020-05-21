@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -240,10 +239,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
-	if u, err := url.Parse(i.Token); err == nil && u.Scheme != "" {
-		return true
-	}
-	return false
+	return IsURL(i.Token)
 }
 
 func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {

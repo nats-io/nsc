@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -40,7 +40,7 @@ func createMigrateKeysCmd() *cobra.Command {
 				return err
 			}
 			if !migration {
-				cmd.Printf("keystore %q does not need migration\n", AbbrevHomePaths(store.GetKeysDir()))
+				cmd.Printf("keystore %#q does not need migration\n", AbbrevHomePaths(store.GetKeysDir()))
 				return nil
 			}
 
@@ -48,7 +48,7 @@ func createMigrateKeysCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.Printf("keystore %q was migrated - old store was renamed to %q - remove at your convenience\n",
+			cmd.Printf("keystore %#q was migrated - old store was renamed to %#q - remove at your convenience\n",
 				AbbrevHomePaths(store.GetKeysDir()),
 				AbbrevHomePaths(old))
 

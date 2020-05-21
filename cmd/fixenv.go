@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -197,11 +197,11 @@ func (p *FixCmd) Regenerate(rr *store.Report) error {
 	var err error
 	p.out, err = Expand(p.out)
 	if err != nil {
-		rr.AddError("error expanding destination directory %q: %v", p.out, err)
+		rr.AddError("error expanding destination directory %#q: %v", p.out, err)
 		return err
 	}
 	if err := os.MkdirAll(p.out, 0700); err != nil {
-		rr.AddError("error creating destination directory %q: %v", p.out, err)
+		rr.AddError("error creating destination directory %#q: %v", p.out, err)
 		return err
 	}
 	if err := os.Setenv(store.NKeysPathEnv, filepath.Join(p.out, "keys")); err != nil {
@@ -630,7 +630,7 @@ func (p *FixCmd) loadFile(fp string) ([]byte, error) {
 func (p *FixCmd) loadJwt(fp string) (string, error) {
 	d, err := p.loadFile(fp)
 	if err != nil {
-		return "", fmt.Errorf("error %q: %v", fp, err)
+		return "", fmt.Errorf("error %#q: %v", fp, err)
 	}
 	return jwt.ParseDecoratedJWT(d)
 }
@@ -705,16 +705,16 @@ func (p *FixCmd) LoadNKey(fp string) error {
 	}
 	kp, err := jwt.ParseDecoratedNKey(d)
 	if err != nil {
-		return fmt.Errorf("error parsing nkey %q: %v", fp, err)
+		return fmt.Errorf("error parsing nkey %#q: %v", fp, err)
 	}
 
 	pk, err := kp.PublicKey()
 	if err != nil {
-		return fmt.Errorf("error reading public key %q: %v", fp, err)
+		return fmt.Errorf("error reading public key %#q: %v", fp, err)
 	}
 	sk, err := kp.Seed()
 	if err != nil {
-		return fmt.Errorf("error reading seed %q: %v", fp, err)
+		return fmt.Errorf("error reading seed %#q: %v", fp, err)
 	}
 	p.Keys[pk] = string(sk)
 	return nil

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -409,14 +409,14 @@ func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		return r, err
 	}
 	r.AddOK("created user %q", p.Name)
-	r.AddOK("project jwt files created in %q", AbbrevHomePaths(p.Dir))
-	r.AddOK("user creds file stored in %q", AbbrevHomePaths(p.User.CredsPath))
+	r.AddOK("project jwt files created in %#q", AbbrevHomePaths(p.Dir))
+	r.AddOK("user creds file stored in %#q", AbbrevHomePaths(p.User.CredsPath))
 
 	if p.CreateOperator {
 		local := `to run a local server using this configuration, enter:
-cmd.Printf("> nsc generate config --mem-resolver --config-file <path/server.conf>
-cmd.Printf("start a nats-server using the generated config:
-cmd.Printf("> nats-server -c <path/server.conf>`
+  nsc generate config --mem-resolver --config-file <path/server.conf>
+then start a nats-server using the generated config:
+  nats-server -c <path/server.conf>`
 		r.Add(store.NewServerMessage(local))
 	}
 	if len(p.ServiceURLs) > 0 {

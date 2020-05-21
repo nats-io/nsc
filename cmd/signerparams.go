@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -160,7 +160,7 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if p.signerKP == nil {
 		// if they specified a key, the file didn't resolve to a key
 		if KeyPathFlag != "" {
-			err = fmt.Errorf("%q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
+			err = fmt.Errorf("%#q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
 		}
 		signers, err := p.getSigners(ctx)
 		if err != nil {
@@ -174,6 +174,28 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 
 func (p *SignerParams) ForceManagedAccountKey(ctx ActionCtx, kp nkeys.KeyPair) {
 	if ctx.StoreCtx().Store.IsManaged() && p.signerKP == nil {
+		// use the account as the signer
 		p.signerKP = kp
+		// check we have a private key available
+		pk, _ := p.signerKP.PrivateKey()
+		if pk == nil {
+			// try to load it
+			pub, _ := p.signerKP.PublicKey()
+			kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(pub)
+			if err == nil {
+				pk, _ := kp.PrivateKey()
+				if pk != nil {
+					p.signerKP = kp
+				}
+			}
+		}
 	}
+}
+
+func (p *SignerParams) canSign(nk nkeys.KeyPair) bool {
+	if nk == nil {
+		return false
+	}
+	pk, _ := nk.PrivateKey()
+	return pk != nil
 }

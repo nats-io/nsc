@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -61,6 +61,9 @@ func ResetForTests() {
 
 func ResetSharedFlags() {
 	KeyPathFlag = ""
+	Json = false
+	Raw = false
+	JsonPath = ""
 }
 
 func NewEmptyStore(t *testing.T) *TestStore {
@@ -84,7 +87,7 @@ func NewEmptyStore(t *testing.T) *TestStore {
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
 	err = os.Mkdir(nkeysDir, 0700)
-	require.NoError(t, err, "error creating %q", nkeysDir)
+	require.NoError(t, err, "error creating %#q", nkeysDir)
 	require.NoError(t, err)
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
 
@@ -147,13 +150,13 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 	storeRoot := ts.GetStoresRoot()
 	operatorRoot := filepath.Join(storeRoot, operatorName)
 	err := os.MkdirAll(operatorRoot, 0700)
-	require.NoError(t, err, "error creating %q", operatorRoot)
+	require.NoError(t, err, "error creating %#q", operatorRoot)
 
 	nkeysDir := filepath.Join(ts.Dir, "keys")
 	_, err = os.Stat(nkeysDir)
 	if err != nil && os.IsNotExist(err) {
 		err = os.Mkdir(nkeysDir, 0700)
-		require.NoError(t, err, "error creating %q", nkeysDir)
+		require.NoError(t, err, "error creating %#q", nkeysDir)
 	}
 	require.NoError(t, err)
 
@@ -631,6 +634,11 @@ func (ts *TestStore) VerifyUser(t *testing.T, operator string, account string, u
 	}
 }
 
+func (ts *TestStore) DoesNotExist(t *testing.T, fp string) {
+	_, err := os.Stat(fp)
+	require.False(t, os.IsExist(err))
+}
+
 func Test_Util(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -674,7 +682,6 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 				w.WriteHeader(http.StatusNotFound)
 			}
 			w.Header().Add("Content-Type", "application/jwt")
-			w.WriteHeader(200)
 			w.Write(data)
 		}
 
@@ -698,6 +705,10 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 			} else {
 				ok = ac.SigningKeys.Contains(ac.Issuer)
 			}
+
+			// store a copy of the source jwt that we can inspect
+			orig := fmt.Sprintf("SRC_%s", ac.Subject)
+			storage[orig] = body
 
 			if ok {
 				ac.Limits.Conn = -1

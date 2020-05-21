@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -97,7 +97,7 @@ func (p *PubParams) Validate(ctx ActionCtx) error {
 
 	_, err := os.Stat(p.credsPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("%v: %q", err, p.credsPath)
+		return fmt.Errorf("%v: %#q", err, p.credsPath)
 	}
 	if len(p.natsURLs) == 0 {
 		return fmt.Errorf("operator %q doesn't have operator_service_urls set", ctx.StoreCtx().Operator.Name)

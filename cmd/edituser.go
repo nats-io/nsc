@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -29,8 +29,36 @@ import (
 func createEditUserCmd() *cobra.Command {
 	var params EditUserParams
 	cmd := &cobra.Command{
-		Use:          "user",
-		Short:        "Edit an user",
+		Use:   "user",
+		Short: "Edit an user",
+		Long: `# Edit permissions so that the user can publish and/or subscribe to the specified subjects or wildcards:
+nsc edit user --name <n> --allow-pubsub <subject>,...
+nsc edit user --name <n> --allow-pub <subject>,...
+nsc edit user --name <n> --allow-sub <subject>,...
+
+# Set permissions so that the user cannot publish nor subscribe to the specified subjects or wildcards:
+nsc edit user --name <n> --deny-pubsub <subject>,...
+nsc edit user --name <n> --deny-pub <subject>,...
+nsc edit user --name <n> --deny-sub <subject>,...
+
+# Remove a previously set permissions
+nsc edit user --name <n> --rm <subject>,...
+
+# To dynamically allow publishing to reply subjects, this works well for service responders:
+nsc edit user --name <n> --allow-pub-response
+
+# A permission to publish a response can be removed after a duration from when 
+# the message was received:
+nsc edit user --name <n> --allow-pub-response --response-ttl 5s
+
+# If the service publishes multiple response messages, you can specify:
+nsc edit user --name <n> --allow-pub-response=5
+# See 'nsc edit export --response-type --help' to enable multiple
+# responses between accounts.
+
+# To remove response settings:
+nsc edit user --name <n> --rm-response-perms
+`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -48,10 +76,6 @@ func createEditUserCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "add deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "add deny subscribe permissions - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().StringVarP(&params.respTTL, "response-ttl", "", "", "max ttl for responding to requests (global to all requests for user)")
-	cmd.Flags().StringVarP(&params.respMax, "max-responses", "", "", "max number of responses for a request (global to all requests for the user)")
-	cmd.Flags().BoolVarP(&params.rmResp, "rm-response-perms", "", false, "remove response settings")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 
@@ -66,6 +90,8 @@ func createEditUserCmd() *cobra.Command {
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
+	params.ResponsePermsParams.bindSetFlags(cmd)
+	params.ResponsePermsParams.bindRemoveFlags(cmd)
 
 	return cmd
 }
@@ -104,7 +130,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl", "bearer") {
+		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -288,7 +314,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
-	s, err := p.ResponsePermsParams.Run(p.claim)
+	s, err := p.ResponsePermsParams.Run(p.claim, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +369,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 			if err != nil {
 				r.AddError("error storing creds: %v", err)
 			} else {
-				r.AddOK("generated user creds file %q", AbbrevHomePaths(p.credsFilePath))
+				r.AddOK("generated user creds file %#q", AbbrevHomePaths(p.credsFilePath))
 			}
 		}
 	} else {

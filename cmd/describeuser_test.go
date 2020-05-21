@@ -1,23 +1,23 @@
 /*
+ * Copyright 2018-2020 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -48,15 +48,11 @@ func TestDescribeUser_Single(t *testing.T) {
 func TestDescribeUserRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-	oldRaw := Raw
-	Raw = true
-	defer func() {
-		Raw = oldRaw
-	}()
 
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
+	Raw = true
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
 
@@ -201,4 +197,35 @@ func TestDescribeRawUser(t *testing.T) {
 	stdout, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
 	require.NoError(t, err)
 	require.Contains(t, stdout, "Issuer Account")
+}
+
+func TestDescribeUser_Json(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "aa")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--json")
+	require.NoError(t, err)
+	m := make(map[string]interface{})
+	err = json.Unmarshal([]byte(out), &m)
+	require.NoError(t, err)
+	uc, err := ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.NotNil(t, uc)
+	require.Equal(t, uc.Subject, m["sub"])
+}
+
+func TestDescribeUser_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "aa")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--field", "sub")
+	uc, err := ts.Store.ReadUserClaim("A", "aa")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out)
 }

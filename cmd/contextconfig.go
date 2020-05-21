@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -151,7 +151,7 @@ func (c *ContextConfig) SetOperator(operator string) error {
 		}
 	}
 	if !ok {
-		return fmt.Errorf("operator %q not in %q", operator, c.StoreRoot)
+		return fmt.Errorf("operator %q not in %#q", operator, c.StoreRoot)
 	}
 
 	c.Operator = operator
@@ -202,5 +202,5 @@ func (c *ContextConfig) hasSubContainer(kind string, name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%q not in %s for operator %q in %q", name, kind, c.Operator, c.StoreRoot)
+	return fmt.Errorf("%q not in %s for operator %q in %#q", name, kind, c.Operator, c.StoreRoot)
 }

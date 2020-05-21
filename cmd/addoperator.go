@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -131,14 +130,14 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		var err error
 		var data []byte
 		loadedFromURL := false
-		if u, err := url.Parse(p.jwtPath); err == nil && u.Scheme != "" {
+		if IsURL(p.jwtPath) {
 			loadedFromURL = true
 			data, err = LoadFromURL(p.jwtPath)
 		}
 		if data == nil {
 			data, err = Read(p.jwtPath)
 			if err != nil {
-				return fmt.Errorf("error reading %q: %v", p.jwtPath, err)
+				return fmt.Errorf("error reading %#q: %v", p.jwtPath, err)
 			}
 		}
 

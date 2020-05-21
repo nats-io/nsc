@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -145,7 +146,7 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 	}
 
 	if len(files) != 0 {
-		return nil, fmt.Errorf("operator %q already exists in %q", operator.Name, operatorsDir)
+		return nil, fmt.Errorf("operator %q already exists in %#q", operator.Name, operatorsDir)
 	}
 
 	if operator.KP != nil {
@@ -166,13 +167,13 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 		return nil, fmt.Errorf("error serializing .nsc: %v", err)
 	}
 	if err := s.Write(d, NSCFile); err != nil {
-		return nil, fmt.Errorf("error writing .nsc in %q: %v", s.Dir, err)
+		return nil, fmt.Errorf("error writing .nsc in %#q: %v", s.Dir, err)
 	}
 
 	for _, d := range standardDirs {
 		dp := s.resolve(d, "")
 		if err = os.MkdirAll(dp, 0700); err != nil {
-			return nil, fmt.Errorf("error creating %q: %v", dp, err)
+			return nil, fmt.Errorf("error creating %#q: %v", dp, err)
 		}
 	}
 
@@ -206,7 +207,7 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 func LoadStore(dir string) (*Store, error) {
 	sf := filepath.Join(dir, NSCFile)
 	if _, err := os.Stat(sf); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%q is not a valid configuration directory", dir)
+		return nil, fmt.Errorf("%#q is not a valid configuration directory", dir)
 	}
 
 	s := &Store{Dir: dir}
@@ -222,6 +223,10 @@ func (s *Store) IsManaged() bool {
 }
 
 func (s *Store) resolve(name ...string) string {
+	return filepath.Join(s.Dir, filepath.Join(name...))
+}
+
+func (s *Store) Resolve(name ...string) string {
 	return filepath.Join(s.Dir, filepath.Join(name...))
 }
 
@@ -249,7 +254,7 @@ func (s *Store) Read(name ...string) ([]byte, error) {
 	fp := s.resolve(name...)
 	d, err := ioutil.ReadFile(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q: %v", fp, err)
+		return nil, fmt.Errorf("error reading %#q: %v", fp, err)
 	}
 	return d, nil
 }
@@ -378,7 +383,8 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 
 	r := NewDetailedReport(false)
 	r.Label = "synchronized account jwt with account server"
-	u.Path = filepath.Join(u.Path, "accounts", ac.Subject)
+	// this is an url - join with path
+	u.Path = path.Join(u.Path, "accounts", ac.Subject)
 	push, err := PushAccount(u.String(), data)
 	if err != nil {
 		r.AddError("error pushing account %q: %v", ac.Name, err)
@@ -638,7 +644,7 @@ func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 	if len(dirs) == 1 {
 		ac, err := s.LoadClaim(kind, dirs[0], JwtName(dirs[0]))
 		if err != nil {
-			return nil, fmt.Errorf("error reading %s %q: %v", kind, dirs[0], err)
+			return nil, fmt.Errorf("error reading %s %#q: %v", kind, dirs[0], err)
 		}
 		return ac, nil
 	}
@@ -654,7 +660,7 @@ func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 			if s.Has(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd))) {
 				ac, err := s.LoadClaim(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd)))
 				if err != nil {
-					return nil, fmt.Errorf("error reading %s %q: %v", kind, dirs[0], err)
+					return nil, fmt.Errorf("error reading %s %#q: %v", kind, dirs[0], err)
 				}
 				return ac, nil
 			} else {

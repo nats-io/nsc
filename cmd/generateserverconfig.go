@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -41,10 +41,10 @@ nsc generate config --mem-resolver --config-file <outfile> --force
 				return err
 			}
 			if !QuietMode() && params.outputFile != "" && params.outputFile != "--" {
-				cmd.Printf("Success!! - generated %q\n", AbbrevHomePaths(params.outputFile))
+				cmd.Printf("Success!! - generated %#q\n", AbbrevHomePaths(params.outputFile))
 			}
 			if !QuietMode() && params.dirOut != "" {
-				cmd.Printf("Success!! - generated  %q\n", AbbrevHomePaths(filepath.Join(params.dirOut, "resolver.conf")))
+				cmd.Printf("Success!! - generated  %#q\n", AbbrevHomePaths(filepath.Join(params.dirOut, "resolver.conf")))
 			}
 			return nil
 		},
@@ -127,7 +127,7 @@ func (p *GenerateServerConfigParams) checkFile(fp string) (string, error) {
 			}
 			return afp, nil
 		}
-		return "", fmt.Errorf("%q already exists", afp)
+		return "", fmt.Errorf("%#q already exists", afp)
 	}
 	return afp, nil
 }
@@ -141,11 +141,11 @@ func (p *GenerateServerConfigParams) checkDir(fp string) (string, error) {
 	fi, err := os.Stat(afp)
 	if err == nil {
 		if !p.force {
-			return "", fmt.Errorf("%q already exists", fp)
+			return "", fmt.Errorf("%#q already exists", fp)
 		}
 		// file exists, if force - delete it
 		if !fi.IsDir() {
-			return "", fmt.Errorf("%q already exists and is not a directory", fp)
+			return "", fmt.Errorf("%#q already exists and is not a directory", fp)
 		}
 	}
 	return afp, nil
@@ -227,7 +227,7 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	if !IsStdOut(p.outputFile) {
-		return store.OKStatus("wrote server configuration to %q", AbbrevHomePaths(p.outputFile)), nil
+		return store.OKStatus("wrote server configuration to %#q", AbbrevHomePaths(p.outputFile)), nil
 	}
 	return nil, err
 }

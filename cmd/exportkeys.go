@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -111,7 +111,7 @@ func (p *ExportKeysParams) Validate(ctx ActionCtx) error {
 	d := store.GetKeysDir()
 	_, err := os.Stat(d)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("keystore %q does not exist", d)
+		return fmt.Errorf("keystore %#q does not exist", d)
 	}
 	return nil
 }
@@ -145,7 +145,7 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 			if os.IsNotExist(err) || (err == nil && p.Force) {
 				j.data = []byte(s)
 			} else {
-				sr.AddError("%q already exists - specify --force to overwrite", j.filepath)
+				sr.AddError("%#q already exists - specify --force to overwrite", j.filepath)
 				continue
 			}
 		}

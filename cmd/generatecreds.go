@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -33,13 +33,13 @@ func createGenerateCredsCmd() *cobra.Command {
 		Short:        "Generate a credentials file for an user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example:      `nsc generate creds --account a --user u`,
+		Example:      `nsc generate creds --account a --name u`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 			if !QuietMode() && params.out != "--" {
-				cmd.Printf("Success!! - generated %q\n", params.out)
+				cmd.Printf("Success!! - generated %#q\n", params.out)
 			}
 			return nil
 		},
@@ -149,7 +149,7 @@ func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	var s store.Status
 	if !IsStdOut(p.out) {
-		s = store.OKStatus("wrote credentials to %q", AbbrevHomePaths(p.out))
+		s = store.OKStatus("wrote credentials to %#q", AbbrevHomePaths(p.out))
 	}
 	return s, nil
 }

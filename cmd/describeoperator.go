@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -76,17 +76,29 @@ func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeOperatorParams) PreInteractive(ctx ActionCtx) error {
+func (p *DescribeOperatorParams) PreInteractive(_ ActionCtx) error {
 	return nil
 }
 
 func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 	var err error
-
-	if Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawOperatorClaim()
 		if err != nil {
 			return err
+		}
+		if Json || JsonPath != "" {
+			p.raw, err = bodyAsJson(p.raw)
+			if err != nil {
+				return err
+			}
+
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
@@ -98,16 +110,16 @@ func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeOperatorParams) Validate(ctx ActionCtx) error {
+func (p *DescribeOperatorParams) Validate(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeOperatorParams) PostInteractive(ctx ActionCtx) error {
+func (p *DescribeOperatorParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
-	if Raw {
+func (p *DescribeOperatorParams) Run(_ ActionCtx) (store.Status, error) {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))
@@ -132,7 +144,7 @@ func (p *DescribeOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 		if Raw {
 			k = "jwt"
 		}
-		s = store.OKStatus("wrote operator %s to %q", k, AbbrevHomePaths(p.outputFile))
+		s = store.OKStatus("wrote operator %s to %#q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }

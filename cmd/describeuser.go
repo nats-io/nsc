@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -56,8 +56,7 @@ type DescribeUserParams struct {
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
 	p.user = NameFlagOrArgument(p.user, ctx)
-	p.AccountContextParams.SetDefaults(ctx)
-	return nil
+	return p.AccountContextParams.SetDefaults(ctx)
 }
 
 func (p *DescribeUserParams) PreInteractive(ctx ActionCtx) error {
@@ -93,10 +92,22 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
-	if Raw {
+	if Json || Raw || JsonPath != "" {
 		p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
 		if err != nil {
 			return err
+		}
+		if Json || JsonPath != "" {
+			p.raw, err = bodyAsJson(p.raw)
+			if err != nil {
+				return err
+			}
+			if JsonPath != "" {
+				p.raw, err = GetField(p.raw, JsonPath)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
@@ -108,16 +119,16 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeUserParams) Validate(ctx ActionCtx) error {
+func (p *DescribeUserParams) Validate(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeUserParams) PostInteractive(ctx ActionCtx) error {
+func (p *DescribeUserParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	if Raw {
+func (p *DescribeUserParams) Run(_ ActionCtx) (store.Status, error) {
+	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))
@@ -126,6 +137,7 @@ func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 			}
 		}
 		p.raw = append(p.raw, '\n')
+
 		if err := Write(p.outputFile, p.raw); err != nil {
 			return nil, err
 		}
@@ -141,7 +153,7 @@ func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		if Raw {
 			k = "jwt"
 		}
-		s = store.OKStatus("wrote user %s to %q", k, AbbrevHomePaths(p.outputFile))
+		s = store.OKStatus("wrote user %s to %#q", k, AbbrevHomePaths(p.outputFile))
 	}
 	return s, nil
 }

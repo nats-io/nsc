@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,7 +85,7 @@ func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
 	} else {
 		p.url, err = cli.Prompt("account jwt url/or path ", p.url, cli.Val(func(v string) error {
 			// we expect either a file or url
-			if u, err := url.Parse(v); err == nil && u.Scheme != "" {
+			if IsURL(v) {
 				return nil
 			}
 			v, err := Expand(v)
@@ -110,11 +109,11 @@ func (p *MigrateCmdParams) Load(ctx ActionCtx) error {
 
 		s, err := store.LoadStore(p.storeDir)
 		if err != nil {
-			return fmt.Errorf("error loading operator %q: %v", p.storeDir, err)
+			return fmt.Errorf("error loading operator %#q: %v", p.storeDir, err)
 		}
 		names, err := s.ListSubContainers(store.Accounts)
 		if err != nil {
-			return fmt.Errorf("error listing accounts in %q: %v", p.storeDir, err)
+			return fmt.Errorf("error listing accounts in %#q: %v", p.storeDir, err)
 		}
 		for _, n := range names {
 			mj := NewMigrateJob(filepath.Join(p.storeDir, store.Accounts, n, store.JwtName(n)), p.overwrite)
@@ -199,7 +198,7 @@ func (j *MigrateJob) Load(ctx ActionCtx) {
 	}
 	data, err := LoadFromFileOrURL(j.url)
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("error loading from %q: %v", j.url, err))
+		j.status = store.ErrorStatus(fmt.Sprintf("error loading from %#q: %v", j.url, err))
 		return
 	}
 	j.isFileImport = !IsURL(j.url)

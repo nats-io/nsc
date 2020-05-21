@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,8 +16,10 @@
 package cmd
 
 import (
+	"runtime"
 	"testing"
 
+	"github.com/nats-io/jwt"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,7 +76,11 @@ func Test_SyncNoServer(t *testing.T) {
 
 	_, stderr, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
-	require.Contains(t, stderr, "connect: connection refused")
+	if runtime.GOOS == "windows" {
+		require.Contains(t, stderr, "connectex: No connection")
+	} else {
+		require.Contains(t, stderr, "connect: connection refused")
+	}
 }
 
 func Test_SyncManaged(t *testing.T) {
@@ -88,4 +94,36 @@ func Test_SyncManaged(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.False(t, ac.IsSelfSigned())
+}
+
+func Test_SyncManualServer(t *testing.T) {
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp)
+	defer as.Close()
+
+	// remove the account server
+	op, err := jwt.DecodeOperatorClaims(string(m["operator"]))
+	require.NoError(t, err)
+	op.AccountServerURL = ""
+	s, err := op.Encode(okp)
+	require.NoError(t, err)
+	m["operator"] = []byte(s)
+
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	err = ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
+	ts.AddAccount(t, "A")
+
+	// edit the jwt
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	require.NoError(t, err)
+
+	// sync the store
+	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A", "--account-jwt-server-url", as.URL)
+	require.NoError(t, err)
+
+	// verify the tag was stored
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Tags, "a")
 }

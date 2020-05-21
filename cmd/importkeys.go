@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,7 +44,7 @@ nsc import keys --recursive --dir <path>
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to export keys to")
+	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to import keys from")
 	cmd.Flags().BoolVarP(&params.Recurse, "recurse", "R", false, "recurse directories")
 	cmd.MarkFlagRequired("dir")
 
@@ -88,7 +88,7 @@ func (p *ImportKeysParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	if !fi.IsDir() {
-		return fmt.Errorf("%q is not a directory", p.Dir)
+		return fmt.Errorf("%#q is not a directory", p.Dir)
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ func (p *ImportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
 	for _, j := range a {
 		if j.err != nil {
-			r.AddError("failed to import %q: %v", j.filepath, j.err)
+			r.AddError("failed to import %#q: %v", j.filepath, j.err)
 			continue
 		} else {
 			r.AddOK("%s was added to the keystore", j.description)

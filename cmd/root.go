@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -130,7 +131,7 @@ var rootCmd = &cobra.Command{
 		}
 		if needsUpdate {
 			cmd.SilenceUsage = true
-			return fmt.Errorf("the keystore %q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
+			return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
 		}
 
 		return nil
@@ -140,10 +141,22 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cli.SetOutput(rootCmd.OutOrStderr())
-	if err := GetRootCmd().Execute(); err != nil {
+	err := ExecuteWithWriter(rootCmd.OutOrStderr())
+	if err != nil {
 		os.Exit(1)
 	}
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+// But writer is decided by the caller function
+// returns error than os.Exit(1)
+func ExecuteWithWriter(out io.Writer) error {
+	cli.SetOutput(out)
+	if err := GetRootCmd().Execute(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {

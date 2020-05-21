@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,8 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -45,14 +47,9 @@ func TestDescribeAccount_Single(t *testing.T) {
 func TestDescribeAccountRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
-	oldRaw := Raw
-	Raw = true
-	defer func() {
-		Raw = oldRaw
-	}()
-
 	ts.AddAccount(t, "A")
 
+	Raw = true
 	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 
@@ -82,7 +79,7 @@ func TestDescribeAccount_MultipleAccountRequired(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
-	GetConfig().SetAccount("")
+	require.NoError(t, GetConfig().SetAccount(""))
 
 	_, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.Error(t, err)
@@ -165,4 +162,31 @@ func TestDescribeAccount_Latency(t *testing.T) {
 	out, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
 	require.NoError(t, err)
 	require.Contains(t, out, "lat (10%)")
+}
+
+func TestDescribeAccount_Json(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
+	require.NoError(t, err)
+	m := make(map[string]interface{})
+	err = json.Unmarshal([]byte(out), &m)
+	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Subject, m["sub"])
+}
+
+func TestDescribeAccount_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--field", "sub")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)
 }

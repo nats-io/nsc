@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -162,7 +162,7 @@ func Test_Nested(t *testing.T) {
 	require.Contains(t, lines[4], fmt.Sprintf(errTemplate, "some error"))
 }
 
-func Test_ServerMessagesAllwaysShow(t *testing.T) {
+func Test_ServerMessagesAlwaysShow(t *testing.T) {
 	s := NewReport(OK, "summary")
 	s.Opt = DetailsOnErrorOrWarning
 	s.AddOK("one")
