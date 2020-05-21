@@ -82,6 +82,8 @@ nsc add user --name <n> --allow-pub-response=5
 	cmd.Flags().StringVarP(&params.userName, "name", "n", "", "name to assign the user")
 	cmd.Flags().StringVarP(&params.pkOrPath, "public-key", "k", "", "public key identifying the user")
 
+	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
+
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
 	params.ResponsePermsParams.bindSetFlags(cmd)
@@ -107,6 +109,7 @@ type AddUserParams struct {
 	src           []string
 	tags          []string
 	credsFilePath string
+	bearer        bool
 	userName      string
 	pkOrPath      string
 	kp            nkeys.KeyPair
@@ -350,6 +353,7 @@ func (p *AddUserParams) generateUserClaim(ctx ActionCtx) (*jwt.UserClaims, error
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
 
+	uc.BearerToken = p.bearer
 	return uc, nil
 }
 
