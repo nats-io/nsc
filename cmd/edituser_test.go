@@ -331,3 +331,32 @@ func Test_EditUserResponsePermissions2(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, uc.Resp)
 }
+
+func Test_EditUserBearerToken(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "U")
+	require.NoError(t, err)
+
+	u, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.False(t, u.BearerToken)
+
+	_, stderr, err := ExecuteCmd(createEditUserCmd(), "--name", "U", "--bearer")
+	require.NoError(t, err)
+	require.Contains(t, stderr, "changed bearer to true")
+
+	u, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.True(t, u.BearerToken)
+
+	_, stderr, err = ExecuteCmd(createEditUserCmd(), "--name", "U", "--bearer=false")
+	require.NoError(t, err)
+	require.Contains(t, stderr, "changed bearer to false")
+
+	u, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.False(t, u.BearerToken)
+}
