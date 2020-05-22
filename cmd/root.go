@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,6 +35,8 @@ const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
 var InteractiveFlag bool
+var NscNoSelfUpdate bool
+var NscCwdOnly bool
 var quietMode bool
 
 var cfgFile string
@@ -159,7 +161,20 @@ func ExecuteWithWriter(out io.Writer) error {
 	return nil
 }
 
+func SetEnvOptions() {
+	if _, ok := os.LookupEnv(NscNoGitIgnoreEnv); ok {
+		store.NscNotGitIgnore = true
+	}
+	if _, ok := os.LookupEnv(NscNoSelfUpdateEnv); ok {
+		NscNoSelfUpdate = true
+	}
+	if _, ok := os.LookupEnv(NscCwdOnlyEnv); ok {
+		NscCwdOnly = true
+	}
+}
+
 func init() {
+	SetEnvOptions()
 	cobra.OnInitialize(initConfig)
 	HoistRootFlags(GetRootCmd())
 }

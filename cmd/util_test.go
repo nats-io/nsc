@@ -68,6 +68,8 @@ func ResetSharedFlags() {
 
 func NewEmptyStore(t *testing.T) *TestStore {
 	ResetForTests()
+	// init runs early
+	SetEnvOptions()
 	var ts TestStore
 
 	// ngsStore is a global - so first test to get it initializes it
@@ -96,6 +98,8 @@ func NewEmptyStore(t *testing.T) *TestStore {
 
 func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
 	ResetForTests()
+	// init runs early
+	SetEnvOptions()
 	var ts TestStore
 
 	// ngsStore is a global - so first test to get it initializes it
@@ -636,7 +640,7 @@ func (ts *TestStore) VerifyUser(t *testing.T, operator string, account string, u
 
 func (ts *TestStore) DoesNotExist(t *testing.T, fp string) {
 	_, err := os.Stat(fp)
-	require.False(t, os.IsExist(err))
+	require.True(t, os.IsNotExist(err), fmt.Sprintf("should not exist %s", fp))
 }
 
 func Test_Util(t *testing.T) {
