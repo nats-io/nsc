@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,6 +28,8 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 )
+
+var NscNotGitIgnore bool
 
 const DefaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
@@ -322,6 +324,9 @@ func (k *KeyStore) Remove(pubkey string) error {
 }
 
 func AddGitIgnore(dir string) error {
+	if NscNotGitIgnore {
+		return nil
+	}
 	if dir != "" {
 		_, err := os.Stat(dir)
 		if err != nil {

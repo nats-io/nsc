@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -122,6 +122,9 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 }
 
 func (u *SelfUpdate) shouldCheck() bool {
+	if NscNoSelfUpdate {
+		return false
+	}
 	have := semver.MustParse(GetRootCmd().Version).String()
 	if have == "0.0.0-dev" {
 		return false

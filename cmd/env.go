@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,7 +25,8 @@ import (
 )
 
 func envSet(varName string) string {
-	return yn(os.Getenv(varName) != "")
+	_, ok := os.LookupEnv(varName)
+	return yn(ok)
 }
 
 func yn(v bool) string {
@@ -46,6 +47,9 @@ func createEnvCmd() *cobra.Command {
 		SilenceUsage:  false,
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if NscCwdOnly && (params.StoreRoot != "" || params.Operator != "" || params.Account != "") {
+				return fmt.Errorf("$%s is set - change your cwd to change context\n", NscCwdOnlyEnv)
+			}
 			if err := params.Run(cmd); err != nil {
 				return err
 			}
@@ -89,6 +93,9 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.UTF8Box()
 	table.AddTitle("NSC Environment")
 	table.AddHeaders("Setting", "Set", "Effective Value")
+	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
+	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
+	table.AddRow("$"+NscNoSelfUpdateEnv, envSet(NscNoSelfUpdateEnv), "If set, no self-update checks")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
 	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
 	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))

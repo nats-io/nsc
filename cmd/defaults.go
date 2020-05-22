@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -33,6 +33,9 @@ import (
 
 //NscHomeEnv the folder for the config file
 const NscHomeEnv = "NSC_HOME"
+const NscCwdOnlyEnv = "NSC_CWD_ONLY"
+const NscNoSelfUpdateEnv = "NSC_NO_SELF_UPDATE"
+const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
 
 type ToolConfig struct {
 	ContextConfig
@@ -228,6 +231,10 @@ func (d *ToolConfig) SetVersion(version string) {
 }
 
 func (d *ToolConfig) load() error {
+	if NscCwdOnly {
+		// don't read it
+		return nil
+	}
 	err := ReadJson(d.configFile(), &config)
 	if err != nil && os.IsNotExist(err) {
 		return nil
@@ -237,7 +244,10 @@ func (d *ToolConfig) load() error {
 
 func (d *ToolConfig) Save() error {
 	d.SetDefaults()
-	return WriteJson(d.configFile(), d)
+	if !NscCwdOnly {
+		return WriteJson(d.configFile(), d)
+	}
+	return nil
 }
 
 // GetToolHome returns the . folder used fro this CLIs config and optionally the projects
