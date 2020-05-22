@@ -129,6 +129,7 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	inputs = []interface{}{"0", "0", true, []int{0}, false, "", false, true, []int{0}, false}
 
 	_, _, err = ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
+	require.NoError(t, err)
 	oc, err = ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.NotContains(t, oc.OperatorServiceURLs, u1)

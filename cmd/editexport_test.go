@@ -111,6 +111,7 @@ func Test_EditExportRmLatencySampling(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 
 	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--rm-latency-sampling")
+	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Nil(t, ac.Exports[0].Latency)

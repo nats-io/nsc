@@ -49,6 +49,7 @@ func Test_DeleteAccountOnly(t *testing.T) {
 	upk := uc.Subject
 
 	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A")
+	require.NoError(t, err)
 	require.True(t, ts.KeyStore.HasPrivateKey(apk))
 	require.True(t, ts.KeyStore.HasPrivateKey(upk))
 	require.FileExists(t, ts.KeyStore.GetUserCredsPath("A", "U"))
@@ -76,6 +77,7 @@ func Test_DeleteAll(t *testing.T) {
 	upk := uc.Subject
 
 	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--rm-nkey", "--rm-creds")
+	require.NoError(t, err)
 	require.False(t, ts.KeyStore.HasPrivateKey(apk))
 	require.False(t, ts.KeyStore.HasPrivateKey(pk))
 	require.False(t, ts.KeyStore.HasPrivateKey(upk))
@@ -95,6 +97,7 @@ func Test_DeleteAccountInteractive(t *testing.T) {
 	apk := ac.Subject
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
 	upk := uc.Subject
 
 	_, _, err = ExecuteInteractiveCmd(createDeleteAccountCmd(), []interface{}{false, true, true, true}, "--name", "A")

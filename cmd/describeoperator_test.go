@@ -174,6 +174,7 @@ func TestDescribeOperator_JsonPath(t *testing.T) {
 	defer ts.Done(t)
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--field", "sub")
+	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("\"%s\"\n", oc.Subject), out)

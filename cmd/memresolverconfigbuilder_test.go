@@ -106,6 +106,7 @@ func Test_MemResolverFiltersNonAccounts(t *testing.T) {
 	require.NoError(t, err)
 
 	aac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 	apk := aac.Subject
 	a, err := ts.Store.Read(store.Accounts, "A", store.JwtName("A"))
 	require.NoError(t, err)
@@ -118,6 +119,7 @@ func Test_MemResolverFiltersNonAccounts(t *testing.T) {
 	require.NoError(t, err)
 
 	bac, err := ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
 	bpk := bac.Subject
 	b, err := ts.Store.Read(store.Accounts, "B", store.JwtName("B"))
 	require.NoError(t, err)

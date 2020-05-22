@@ -37,6 +37,7 @@ func Test_AddAccount(t *testing.T) {
 	ckp, err := nkeys.CreateCluster()
 	require.NoError(t, err)
 	cpk, err := ckp.PublicKey()
+	require.NoError(t, err)
 
 	tests := CmdTests{
 		{CreateAddAccountCmd(), []string{"add", "account"}, nil, []string{"account name is required"}, true},

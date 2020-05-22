@@ -92,6 +92,7 @@ func NewEmptyStore(t *testing.T) *TestStore {
 	require.NoError(t, err, "error creating %#q", nkeysDir)
 	require.NoError(t, err)
 	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
+	require.NoError(t, err)
 
 	return &ts
 }
@@ -349,6 +350,7 @@ func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount strin
 	stdout, _, err := ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), flags...)
 	require.NoError(t, err)
 	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	require.NoError(t, err)
 	return token
 }
 
@@ -402,10 +404,6 @@ func ForceStoreRoot(t *testing.T, fp string) error {
 
 func ForceOperator(t *testing.T, operator string) {
 	config.Operator = operator
-}
-
-func ForceAccount(t *testing.T, account string) {
-	config.Account = account
 }
 
 func StripTableDecorations(s string) string {
@@ -481,13 +479,6 @@ func (ts *TestStore) RunServerWithConfig(t *testing.T, config string) *server.Po
 
 // Runs a NATS server at a random port
 func (ts *TestStore) RunServer(t *testing.T, opts *server.Options) *server.Ports {
-	if opts.Port == 0 {
-		opts.Port = -1
-	}
-	if opts.HTTPPort == 0 {
-		opts.HTTPPort = -1
-	}
-	opts.NoLog = true
 	if opts == nil {
 		opts = &server.Options{
 			Host:           "127.0.0.1",
@@ -498,6 +489,14 @@ func (ts *TestStore) RunServer(t *testing.T, opts *server.Options) *server.Ports
 			MaxControlLine: 2048,
 		}
 	}
+	if opts.Port == 0 {
+		opts.Port = -1
+	}
+	if opts.HTTPPort == 0 {
+		opts.HTTPPort = -1
+	}
+	opts.NoLog = true
+
 	var err error
 	ts.Server, err = server.NewServer(opts)
 	require.NoError(t, err)

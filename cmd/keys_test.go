@@ -69,26 +69,6 @@ func storeOldKey(ts *TestStore, operator string, account string, user string, se
 	return ioutil.WriteFile(target, seed, 0700)
 }
 
-func storeNewKey(ts *TestStore, operator string, account string, user string, seed []byte) error {
-	// keys/<op>/<first letter pk>/<second and third letters pk>/<pk>.nk
-	// creds/<op>/<actname>/<un>.creds
-	kp, err := store.ExtractSeed(string(seed))
-	if err != nil {
-		return err
-	}
-	pk, err := kp.PublicKey()
-	if err != nil {
-		return err
-	}
-	target := filepath.Join(ts.Dir, "keys", pk[:1], pk[1:3], fmt.Sprintf("%s.nk", pk))
-
-	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(target, seed, 0700)
-}
-
 func Test_HasOldStructure(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
@@ -111,6 +91,7 @@ func Test_HasOldStructure(t *testing.T) {
 	require.NoError(t, err)
 
 	isOld, err := store.IsOldKeyRing(store.GetKeysDir())
+	require.NoError(t, err)
 	require.True(t, isOld)
 }
 

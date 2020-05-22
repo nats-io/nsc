@@ -66,6 +66,7 @@ func TestImportOperator(t *testing.T) {
 	require.FileExists(t, storeFile)
 
 	d, err := Read(storeFile)
+	require.NoError(t, err)
 	var info store.Info
 	json.Unmarshal(d, &info)
 	require.True(t, info.Managed)
@@ -85,7 +86,9 @@ func TestAddOperatorInteractive(t *testing.T) {
 	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true})
 	require.NoError(t, err)
 	d, err := Read(filepath.Join(ts.Dir, "store", "O", "O.jwt"))
+	require.NoError(t, err)
 	oc, err := jwt.DecodeOperatorClaims(string(d))
+	require.NoError(t, err)
 	require.Equal(t, oc.Name, "O")
 	start := time.Unix(oc.NotBefore, 0).UTC()
 	require.Equal(t, 2019, start.Year())
@@ -196,6 +199,7 @@ func Test_AddWellKnownOperator(t *testing.T) {
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
 	var twko KnownOperator

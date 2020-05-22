@@ -57,6 +57,7 @@ func Test_ValidateExpiredOperator(t *testing.T) {
 	oc.Expires = before
 
 	token, err := oc.Encode(ts.OperatorKey)
+	require.NoError(t, err)
 	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
@@ -72,6 +73,7 @@ func Test_ValidateBadOperatorIssuer(t *testing.T) {
 	require.NoError(t, err)
 	_, _, kp := CreateOperatorKey(t)
 	token, err := oc.Encode(kp)
+	require.NoError(t, err)
 	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
 
 	_, stderr, err := ExecuteCmd(createValidateCommand())
@@ -132,6 +134,7 @@ func Test_ValidateBadUserIssuer(t *testing.T) {
 
 	_, _, kp := CreateAccountKey(t)
 	token, err := uc.Encode(kp)
+	require.NoError(t, err)
 	fp := filepath.Join(ts.Dir, "store", "O", store.Accounts, "A", store.Users, store.JwtName("U"))
 	require.NoError(t, os.Remove(fp))
 	require.NoError(t, Write(fp, []byte(token)))

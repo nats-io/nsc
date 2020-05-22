@@ -131,7 +131,8 @@ func TestDescribe_ActivationWithSigner(t *testing.T) {
 	require.NotContains(t, out, "Issuer Account")
 	// modify the account to have a signing key
 	_, pk, kp := CreateAccountKey(t)
-	_, _, err = ExecuteCmd(createEditAccount(), "-a", "A", "--sk", pk)
+	_, _, err = ExecuteCmd(createEditAccount(), "-n", "A", "--sk", pk)
+	require.NoError(t, err)
 	// generate an export using the account signing key
 	token = ts.GenerateActivationWithSigner(t, "A", "AA.>", "B", kp)
 	tp2 := filepath.Join(ts.Dir, "token2.jwt")

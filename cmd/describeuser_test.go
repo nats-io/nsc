@@ -225,6 +225,7 @@ func TestDescribeUser_JsonPath(t *testing.T) {
 	ts.AddUser(t, "A", "aa")
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--field", "sub")
+	require.NoError(t, err)
 	uc, err := ts.Store.ReadUserClaim("A", "aa")
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out)

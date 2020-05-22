@@ -95,6 +95,7 @@ func Test_RenameManagedAccount(t *testing.T) {
 	ts.AddAccount(t, "A")
 	pk := ts.GetAccountPublicKey(t, "A")
 	ac, err := jwt.DecodeAccountClaims(string(m[pk]))
+	require.NoError(t, err)
 	require.Equal(t, pk, ac.Subject)
 	require.Equal(t, "A", ac.Name)
 
