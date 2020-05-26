@@ -58,6 +58,7 @@ func Test_FriendlyNameCollector(t *testing.T) {
 	_, ak2, _ := CreateAccountKey(t)
 	aac.SigningKeys.Add(ak2)
 	token, err = aac.Encode(okp2)
+	require.NoError(t, err)
 	rs, err := ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 	require.Nil(t, rs)

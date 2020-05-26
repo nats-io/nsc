@@ -116,6 +116,7 @@ func Test_MigrateManaged(t *testing.T) {
 	require.NotNil(t, m[apk])
 
 	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 	require.Equal(t, opk, ac.Issuer)
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")

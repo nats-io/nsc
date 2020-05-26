@@ -186,6 +186,7 @@ func TestDescribeAccount_JsonPath(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--field", "sub")
+	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)

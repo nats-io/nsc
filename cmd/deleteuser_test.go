@@ -44,6 +44,7 @@ func Test_DeleteUserOnly(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
 	upk := uc.Subject
 
 	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U")
@@ -64,6 +65,7 @@ func Test_DeleteUserAll(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
 	upk := uc.Subject
 
 	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--rm-nkey", "--rm-creds")
@@ -85,12 +87,14 @@ func Test_DeleteUserInvalidate(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
 	upk := uc.Subject
 
 	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--revoke")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 	require.True(t, ac.Revocations[upk] > 0)
 }
 
@@ -102,6 +106,7 @@ func Test_DeleteUserInteractive(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
 	upk := uc.Subject
 
 	_, _, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{[]int{0}, true, true, true, true})

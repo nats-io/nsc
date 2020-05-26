@@ -39,6 +39,7 @@ func requireExportedKey(t *testing.T, dir string, pk string) {
 	d, err := Read(kf)
 	require.NoError(t, err)
 	nk, err := nkeys.FromSeed(d)
+	require.NoError(t, err)
 	vpk, err := nk.PublicKey()
 	require.NoError(t, err)
 	require.Equal(t, pk, vpk)

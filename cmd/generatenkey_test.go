@@ -35,12 +35,14 @@ func Test_GenerateOperatorNKey(t *testing.T) {
 
 	// seed
 	kp, err := nkeys.FromSeed([]byte(lines[0]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteOperator, kp))
 	_, err = kp.Seed()
 	require.NoError(t, err)
 
 	// pk
 	pk, err := nkeys.FromPublicKey(lines[1])
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteOperator, pk))
 	_, err = pk.Seed()
 	require.Error(t, err)
@@ -76,12 +78,14 @@ func Test_GenerateAccountNKey(t *testing.T) {
 
 	// seed
 	kp, err := nkeys.FromSeed([]byte(lines[0]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteAccount, kp))
 	_, err = kp.Seed()
 	require.NoError(t, err)
 
 	// pk
 	pk, err := nkeys.FromPublicKey(lines[1])
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteAccount, pk))
 	_, err = pk.Seed()
 	require.Error(t, err)
@@ -98,12 +102,14 @@ func Test_GenerateUserNKey(t *testing.T) {
 
 	// seed
 	kp, err := nkeys.FromSeed([]byte(lines[0]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteUser, kp))
 	_, err = kp.Seed()
 	require.NoError(t, err)
 
 	// pk
 	pk, err := nkeys.FromPublicKey(lines[1])
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteUser, pk))
 	_, err = pk.Seed()
 	require.Error(t, err)
@@ -120,11 +126,14 @@ func Test_GenerateAllNKeys(t *testing.T) {
 	require.True(t, len(lines) > 9)
 
 	kp, err := nkeys.FromSeed([]byte(lines[0]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteOperator, kp))
 
 	kp, err = nkeys.FromSeed([]byte(lines[3]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteAccount, kp))
 
 	kp, err = nkeys.FromSeed([]byte(lines[6]))
+	require.NoError(t, err)
 	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteUser, kp))
 }

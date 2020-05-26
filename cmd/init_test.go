@@ -114,6 +114,7 @@ func Test_InitWellKnown(t *testing.T) {
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
 	var twko KnownOperator
@@ -145,6 +146,7 @@ func Test_InitWellKnown2(t *testing.T) {
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
 	var twko KnownOperator
@@ -181,6 +183,7 @@ func Test_InitWellKnownInteractive(t *testing.T) {
 
 	// add an entry to well known
 	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
 	var twko KnownOperator
@@ -245,6 +248,7 @@ func Test_InitDuplicate(t *testing.T) {
 	defer ts.Done(t)
 
 	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 	u := ourl.String()
 
