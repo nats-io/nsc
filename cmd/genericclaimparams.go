@@ -40,6 +40,9 @@ func (sp *GenericClaimsParams) Edit(current []string) error {
 		return err
 	}
 	sp.rmTags, err = sp.remove("tags", current)
+	if err != nil {
+		return err
+	}
 	sp.tags, err = sp.add("tags", current)
 	if err != nil {
 		return err

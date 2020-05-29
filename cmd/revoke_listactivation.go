@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -70,14 +69,6 @@ type RevokeListActivationParams struct {
 func (p *RevokeListActivationParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
-	return nil
-}
-
-func (p *RevokeListActivationParams) canParse(s string) error {
-	_, err := strconv.Atoi(s)
-	if err != nil {
-		return fmt.Errorf("%s is invalid: %v", s, err)
-	}
 	return nil
 }
 

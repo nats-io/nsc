@@ -501,18 +501,6 @@ func (s *Store) GetName() string {
 	return s.Info.Name
 }
 
-func (s *Store) operatorJwtName() (string, error) {
-	if s.Has(".nsc") {
-		var t Info
-		err := s.loadJson(&t, ".nsc")
-		if err != nil {
-			return "", err
-		}
-		return JwtName(t.Name), nil
-	}
-	return "", fmt.Errorf("'.nsc' file was not found")
-}
-
 func JwtName(name string) string {
 	return fmt.Sprintf("%s.jwt", SafeName(name))
 }

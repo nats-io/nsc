@@ -48,7 +48,7 @@ func createEnvCmd() *cobra.Command {
 		Example:       "env",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if NscCwdOnly && (params.StoreRoot != "" || params.Operator != "" || params.Account != "") {
-				return fmt.Errorf("$%s is set - change your cwd to change context\n", NscCwdOnlyEnv)
+				return fmt.Errorf("$%s is set - change your cwd to change context", NscCwdOnlyEnv)
 			}
 			if err := params.Run(cmd); err != nil {
 				return err

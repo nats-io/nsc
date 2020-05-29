@@ -45,8 +45,8 @@ func (n *Node) Delete() {
 	}
 }
 
-var SkipChildren = errors.New("skip node")
-var StopWalking = errors.New("found node")
+var ErrSkipChildren = errors.New("skip node")
+var ErrStopWalking = errors.New("found node")
 
 type WalkFunc func(*Node) error
 
@@ -55,7 +55,7 @@ func Walk(root *Node, walkFn WalkFunc) error {
 	if err == nil {
 		err = walk(root, walkFn)
 	}
-	if err == SkipChildren || err == StopWalking {
+	if err == ErrSkipChildren || err == ErrStopWalking {
 		return nil
 	}
 	return err
@@ -65,9 +65,9 @@ func walk(n *Node, walkFn WalkFunc) error {
 	for _, c := range n.Children {
 		err := walkFn(c)
 		if err != nil {
-			if err == SkipChildren {
+			if err == ErrSkipChildren {
 				continue
-			} else if err == StopWalking {
+			} else if err == ErrStopWalking {
 				return err
 			} else {
 				return err

@@ -132,7 +132,7 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		loadedFromURL := false
 		if IsURL(p.jwtPath) {
 			loadedFromURL = true
-			data, err = LoadFromURL(p.jwtPath)
+			data, _ = LoadFromURL(p.jwtPath)
 		}
 		if data == nil {
 			data, err = Read(p.jwtPath)

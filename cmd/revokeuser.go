@@ -89,7 +89,13 @@ func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
 	if p.at == 0 {
 		at := fmt.Sprintf("%d", p.at)
 		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
+		if err != nil {
+			return err
+		}
 		p.at, err = strconv.Atoi(at)
+		if err != nil {
+			return err
+		}
 	}
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err

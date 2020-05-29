@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mitchellh/go-homedir"
 	cli "github.com/nats-io/cliprompts/v2"
@@ -41,13 +40,7 @@ var quietMode bool
 
 var cfgFile string
 
-//lint:ignore U1000 used by tests
-var ngsStore *store.Store
-var interceptorFn InterceptorFn
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
-
-// show some other hidden commands if the env is set
-var show, _ = strconv.ParseBool(os.Getenv(TestEnv))
 
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
 
@@ -85,11 +78,6 @@ func GetStoreForOperator(operator string) (*store.Store, error) {
 
 func GetStore() (*store.Store, error) {
 	return GetStoreForOperator("")
-}
-
-// ResetStore to nil for tests
-func ResetStore() {
-	ngsStore = nil
 }
 
 func ResolveKeyFlag() (nkeys.KeyPair, error) {

@@ -58,7 +58,6 @@ type ReqParams struct {
 	AccountUserContextParams
 	credsPath string
 	natsURLs  []string
-	queue     string
 }
 
 func (p *ReqParams) SetDefaults(ctx ActionCtx) error {
@@ -137,6 +136,9 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 	out := []byte(payload)
 	if encryptFlag {
 		out, err = EncryptKV(seed, out)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if encryptFlag {

@@ -46,8 +46,6 @@ func (p *SignerParams) SetPrompt(message string) {
 }
 
 func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error {
-	var err error
-
 	// build a list of the signing keys
 	// allow selecting a key from the ones we have
 	var notFound []string
@@ -66,7 +64,11 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 	}
 	// if we have more than one key, we prompt
 	if len(keys) == 1 && len(notFound) == 0 {
+		var err error
 		p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[0])
+		if err != nil {
+			return err
+		}
 	} else {
 		// maybe add an option for asking for one we don't have
 		idx := -1
@@ -91,14 +93,15 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 				return err
 			}
 			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
-
+			return err
 		} else {
 			// they picked one
 			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[choice])
+			return err
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (p *SignerParams) Edit(ctx ActionCtx) error {
@@ -158,10 +161,7 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 		return err
 	}
 	if p.signerKP == nil {
-		// if they specified a key, the file didn't resolve to a key
-		if KeyPathFlag != "" {
-			err = fmt.Errorf("%#q - no such file or directory", AbbrevHomePaths(KeyPathFlag))
-		}
+		// if they specified a key, the file didn't resolve lets see if we can find another
 		signers, err := p.getSigners(ctx)
 		if err != nil {
 			return fmt.Errorf("error reading signers: %v", err)
@@ -190,12 +190,4 @@ func (p *SignerParams) ForceManagedAccountKey(ctx ActionCtx, kp nkeys.KeyPair) {
 			}
 		}
 	}
-}
-
-func (p *SignerParams) canSign(nk nkeys.KeyPair) bool {
-	if nk == nil {
-		return false
-	}
-	pk, _ := nk.PrivateKey()
-	return pk != nil
 }

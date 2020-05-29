@@ -47,7 +47,7 @@ func TestNode_WalkFind(t *testing.T) {
 	Walk(root, func(n *Node) error {
 		visited = append(visited, n.Data)
 		if n.Data == "A" {
-			return StopWalking
+			return ErrStopWalking
 		}
 		return nil
 	})
@@ -69,7 +69,7 @@ func TestNode_WalkSkipChildren(t *testing.T) {
 	Walk(root, func(n *Node) error {
 		visited = append(visited, n.Data)
 		if n.Data == "A" {
-			return SkipChildren
+			return ErrSkipChildren
 		}
 		return nil
 	})
@@ -93,7 +93,7 @@ func TestNode_Parents(t *testing.T) {
 		visited = append(visited, n.Data)
 		if n.Data == "A" {
 			found = n
-			return StopWalking
+			return ErrStopWalking
 		}
 		return nil
 	})

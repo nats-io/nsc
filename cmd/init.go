@@ -108,6 +108,9 @@ func (p *InitCmdParams) init(cmd *cobra.Command) error {
 			_, err := Expand(v)
 			return err
 		}))
+		if err != nil {
+			return err
+		}
 	}
 	p.Dir, err = Expand(p.Dir)
 	if err != nil {
@@ -329,6 +332,9 @@ func (p *InitCmdParams) createAccount(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	p.Account.PubKey, err = p.Account.KP.PublicKey()
+	if err != nil {
+		return nil, err
+	}
 	ac := jwt.NewAccountClaims(p.Account.PubKey)
 	ac.Name = p.Name
 
@@ -372,6 +378,9 @@ func (p *InitCmdParams) createUser(ctx ActionCtx) error {
 		return err
 	}
 	config, err := GenerateConfig(ctx.StoreCtx().Store, p.Name, p.Name, p.User.KP)
+	if err != nil {
+		return err
+	}
 	p.User.CredsPath, err = ctx.StoreCtx().KeyStore.MaybeStoreUserCreds(p.Name, p.Name, config)
 	if err != nil {
 		return err
@@ -427,9 +436,9 @@ then start a nats-server using the generated config:
 		}
 		buf.WriteRune('\n')
 		buf.WriteString("To listen for messages enter:\n")
-		buf.WriteString(fmt.Sprintf("> nsc tools sub \">\"\n"))
-		buf.WriteString(fmt.Sprintf("\nTo publish your first message enter:\n"))
-		buf.WriteString(fmt.Sprintf("> nsc tools pub hello \"Hello World\"\n"))
+		buf.WriteString("> nsc tools sub \">\"\n")
+		buf.WriteString("\nTo publish your first message enter:\n")
+		buf.WriteString("> nsc tools pub hello \"Hello World\"\n")
 		r.Add(store.NewServerMessage(buf.String()))
 	}
 	return r, nil

@@ -30,7 +30,6 @@ type NKeyConfigBuilder struct {
 	accountClaims       map[string]*jwt.AccountClaims
 	userClaims          map[string][]*jwt.UserClaims
 	srcToPrivateImports map[string][]jwt.Import
-	sysAccount          string
 }
 
 func NewNKeyConfigBuilder() *NKeyConfigBuilder {
@@ -140,7 +139,7 @@ func (cb *NKeyConfigBuilder) parse() error {
 
 			if exports.TokenReq {
 				if e.Accounts == nil {
-					accts := make([]string, 0, 0)
+					accts := make([]string, 0)
 					e.Accounts = &accts
 				}
 

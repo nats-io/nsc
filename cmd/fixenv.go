@@ -214,7 +214,7 @@ func (p *FixCmd) Regenerate(rr *store.Report) error {
 
 	for _, ot := range p.Operators {
 		name := ot.OC.Name
-		if strings.Index(name, " ") != -1 {
+		if strings.Contains(name, " ") {
 			ops, err := GetWellKnownOperators()
 			if err == nil {
 				for _, o := range ops {

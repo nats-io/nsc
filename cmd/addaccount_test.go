@@ -56,7 +56,6 @@ func Test_AddAccount(t *testing.T) {
 func Test_AddAccountNoStore(t *testing.T) {
 	// reset the store
 	ForceStoreRoot(t, "")
-	ngsStore = nil
 	_, _, err := ExecuteCmd(CreateAddAccountCmd())
 	require.Equal(t, "no stores available", err.Error())
 }

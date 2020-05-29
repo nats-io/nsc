@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -113,14 +112,6 @@ type AddUserParams struct {
 	userName      string
 	pkOrPath      string
 	kp            nkeys.KeyPair
-}
-
-func (p *AddUserParams) longHelp() string {
-	s := `toolName add user -i
-toolName add user --name u --deny-pubsub "bar.>"
-toolName add user --name u --tag test,service_a`
-
-	return strings.Replace(s, "toolName", GetToolName(), -1)
 }
 
 func (p *AddUserParams) SetDefaults(ctx ActionCtx) error {

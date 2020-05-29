@@ -38,5 +38,5 @@ release: fmt test compile
 
 lint:
 	go vet ./...
-	staticcheck -f text ./... | grep _test.go
+	staticcheck -f text ./...
 	$(exit $(go fmt $EXCLUDE_VENDOR | wc -l))

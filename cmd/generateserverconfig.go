@@ -137,6 +137,9 @@ func (p *GenerateServerConfigParams) checkDir(fp string) (string, error) {
 		return fp, nil
 	}
 	afp, err := Expand(fp)
+	if err != nil {
+		return "", err
+	}
 
 	fi, err := os.Stat(afp)
 	if err == nil {
@@ -210,6 +213,9 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) (store.Status, error) {
 		p.generator.Add(d)
 
 		users, err := s.ListEntries(store.Accounts, n, store.Users)
+		if err != nil {
+			return nil, err
+		}
 		for _, u := range users {
 			d, err := s.Read(store.Accounts, n, store.Users, store.JwtName(u))
 			if err != nil {

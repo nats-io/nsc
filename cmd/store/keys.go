@@ -97,6 +97,9 @@ func IsOldKeyRing(dir string) (bool, error) {
 	}
 	isOld := false
 	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info == nil && err != nil {
+			return err
+		}
 		// breakout if we determined we have old keyring
 		if isOld {
 			return filepath.SkipDir
@@ -184,10 +187,6 @@ func (k *KeyStore) AllKeys() ([]string, error) {
 
 func (k *KeyStore) credsName(n string) string {
 	return fmt.Sprintf("%s%s", n, CredsExtension)
-}
-
-func (k *KeyStore) keyName(n string) string {
-	return fmt.Sprintf("%s%s", n, NKeyExtension)
 }
 
 func (k *KeyStore) CalcAccountCredsDir(account string) string {
