@@ -105,6 +105,9 @@ func (p *RenameAccountParams) PostInteractive(ctx ActionCtx) error {
 
 func (p *RenameAccountParams) Validate(ctx ActionCtx) error {
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.from)
+	if err != nil {
+		return err
+	}
 	ctx.StoreCtx().Account.Name = p.from
 	ctx.StoreCtx().Account.PublicKey = ac.Subject
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)

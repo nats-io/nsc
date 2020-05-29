@@ -54,7 +54,6 @@ func Test_AddUser(t *testing.T) {
 
 func Test_AddUserNoStore(t *testing.T) {
 	// reset the store
-	ngsStore = nil
 	require.NoError(t, ForceStoreRoot(t, ""))
 	_, _, err := ExecuteCmd(CreateAddUserCmd())
 	require.Error(t, err)

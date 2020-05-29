@@ -174,6 +174,9 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if oc.AccountServerURL != "" {
 		m := fmt.Sprintf("push the activation to %q", oc.AccountServerURL)
 		p.push, err = cli.Confirm(m, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

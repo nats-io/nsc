@@ -95,6 +95,9 @@ func (p *MigrateCmdParams) PreInteractive(ctx ActionCtx) error {
 			_, err = os.Stat(v)
 			return err
 		}))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -338,6 +341,10 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 						return
 					}
 					uc, err := jwt.DecodeUserClaims(s)
+					if err != nil {
+						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						return
+					}
 					if err := ctx.StoreCtx().Store.StoreRaw([]byte(s)); err != nil {
 						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
 						return

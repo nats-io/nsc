@@ -226,7 +226,7 @@ func (p *ValidateCmdParams) foundErrors() bool {
 func (p *ValidateCmdParams) render(name string, issues *jwt.ValidationResults) string {
 	table := tablewriter.CreateTable()
 	table.UTF8Box()
-	table.AddTitle(fmt.Sprintf(name))
+	table.AddTitle(name)
 	if issues != nil {
 		table.AddHeaders("#", " ", "Description")
 		for i, v := range issues.Issues {

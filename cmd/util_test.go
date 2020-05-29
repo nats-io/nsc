@@ -72,8 +72,6 @@ func NewEmptyStore(t *testing.T) *TestStore {
 	SetEnvOptions()
 	var ts TestStore
 
-	// ngsStore is a global - so first test to get it initializes it
-	ngsStore = nil
 	homeEnv = t.Name()
 
 	ts.Dir = MakeTempDir(t)
@@ -104,7 +102,6 @@ func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.
 	var ts TestStore
 
 	// ngsStore is a global - so first test to get it initializes it
-	ngsStore = nil
 	homeEnv = t.Name()
 
 	ts.OperatorKey = operator

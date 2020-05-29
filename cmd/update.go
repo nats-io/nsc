@@ -142,10 +142,6 @@ func (u *SelfUpdate) updateLastChecked() error {
 	return config.Save()
 }
 
-func (u *SelfUpdate) updateCheckFn() (*selfupdate.Release, bool, error) {
-	return selfupdate.DetectLatest(config.GithubUpdates)
-}
-
 func (u *SelfUpdate) doCheck() (*semver.Version, error) {
 	config := GetConfig()
 	have, err := semver.ParseTolerant(GetRootCmd().Version)

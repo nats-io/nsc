@@ -201,6 +201,9 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 					}
 					return nil
 				}))
+				if err != nil {
+					return false, err
+				}
 			}
 			p.remote = subject
 			p.service = c.Selection.IsService()
@@ -479,10 +482,9 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	}
 
 	for _, im := range p.filter(kind, p.claim.Imports) {
-		local := string(im.To)
 		remote := string(im.Subject)
 		if im.Type == jwt.Service {
-			local, remote = remote, local
+			remote = string(im.To)
 		}
 		if im.Account == p.srcAccount.publicKey && remote == p.remote {
 			return fmt.Errorf("account already imports %s %q from %s", kind, im.Subject, p.srcAccount.publicKey)

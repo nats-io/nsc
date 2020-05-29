@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
@@ -73,14 +72,6 @@ type RevokeClearActivationParams struct {
 func (p *RevokeClearActivationParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
-	return nil
-}
-
-func (p *RevokeClearActivationParams) canParse(s string) error {
-	_, err := strconv.Atoi(s)
-	if err != nil {
-		return fmt.Errorf("%s is invalid: %v", s, err)
-	}
 	return nil
 }
 
