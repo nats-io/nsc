@@ -31,7 +31,7 @@ after_success:
 
 deploy:
 - provider: script
-  skip_cleanup: true
+  cleanup: false
   script: curl -sL http://git.io/goreleaser | bash
   on:
     tags: true
