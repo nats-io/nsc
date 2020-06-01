@@ -4,7 +4,7 @@ os:
 
 language: go
 go:
-- 1.12.x
+- 1.14.x
 
 git:
   depth: false
@@ -16,9 +16,6 @@ install:
   - go get github.com/mattn/goveralls
   - go get -u honnef.co/go/tools/cmd/staticcheck
 
-#  - go get -u honnef.co/go/tools/cmd/megacheck
-#  - go get -u github.com/client9/misspell/cmd/misspell
-
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/") && $(exit $(go fmt $EXCLUDE_VENDOR | wc -l)) && go vet $EXCLUDE_VENDOR; fi
   - staticcheck ./...
@@ -26,12 +23,14 @@ before_script:
 script:
     go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
-after_success:
-- git reset --hard
-
 deploy:
 - provider: script
-  skip_cleanup: true
+  script: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service travis-ci
+  on:
+    condition: $TRAVIS_OS_NAME = linux && $TRAVIS_GO_VERSION =~ ^1.14.
+
+- provider: script
+  cleanup: true
   script: curl -sL http://git.io/goreleaser | bash
   on:
     tags: true
