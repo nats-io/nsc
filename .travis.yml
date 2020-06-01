@@ -25,9 +25,8 @@ script:
 
 deploy:
 - provider: script
-  script: $HOME/gopath/bin/goveralls -coverprofile=v2/coverage.out -service travis-ci
+  script: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service travis-ci
   on:
-    tags: true
     condition: $TRAVIS_OS_NAME = linux && $TRAVIS_GO_VERSION =~ ^1.14.
 
 - provider: script
