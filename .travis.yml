@@ -21,7 +21,7 @@ before_script:
   - staticcheck ./...
 
 script:
-    go test -coverpkg=./... -coverprofile=./coverage.out ./...
+  - go test -coverpkg=./... -coverprofile=./coverage.out ./...
 
 deploy:
 - provider: script
@@ -30,7 +30,7 @@ deploy:
     condition: $TRAVIS_OS_NAME = linux && $TRAVIS_GO_VERSION =~ ^1.14.
 
 - provider: script
-  cleanup: true
+  skip_cleanup: true
   script: curl -sL http://git.io/goreleaser | bash
   on:
     tags: true
