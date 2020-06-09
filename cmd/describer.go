@@ -181,7 +181,7 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := strings.Title(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, toYesNo(v.TokenReq), len(v.Revocations), mon)
+		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
 	}
 	return table.Render()
 }
