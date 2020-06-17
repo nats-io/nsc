@@ -42,6 +42,7 @@ nsc delete user -i`,
 	cmd.Flags().BoolVarP(&params.revoke, "revoke", "R", false, "revoke user before deleting")
 	cmd.Flags().BoolVarP(&params.rmNKey, "rm-nkey", "D", false, "delete the user key")
 	cmd.Flags().BoolVarP(&params.rmCreds, "rm-creds", "C", false, "delete the user creds")
+	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
 }
