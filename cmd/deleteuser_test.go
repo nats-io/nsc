@@ -120,3 +120,42 @@ func Test_DeleteUserInteractive(t *testing.T) {
 	_, err = os.Stat(ts.KeyStore.GetUserCredsPath("A", "U"))
 	require.True(t, os.IsNotExist(err))
 }
+
+func Test_DeleteUserFromDiffAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+	ts.AddAccount(t, "B")
+
+	_, _, err := ExecuteCmd(createDeleteUserCmd(), "a", "-a", "A")
+	require.NoError(t, err)
+
+	_, err = ts.Store.ReadUserClaim("A", "a")
+	require.Error(t, err)
+}
+
+func Test_DeleteUserFromDiffAccountInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+	ts.AddAccount(t, "B")
+
+	uc, err := ts.Store.ReadUserClaim("A", "a")
+	require.NoError(t, err)
+	upk := uc.Subject
+
+	_, _, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{0, []int{0}, true, true, true, true})
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadUserClaim("A", "a")
+	require.Error(t, err)
+	require.Nil(t, uc)
+
+	require.False(t, ts.KeyStore.HasPrivateKey(upk))
+	_, err = os.Stat(ts.KeyStore.GetUserCredsPath("A", "a"))
+	require.True(t, os.IsNotExist(err))
+}
