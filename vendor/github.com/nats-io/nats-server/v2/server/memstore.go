@@ -27,7 +27,7 @@ type memStore struct {
 	cfg       StreamConfig
 	state     StreamState
 	msgs      map[uint64]*storedMsg
-	scb       func(int64)
+	scb       StorageUpdateHandler
 	ageChk    *time.Timer
 	consumers int
 }
@@ -134,14 +134,34 @@ func (ms *memStore) StoreMsg(subj string, hdr, msg []byte) (uint64, int64, error
 	ms.mu.Unlock()
 
 	if cb != nil {
-		cb(stopBytes - startBytes)
+		cb(1, stopBytes-startBytes, seq, subj)
 	}
 
 	return seq, ts, nil
 }
 
-// StorageBytesUpdate registers an async callback for updates to storage changes.
-func (ms *memStore) StorageBytesUpdate(cb func(int64)) {
+// SkipMsg will use the next sequence number but not store anything.
+func (ms *memStore) SkipMsg() uint64 {
+	// Grab time.
+	now := time.Now().UTC()
+
+	ms.mu.Lock()
+	seq := ms.state.LastSeq + 1
+	ms.state.LastSeq = seq
+	ms.state.LastTime = now
+	if ms.state.Msgs == 0 {
+		ms.state.FirstSeq = seq
+		ms.state.FirstTime = now
+	}
+	ms.updateFirstSeq(seq)
+	ms.mu.Unlock()
+	return seq
+}
+
+// RegisterStorageUpdates registers a callback for updates to storage changes.
+// It will present number of messages and bytes as a signed integer and an
+// optional sequence number of the message if a single.
+func (ms *memStore) RegisterStorageUpdates(cb StorageUpdateHandler) {
 	ms.mu.Lock()
 	ms.scb = cb
 	ms.mu.Unlock()
@@ -247,7 +267,7 @@ func (ms *memStore) Purge() uint64 {
 	ms.mu.Unlock()
 
 	if cb != nil {
-		cb(-bytes)
+		cb(-int64(purged), -bytes, 0, _EMPTY_)
 	}
 
 	return purged
@@ -297,7 +317,31 @@ func (ms *memStore) EraseMsg(seq uint64) (bool, error) {
 	return removed, nil
 }
 
+// Performs logic to update first sequence number.
+// Lock should be held.
+func (ms *memStore) updateFirstSeq(seq uint64) {
+	if seq != ms.state.FirstSeq {
+		return
+	}
+	var nsm *storedMsg
+	var ok bool
+	for nseq := ms.state.FirstSeq + 1; nseq <= ms.state.LastSeq; nseq++ {
+		if nsm, ok = ms.msgs[nseq]; ok {
+			break
+		}
+	}
+	if nsm != nil {
+		ms.state.FirstSeq = nsm.seq
+		ms.state.FirstTime = time.Unix(0, nsm.ts).UTC()
+	} else {
+		// Like purge.
+		ms.state.FirstSeq = ms.state.LastSeq + 1
+		ms.state.FirstTime = time.Time{}
+	}
+}
+
 // Removes the message referenced by seq.
+// Lock should he held.
 func (ms *memStore) removeMsg(seq uint64, secure bool) bool {
 	var ss uint64
 	sm, ok := ms.msgs[seq]
@@ -305,27 +349,12 @@ func (ms *memStore) removeMsg(seq uint64, secure bool) bool {
 		return false
 	}
 
+	ss = memStoreMsgSize(sm.subj, sm.hdr, sm.msg)
+
 	delete(ms.msgs, seq)
 	ms.state.Msgs--
-	ss = memStoreMsgSize(sm.subj, sm.hdr, sm.msg)
 	ms.state.Bytes -= ss
-	if seq == ms.state.FirstSeq {
-		var nsm *storedMsg
-		var ok bool
-		for nseq := ms.state.FirstSeq + 1; nseq <= ms.state.LastSeq; nseq++ {
-			if nsm, ok = ms.msgs[nseq]; ok {
-				break
-			}
-		}
-		if nsm != nil {
-			ms.state.FirstSeq = nsm.seq
-			ms.state.FirstTime = time.Unix(0, nsm.ts).UTC()
-		} else {
-			// Like purge.
-			ms.state.FirstSeq = ms.state.LastSeq + 1
-			ms.state.FirstTime = time.Time{}
-		}
-	}
+	ms.updateFirstSeq(seq)
 
 	if secure {
 		if len(sm.hdr) > 0 {
@@ -340,8 +369,10 @@ func (ms *memStore) removeMsg(seq uint64, secure bool) bool {
 	}
 
 	if ms.scb != nil {
+		ms.mu.Unlock()
 		delta := int64(ss)
-		ms.scb(-delta)
+		ms.scb(-1, -delta, seq, sm.subj)
+		ms.mu.Lock()
 	}
 
 	return ok
@@ -404,9 +435,12 @@ func (ms *memStore) Snapshot(_ time.Duration, _, _ bool) (*SnapshotResult, error
 }
 
 // No-ops.
-func (os *consumerMemStore) Update(_ *ConsumerState) error {
-	return nil
-}
+func (os *consumerMemStore) Update(_ *ConsumerState) error { return nil }
+
+func (os *consumerMemStore) UpdateDelivered(_, _, _ uint64, _ int64) error { return nil }
+
+func (os *consumerMemStore) UpdateAcks(_, _ uint64) error { return nil }
+
 func (os *consumerMemStore) Stop() error {
 	os.ms.decConsumers()
 	return nil

@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/dustin/go-humanize"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/xlab/tablewriter"
 )
 
@@ -309,18 +309,10 @@ func (c *ActivationDescriber) Describe() string {
 	table.AddRow("Import Subject", string(c.ImportSubject))
 	table.AddSeparator()
 
-	AddLimits(table, c.Limits)
-
 	return table.Render()
 }
 
 func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
-	if lim.Max > 0 {
-		table.AddRow("Max Messages", fmt.Sprintf("%d", lim.Max))
-	} else {
-		table.AddRow("Max Messages", "Unlimited")
-	}
-
 	if lim.Payload > 0 {
 		v := fmt.Sprintf("%d bytes (≈%s)", lim.Payload, humanize.Bytes(uint64(lim.Payload)))
 		table.AddRow("Max Msg Payload", v)
@@ -328,7 +320,7 @@ func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
 		table.AddRow("Max Msg Payload", "Unlimited")
 	}
 
-	if lim.Src != "" {
+	if len(lim.Src) != 0 {
 		table.AddRow("Network Src", lim.Src)
 	} else {
 		table.AddRow("Network Src", "Any")
@@ -420,13 +412,6 @@ func (o *OperatorDescriber) Describe() string {
 
 	if o.SystemAccount != "" {
 		table.AddRow("System Account", o.SystemAccount)
-	}
-
-	if len(o.Identities) > 0 {
-		table.AddSeparator()
-		for _, v := range o.Identities {
-			table.AddRow(fmt.Sprintf("ID %s", v.ID), v.Proof)
-		}
 	}
 
 	if len(o.SigningKeys) > 0 {

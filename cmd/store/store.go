@@ -33,7 +33,7 @@ import (
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
 
@@ -187,10 +187,9 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 		return "", fmt.Errorf("error reading public key: %v", err)
 	}
 
-	var v = jwt.NewGenericClaims(string(pub))
+	var v = jwt.NewOperatorClaims(string(pub))
 	s.Info.Kind = jwt.OperatorClaim
 	v.Name = operator.Name
-	v.Type = jwt.OperatorClaim
 
 	if !nkeys.IsValidPublicOperatorKey(pub) {
 		return "", fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
@@ -326,16 +325,16 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 	return entries, nil
 }
 
-func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
+func (s *Store) ClaimType(data []byte) (jwt.ClaimType, error) {
 	// Decode the jwt to figure out where it goes
 	gc, err := jwt.DecodeGeneric(string(data))
 	if err != nil {
-		return nil, fmt.Errorf("invalid jwt: %v", err)
+		return "", fmt.Errorf("invalid jwt: %v", err)
 	}
 	if gc.Name == "" {
-		return nil, errors.New("jwt claim doesn't have a name")
+		return "", errors.New("jwt claim doesn't have a name")
 	}
-	return &gc.Type, nil
+	return gc.ClaimType(), nil
 }
 
 func PullAccount(u string) (Status, error) {
@@ -414,7 +413,7 @@ func (s *Store) StoreClaim(data []byte) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
-	if *ct == jwt.AccountClaim && s.IsManaged() {
+	if ct == jwt.AccountClaim && s.IsManaged() {
 		var pull Report
 		pp, err := s.handleManagedAccount(data)
 		if pp != nil {
@@ -452,7 +451,7 @@ func (s *Store) StoreRaw(data []byte) error {
 		return err
 	}
 	var path string
-	switch *ct {
+	switch ct {
 	case jwt.AccountClaim:
 		ac, err := jwt.DecodeAccountClaims(string(data))
 		if err != nil {
@@ -496,7 +495,7 @@ func (s *Store) StoreRaw(data []byte) error {
 		}
 		path = JwtName(s.GetName())
 	default:
-		return fmt.Errorf("unsuported store claim type: %s", *ct)
+		return fmt.Errorf("unsuported store claim type: %s", ct)
 	}
 
 	return s.Write(data, path)

@@ -125,6 +125,9 @@ var (
 	// ErrServiceImportAuthorization is returned when a service import is not authorized.
 	ErrServiceImportAuthorization = errors.New("service import not authorized")
 
+	// ErrServiceImportFormsCycle is returned when a service import forms a cycle.
+	ErrServiceImportFormsCycle = errors.New("service import forms cycle")
+
 	// ErrClientOrRouteConnectedToGatewayPort represents an error condition when
 	// a client or route attempted to connect to the Gateway port.
 	ErrClientOrRouteConnectedToGatewayPort = errors.New("attempted to connect to gateway port")
@@ -169,6 +172,15 @@ var (
 
 	// ErrNoTransforms signals no subject transforms are available to map this subject.
 	ErrNoTransforms = errors.New("no matching transforms available")
+
+	// ErrJetStreamNotEnabled is returned when JetStream is not enabled.
+	ErrJetStreamNotEnabled = errors.New("jetstream not enabled")
+
+	// ErrJetStreamStreamNotFound is returned when a stream can not be found.
+	ErrJetStreamStreamNotFound = errors.New("stream not found")
+
+	// ErrJetStreamNotEnabledForAccount is returned JetStream is not enabled for this account.
+	ErrJetStreamNotEnabledForAccount = errors.New("jetstream not enabled for account")
 )
 
 // configErr is a configuration error.

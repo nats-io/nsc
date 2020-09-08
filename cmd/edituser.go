@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -308,11 +308,10 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed bearer to %t", p.bearer)
 	}
 
-	src := strings.Split(p.claim.Src, ",")
-	var srcList jwt.StringList
-	srcList.Add(src...)
+	var srcList jwt.CIDRList
+	srcList.Add(p.claim.Src...)
 	srcList.Add(p.src...)
-	for _, v := range p.src {
+	for _, v := range p.claim.Src {
 		r.AddOK("added src network %s", v)
 	}
 	srcList.Remove(p.rmSrc...)
@@ -320,7 +319,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("removed src network %s", v)
 	}
 	sort.Strings(srcList)
-	p.claim.Src = strings.Join(srcList, ",")
+	p.claim.Src = srcList
 
 	for _, v := range p.times {
 		r.AddOK("added time range %s-%s", v.Start, v.End)

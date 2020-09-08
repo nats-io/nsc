@@ -177,14 +177,16 @@ const (
 	MsgHeaderViolation
 	NoRespondersRequiresHeaders
 	ClusterNameConflict
+	DuplicateRemoteLeafnodeConnection
 )
 
-// Some flags passed to processMsgResultsEx
+// Some flags passed to processMsgResults
 const pmrNoFlag int = 0
 const (
 	pmrCollectQueueNames int = 1 << iota
 	pmrIgnoreEmptyQueueFilter
 	pmrAllowSendFromRouteToRoute
+	pmrMsgImportedFromService
 )
 
 type client struct {
@@ -2234,7 +2236,6 @@ func (c *client) parseSub(argo []byte, noForward bool) error {
 }
 
 func (c *client) processSub(subject, queue, bsid []byte, cb msgHandler, noForward bool) (*subscription, error) {
-
 	// Create the subscription
 	sub := &subscription{client: c, subject: subject, queue: queue, sid: bsid, icb: cb}
 
@@ -2949,14 +2950,13 @@ func (c *client) deliverMsg(sub *subscription, subject, reply, mh, msg []byte, g
 	client.outBytes += msgSize
 
 	// Check for internal subscriptions.
-	if sub.icb != nil || client.kind == SYSTEM || client.kind == JETSTREAM || client.kind == ACCOUNT {
+	if sub.icb != nil {
 		client.mu.Unlock()
-		// Internal account clients are for service imports and need the
-		// complete raw msg with '\r\n'.
+		// Internal account clients are for service imports and need the '\r\n'.
 		if client.kind == ACCOUNT {
-			sub.icb(sub, c, string(subject), string(c.pa.reply), msg)
+			sub.icb(sub, c, string(subject), string(reply), msg)
 		} else {
-			sub.icb(sub, c, string(subject), string(c.pa.reply), msg[:msgSize])
+			sub.icb(sub, c, string(subject), string(reply), msg[:msgSize])
 		}
 		return true
 	}
@@ -3378,6 +3378,7 @@ func (c *client) processInboundClientMsg(msg []byte) bool {
 			atomic.LoadInt64(&c.srv.gateway.totalQSubs) > 0 {
 			flag |= pmrCollectQueueNames
 		}
+
 		didDeliver, qnames = c.processMsgResults(c.acc, r, msg, c.pa.deliver, c.pa.subject, c.pa.reply, flag)
 	}
 
@@ -3501,8 +3502,7 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 	// TODO(dlc) - restrict to configured service imports and not responses?
 	tracking, headers := shouldSample(si.latency, c)
 	if len(c.pa.reply) > 0 {
-		rsi = c.setupResponseServiceImport(acc, si, tracking, headers)
-		if rsi != nil {
+		if rsi = c.setupResponseServiceImport(acc, si, tracking, headers); rsi != nil {
 			nrr = []byte(rsi.from)
 		}
 	} else {
@@ -3516,6 +3516,8 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 	// This is always a response.
 	var didSendTL bool
 	if si.tracking {
+		// Stamp that we attempted delivery.
+		si.didDeliver = true
 		didSendTL = acc.sendTrackingLatency(si, c)
 	}
 
@@ -3529,16 +3531,23 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 	}
 
 	// Now check to see if this account has mappings that could affect the service import.
-	// Can't use non locked trick like in processInboundClientMsg, so just call into selectMappedSubject
+	// Can't use non-locked trick like in processInboundClientMsg, so just call into selectMappedSubject
 	// so we only lock once.
 	to, _ = si.acc.selectMappedSubject(to)
 
+	oreply, oacc := c.pa.reply, c.acc
+	c.pa.reply = nrr
+	if !si.isSysAcc {
+		c.mu.Lock()
+		c.acc = si.acc
+		c.mu.Unlock()
+	}
 	// FIXME(dlc) - Do L1 cache trick like normal client?
 	rr := si.acc.sl.Match(to)
 
 	// If we are a route or gateway or leafnode and this message is flipped to a queue subscriber we
 	// need to handle that since the processMsgResults will want a queue filter.
-	flags := pmrNoFlag
+	flags := pmrMsgImportedFromService
 	if c.kind == GATEWAY || c.kind == ROUTER || c.kind == LEAF {
 		flags |= pmrIgnoreEmptyQueueFilter
 	}
@@ -3567,6 +3576,13 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 
 	// Put what was there back now.
 	c.in.rts = orts
+	c.pa.reply = oreply
+
+	if !si.isSysAcc {
+		c.mu.Lock()
+		c.acc = oacc
+		c.mu.Unlock()
+	}
 
 	// Determine if we should remove this service import. This is for response service imports.
 	// We will remove if we did not deliver, or if we are a response service import and we are
@@ -3704,19 +3720,37 @@ func (c *client) processMsgResults(acc *Account, r *SublistResult, msg, deliver,
 			}
 			continue
 		}
-		// Assume delivery subject is normal subject to this point.
+
+		// Assume delivery subject is the normal subject to this point.
 		dsubj = subj
+
 		// Check for stream import mapped subs (shadow subs). These apply to local subs only.
 		if sub.im != nil {
+			// If this message was a service import do not re-export to an exported stream.
+			if flags&pmrMsgImportedFromService != 0 {
+				continue
+			}
 			if sub.im.tr != nil {
-				to, _ := sub.im.tr.transformSubject(string(subj))
+				to, _ := sub.im.tr.transformSubject(string(dsubj))
 				dsubj = append(_dsubj[:0], to...)
 			} else if sub.im.usePub {
 				dsubj = append(_dsubj[:0], subj...)
 			} else {
 				dsubj = append(_dsubj[:0], sub.im.to...)
 			}
+			// If we are mapping for a deliver subject we will reverse roles.
+			// The original subj we set from above is correct for the msg header,
+			// but we need to transform the deliver subject to properly route.
+			if len(deliver) > 0 {
+				dsubj, subj = subj, dsubj
+			}
 		}
+
+		// Remap to original if internal.
+		if sub.icb != nil {
+			subj = subject
+		}
+
 		// Normal delivery
 		mh := c.msgHeader(dsubj, creply, sub)
 		didDeliver = c.deliverMsg(sub, subj, creply, mh, msg, rplyHasGWPrefix) || didDeliver
@@ -3812,6 +3846,8 @@ func (c *client) processMsgResults(acc *Account, r *SublistResult, msg, deliver,
 					continue
 				} else {
 					c.addSubToRouteTargets(sub)
+					// Clear rsub since we added a sub.
+					rsub = nil
 					if flags&pmrCollectQueueNames != 0 {
 						queues = append(queues, sub.queue)
 					}
@@ -3823,6 +3859,10 @@ func (c *client) processMsgResults(acc *Account, r *SublistResult, msg, deliver,
 			dsubj = subj
 			// Check for stream import mapped subs. These apply to local subs only.
 			if sub.im != nil {
+				// If this message was a service import do not re-export to an exported stream.
+				if flags&pmrMsgImportedFromService != 0 {
+					continue
+				}
 				if sub.im.tr != nil {
 					to, _ := sub.im.tr.transformSubject(string(subj))
 					dsubj = append(_dsubj[:0], to...)
@@ -3942,18 +3982,30 @@ func (c *client) processPingTimer() {
 
 	c.Debugf("%s Ping Timer", c.typeString())
 
+	var sendPing bool
+
 	// If we have had activity within the PingInterval then
 	// there is no need to send a ping. This can be client data
 	// or if we received a ping from the other side.
 	pingInterval := c.srv.getOpts().PingInterval
+	if c.kind == GATEWAY {
+		pingInterval = adjustPingIntervalForGateway(pingInterval)
+		sendPing = true
+	}
 	now := time.Now()
 	needRTT := c.rtt == 0 || now.Sub(c.rttStart) > DEFAULT_RTT_MEASUREMENT_INTERVAL
 
-	if delta := now.Sub(c.last); delta < pingInterval && !needRTT {
-		c.Debugf("Delaying PING due to client activity %v ago", delta.Round(time.Second))
-	} else if delta := now.Sub(c.ping.last); delta < pingInterval && !needRTT {
-		c.Debugf("Delaying PING due to remote ping %v ago", delta.Round(time.Second))
-	} else {
+	// Do not delay PINGs for GATEWAY connections.
+	if c.kind != GATEWAY {
+		if delta := now.Sub(c.last); delta < pingInterval && !needRTT {
+			c.Debugf("Delaying PING due to client activity %v ago", delta.Round(time.Second))
+		} else if delta := now.Sub(c.ping.last); delta < pingInterval && !needRTT {
+			c.Debugf("Delaying PING due to remote ping %v ago", delta.Round(time.Second))
+		} else {
+			sendPing = true
+		}
+	}
+	if sendPing {
 		// Check for violation
 		if c.ping.out+1 > c.srv.getOpts().MaxPingsOut {
 			c.Debugf("Stale Client Connection - Closing")
@@ -3971,12 +4023,24 @@ func (c *client) processPingTimer() {
 	c.mu.Unlock()
 }
 
+// Returns the smallest value between the given `d` and `gatewayMaxPingInterval` durations.
+// Invoked for connections known to be of GATEWAY type.
+func adjustPingIntervalForGateway(d time.Duration) time.Duration {
+	if d > gatewayMaxPingInterval {
+		return gatewayMaxPingInterval
+	}
+	return d
+}
+
 // Lock should be held
 func (c *client) setPingTimer() {
 	if c.srv == nil {
 		return
 	}
 	d := c.srv.getOpts().PingInterval
+	if c.kind == GATEWAY {
+		d = adjustPingIntervalForGateway(d)
+	}
 	c.ping.tmr = time.AfterFunc(d, c.processPingTimer)
 }
 

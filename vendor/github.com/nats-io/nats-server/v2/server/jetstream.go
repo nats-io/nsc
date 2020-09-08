@@ -101,13 +101,15 @@ func (s *Server) EnableJetStream(config *JetStreamConfig) error {
 	s.Noticef("Starting JetStream")
 	if config == nil || config.MaxMemory <= 0 || config.MaxStore <= 0 {
 		var storeDir string
-		s.Debugf("JetStream creating dynamic configuration - 75%% of system memory, %s disk", FriendlyBytes(JetStreamMaxStoreDefault))
+		var maxStore int64
 		if config != nil {
 			storeDir = config.StoreDir
+			maxStore = config.MaxStore
 		}
-		config = s.dynJetStreamConfig(storeDir)
+		config = s.dynJetStreamConfig(storeDir, maxStore)
+		s.Debugf("JetStream creating dynamic configuration - %s memory, %s disk", FriendlyBytes(config.MaxMemory), FriendlyBytes(config.MaxStore))
 	}
-	// Copy, don't change callers.
+	// Copy, don't change callers version.
 	cfg := *config
 	if cfg.StoreDir == "" {
 		cfg.StoreDir = filepath.Join(os.TempDir(), JetStreamStoreDir)
@@ -341,7 +343,7 @@ func (s *Server) JetStreamNumAccounts() int {
 func (s *Server) JetStreamReservedResources() (int64, int64, error) {
 	js := s.getJetStream()
 	if js == nil {
-		return -1, -1, fmt.Errorf("jetstream not enabled")
+		return -1, -1, ErrJetStreamNotEnabled
 	}
 	js.mu.RLock()
 	defer js.mu.RUnlock()
@@ -367,7 +369,7 @@ func (a *Account) EnableJetStream(limits *JetStreamAccountLimits) error {
 	// FIXME(dlc) - cluster mode
 	js := s.getJetStream()
 	if js == nil {
-		return fmt.Errorf("jetstream not enabled")
+		return ErrJetStreamNotEnabled
 	}
 	if s.SystemAccount() == a {
 		return fmt.Errorf("jetstream can not be enabled on the system account")
@@ -531,7 +533,7 @@ func (a *Account) EnableJetStream(limits *JetStreamAccountLimits) error {
 		stats := mset.State()
 		s.Noticef("  Restored %s messages for Stream %q", comma(int64(stats.Msgs)), fi.Name())
 
-		// Now do Consumers.
+		// Now do the consumers.
 		odir := path.Join(sdir, fi.Name(), consumerDir)
 		ofis, _ := ioutil.ReadDir(odir)
 		if len(ofis) > 0 {
@@ -605,34 +607,52 @@ func (a *Account) NumStreams() int {
 
 // Streams will return all known streams.
 func (a *Account) Streams() []*Stream {
+	return a.filteredStreams(_EMPTY_)
+}
+
+func (a *Account) filteredStreams(filter string) []*Stream {
 	a.mu.RLock()
 	jsa := a.js
 	a.mu.RUnlock()
+
 	if jsa == nil {
 		return nil
 	}
-	var msets []*Stream
+
 	jsa.mu.Lock()
+	defer jsa.mu.Unlock()
+
+	var msets []*Stream
 	for _, mset := range jsa.streams {
-		msets = append(msets, mset)
+		if filter != _EMPTY_ {
+			for _, subj := range mset.config.Subjects {
+				if SubjectsCollide(filter, subj) {
+					msets = append(msets, mset)
+					break
+				}
+			}
+		} else {
+			msets = append(msets, mset)
+		}
 	}
-	jsa.mu.Unlock()
+
 	return msets
 }
 
+// LookupStream will lookup a stream by name.
 func (a *Account) LookupStream(name string) (*Stream, error) {
 	a.mu.RLock()
 	jsa := a.js
 	a.mu.RUnlock()
 
 	if jsa == nil {
-		return nil, fmt.Errorf("jetstream not enabled")
+		return nil, ErrJetStreamNotEnabled
 	}
 	jsa.mu.Lock()
 	mset, ok := jsa.streams[name]
 	jsa.mu.Unlock()
 	if !ok {
-		return nil, fmt.Errorf("stream not found")
+		return nil, ErrJetStreamStreamNotFound
 	}
 	return mset, nil
 }
@@ -649,10 +669,10 @@ func (a *Account) UpdateJetStreamLimits(limits *JetStreamAccountLimits) error {
 	}
 	js := s.getJetStream()
 	if js == nil {
-		return fmt.Errorf("jetstream not enabled")
+		return ErrJetStreamNotEnabled
 	}
 	if jsa == nil {
-		return fmt.Errorf("jetstream not enabled for account")
+		return ErrJetStreamNotEnabledForAccount
 	}
 
 	if limits == nil {
@@ -722,7 +742,7 @@ func (a *Account) DisableJetStream() error {
 
 	js := s.getJetStream()
 	if js == nil {
-		return fmt.Errorf("jetstream not enabled")
+		return ErrJetStreamNotEnabled
 	}
 
 	// Remove service imports.
@@ -736,7 +756,7 @@ func (a *Account) DisableJetStream() error {
 // Disable JetStream for the account.
 func (js *jetStream) disableJetStream(jsa *jsAccount) error {
 	if jsa == nil {
-		return fmt.Errorf("jetstream not enabled for account")
+		return ErrJetStreamNotEnabledForAccount
 	}
 
 	js.mu.Lock()
@@ -825,6 +845,13 @@ func (jsa *jsAccount) checkBytesLimits(addBytes int64, storage StorageType) erro
 		}
 	}
 	return nil
+}
+
+func (jsa *jsAccount) acc() *Account {
+	jsa.mu.RLock()
+	acc := jsa.account
+	jsa.mu.RUnlock()
+	return acc
 }
 
 // Delete the JetStream resources.
@@ -922,7 +949,7 @@ const (
 )
 
 // Dynamically create a config with a tmp based directory (repeatable) and 75% of system memory.
-func (s *Server) dynJetStreamConfig(storeDir string) *JetStreamConfig {
+func (s *Server) dynJetStreamConfig(storeDir string, maxStore int64) *JetStreamConfig {
 	jsc := &JetStreamConfig{}
 	if storeDir != "" {
 		jsc.StoreDir = filepath.Join(storeDir, JetStreamStoreDir)
@@ -930,7 +957,12 @@ func (s *Server) dynJetStreamConfig(storeDir string) *JetStreamConfig {
 		tdir, _ := ioutil.TempDir(os.TempDir(), "nats-jetstream-storedir-")
 		jsc.StoreDir = filepath.Join(tdir, JetStreamStoreDir)
 	}
-	jsc.MaxStore = JetStreamMaxStoreDefault
+
+	if maxStore > 0 {
+		jsc.MaxStore = maxStore
+	} else {
+		jsc.MaxStore = diskAvailable(jsc.StoreDir)
+	}
 	// Estimate to 75% of total memory if we can determine system memory.
 	if sysMem := sysmem.Memory(); sysMem > 0 {
 		jsc.MaxMemory = sysMem / 4 * 3
@@ -952,7 +984,7 @@ func (a *Account) checkForJetStream() (*Server, *jsAccount, error) {
 	}
 
 	if jsa == nil {
-		return nil, nil, fmt.Errorf("jetstream not enabled for account")
+		return nil, nil, ErrJetStreamNotEnabledForAccount
 	}
 
 	return s, jsa, nil
@@ -1163,7 +1195,7 @@ func (t *StreamTemplate) Delete() error {
 	t.mu.Unlock()
 
 	if jsa == nil {
-		return fmt.Errorf("jetstream not enabled")
+		return ErrJetStreamNotEnabled
 	}
 
 	jsa.mu.Lock()

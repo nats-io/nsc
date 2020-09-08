@@ -18,11 +18,10 @@ package cmd
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -180,10 +179,9 @@ func (p *ClearRevokeUserParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *ClearRevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	if !p.claim.IsRevokedAt(p.userPubKey, time.Unix(0, 0)) {
+	if _, ok := p.claim.Revocations[p.userPubKey]; !ok {
 		return nil, fmt.Errorf("user with public key %s is not revoked", p.userPubKey)
 	}
-
 	p.claim.ClearRevocation(p.userPubKey)
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {

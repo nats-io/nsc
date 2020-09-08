@@ -49,6 +49,6 @@ func Test_NatsResolverServerParse(t *testing.T) {
 	require.NoError(t, opts.ProcessConfigFile(serverconf))
 	require.NotEmpty(t, opts.SystemAccount)
 	require.NotEmpty(t, opts.TrustedOperators)
-	_, ok := opts.AccountResolver.(*server.DirAccResolver)
+	_, ok := opts.AccountResolver.(server.AccountResolver)
 	require.True(t, ok)
 }

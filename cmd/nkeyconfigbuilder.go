@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 )
 
 type NKeyConfigBuilder struct {
@@ -56,7 +56,7 @@ func (cb *NKeyConfigBuilder) Add(rawClaim []byte) error {
 	if err != nil {
 		return err
 	}
-	switch gc.Type {
+	switch gc.ClaimType() {
 	case jwt.AccountClaim:
 		ac, err := jwt.DecodeAccountClaims(token)
 		if err != nil {

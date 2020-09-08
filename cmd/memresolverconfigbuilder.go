@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 )
 
@@ -58,7 +58,7 @@ func (cb *MemResolverConfigBuilder) Add(rawClaim []byte) error {
 	if err != nil {
 		return err
 	}
-	switch gc.Type {
+	switch gc.ClaimType() {
 	case jwt.OperatorClaim:
 		oc, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {

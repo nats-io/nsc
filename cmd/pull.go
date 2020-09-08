@@ -23,7 +23,7 @@ import (
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -79,7 +79,7 @@ func (j *PullJob) Token() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	switch gc.Type {
+	switch gc.ClaimType() {
 	case jwt.AccountClaim:
 		_, err := jwt.DecodeAccountClaims(token)
 		if err != nil {
@@ -93,7 +93,7 @@ func (j *PullJob) Token() (string, error) {
 		}
 		return token, nil
 	default:
-		return "", fmt.Errorf("unsupported token type: %q", gc.Type)
+		return "", fmt.Errorf("unsupported token type: %q", gc.ClaimType())
 	}
 }
 
@@ -223,7 +223,7 @@ func (p *PullParams) maybeStoreJWT(ctx ActionCtx, sub *store.Report, token strin
 		sub.AddError("error storing %q: %v", remoteClaim.Name, err)
 		return
 	}
-	sub.AddOK("stored %s %q", remoteClaim.Type, remoteClaim.Name)
+	sub.AddOK("stored %s %q", remoteClaim.ClaimType(), remoteClaim.Name)
 	if sub.OK() {
 		sub.Label = fmt.Sprintf("pulled %q from the account server", remoteClaim.Name)
 	}

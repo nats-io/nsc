@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestRevokeUser(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
+	require.True(t, ac.IsClaimRevoked(u))
 
 	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two")
 	require.NoError(t, err)
@@ -51,7 +52,7 @@ func TestRevokeUser(t *testing.T) {
 
 	u, err = ts.Store.ReadUserClaim("A", "two")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
+	require.True(t, ac.IsClaimRevoked(u))
 
 	// Double doesn't do anything
 	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two")
@@ -80,10 +81,11 @@ func TestRevokeUserAt(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(999, 0)))
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Unix(1001, 0)))
+	require.False(t, ac.IsClaimRevoked(u))
+	_, ok := ac.Revocations[u.Subject]
+	require.True(t, ok)
 
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two", "--at", "2000")
+	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two", "--at", strconv.Itoa(int(time.Now().Unix())))
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -92,8 +94,9 @@ func TestRevokeUserAt(t *testing.T) {
 
 	u, err = ts.Store.ReadUserClaim("A", "two")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(1999, 0)))
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Unix(2001, 0)))
+	require.True(t, ac.IsClaimRevoked(u))
+	_, ok = ac.Revocations[u.Subject]
+	require.True(t, ok)
 }
 
 func Test_RevokeUserAccountNameRequired(t *testing.T) {
@@ -143,9 +146,7 @@ func TestRevokeUserInteractive(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	uPub := u.Subject
-	require.True(t, ac.IsRevokedAt(uPub, time.Unix(0, 0)))
-	require.False(t, ac.IsRevokedAt(uPub, time.Now().Add(1*time.Hour)))
+	require.True(t, ac.IsClaimRevoked(u))
 
 	cmd = createRevokeUserCmd()
 	HoistRootFlags(cmd)
@@ -187,11 +188,9 @@ func TestRevokeUserByNkey(t *testing.T) {
 	// make sure one is expired
 	u, err = ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
+	require.True(t, ac.IsClaimRevoked(u))
 	// make sure two is not expired
 	u, err = ts.Store.ReadUserClaim("A", "two")
 	require.NoError(t, err)
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
+	require.False(t, ac.IsClaimRevoked(u))
 }

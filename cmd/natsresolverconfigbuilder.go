@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 )
 
 type NatsResolverConfigBuilder struct {
@@ -41,7 +41,7 @@ func (cb *NatsResolverConfigBuilder) Add(rawClaim []byte) error {
 	if err != nil {
 		return err
 	}
-	switch gc.Type {
+	switch gc.ClaimType() {
 	case jwt.OperatorClaim:
 		if claim, err := jwt.DecodeOperatorClaims(token); err != nil {
 			return err

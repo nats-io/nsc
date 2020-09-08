@@ -1065,7 +1065,7 @@ type GatewayOptsVarz struct {
 	Advertise      string                  `json:"advertise,omitempty"`
 	ConnectRetries int                     `json:"connect_retries,omitempty"`
 	Gateways       []RemoteGatewayOptsVarz `json:"gateways,omitempty"`
-	RejectUnknown  bool                    `json:"reject_unknown,omitempty"`
+	RejectUnknown  bool                    `json:"reject_unknown,omitempty"` // config got renamed to reject_unknown_cluster
 }
 
 // RemoteGatewayOptsVarz contains monitoring remote gateway information
@@ -1913,6 +1913,8 @@ func (reason ClosedState) String() string {
 		return "No Responders Requires Headers"
 	case ClusterNameConflict:
 		return "Cluster Name Conflict"
+	case DuplicateRemoteLeafnodeConnection:
+		return "Duplicate Remote LeafNode Connection"
 	}
 
 	return "Unknown State"
@@ -1924,9 +1926,24 @@ type AccountzOptions struct {
 	Account string `json:"account"`
 }
 
+func newExtServiceLatency(l *serviceLatency) *jwt.ServiceLatency {
+	if l == nil {
+		return nil
+	}
+	return &jwt.ServiceLatency{
+		Sampling: int(l.sampling),
+		Results:  jwt.Subject(l.subject),
+	}
+}
+
 type ExtImport struct {
 	jwt.Import
-	Invalid bool `json:"invalid"`
+	Invalid     bool                `json:"invalid"`
+	Share       bool                `json:"share"`
+	Tracking    bool                `json:"tracking"`
+	TrackingHdr http.Header         `json:"tracking_header,omitempty"`
+	Latency     *jwt.ServiceLatency `json:"latency,omitempty"`
+	M1          *ServiceLatency     `json:"m1,omitempty"`
 }
 
 type ExtExport struct {
@@ -1943,20 +1960,24 @@ type ExtVrIssues struct {
 type ExtMap map[string][]*MapDest
 
 type AccountInfo struct {
-	AccountName string             `json:"account_name"`
-	LastUpdate  time.Time          `json:"update_time,omitempty"`
-	Expired     bool               `json:"expired"`
-	Complete    bool               `json:"complete"`
-	JetStream   bool               `json:"jetstream_enabled"`
-	LeafCnt     int                `json:"leafnode_connections"`
-	ClientCnt   int                `json:"client_connections"`
-	SubCnt      uint32             `json:"subscriptions"`
-	Mappings    ExtMap             `json:"mappings,omitempty"`
-	Exports     []ExtExport        `json:"exports,omitempty"`
-	Imports     []ExtImport        `json:"imports,omitempty"`
-	Jwt         string             `json:"jwt,omitempty"`
-	Claim       *jwt.AccountClaims `json:"decoded_jwt,omitempty"`
-	Vr          []ExtVrIssues      `json:"validation_result_jwt,omitempty"`
+	AccountName string               `json:"account_name"`
+	LastUpdate  time.Time            `json:"update_time,omitempty"`
+	Expired     bool                 `json:"expired"`
+	Complete    bool                 `json:"complete"`
+	JetStream   bool                 `json:"jetstream_enabled"`
+	LeafCnt     int                  `json:"leafnode_connections"`
+	ClientCnt   int                  `json:"client_connections"`
+	SubCnt      uint32               `json:"subscriptions"`
+	Mappings    ExtMap               `json:"mappings,omitempty"`
+	Exports     []ExtExport          `json:"exports,omitempty"`
+	Imports     []ExtImport          `json:"imports,omitempty"`
+	Jwt         string               `json:"jwt,omitempty"`
+	Claim       *jwt.AccountClaims   `json:"decoded_jwt,omitempty"`
+	Vr          []ExtVrIssues        `json:"validation_result_jwt,omitempty"`
+	RevokedUser map[string]time.Time `json:"revoked_user,omitempty"`
+	RevokedAct  map[string]time.Time `json:"revoked_activations,omitempty"`
+	Sublist     *SublistStats        `json:"sublist_stats,omitempty"`
+	Responses   map[string]ExtImport `json:"responses,omitempty"`
 }
 
 type Accountz struct {
@@ -2003,6 +2024,31 @@ func (s *Server) Accountz(optz *AccountzOptions) (*Accountz, error) {
 	}
 }
 
+func newExtImport(v *serviceImport) ExtImport {
+	imp := ExtImport{
+		Invalid: true,
+		Import:  jwt.Import{Type: jwt.Service},
+	}
+	if v != nil {
+		imp.Share = v.share
+		imp.Tracking = v.tracking
+		imp.Invalid = v.invalid
+		imp.Import = jwt.Import{
+			Subject: jwt.Subject(v.from),
+			Account: v.acc.Name,
+			Type:    jwt.Service,
+			To:      jwt.Subject(v.to),
+		}
+		imp.TrackingHdr = v.trackingHdr
+		imp.Latency = newExtServiceLatency(v.latency)
+		if v.m1 != nil {
+			m1 := *v.m1
+			imp.M1 = &m1
+		}
+	}
+	return imp
+}
+
 func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 	var a *Account
 	if v, ok := s.accounts.Load(accName); !ok {
@@ -2032,6 +2078,7 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 			ApprovedAccounts: []string{},
 		}
 		if v != nil {
+			e.Latency = newExtServiceLatency(v.latency)
 			e.TokenReq = v.tokenReq
 			e.ResponseType = jwt.ResponseType(v.respType.String())
 			for name := range v.approved {
@@ -2074,20 +2121,11 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 		imports = append(imports, imp)
 	}
 	for _, v := range a.imports.services {
-		imp := ExtImport{
-			Invalid: true,
-			Import:  jwt.Import{Type: jwt.Service},
-		}
-		if v != nil {
-			imp.Invalid = v.invalid
-			imp.Import = jwt.Import{
-				Subject: jwt.Subject(v.from),
-				Account: v.acc.Name,
-				Type:    jwt.Service,
-				To:      jwt.Subject(v.to),
-			}
-		}
-		imports = append(imports, imp)
+		imports = append(imports, newExtImport(v))
+	}
+	responses := map[string]ExtImport{}
+	for k, v := range a.exports.responses {
+		responses[k] = newExtImport(v)
 	}
 	mappings := ExtMap{}
 	for _, m := range a.mappings {
@@ -2112,7 +2150,13 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 		}
 		mappings[src] = dests
 	}
-
+	collectRevocations := func(revocations map[string]int64) map[string]time.Time {
+		rev := map[string]time.Time{}
+		for k, v := range a.usersRevoked {
+			rev[k] = time.Unix(v, 0)
+		}
+		return rev
+	}
 	return &AccountInfo{
 		accName,
 		a.updated,
@@ -2128,5 +2172,9 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 		a.claimJWT,
 		claim,
 		vrIssues,
+		collectRevocations(a.usersRevoked),
+		collectRevocations(a.actsRevoked),
+		a.sl.Stats(),
+		responses,
 	}, nil
 }
