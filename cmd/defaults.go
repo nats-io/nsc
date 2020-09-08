@@ -34,7 +34,6 @@ import (
 //NscHomeEnv the folder for the config file
 const NscHomeEnv = "NSC_HOME"
 const NscCwdOnlyEnv = "NSC_CWD_ONLY"
-const NscNoSelfUpdateEnv = "NSC_NO_SELF_UPDATE"
 const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
 
 type ToolConfig struct {

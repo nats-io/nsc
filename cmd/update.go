@@ -18,16 +18,43 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/blang/semver"
+
 	"github.com/briandowns/spinner"
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
 )
 
+type semV string
+
+func (r *semV) String() string {
+	if *r == "" {
+		return "latest"
+	}
+	return string(*r)
+}
+
+func (r *semV) Type() string {
+	return "version"
+}
+
+func (r *semV) Set(s string) error {
+	if strings.ToLower(strings.TrimSpace(s)) == "latest" {
+		*r = ""
+	} else if v, err := semver.ParseTolerant(s); err != nil {
+		return err
+	} else {
+		*r = semV(v.String())
+	}
+	return nil
+}
+
 func createUpdateCommand() *cobra.Command {
+	ver := semV("")
 	var cmd = &cobra.Command{
 		Example: "nsc update",
 		Use:     "update",
@@ -38,50 +65,53 @@ func createUpdateCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
+			cmdPath, err := os.Executable()
+			if err != nil {
+				return err
+			}
 			su, err := NewSelfUpdate()
 			if err != nil {
 				return err
 			}
-			nvs, err := su.doCheck()
+			nvs, err := su.doCheck(string(ver))
 			if err != nil {
 				return err
 			}
 			if nvs == nil {
-				cmd.Println("Current version", v, "is the latest")
+				cmd.Println("Current version", v, "is requested version")
 				return nil
 			}
 
 			wait := spinner.New(spinner.CharSets[14], 250*time.Millisecond)
 			defer wait.Stop()
 
-			wait.Prefix = "Downloading latest version "
+			wait.Prefix = fmt.Sprintf("Downloading version: %s", ver.String())
 			_ = wait.Color("italic")
 			wait.Start()
 
-			var latest *selfupdate.Release
 			if updateFn == nil {
 				// the library freak out if GITHUB_TOKEN is set - don't break travis :)
 				_ = os.Setenv("GITHUB_TOKEN", "")
-				latest, err = selfupdate.UpdateSelf(v, GetConfig().GithubUpdates)
+
+				err = selfupdate.DefaultUpdater().UpdateTo(nvs, cmdPath)
 			} else {
-				latest, err = updateFn(v, GetConfig().GithubUpdates)
+				err = updateFn(nvs, cmdPath)
 			}
 			if err != nil {
 				cmd.SilenceErrors = false
 				return err
 			}
 
-			cmd.Printf("Successfully updated to version %s\n", latest.Version.String())
+			cmd.Printf("Successfully updated to version %s\n", nvs.Version.String())
 			cmd.Println()
 			cmd.Println("Release Notes:")
 			cmd.Println()
-			cmd.Println(cli.Wrap(80, latest.ReleaseNotes))
+			cmd.Println(cli.Wrap(80, nvs.ReleaseNotes))
 
 			return nil
 		},
 	}
-
+	cmd.Flags().Var(&ver, "version", "version to updated the nsc binary to")
 	return cmd
 }
 
@@ -89,8 +119,8 @@ func init() {
 	GetRootCmd().AddCommand(createUpdateCommand())
 }
 
-type UpdateCheckFn func(slug string) (*selfupdate.Release, bool, error)
-type UpdateFn func(current semver.Version, slug string) (*selfupdate.Release, error)
+type UpdateCheckFn func(slug string, wantVer string) (*selfupdate.Release, bool, error)
+type UpdateFn func(want *selfupdate.Release, cmdPath string) error
 
 var updateCheckFn UpdateCheckFn
 var updateFn UpdateFn
@@ -111,20 +141,21 @@ func (u *SelfUpdate) Run() (*semver.Version, error) {
 	if !u.shouldCheck() {
 		return nil, nil
 	}
-	version, err := u.doCheck()
+	rel, err := u.doCheck("")
 	if err != nil {
 		// stop checking for a bit
 		_ = u.updateLastChecked()
 		return nil, err
 	}
 	err = u.updateLastChecked()
-	return version, err
+	if rel == nil {
+		return nil, err
+	} else {
+		return &rel.Version, err
+	}
 }
 
 func (u *SelfUpdate) shouldCheck() bool {
-	if NscNoSelfUpdate {
-		return false
-	}
 	have := semver.MustParse(GetRootCmd().Version).String()
 	if have == "0.0.0-dev" {
 		return false
@@ -142,31 +173,48 @@ func (u *SelfUpdate) updateLastChecked() error {
 	return config.Save()
 }
 
-func (u *SelfUpdate) doCheck() (*semver.Version, error) {
+func (u *SelfUpdate) doCheck(wantVer string) (*selfupdate.Release, error) {
 	config := GetConfig()
 	have, err := semver.ParseTolerant(GetRootCmd().Version)
 	if err != nil {
 		return nil, err
 	}
+	if wantVer != "" {
+		want, err := semver.ParseTolerant(wantVer)
+		if err != nil {
+			return nil, err
+		}
+		wantVer = want.String()
+	}
 	wait := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	wait.Prefix = "Checking for latest version "
+	if wantVer == "" {
+		wait.Prefix = "Checking for latest version "
+	} else {
+		wait.Prefix = fmt.Sprintf("Checking for version %s ", wantVer)
+	}
 	_ = wait.Color("italic")
 	wait.Start()
 	defer wait.Stop()
 
-	var latest *selfupdate.Release
+	var want *selfupdate.Release
 	var found bool
 	if updateCheckFn == nil {
 		// the library freak out if GITHUB_TOKEN is set - don't break travis :)
 		_ = os.Setenv("GITHUB_TOKEN", "")
-		latest, found, err = selfupdate.DetectLatest(config.GithubUpdates)
+		if wantVer == "" {
+			want, found, err = selfupdate.DetectLatest(config.GithubUpdates)
+		} else {
+			want, found, err = selfupdate.DetectVersion(GetConfig().GithubUpdates, wantVer)
+		}
 	} else {
-		latest, found, err = updateCheckFn(config.GithubUpdates)
+		want, found, err = updateCheckFn(config.GithubUpdates, wantVer)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error checking version: %v", err)
-	} else if found && latest.Version.GT(have) {
-		return &latest.Version, nil
+	} else if !found {
+		return nil, fmt.Errorf("version %v not found", wantVer)
+	} else if !want.Version.EQ(have) {
+		return want, nil
 	}
 	return nil, nil
 }

@@ -2,10 +2,12 @@ package selfupdate
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v30/github"
 	gitconfig "github.com/tcnksm/go-gitconfig"
 	"golang.org/x/oauth2"
 )
@@ -13,9 +15,10 @@ import (
 // Updater is responsible for managing the context of self-update.
 // It contains GitHub client and its context.
 type Updater struct {
-	api    *github.Client
-	apiCtx context.Context
+	api       *github.Client
+	apiCtx    context.Context
 	validator Validator
+	filters   []*regexp.Regexp
 }
 
 // Config represents the configuration of self-update.
@@ -30,6 +33,10 @@ type Config struct {
 	EnterpriseUploadURL string
 	// Validator represents types which enable additional validation of downloaded release.
 	Validator Validator
+	// Filters are regexp used to filter on specific assets for releases with multiple assets.
+	// An asset is selected if it matches any of those, in addition to the regular tag, os, arch, extensions.
+	// Please make sure that your filter(s) uniquely match an asset.
+	Filters []string
 }
 
 func newHTTPClient(ctx context.Context, token string) *http.Client {
@@ -53,9 +60,18 @@ func NewUpdater(config Config) (*Updater, error) {
 	ctx := context.Background()
 	hc := newHTTPClient(ctx, token)
 
+	filtersRe := make([]*regexp.Regexp, 0, len(config.Filters))
+	for _, filter := range config.Filters {
+		re, err := regexp.Compile(filter)
+		if err != nil {
+			return nil, fmt.Errorf("Could not compile regular expression %q for filtering releases: %v", filter, err)
+		}
+		filtersRe = append(filtersRe, re)
+	}
+
 	if config.EnterpriseBaseURL == "" {
 		client := github.NewClient(hc)
-		return &Updater{client, ctx, config.Validator}, nil
+		return &Updater{api: client, apiCtx: ctx, validator: config.Validator, filters: filtersRe}, nil
 	}
 
 	u := config.EnterpriseUploadURL
@@ -66,7 +82,7 @@ func NewUpdater(config Config) (*Updater, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Updater{api: client, apiCtx: ctx, validator: config.Validator}, nil
+	return &Updater{api: client, apiCtx: ctx, validator: config.Validator, filters: filtersRe}, nil
 }
 
 // DefaultUpdater creates a new updater instance with default configuration.

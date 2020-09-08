@@ -34,7 +34,6 @@ const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
 var InteractiveFlag bool
-var NscNoSelfUpdate bool
 var NscCwdOnly bool
 var quietMode bool
 
@@ -152,9 +151,6 @@ func ExecuteWithWriter(out io.Writer) error {
 func SetEnvOptions() {
 	if _, ok := os.LookupEnv(NscNoGitIgnoreEnv); ok {
 		store.NscNotGitIgnore = true
-	}
-	if _, ok := os.LookupEnv(NscNoSelfUpdateEnv); ok {
-		NscNoSelfUpdate = true
 	}
 	if _, ok := os.LookupEnv(NscCwdOnlyEnv); ok {
 		NscCwdOnly = true
