@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -83,21 +83,28 @@ func (e *KP) Generate() error {
 	return err
 }
 
-func (e *KP) String() string {
+func (e *KP) String(pubOnly bool) string {
 	if e.kp != nil {
-		seed, err := e.kp.Seed()
-		if err != nil {
-			return ""
+		if pubOnly {
+			pk, err := e.kp.PublicKey()
+			if err != nil {
+				return ""
+			}
+			return fmt.Sprintf("%s\n%s key stored %s\n", pk, e.kind(), e.fp)
+		} else {
+			seed, err := e.kp.Seed()
+			if err != nil {
+				return ""
+			}
+			pk, err := e.kp.PublicKey()
+			if err != nil {
+				return ""
+			}
+			if e.fp == "" {
+				return fmt.Sprintf("%s\n%s\n", string(seed), pk)
+			}
+			return fmt.Sprintf("%s\n%s\n%s key stored %s\n", string(seed), pk, e.kind(), e.fp)
 		}
-		pk, err := e.kp.PublicKey()
-		if err != nil {
-			return ""
-		}
-		if e.fp == "" {
-			return fmt.Sprintf("%s\n%s\n", string(seed), pk)
-		}
-		return fmt.Sprintf("%s\n%s\n%s key stored %s\n", string(seed), pk, e.kind(), e.fp)
-
 	}
 	return ""
 }
@@ -140,7 +147,7 @@ func (p *GenerateNKeysParam) Run(ctx ActionCtx) (store.Status, error) {
 					return nil, err
 				}
 			}
-			ctx.CurrentCmd().Println(j.String())
+			ctx.CurrentCmd().Println(j.String(p.store))
 		}
 	}
 	return nil, nil
