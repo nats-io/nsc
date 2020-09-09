@@ -44,6 +44,7 @@ func createAddOperatorCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
 	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url, file, or well known operator")
+	cmd.Flags().BoolVarP(&params.sysAcc, "sys", "s", false, "generate system account with the operator")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -60,6 +61,7 @@ type AddOperatorParams struct {
 	token    string
 	name     string
 	generate bool
+	sysAcc   bool
 	keyPath  string
 }
 
@@ -83,6 +85,7 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 	if ok {
+		p.sysAcc = false
 		p.jwtPath, err = cli.Prompt("path or url for operator jwt", p.jwtPath, cli.Val(func(v string) error {
 			// is it is an URL or path
 			pv := cli.PathOrURLValidator()
@@ -107,6 +110,9 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if err = p.TimeParams.Edit(); err != nil {
+			return err
+		}
+		if p.sysAcc, err = cli.Confirm("Generate system account?", true); err != nil {
 			return err
 		}
 	}
@@ -239,6 +245,10 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
+	if p.sysAcc && p.signerKP == nil {
+		return fmt.Errorf("generating system account requires a key")
+	}
+
 	if err := p.Resolve(ctx); err != nil {
 		return err
 	}
@@ -253,6 +263,9 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
+	var sAcc *keys
+	var sUsr *keys
+
 	if p.token == "" {
 		ctx, err := s.GetContext()
 		if err != nil {
@@ -265,28 +278,35 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 			}
 		}
 
-		if p.Start != "" || p.Expiry != "" {
-			oc, err := ctx.Store.ReadOperatorClaim()
-			if err != nil {
-				return nil, err
-			}
-			if p.Start != "" {
-				oc.NotBefore, err = p.TimeParams.StartDate()
-				if err != nil {
-					return nil, err
-				}
-			}
-			if p.Expiry != "" {
-				oc.Expires, err = p.TimeParams.ExpiryDate()
-				if err != nil {
-					return nil, err
-				}
-			}
-			p.token, err = oc.Encode(p.signerKP)
+		oc, err := ctx.Store.ReadOperatorClaim()
+		if err != nil {
+			return nil, err
+		}
+		if p.Start != "" {
+			oc.NotBefore, err = p.TimeParams.StartDate()
 			if err != nil {
 				return nil, err
 			}
 		}
+		if p.Expiry != "" {
+			oc.Expires, err = p.TimeParams.ExpiryDate()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if p.sysAcc {
+			if sAcc, sUsr, err = createSystemAccount(ctx, p.signerKP); err != nil {
+				return nil, err
+			}
+			oc.SystemAccount = sAcc.PubKey
+		}
+
+		p.token, err = oc.Encode(p.signerKP)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	r := store.NewDetailedReport(false)
@@ -308,6 +328,11 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 			verb = "imported"
 		}
 		r.AddOK("%s operator %q", verb, p.name)
+		if sAcc != nil && sUsr != nil {
+			r.AddOK("created system_account: name:SYS id:%s", sAcc.PubKey)
+			r.AddOK("created system account user: name:sys id:%s", sUsr.PubKey)
+			r.AddOK("system account user creds file stored in %#q", AbbrevHomePaths(sUsr.CredsPath))
+		}
 	}
 	return r, err
 }

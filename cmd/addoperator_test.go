@@ -40,11 +40,14 @@ func Test_AddOperator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O")
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--sys")
 	require.NoError(t, err)
 
 	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", ".nsc"))
 	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "O.jwt"))
+
+	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt"))
+	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt"))
 }
 
 func TestImportOperator(t *testing.T) {
@@ -83,7 +86,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true})
+	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true, true})
 	require.NoError(t, err)
 	d, err := Read(filepath.Join(ts.Dir, "store", "O", "O.jwt"))
 	require.NoError(t, err)
@@ -99,6 +102,10 @@ func TestAddOperatorInteractive(t *testing.T) {
 	require.Equal(t, 2029, expiry.Year())
 	require.Equal(t, time.Month(12), expiry.Month())
 	require.Equal(t, 1, expiry.Day())
+	require.NotEmpty(t, oc.SystemAccount)
+
+	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt"))
+	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt"))
 }
 
 func TestImportOperatorInteractive(t *testing.T) {
@@ -178,7 +185,7 @@ func Test_AddOperatorWithKeyInteractive(t *testing.T) {
 	cmd := createAddOperatorCmd()
 	HoistRootFlags(cmd)
 
-	args := []interface{}{false, "T", "0", "0", false, string(seed)}
+	args := []interface{}{false, "T", "0", "0", false, false, string(seed)}
 	_, _, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
