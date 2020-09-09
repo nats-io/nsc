@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -48,23 +48,54 @@ func Test_GenerateOperatorNKey(t *testing.T) {
 	require.Error(t, err)
 }
 
-func Test_GenerateNKeyAndStore(t *testing.T) {
+func Test_GenerateNKeyAndStoreDoesntPrint(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
 	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--store")
 	require.NoError(t, err)
 	lines := strings.Split(stderr, "\n")
-	require.True(t, len(lines) >= 2)
+	require.True(t, len(lines) == 4)
+	require.Equal(t, lines[2], "")
+	require.Equal(t, lines[3], "")
 
-	seed, err := ts.KeyStore.GetSeed(lines[1])
+	// pk only
+	pk := strings.TrimSpace(lines[0])
+	kp, err := nkeys.FromPublicKey(pk)
 	require.NoError(t, err)
-	require.Equal(t, lines[0], seed)
+	require.Equal(t, string(lines[0][0]), "O")
+	require.True(t, store.KeyPairTypeOk(nkeys.PrefixByteOperator, kp))
+	require.NoError(t, err)
+
+	// check this is the file
+	chunks := strings.Split(lines[1], " ")
+	fp := chunks[3]
+	fp = strings.TrimSpace(fp)
+	fp2 := ts.KeyStore.GetKeyPath(pk)
+	require.Equal(t, fp, fp2)
+}
+
+func Test_GenerateNKeyAndStore(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	kp, err := nkeys.CreateOperator()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	gpk, err := kp.PublicKey()
+	require.NoError(t, err)
+	gsk, err := kp.Seed()
+	require.NoError(t, err)
+
+	seed, err := ts.KeyStore.GetSeed(gpk)
+	require.NoError(t, err)
+	require.Equal(t, seed, string(gsk))
 
 	// pk
-	pk, err := ts.KeyStore.GetPublicKey(lines[1])
+	pk, err := ts.KeyStore.GetPublicKey(gpk)
 	require.NoError(t, err)
-	require.Equal(t, lines[1], pk)
+	require.Equal(t, pk, gpk)
 }
 
 func Test_GenerateAccountNKey(t *testing.T) {

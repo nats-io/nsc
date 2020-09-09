@@ -18,7 +18,6 @@ package cmd
 import (
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -333,9 +332,13 @@ func Test_AddUserWithExistingNkey(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--user", "--store")
+	kp, err := nkeys.CreateUser()
 	require.NoError(t, err)
-	pk := strings.Split(stderr, "\n")[1]
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+
 	_, _, err = ExecuteCmd(CreateAddUserCmd(), "U", "--public-key", pk)
 	require.NoError(t, err)
 }
