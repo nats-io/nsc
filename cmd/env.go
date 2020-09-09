@@ -95,7 +95,6 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddHeaders("Setting", "Set", "Effective Value")
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
-	table.AddRow("$"+NscNoSelfUpdateEnv, envSet(NscNoSelfUpdateEnv), "If set, no self-update checks")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
 	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
 	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
