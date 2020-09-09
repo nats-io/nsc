@@ -7,14 +7,12 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	"github.com/google/go-github/v30/github"
+	"github.com/google/go-github/github"
 )
 
 var reVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
-func findAssetFromRelease(rel *github.RepositoryRelease,
-	suffixes []string, targetVersion string, filters []*regexp.Regexp) (*github.ReleaseAsset, semver.Version, bool) {
-
+func findAssetFromReleasse(rel *github.RepositoryRelease, suffixes []string, targetVersion string) (*github.ReleaseAsset, semver.Version, bool) {
 	if targetVersion != "" && targetVersion != rel.GetTagName() {
 		log.Println("Skip", rel.GetTagName(), "not matching to specified version", targetVersion)
 		return nil, semver.Version{}, false
@@ -50,26 +48,9 @@ func findAssetFromRelease(rel *github.RepositoryRelease,
 
 	for _, asset := range rel.Assets {
 		name := asset.GetName()
-		if len(filters) > 0 {
-			// if some filters are defined, match them: if any one matches, the asset is selected
-			matched := false
-			for _, filter := range filters {
-				if filter.MatchString(name) {
-					log.Println("Selected filtered asset", name)
-					matched = true
-					break
-				}
-				log.Printf("Skipping asset %q not matching filter %v\n", name, filter)
-			}
-			if !matched {
-				continue
-			}
-		}
-
 		for _, s := range suffixes {
-			if strings.HasSuffix(name, s) { // require version, arch etc
-				// default: assume single artifact
-				return asset, ver, true
+			if strings.HasSuffix(name, s) {
+				return &asset, ver, true
 			}
 		}
 	}
@@ -81,19 +62,17 @@ func findAssetFromRelease(rel *github.RepositoryRelease,
 func findValidationAsset(rel *github.RepositoryRelease, validationName string) (*github.ReleaseAsset, bool) {
 	for _, asset := range rel.Assets {
 		if asset.GetName() == validationName {
-			return asset, true
+			return &asset, true
 		}
 	}
 	return nil, false
 }
 
-func findReleaseAndAsset(rels []*github.RepositoryRelease,
-	targetVersion string,
-	filters []*regexp.Regexp) (*github.RepositoryRelease, *github.ReleaseAsset, semver.Version, bool) {
+func findReleaseAndAsset(rels []*github.RepositoryRelease, targetVersion string) (*github.RepositoryRelease, *github.ReleaseAsset, semver.Version, bool) {
 	// Generate candidates
 	suffixes := make([]string, 0, 2*7*2)
 	for _, sep := range []rune{'_', '-'} {
-		for _, ext := range []string{".zip", ".tar.gz", ".tgz", ".gzip", ".gz", ".tar.xz", ".xz", ""} {
+		for _, ext := range []string{".zip", ".tar.gz", ".gzip", ".gz", ".tar.xz", ".xz", ""} {
 			suffix := fmt.Sprintf("%s%c%s%s", runtime.GOOS, sep, runtime.GOARCH, ext)
 			suffixes = append(suffixes, suffix)
 			if runtime.GOOS == "windows" {
@@ -111,7 +90,7 @@ func findReleaseAndAsset(rels []*github.RepositoryRelease,
 	// Returned list from GitHub API is in the order of the date when created.
 	//   ref: https://github.com/rhysd/go-github-selfupdate/issues/11
 	for _, rel := range rels {
-		if a, v, ok := findAssetFromRelease(rel, suffixes, targetVersion, filters); ok {
+		if a, v, ok := findAssetFromReleasse(rel, suffixes, targetVersion); ok {
 			// Note: any version with suffix is less than any version without suffix.
 			// e.g. 0.0.1 > 0.0.1-beta
 			if release == nil || v.GTE(ver) {
@@ -159,7 +138,7 @@ func (up *Updater) DetectVersion(slug string, version string) (release *Release,
 		return nil, false, err
 	}
 
-	rel, asset, ver, found := findReleaseAndAsset(rels, version, up.filters)
+	rel, asset, ver, found := findReleaseAndAsset(rels, version)
 	if !found {
 		return nil, false, nil
 	}
@@ -183,7 +162,7 @@ func (up *Updater) DetectVersion(slug string, version string) (release *Release,
 	}
 
 	if up.validator != nil {
-		validationName := asset.GetName() + up.validator.Suffix()
+		validationName := asset.GetName()+up.validator.Suffix()
 		validationAsset, ok := findValidationAsset(rel, validationName)
 		if !ok {
 			return nil, false, fmt.Errorf("Failed finding validation file %q", validationName)

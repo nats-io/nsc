@@ -20,7 +20,7 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
-	github.com/rhysd/go-github-selfupdate v1.2.2
+	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/spf13/cast v1.3.0 // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3
