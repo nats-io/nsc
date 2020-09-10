@@ -33,6 +33,8 @@ func Test_InitLocal(t *testing.T) {
 	ts.VerifyOperator(t, "O", false)
 	ts.VerifyAccount(t, "O", "O", true)
 	ts.VerifyUser(t, "O", "O", "O", true)
+	ts.VerifyAccount(t, "O", "SYS", true)
+	ts.VerifyUser(t, "O", "SYS", "sys", true)
 }
 
 func Test_InitExists(t *testing.T) {
@@ -217,6 +219,8 @@ func Test_InitLocalInteractive(t *testing.T) {
 	ts.VerifyOperator(t, "O", false)
 	ts.VerifyAccount(t, "O", "O", true)
 	ts.VerifyUser(t, "O", "O", "O", true)
+	ts.VerifyAccount(t, "O", "SYS", true)
+	ts.VerifyUser(t, "O", "SYS", "sys", true)
 }
 
 func Test_InitCustomInteractive(t *testing.T) {

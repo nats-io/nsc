@@ -425,6 +425,10 @@ func (o *OperatorDescriber) Describe() string {
 
 	AddListValues(table, "Operator Service URLs", o.OperatorServiceURLs)
 
+	if o.SystemAccount != "" {
+		table.AddRow("System Account", o.SystemAccount)
+	}
+
 	if len(o.Identities) > 0 {
 		table.AddSeparator()
 		for _, v := range o.Identities {

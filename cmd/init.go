@@ -75,6 +75,8 @@ type InitCmdParams struct {
 	ManagedOperatorName string
 	CreateOperator      bool
 	Operator            keys
+	SystemAccount       keys
+	SystemUser          keys
 	Account             keys
 	User                keys
 	OperatorJwtURL      string
@@ -299,13 +301,67 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 	return GetConfig().Save()
 }
 
+func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, error) {
+	var acc keys
+	var usr keys
+	var err error
+	// create system account, signed by this operator
+	if acc.KP, err = nkeys.CreateAccount(); err != nil {
+		return nil, nil, err
+	} else if acc.PubKey, err = acc.KP.PublicKey(); err != nil {
+		return nil, nil, err
+	}
+	sysAccClaim := jwt.NewAccountClaims(acc.PubKey)
+	sysAccClaim.Name = "SYS"
+	if sysAccJwt, err := sysAccClaim.Encode(opKp); err != nil {
+		return nil, nil, err
+	} else if _, err := s.Store.StoreClaim([]byte(sysAccJwt)); err != nil {
+		return nil, nil, err
+	} else if acc.KeyPath, err = s.KeyStore.Store(acc.KP); err != nil {
+		return nil, nil, err
+	}
+	// create system account user and creds
+	if usr.KP, err = nkeys.CreateUser(); err != nil {
+		return nil, nil, err
+	} else if usr.PubKey, err = usr.KP.PublicKey(); err != nil {
+		return nil, nil, err
+	}
+	sysUsrClaim := jwt.NewUserClaims(usr.PubKey)
+	sysUsrClaim.Name = "sys"
+	if sysUsrJwt, err := sysUsrClaim.Encode(acc.KP); err != nil {
+		return nil, nil, err
+	} else if _, err := s.Store.StoreClaim([]byte(sysUsrJwt)); err != nil {
+		return nil, nil, err
+	} else if usr.KeyPath, err = s.KeyStore.Store(usr.KP); err != nil {
+		return nil, nil, err
+	}
+	config, err := GenerateConfig(s.Store, sysAccClaim.Name, sysUsrClaim.Name, usr.KP)
+	if err != nil {
+		return nil, nil, err
+	}
+	if usr.CredsPath, err = s.KeyStore.MaybeStoreUserCreds(sysAccClaim.Name, sysUsrClaim.Name, config); err != nil {
+		return nil, nil, err
+	}
+	return &acc, &usr, nil
+}
+
 func (p *InitCmdParams) setOperatorDefaults(ctx ActionCtx) error {
+	ctx.StoreCtx()
 	if p.CreateOperator {
+		if acc, usr, err := createSystemAccount(ctx.StoreCtx(), p.Operator.KP); err != nil {
+			return err
+		} else {
+			p.SystemAccount = *acc
+			p.SystemUser = *usr
+		}
+
+		// read/create operator
 		oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 		if err != nil {
 			return err
 		}
 		oc.OperatorServiceURLs.Add("nats://localhost:4222")
+		oc.SystemAccount = p.SystemAccount.PubKey
 		token, err := oc.Encode(p.Operator.KP)
 		if err != nil {
 			return err
@@ -396,6 +452,9 @@ func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			return nil, err
 		}
 		r.AddOK("created operator %s", p.Name)
+		r.AddOK("created system_account: name:SYS id:%s", p.SystemAccount.PubKey)
+		r.AddOK("created system account user: name:sys id:%s", p.SystemUser.PubKey)
+		r.AddOK("system account user creds file stored in %#q", AbbrevHomePaths(p.SystemUser.CredsPath))
 	} else {
 		r.AddOK("add managed operator %s", GetConfig().Operator)
 	}
