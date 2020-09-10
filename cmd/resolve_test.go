@@ -96,15 +96,15 @@ func Test_NscURLEncodedNames(t *testing.T) {
 	require.Equal(t, "", u)
 }
 
-func loadResults(t *testing.T, out string) ResolveResults {
+func loadResults(t *testing.T, out string) Profile {
 	d, err := Read(out)
 	require.NoError(t, err)
-	var r ResolveResults
+	var r Profile
 	require.NoError(t, json.Unmarshal(d, &r))
 	return r
 }
 
-func Test_NscURLIDs(t *testing.T) {
+func Test_ProfileIDs(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
@@ -117,7 +117,7 @@ func Test_NscURLIDs(t *testing.T) {
 
 	out := path.Join(ts.Dir, "out.json")
 	nu := fmt.Sprintf("nsc://%s/%s/%s?operatorName&accountName&userName", o, a, u)
-	_, _, err := ExecuteCmd(createResolveCmd(), "-o", out, nu)
+	_, _, err := ExecuteCmd(createProfileCmd(), "-o", out, nu)
 	require.NoError(t, err)
 
 	r := loadResults(t, out)
@@ -126,7 +126,7 @@ func Test_NscURLIDs(t *testing.T) {
 	require.Equal(t, "U", r.User.Name)
 }
 
-func Test_ResolveStoreAndKeysDir(t *testing.T) {
+func Test_ProfileStoreAndKeysDir(t *testing.T) {
 	// create store
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -153,7 +153,7 @@ func Test_ResolveStoreAndKeysDir(t *testing.T) {
 	keyDir := path.Join(ts.Dir, "keys")
 	u := fmt.Sprintf("nsc://O/A/U?operatorName&accountName&userName&operatorKey&accountKey&userKey&store=%s&keyStore=%s", storeDir, keyDir)
 
-	_, _, err = ExecuteCmd(rootCmd, "resolve", "-o", out, u)
+	_, _, err = ExecuteCmd(rootCmd, "generate", "profile", "-o", out, u)
 	require.NoError(t, err)
 	r := loadResults(t, out)
 
@@ -165,7 +165,7 @@ func Test_ResolveStoreAndKeysDir(t *testing.T) {
 	require.Equal(t, upk, r.User.Key)
 }
 
-func TestKey_ResolveBasics(t *testing.T) {
+func TestKey_ProfileBasics(t *testing.T) {
 	type test struct {
 		u    string
 		want []Arg
@@ -214,7 +214,7 @@ func TestKey_ResolveBasics(t *testing.T) {
 
 		// execute the command
 		out := path.Join(ts.Dir, "out.json")
-		_, _, err = ExecuteCmd(createResolveCmd(), "-o", out, tc.u)
+		_, _, err = ExecuteCmd(createProfileCmd(), "-o", out, tc.u)
 		require.NoError(t, err)
 		r := loadResults(t, out)
 

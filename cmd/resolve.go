@@ -28,12 +28,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createResolveCmd() *cobra.Command {
-	var params ResolveCmdParams
+func createProfileCmd() *cobra.Command {
+	var params ProfileCmdParams
 	var cmd = &cobra.Command{
-		Use:     "resolve",
-		Short:   "Resolve an nsc 'URL' into a JSON blob that can be used by tooling",
-		Example: `resolve nsc://operator
+		Use:   "profile",
+		Short: "Generate a profile from nsc 'URL' that can be used by tooling",
+		Example: `profile nsc://operator
 resolve nsc://operator/account
 resolve nsc://operator/account/user
 resolve nsc://operator/account/user?operatorSeed&accountSeed&userSeed
@@ -71,7 +71,7 @@ user, account, operator, If no prefix (user/account/operator is provided,
 it targets the last object in the configuration path)
 		`,
 
-		Args:    MaxArgs(1),
+		Args: MaxArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			us := args[0]
 			u, err := ParseNscURL(us)
@@ -132,7 +132,7 @@ it targets the last object in the configuration path)
 }
 
 func init() {
-	GetRootCmd().AddCommand(createResolveCmd())
+	generateCmd.AddCommand(createProfileCmd())
 }
 
 type Arg string
@@ -155,9 +155,9 @@ const (
 	storeDir     Arg = "store"
 )
 
-type ResolveCmdParams struct {
+type ProfileCmdParams struct {
 	nscu       *NscURL
-	results    *ResolveResults
+	results    *Profile
 	oc         *jwt.OperatorClaims
 	ac         *jwt.AccountClaims
 	uc         *jwt.UserClaims
@@ -171,7 +171,7 @@ type Details struct {
 	Key     string   `json:"id,omitempty"`
 }
 
-type ResolveResults struct {
+type Profile struct {
 	UserCreds string   `json:"user_creds,omitempty"`
 	Operator  *Details `json:"operator,omitempty"`
 	Account   *Details `json:"account,omitempty"`
@@ -245,23 +245,23 @@ func ParseNscURL(u string) (*NscURL, error) {
 	return &v, nil
 }
 
-func (p *ResolveCmdParams) SetDefaults(_ ActionCtx) error {
+func (p *ProfileCmdParams) SetDefaults(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) PreInteractive(_ ActionCtx) error {
+func (p *ProfileCmdParams) PreInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) Load(_ ActionCtx) error {
+func (p *ProfileCmdParams) Load(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) PostInteractive(_ ActionCtx) error {
+func (p *ProfileCmdParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) hasName(name string, names []string) bool {
+func (p *ProfileCmdParams) hasName(name string, names []string) bool {
 	nn := strings.ToLower(name)
 	for _, n := range names {
 		if strings.ToLower(n) == nn {
@@ -271,7 +271,7 @@ func (p *ResolveCmdParams) hasName(name string, names []string) bool {
 	return false
 }
 
-func (p *ResolveCmdParams) loadNames(c jwt.Claims) []string {
+func (p *ProfileCmdParams) loadNames(c jwt.Claims) []string {
 	var names []string
 	cd := c.Claims()
 	names = append(names, cd.Name)
@@ -286,7 +286,7 @@ func (p *ResolveCmdParams) loadNames(c jwt.Claims) []string {
 	return names
 }
 
-func (p *ResolveCmdParams) checkLoadOperator(ctx ActionCtx) error {
+func (p *ProfileCmdParams) checkLoadOperator(ctx ActionCtx) error {
 	conf := GetConfig()
 	if conf.Operator == "" {
 		return errors.New("no operator set - `env --operator <name>`")
@@ -307,7 +307,7 @@ func (p *ResolveCmdParams) checkLoadOperator(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) checkLoadAccount(ctx ActionCtx) error {
+func (p *ProfileCmdParams) checkLoadAccount(ctx ActionCtx) error {
 	if p.nscu.account == "" {
 		return nil
 	}
@@ -347,7 +347,7 @@ func (p *ResolveCmdParams) checkLoadAccount(ctx ActionCtx) error {
 	return fmt.Errorf("invalid account %q: account was not found", p.nscu.account)
 }
 
-func (p *ResolveCmdParams) checkLoadUser(ctx ActionCtx) error {
+func (p *ProfileCmdParams) checkLoadUser(ctx ActionCtx) error {
 	if p.nscu.user == "" {
 		return nil
 	}
@@ -386,7 +386,7 @@ func (p *ResolveCmdParams) checkLoadUser(ctx ActionCtx) error {
 	return fmt.Errorf("invalid user %q: user was not found", p.nscu.user)
 }
 
-func (p *ResolveCmdParams) Validate(ctx ActionCtx) error {
+func (p *ProfileCmdParams) Validate(ctx ActionCtx) error {
 	if err := p.checkLoadOperator(ctx); err != nil {
 		return err
 	}
@@ -396,25 +396,25 @@ func (p *ResolveCmdParams) Validate(ctx ActionCtx) error {
 	return p.checkLoadUser(ctx)
 }
 
-func (p *ResolveCmdParams) addOperatorKeys() {
+func (p *ProfileCmdParams) addOperatorKeys() {
 	p.results.Operator.Key = p.oc.Subject
 }
 
-func (p *ResolveCmdParams) addAccountKeys() {
+func (p *ProfileCmdParams) addAccountKeys() {
 	if p.results.Account == nil {
 		p.results.Account = &Details{}
 	}
 	p.results.Account.Key = p.ac.Subject
 }
 
-func (p *ResolveCmdParams) addUserKeys() {
+func (p *ProfileCmdParams) addUserKeys() {
 	if p.results.User == nil {
 		p.results.User = &Details{}
 	}
 	p.results.User.Key = p.uc.Subject
 }
 
-func (p *ResolveCmdParams) addKeys() error {
+func (p *ProfileCmdParams) addKeys() error {
 	q, err := p.nscu.query()
 	if err != nil {
 		return err
@@ -447,7 +447,7 @@ func (p *ResolveCmdParams) addKeys() error {
 	return nil
 }
 
-func (p *ResolveCmdParams) getKeys(claim jwt.Claims) []string {
+func (p *ProfileCmdParams) getKeys(claim jwt.Claims) []string {
 	var keys []string
 	if claim != nil {
 		keys = append(keys, claim.Claims().Subject)
@@ -464,7 +464,7 @@ func (p *ResolveCmdParams) getKeys(claim jwt.Claims) []string {
 	return keys
 }
 
-func (p *ResolveCmdParams) resolveSeed(ctx ActionCtx, s string, keys []string) (string, error) {
+func (p *ProfileCmdParams) resolveSeed(ctx ActionCtx, s string, keys []string) (string, error) {
 	ks := ctx.StoreCtx().KeyStore
 	if s != "" {
 		found := false
@@ -498,7 +498,7 @@ func (p *ResolveCmdParams) resolveSeed(ctx ActionCtx, s string, keys []string) (
 	return "", fmt.Errorf("no seed was found for %q", keys[0])
 }
 
-func (p *ResolveCmdParams) addOperatorSeed(ctx ActionCtx, v string) error {
+func (p *ProfileCmdParams) addOperatorSeed(ctx ActionCtx, v string) error {
 	seed, err := p.resolveSeed(ctx, v, p.getKeys(p.oc))
 	if err != nil {
 		return err
@@ -507,7 +507,7 @@ func (p *ResolveCmdParams) addOperatorSeed(ctx ActionCtx, v string) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) addAccountSeed(ctx ActionCtx, v string) error {
+func (p *ProfileCmdParams) addAccountSeed(ctx ActionCtx, v string) error {
 	seed, err := p.resolveSeed(ctx, v, p.getKeys(p.ac))
 	if err != nil {
 		return err
@@ -519,7 +519,7 @@ func (p *ResolveCmdParams) addAccountSeed(ctx ActionCtx, v string) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) addUserSeed(ctx ActionCtx, v string) error {
+func (p *ProfileCmdParams) addUserSeed(ctx ActionCtx, v string) error {
 	seed, err := p.resolveSeed(ctx, v, p.getKeys(p.uc))
 	if err != nil {
 		return err
@@ -531,7 +531,7 @@ func (p *ResolveCmdParams) addUserSeed(ctx ActionCtx, v string) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) addSeeds(ctx ActionCtx) error {
+func (p *ProfileCmdParams) addSeeds(ctx ActionCtx) error {
 	q, err := p.nscu.query()
 	if err != nil {
 		return err
@@ -582,26 +582,26 @@ func (p *ResolveCmdParams) addSeeds(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) addOperatorName() {
+func (p *ProfileCmdParams) addOperatorName() {
 	conf := GetConfig()
 	p.results.Operator.Name = conf.Operator
 }
 
-func (p *ResolveCmdParams) addAccountName() {
+func (p *ProfileCmdParams) addAccountName() {
 	if p.results.Account == nil {
 		p.results.Account = &Details{}
 	}
 	p.results.Account.Name = p.ac.Name
 }
 
-func (p *ResolveCmdParams) addUserName() {
+func (p *ProfileCmdParams) addUserName() {
 	if p.results.User == nil {
 		p.results.User = &Details{}
 	}
 	p.results.User.Name = p.uc.Name
 }
 
-func (p *ResolveCmdParams) addNames() error {
+func (p *ProfileCmdParams) addNames() error {
 	q, err := p.nscu.query()
 	if err != nil {
 		return err
@@ -635,8 +635,8 @@ func (p *ResolveCmdParams) addNames() error {
 	return nil
 }
 
-func (p *ResolveCmdParams) Run(ctx ActionCtx) (store.Status, error) {
-	p.results = &ResolveResults{}
+func (p *ProfileCmdParams) Run(ctx ActionCtx) (store.Status, error) {
+	p.results = &Profile{}
 	p.results.Operator = &Details{}
 	p.results.Operator.Service = p.oc.OperatorServiceURLs
 	if p.nscu.user != "" {
@@ -657,6 +657,7 @@ func (p *ResolveCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	v, err := json.MarshalIndent(p.results, "", "  ")
+	v = append(v, '\n')
 	if err != nil {
 		return nil, err
 	}
