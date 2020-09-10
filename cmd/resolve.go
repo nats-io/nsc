@@ -25,7 +25,6 @@ import (
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nsc/cmd/store"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,8 +32,45 @@ func createResolveCmd() *cobra.Command {
 	var params ResolveCmdParams
 	var cmd = &cobra.Command{
 		Use:     "resolve",
-		Short:   "Resolve an nsc URL into a JSON blob that can be used by tooling",
-		Example: "resolve nsc://<operator>/?<account>/?<user>",
+		Short:   "Resolve an nsc 'URL' into a JSON blob that can be used by tooling",
+		Example: `resolve nsc://operator
+resolve nsc://operator/account
+resolve nsc://operator/account/user
+resolve nsc://operator/account/user?operatorSeed&accountSeed&userSeed
+resolve nsc://operator/account/user?operatorKey&accountKey&userKey
+resolve nsc://operator?key&seed
+resolve nsc://operator/account?key&seed
+resolve nsc://operator/account/user?key&seed
+resolve nsc://operator/account/user?store=/a/.nsc/nats&keystore=/foo/.nkeys
+
+Output of the program looks like:
+{
+  "user_creds": "<filepath>",
+  "operator" : {
+     "service": "hostport"
+   }
+}
+The user_creds is printed if an user is specified
+Other options (as query string arguments):
+keystore=<dir> that specifies the location of the keystore
+
+store=<dir> that specifies a directory that contains the named operator
+
+[user|account|operator]Key - includes the public key for user, account, 
+operator, If no prefix (user/account/operator is provided, it targets 
+the last object in the configuration path)
+
+[user|account|operator]Seed=<optional public key> - include the seed for 
+user, account, operator, if an argument is provided, the seed for the 
+specified public key is provided - this allows targeting a signing key.
+If no prefix (user/account/operator is provided, it targets the last 
+object in the configuration path)
+
+[user|account|operator]Name - includes the friendly name for the for 
+user, account, operator, If no prefix (user/account/operator is provided, 
+it targets the last object in the configuration path)
+		`,
+
 		Args:    MaxArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			us := args[0]
@@ -43,7 +79,10 @@ func createResolveCmd() *cobra.Command {
 				return fmt.Errorf("error parsing %q:%v", us, err)
 			}
 			params.nscu = u
-			q := u.query()
+			q, err := u.query()
+			if err != nil {
+				return fmt.Errorf("error parsing query %q:%v", us, err)
+			}
 			if len(q) > 0 {
 				config := GetConfig()
 				oldSR := config.StoreRoot
@@ -52,29 +91,35 @@ func createResolveCmd() *cobra.Command {
 				v, ok := q["store"]
 				if ok {
 					defer func() {
-						config.setStoreRoot(oldSR)
+						_ = config.setStoreRoot(oldSR)
 						if oldOp != "" {
-							config.SetOperator(oldOp)
+							_ = config.SetOperator(oldOp)
 						}
 						if oldAc != "" {
-							config.SetAccount(oldAc)
+							_ = config.SetAccount(oldAc)
 						}
 					}()
 					sr, err := Expand(v)
 					if err != nil {
 						return err
 					}
-					config.setStoreRoot(sr)
-					config.SetOperator(u.operator)
+					if err := config.setStoreRoot(sr); err != nil {
+						return err
+					}
+					if err := config.SetOperator(u.operator); err != nil {
+						return err
+					}
 				}
 
-				storeDir, ok := q["keystore"]
+				storeDir, ok := q[keystoreDir]
 				if ok {
 					ks, err := Expand(storeDir)
 					if err != nil {
 						return err
 					}
-					os.Setenv(store.NKeysPathEnv, ks)
+					if err := os.Setenv(store.NKeysPathEnv, ks); err != nil {
+						return err
+					}
 				}
 			}
 			return RunAction(cmd, args, &params)
@@ -89,6 +134,26 @@ func createResolveCmd() *cobra.Command {
 func init() {
 	GetRootCmd().AddCommand(createResolveCmd())
 }
+
+type Arg string
+
+const (
+	prefix           = "nsc://"
+	operatorKey  Arg = "operatorkey"
+	accountKey   Arg = "accountkey"
+	userKey      Arg = "userkey"
+	key          Arg = "key"
+	operatorSeed Arg = "operatorseed"
+	accountSeed  Arg = "accountseed"
+	userSeed     Arg = "userseed"
+	seed         Arg = "seed"
+	operatorName Arg = "operatorname"
+	accountName  Arg = "accountname"
+	userName     Arg = "username"
+	name         Arg = "name"
+	keystoreDir  Arg = "keystore"
+	storeDir     Arg = "store"
+)
 
 type ResolveCmdParams struct {
 	nscu       *NscURL
@@ -132,25 +197,28 @@ func (u *NscURL) getUser() (string, error) {
 	return url.QueryUnescape(u.user)
 }
 
-func (u *NscURL) query() map[string]string {
+func (u *NscURL) query() (map[Arg]string, error) {
 	q := strings.ToLower(u.qs)
-	m := make(map[string]string)
+	m := make(map[Arg]string)
 	for _, e := range strings.Split(q, "&") {
 		kv := strings.Split(e, "=")
-		k := kv[0]
+		k := strings.ToLower(kv[0])
 		v := ""
 		if len(kv) == 2 {
-			v = kv[1]
+			s, err := url.QueryUnescape(kv[1])
+			if err != nil {
+				return nil, err
+			}
+			v = s
 		}
-		m[k] = v
+		m[Arg(k)] = v
 	}
-	return m
+	return m, nil
 }
 
 func ParseNscURL(u string) (*NscURL, error) {
 	var v NscURL
 	s := u
-	const prefix = "nsc://"
 	if !strings.HasPrefix(strings.ToLower(u), prefix) {
 		return nil, errors.New("invalid nsc url: expecting 'nsc://'")
 	}
@@ -177,19 +245,19 @@ func ParseNscURL(u string) (*NscURL, error) {
 	return &v, nil
 }
 
-func (p *ResolveCmdParams) SetDefaults(ctx ActionCtx) error {
+func (p *ResolveCmdParams) SetDefaults(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) PreInteractive(ctx ActionCtx) error {
+func (p *ResolveCmdParams) PreInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) Load(ctx ActionCtx) error {
+func (p *ResolveCmdParams) Load(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ResolveCmdParams) PostInteractive(ctx ActionCtx) error {
+func (p *ResolveCmdParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
@@ -267,7 +335,7 @@ func (p *ResolveCmdParams) checkLoadAccount(ctx ActionCtx) error {
 	for _, n := range names {
 		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(n)
 		if err != nil {
-			return err
+			continue
 		}
 		aliases := p.loadNames(ac)
 		if p.hasName(p.nscu.account, aliases) {
@@ -306,7 +374,7 @@ func (p *ResolveCmdParams) checkLoadUser(ctx ActionCtx) error {
 	for _, n := range names {
 		uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.nscu.account, n)
 		if err != nil {
-			return err
+			continue
 		}
 		aliases := p.loadNames(uc)
 		if p.hasName(p.nscu.user, aliases) {
@@ -319,20 +387,13 @@ func (p *ResolveCmdParams) checkLoadUser(ctx ActionCtx) error {
 }
 
 func (p *ResolveCmdParams) Validate(ctx ActionCtx) error {
-	err := p.checkLoadOperator(ctx)
-	if err != nil {
+	if err := p.checkLoadOperator(ctx); err != nil {
 		return err
 	}
-	err = p.checkLoadAccount(ctx)
-	if err != nil {
+	if err := p.checkLoadAccount(ctx); err != nil {
 		return err
 	}
-	err = p.checkLoadUser(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return p.checkLoadUser(ctx)
 }
 
 func (p *ResolveCmdParams) addOperatorKeys() {
@@ -353,24 +414,27 @@ func (p *ResolveCmdParams) addUserKeys() {
 	p.results.User.Key = p.uc.Subject
 }
 
-func (p *ResolveCmdParams) addKeys() {
-	q := p.nscu.query()
-	if len(q) == 0 {
-		return
+func (p *ResolveCmdParams) addKeys() error {
+	q, err := p.nscu.query()
+	if err != nil {
+		return err
 	}
-	_, ok := q["operatorkey"]
+	if len(q) == 0 {
+		return nil
+	}
+	_, ok := q[operatorKey]
 	if ok {
 		p.addOperatorKeys()
 	}
-	_, ok = q["accountkey"]
+	_, ok = q[accountKey]
 	if ok {
 		p.addAccountKeys()
 	}
-	_, ok = q["userkey"]
+	_, ok = q[userKey]
 	if ok {
 		p.addUserKeys()
 	}
-	_, ok = q["key"]
+	_, ok = q[key]
 	if ok {
 		if p.nscu.user != "" {
 			p.addUserKeys()
@@ -380,6 +444,7 @@ func (p *ResolveCmdParams) addKeys() {
 			p.addOperatorKeys()
 		}
 	}
+	return nil
 }
 
 func (p *ResolveCmdParams) getKeys(claim jwt.Claims) []string {
@@ -467,32 +532,35 @@ func (p *ResolveCmdParams) addUserSeed(ctx ActionCtx, v string) error {
 }
 
 func (p *ResolveCmdParams) addSeeds(ctx ActionCtx) error {
-	q := p.nscu.query()
+	q, err := p.nscu.query()
+	if err != nil {
+		return err
+	}
 	if len(q) == 0 {
 		return nil
 	}
-	v, ok := q["operatorseed"]
+	v, ok := q[operatorSeed]
 	if ok {
 		err := p.addOperatorSeed(ctx, v)
 		if err != nil {
 			return err
 		}
 	}
-	v, ok = q["accountseed"]
+	v, ok = q[accountSeed]
 	if ok {
 		err := p.addAccountSeed(ctx, v)
 		if err != nil {
 			return err
 		}
 	}
-	v, ok = q["userseed"]
+	v, ok = q[userSeed]
 	if ok {
 		err := p.addUserSeed(ctx, v)
 		if err != nil {
 			return err
 		}
 	}
-	_, ok = q["seed"]
+	_, ok = q[seed]
 	if ok {
 		if p.nscu.user != "" {
 			err := p.addUserSeed(ctx, "")
@@ -533,25 +601,28 @@ func (p *ResolveCmdParams) addUserName() {
 	p.results.User.Name = p.uc.Name
 }
 
-func (p *ResolveCmdParams) addNames() {
-	q := p.nscu.query()
+func (p *ResolveCmdParams) addNames() error {
+	q, err := p.nscu.query()
+	if err != nil {
+		return err
+	}
 	if len(q) == 0 {
-		return
+		return nil
 	}
 
-	_, ok := q["operatorname"]
+	_, ok := q[operatorName]
 	if ok {
 		p.addOperatorName()
 	}
-	_, ok = q["accountname"]
+	_, ok = q[accountName]
 	if ok {
 		p.addAccountName()
 	}
-	_, ok = q["username"]
+	_, ok = q[userName]
 	if ok {
 		p.addUserName()
 	}
-	_, ok = q["name"]
+	_, ok = q[name]
 	if ok {
 		if p.nscu.user != "" {
 			p.addUserName()
@@ -561,6 +632,7 @@ func (p *ResolveCmdParams) addNames() {
 			p.addOperatorName()
 		}
 	}
+	return nil
 }
 
 func (p *ResolveCmdParams) Run(ctx ActionCtx) (store.Status, error) {
@@ -575,10 +647,13 @@ func (p *ResolveCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			p.results.UserCreds = creds
 		}
 	}
-	p.addNames()
-	p.addKeys()
-	err := p.addSeeds(ctx)
-	if err != nil {
+	if err := p.addNames(); err != nil {
+		return nil, err
+	}
+	if err := p.addKeys(); err != nil {
+		return nil, err
+	}
+	if err := p.addSeeds(ctx); err != nil {
 		return nil, err
 	}
 	v, err := json.MarshalIndent(p.results, "", "  ")

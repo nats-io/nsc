@@ -18,6 +18,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/nats-io/jwt"
 	"net/url"
 	"path"
 	"testing"
@@ -53,6 +54,31 @@ func Test_ParseNscURLs(t *testing.T) {
 	}
 }
 
+func Test_ParseNscURLQuery(t *testing.T) {
+	type test struct {
+		u    string
+		want map[Arg]string
+	}
+
+	tests := []test{
+		{u: "nsc://one?seed&name&key", want: map[Arg]string{seed: "", name: "", key: ""}},
+		{u: "nsc://one/two/three?store=/tmp/storedir&keystore=/tmp/key+dir",
+			want: map[Arg]string{
+				storeDir:    "/tmp/storedir",
+				keystoreDir: "/tmp/key dir"}},
+	}
+
+	for _, tc := range tests {
+		u, err := ParseNscURL(tc.u)
+		if err != nil {
+			t.Fatalf("failed parsing query %q: %v", tc.u, err)
+		}
+		q, err := u.query()
+		require.NoError(t, err)
+		require.Equal(t, tc.want, q)
+	}
+}
+
 func Test_NscURLEncodedNames(t *testing.T) {
 	t.Log(url.QueryEscape("My Company Inc."))
 	nu, err := ParseNscURL("nsc://My+Company+Inc./Account+Name/")
@@ -68,6 +94,14 @@ func Test_NscURLEncodedNames(t *testing.T) {
 	u, err := nu.getUser()
 	require.NoError(t, err)
 	require.Equal(t, "", u)
+}
+
+func loadResults(t *testing.T, out string) ResolveResults {
+	d, err := Read(out)
+	require.NoError(t, err)
+	var r ResolveResults
+	require.NoError(t, json.Unmarshal(d, &r))
+	return r
 }
 
 func Test_NscURLIDs(t *testing.T) {
@@ -86,27 +120,62 @@ func Test_NscURLIDs(t *testing.T) {
 	_, _, err := ExecuteCmd(createResolveCmd(), "-o", out, nu)
 	require.NoError(t, err)
 
-	// read the json
-	d, err := Read(out)
-	require.NoError(t, err)
-	var r ResolveResults
-	require.NoError(t, json.Unmarshal(d, &r))
-
+	r := loadResults(t, out)
 	require.Equal(t, "O", r.Operator.Name)
 	require.Equal(t, "A", r.Account.Name)
 	require.Equal(t, "U", r.User.Name)
 }
 
-func Test_NscURLBasics(t *testing.T) {
+func Test_ResolveStoreAndKeysDir(t *testing.T) {
+	// create store
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	opk := ts.GetOperatorPublicKey(t)
+	apk := ts.GetAccountPublicKey(t, "A")
+	upk := ts.GetUserPublicKey(t, "A", "U")
+
+	// context for the store is replaced
+	ts2 := NewTestStore(t, "OO")
+	defer ts2.Done(t)
+	ts2.AddAccount(t, "AA")
+	ts2.AddUser(t, "AA", "UU")
+
+	stdout, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--raw")
+	require.NoError(t, err)
+	ojwt, err := jwt.DecodeOperatorClaims(stdout)
+	require.NoError(t, err)
+	require.Equal(t, "OO", ojwt.Name)
+
+	out := path.Join(ts.Dir, "out.json")
+	storeDir := path.Join(ts.Dir, "store")
+	keyDir := path.Join(ts.Dir, "keys")
+	u := fmt.Sprintf("nsc://O/A/U?operatorName&accountName&userName&operatorKey&accountKey&userKey&store=%s&keyStore=%s", storeDir, keyDir)
+
+	_, _, err = ExecuteCmd(rootCmd, "resolve", "-o", out, u)
+	require.NoError(t, err)
+	r := loadResults(t, out)
+
+	require.Equal(t, "O", r.Operator.Name)
+	require.Equal(t, opk, r.Operator.Key)
+	require.Equal(t, "A", r.Account.Name)
+	require.Equal(t, apk, r.Account.Key)
+	require.Equal(t, "U", r.User.Name)
+	require.Equal(t, upk, r.User.Key)
+}
+
+func TestKey_ResolveBasics(t *testing.T) {
 	type test struct {
-		u string
+		u    string
+		want []Arg
 	}
 
 	tests := []test{
-		{u: "nsc://O?operatorSeed&operatorKey"},
-		{u: "nsc://O?key&seed"},
-		{u: "nsc://O/A?key&seed"},
-		{u: "nsc://O/A/U?key&seed"},
+		{u: "nsc://O?operatorSeed&operatorKey", want: []Arg{operatorKey, operatorSeed}},
+		{u: "nsc://O?key&seed", want: []Arg{operatorKey, operatorSeed}},
+		{u: "nsc://O/A?key&seed", want: []Arg{accountKey, accountSeed}},
+		{u: "nsc://O/A/U?key&seed", want: []Arg{userKey, userSeed}},
 	}
 
 	for _, tc := range tests {
@@ -147,23 +216,21 @@ func Test_NscURLBasics(t *testing.T) {
 		out := path.Join(ts.Dir, "out.json")
 		_, _, err = ExecuteCmd(createResolveCmd(), "-o", out, tc.u)
 		require.NoError(t, err)
+		r := loadResults(t, out)
 
-		// read the json
-		d, err := Read(out)
+		q, err := u.query()
 		require.NoError(t, err)
-		var r ResolveResults
-		require.NoError(t, json.Unmarshal(d, &r))
-
-		q := u.query()
-		for k := range q {
+		require.Equal(t, len(tc.want), len(q))
+		// check ask keys
+		for _, k := range tc.want {
 			switch k {
-			case "operatorkey":
+			case operatorKey:
 				require.Equal(t, opub, r.Operator.Key)
-			case "accountkey":
+			case accountKey:
 				require.Equal(t, apub, r.Account.Key)
-			case "userkey":
+			case userKey:
 				require.Equal(t, upub, r.User.Key)
-			case "key":
+			case key:
 				if u.user != "" {
 					require.Equal(t, upub, r.User.Key)
 				} else if u.account != "" {
@@ -171,13 +238,13 @@ func Test_NscURLBasics(t *testing.T) {
 				} else {
 					require.Equal(t, opub, r.Operator.Key)
 				}
-			case "operatorseed":
+			case operatorSeed:
 				require.Equal(t, string(oseed), r.Operator.Seed)
-			case "accountseed":
+			case accountSeed:
 				require.Equal(t, string(aseed), r.Account.Seed)
-			case "userseed":
+			case userSeed:
 				require.Equal(t, string(useed), r.User.Seed)
-			case "seed":
+			case seed:
 				if u.user != "" {
 					require.Equal(t, string(useed), r.User.Seed)
 				} else if u.account != "" {
@@ -185,8 +252,8 @@ func Test_NscURLBasics(t *testing.T) {
 				} else {
 					require.Equal(t, string(oseed), r.Operator.Seed)
 				}
-			case "store":
-			case "keystore":
+			case storeDir:
+			case keystoreDir:
 			}
 		}
 
