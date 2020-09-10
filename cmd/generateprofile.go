@@ -185,6 +185,24 @@ type NscURL struct {
 	qs       string
 }
 
+type stringSet struct {
+	set map[string]string
+}
+
+func newStringSet() *stringSet {
+	var s stringSet
+	s.set = make(map[string]string)
+	return &s
+}
+
+func (u *stringSet) add(s string) {
+	u.set[strings.ToLower(s)] = s
+}
+
+func (u *stringSet) contains(s string) bool {
+	return u.set[strings.ToLower(s)] != ""
+}
+
 func (u *NscURL) getOperator() (string, error) {
 	return url.QueryUnescape(u.operator)
 }
@@ -261,27 +279,17 @@ func (p *ProfileCmdParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *ProfileCmdParams) hasName(name string, names []string) bool {
-	nn := strings.ToLower(name)
-	for _, n := range names {
-		if strings.ToLower(n) == nn {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *ProfileCmdParams) loadNames(c jwt.Claims) []string {
-	var names []string
+func (p *ProfileCmdParams) loadNames(c jwt.Claims) *stringSet {
+	names := newStringSet()
 	cd := c.Claims()
-	names = append(names, cd.Name)
-	names = append(names, cd.Subject)
+	names.add(cd.Name)
+	names.add(cd.Subject)
 
 	conf := GetConfig()
 	payload := c.Payload()
 	_, ok := payload.(jwt.Operator)
 	if ok && conf.Operator != "" {
-		names = append(names, conf.Operator)
+		names.add(conf.Operator)
 	}
 	return names
 }
@@ -297,9 +305,9 @@ func (p *ProfileCmdParams) checkLoadOperator(ctx ActionCtx) error {
 		return err
 	}
 	names := p.loadNames(oc)
-	names = append(names, conf.Operator)
+	names.add(conf.Operator)
 
-	if !p.hasName(p.nscu.operator, names) {
+	if !names.contains(p.nscu.operator) {
 		return fmt.Errorf("invalid operator %q: make sure you have the right operator context", p.nscu.operator)
 	}
 	p.nscu.operator = oc.Name
@@ -338,7 +346,7 @@ func (p *ProfileCmdParams) checkLoadAccount(ctx ActionCtx) error {
 			continue
 		}
 		aliases := p.loadNames(ac)
-		if p.hasName(p.nscu.account, aliases) {
+		if aliases.contains(p.nscu.account) {
 			p.nscu.account = ac.Name
 			p.ac = ac
 			return nil
@@ -377,7 +385,7 @@ func (p *ProfileCmdParams) checkLoadUser(ctx ActionCtx) error {
 			continue
 		}
 		aliases := p.loadNames(uc)
-		if p.hasName(p.nscu.user, aliases) {
+		if aliases.contains(p.nscu.user) {
 			p.nscu.user = uc.Name
 			p.uc = uc
 			return nil
