@@ -452,11 +452,11 @@ func (p *ProfileCmdParams) getKeys(claim jwt.Claims) []string {
 	if claim != nil {
 		keys = append(keys, claim.Claims().Subject)
 		var payload = claim.Payload()
-		oc, ok := payload.(jwt.Operator)
+		oc, ok := payload.(*jwt.Operator)
 		if ok {
 			keys = append(keys, oc.SigningKeys...)
 		}
-		ac, ok := payload.(jwt.Account)
+		ac, ok := payload.(*jwt.Account)
 		if ok {
 			keys = append(keys, ac.SigningKeys...)
 		}

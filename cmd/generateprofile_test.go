@@ -126,6 +126,40 @@ func Test_ProfileIDs(t *testing.T) {
 	require.Equal(t, "U", r.User.Name)
 }
 
+func Test_ProfileSeedIDs(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// add a signing key
+	osk, opk, okp := CreateOperatorKey(t)
+	ts.KeyStore.Store(okp)
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	kp, err := ts.KeyStore.GetKeyPair(oc.Issuer)
+	require.NoError(t, err)
+	require.NoError(t, err)
+	oc.SigningKeys.Add(opk)
+	sjwt, err := oc.Encode(kp)
+	require.NoError(t, err)
+	_, err = ts.Store.StoreClaim([]byte(sjwt))
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	o := ts.GetOperatorPublicKey(t)
+	a := ts.GetAccountPublicKey(t, "A")
+	u := ts.GetUserPublicKey(t, "A", "U")
+
+	out := path.Join(ts.Dir, "out.json")
+	nu := fmt.Sprintf("nsc://%s/%s/%s?operatorSeed=%s", o, a, u, opk)
+	_, _, err = ExecuteCmd(createProfileCmd(), "-o", out, nu)
+	require.NoError(t, err)
+
+	r := loadResults(t, out)
+	require.Equal(t, string(osk), r.Operator.Seed)
+}
+
 func Test_ProfileStoreAndKeysDir(t *testing.T) {
 	// create store
 	ts := NewTestStore(t, "O")
