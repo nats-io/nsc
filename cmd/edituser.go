@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -65,6 +66,9 @@ nsc edit user --name <n> --rm-response-perms
 			return RunAction(cmd, args, &params)
 		},
 	}
+
+	cmd.Flags().VarP(&params.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
+	cmd.Flags().StringSliceVarP(&params.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
 
 	cmd.Flags().StringSliceVarP(&params.remove, "rm", "", nil, "remove publish/subscribe and deny permissions - comma separated list or option can be specified multiple times")
 
@@ -119,6 +123,8 @@ type EditUserParams struct {
 	remove      []string
 	rmSrc       []string
 	src         []string
+	times       timeSlice
+	rmTimes     []string
 	payload     DataParams
 	bearer      bool
 }
@@ -130,7 +136,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer") {
+		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -314,6 +320,24 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	sort.Strings(srcList)
 	p.claim.Src = strings.Join(srcList, ",")
 
+	for _, v := range p.times {
+		r.AddOK("added time range %s-%s", v.Start, v.End)
+		p.claim.Times = append(p.claim.Times, v)
+	}
+	for _, vDel := range p.rmTimes {
+		for i, v := range p.claim.Times {
+			if v.Start == vDel {
+				r.AddOK("removed time range %s-%s", v.Start, v.End)
+				a := p.claim.Times
+				// Remove the element at index i from a.
+				copy(a[i:], a[i+1:])          // Shift a[i+1:] left one index.
+				a[len(a)-1] = jwt.TimeRange{} // Erase last element (write zero value).
+				p.claim.Times = a[:len(a)-1]  // Truncate slice.
+				break
+			}
+		}
+	}
+
 	s, err := p.ResponsePermsParams.Run(p.claim, ctx)
 	if err != nil {
 		return nil, err
@@ -379,4 +403,34 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("edited user %q", p.name)
 	}
 	return r, nil
+}
+
+const timeFormat = "hh:mm:ss"
+const timeLayout = "15:04:05"
+
+type timeSlice []jwt.TimeRange
+
+func (t *timeSlice) Set(val string) error {
+	if tk := strings.Split(val, "-"); len(tk) != 2 {
+		return fmt.Errorf(`require format: "%s-%s" got "%s"`, timeLayout, timeLayout, val)
+	} else if _, err := time.Parse(timeLayout, tk[0]); err != nil {
+		return fmt.Errorf(`require format: "%s-%s" could not parse start time "%s"`, timeLayout, timeLayout, tk[0])
+	} else if _, err := time.Parse(timeLayout, tk[1]); err != nil {
+		return fmt.Errorf(`require format: "%s-%s" could not parse end time "%s"`, timeLayout, timeLayout, tk[1])
+	} else {
+		*t = append(*t, jwt.TimeRange{Start: tk[0], End: tk[1]})
+		return nil
+	}
+}
+
+func (t *timeSlice) String() string {
+	values := make([]string, len(*t))
+	for i, r := range *t {
+		values[i] = fmt.Sprintf("%s-%s", r.Start, r.End)
+	}
+	return "[" + strings.Join(values, ",") + "]"
+}
+
+func (t *timeSlice) Type() string {
+	return "time-ranges"
 }

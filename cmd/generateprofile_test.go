@@ -18,10 +18,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/jwt"
 	"net/url"
 	"path"
 	"testing"
+
+	"github.com/nats-io/jwt"
 
 	"github.com/stretchr/testify/require"
 )
