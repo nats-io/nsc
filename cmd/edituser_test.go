@@ -123,28 +123,6 @@ func Test_EditUser_Tag(t *testing.T) {
 
 }
 
-func Test_EditUser_Times(t *testing.T) {
-	ts := NewTestStore(t, "edit server")
-	defer ts.Done(t)
-
-	ts.AddUser(t, "A", "a")
-
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--start", "2018-01-01", "--expiry", "2050-01-01")
-	require.NoError(t, err)
-
-	start, err := ParseExpiry("2018-01-01")
-	require.NoError(t, err)
-
-	expiry, err := ParseExpiry("2050-01-01")
-	require.NoError(t, err)
-
-	cc, err := ts.Store.ReadUserClaim("A", "a")
-	require.NoError(t, err)
-	require.NotNil(t, cc)
-	require.Equal(t, start, cc.NotBefore)
-	require.Equal(t, expiry, cc.Expires)
-}
-
 func Test_EditUser_Pubs(t *testing.T) {
 	ts := NewTestStore(t, "edit user")
 	defer ts.Done(t)
@@ -195,6 +173,33 @@ func Test_EditUser_Src(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cc)
 	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.1.0/8"})
+}
+
+func Test_EditUser_Times(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	ts.AddUser(t, "A", "a")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09", "--time", "18:04:05-19:04:09")
+	require.NoError(t, err)
+
+	cc, err := ts.Store.ReadUserClaim("A", "a")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+
+	require.ElementsMatch(t, cc.Times, []jwt.TimeRange{
+		{Start: "16:04:05", End: "17:04:09"},
+		{Start: "18:04:05", End: "19:04:09"}})
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-time", "16:04:05")
+	require.NoError(t, err)
+
+	cc, err = ts.Store.ReadUserClaim("A", "a")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.ElementsMatch(t, cc.Times, []jwt.TimeRange{
+		{Start: "18:04:05", End: "19:04:09"}})
 }
 
 func Test_EditUserSK(t *testing.T) {

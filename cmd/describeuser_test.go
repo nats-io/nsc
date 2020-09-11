@@ -230,3 +230,18 @@ func TestDescribeUser_JsonPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out)
 }
+
+func TestDescribeUser_Times(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "aa")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09")
+	require.NoError(t, err)
+
+	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
+	require.NoError(t, err)
+	require.Contains(t, stdout, "16:04:05-17:04:09")
+
+}
