@@ -31,6 +31,7 @@ func createRevokeUserCmd() *cobra.Command {
 	var params RevokeUserParams
 	cmd := &cobra.Command{
 		Use:          "add_user",
+		Aliases:      []string{"add-user"},
 		Short:        "Revoke a user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
@@ -40,6 +41,7 @@ func createRevokeUserCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
 	cmd.Flags().IntVarP(&params.at, "at", "", 0, "revokes all user credentials created before a Unix timestamp ('0' is treated as now)")
+	cmd.Flags().StringVarP(&params.userPubKey, "user-public-key", "u", "", "public user key (use when user was generated outside of nsc)")
 
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -75,20 +77,26 @@ func (p *RevokeUserParams) canParse(s string) error {
 }
 
 func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
-	var err error
-
-	if err = p.AccountContextParams.Edit(ctx); err != nil {
+	if err := p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	if p.user == "" {
-		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
-		if err != nil {
-			return err
+	byName, err := cli.Confirm("Do you want to revoke a user (known to nsc) by name?", true)
+	if err != nil {
+		return err
+	}
+	if byName {
+		if p.user == "" {
+			p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
+			if err != nil {
+				return err
+			}
 		}
+	} else if p.userPubKey, err = cli.Prompt("Enter user public nkey", ""); err != nil {
+		return err
 	}
 	if p.at == 0 {
 		at := fmt.Sprintf("%d", p.at)
-		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
+		at, err := cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
 		if err != nil {
 			return err
 		}
@@ -100,6 +108,7 @@ func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -110,22 +119,25 @@ func (p *RevokeUserParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.user == "" {
+	if p.user == "" && p.userPubKey == "" {
 		n := ctx.StoreCtx().DefaultUser(p.AccountContextParams.Name)
 		if n != nil {
 			p.user = *n
 		}
 	}
-
-	if p.user == "" {
-		return fmt.Errorf("user is required")
+	if p.userPubKey == "" && p.user == "" {
+		return fmt.Errorf("user or user-public-key are required")
 	}
-
+	if p.userPubKey != "" && p.user != "" {
+		return fmt.Errorf("user and user-public-key are mutually exclusive")
+	}
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}
-
+	if p.userPubKey != "" {
+		return nil
+	}
 	userClaim, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
 	if err != nil {
 		return err
@@ -141,7 +153,9 @@ func (p *RevokeUserParams) Load(ctx ActionCtx) error {
 }
 
 func (p *RevokeUserParams) Validate(ctx ActionCtx) error {
-
+	if !nkeys.IsValidPublicUserKey(p.userPubKey) {
+		return fmt.Errorf("user-public-key %q is not a valid public user nkey", p.userPubKey)
+	}
 	if err := p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}

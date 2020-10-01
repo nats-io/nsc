@@ -31,6 +31,7 @@ func createRevokeListActivationCmd() *cobra.Command {
 	var params RevokeListActivationParams
 	cmd := &cobra.Command{
 		Use:          "list_activations",
+		Aliases:      []string{"list-activations"},
 		Short:        "List account revocations for an export",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,

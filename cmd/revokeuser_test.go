@@ -118,6 +118,8 @@ func Test_RevokeUserAccountNameRequired(t *testing.T) {
 	require.Len(t, ac.Revocations, 0)
 }
 
+const keyToRevoke = "UCLMBZ5CBDRDG2TAYOJK23U7IGKPTTW7DTWNOP4TUW4PAB3GRUSKXG3N"
+
 func TestRevokeUserInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
@@ -129,7 +131,7 @@ func TestRevokeUserInteractive(t *testing.T) {
 	ts.AddUser(t, "B", "one")
 	ts.AddUser(t, "B", "two")
 
-	input := []interface{}{0, 0, "0"}
+	input := []interface{}{0, true, 0, "0"}
 	cmd := createRevokeUserCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
@@ -141,6 +143,55 @@ func TestRevokeUserInteractive(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
+	uPub := u.Subject
+	require.True(t, ac.IsRevokedAt(uPub, time.Unix(0, 0)))
+	require.False(t, ac.IsRevokedAt(uPub, time.Now().Add(1*time.Hour)))
+
+	cmd = createRevokeUserCmd()
+	HoistRootFlags(cmd)
+	input = []interface{}{0, false, keyToRevoke, "0"}
+	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, ac.Revocations.IsRevoked(keyToRevoke, time.Unix(0, 0)))
+	require.False(t, ac.Revocations.IsRevoked(keyToRevoke, time.Now().Add(1*time.Hour)))
+	require.Len(t, ac.Revocations, 2)
+}
+
+func TestRevokeUserByNkey(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "one")
+	ts.AddUser(t, "A", "two")
+
+	u, err := ts.Store.ReadUserClaim("A", "one")
+	require.NoError(t, err)
+
+	cmd := createRevokeUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteCmd(cmd, "-u", u.Subject)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(cmd, "-u", keyToRevoke)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Revocations, 2)
+	require.True(t, ac.Revocations.IsRevoked(u.Subject, time.Unix(0, 0)))
+	require.True(t, ac.Revocations.IsRevoked(keyToRevoke, time.Unix(0, 0)))
+
+	// make sure one is expired
+	u, err = ts.Store.ReadUserClaim("A", "one")
+	require.NoError(t, err)
 	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
+	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
+	// make sure two is not expired
+	u, err = ts.Store.ReadUserClaim("A", "two")
+	require.NoError(t, err)
+	require.False(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
 	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
 }

@@ -29,6 +29,7 @@ func createClearRevokeActivationCmd() *cobra.Command {
 	var params RevokeClearActivationParams
 	cmd := &cobra.Command{
 		Use:          "delete_activation",
+		Aliases:      []string{"delete-activation"},
 		Short:        "Remove an account revocation from an export",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,

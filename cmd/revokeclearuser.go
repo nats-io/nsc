@@ -17,7 +17,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"time"
+
+	cli "github.com/nats-io/cliprompts/v2"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -29,6 +32,7 @@ func createClearRevokeUserCmd() *cobra.Command {
 	var params ClearRevokeUserParams
 	cmd := &cobra.Command{
 		Use:          "delete_user",
+		Aliases:      []string{"delete-user"},
 		Short:        "Remove a user revocation",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
@@ -44,6 +48,7 @@ func createClearRevokeUserCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
+	cmd.Flags().StringVarP(&params.userPubKey, "user-public-key", "u", "", "public user key (use when user was generated outside of nsc)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -74,11 +79,42 @@ func (p *ClearRevokeUserParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	if p.user == "" {
-		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
-		if err != nil {
-			return err
+
+	st := ctx.StoreCtx().Store
+	accClaim, err := st.ReadAccountClaim(p.AccountContextParams.Name)
+	if err != nil || len(accClaim.Revocations) == 0 {
+		return err
+	}
+	keyToUserName := map[string]string{}
+	users, err := st.ListEntries(store.Accounts, p.AccountContextParams.Name, store.Users)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		if uc, err := st.ReadUserClaim(p.AccountContextParams.Name, user); err == nil {
+			if _, ok := accClaim.Revocations[uc.Subject]; ok {
+				keyToUserName[uc.Subject] = uc.Name
+			}
 		}
+	}
+
+	choices := make([]string, 1, len(accClaim.Revocations)+1)
+	choices[0] = "none"
+	for userNkey := range accClaim.Revocations {
+		choice := ""
+		if name, ok := keyToUserName[userNkey]; ok {
+			choice = fmt.Sprintf("%s: %s", userNkey, name)
+		} else {
+			choice = userNkey
+		}
+		choices = append(choices, choice)
+	}
+	if choice, err := cli.Select("Revoked users to remove", "", choices); err != nil {
+		return err
+	} else if choice == 0 {
+		return fmt.Errorf("no Nkey selected")
+	} else {
+		p.userPubKey = strings.Split(choices[choice], ":")[0]
 	}
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
@@ -93,15 +129,17 @@ func (p *ClearRevokeUserParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.user == "" {
+	if p.user == "" && p.userPubKey == "" {
 		n := ctx.StoreCtx().DefaultUser(p.AccountContextParams.Name)
 		if n != nil {
 			p.user = *n
 		}
 	}
-
-	if p.user == "" {
-		return fmt.Errorf("user is required")
+	if p.userPubKey == "" && p.user == "" {
+		return fmt.Errorf("user or user-public-key are required")
+	}
+	if p.userPubKey != "" && p.user != "" {
+		return fmt.Errorf("user and user-public-key are mutually exclusive")
 	}
 
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
@@ -109,6 +147,9 @@ func (p *ClearRevokeUserParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
+	if p.userPubKey != "" {
+		return nil
+	}
 	userClaim, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
 	if err != nil {
 		return err
@@ -124,7 +165,9 @@ func (p *ClearRevokeUserParams) Load(ctx ActionCtx) error {
 }
 
 func (p *ClearRevokeUserParams) Validate(ctx ActionCtx) error {
-
+	if !nkeys.IsValidPublicUserKey(p.userPubKey) {
+		return fmt.Errorf("user-public-key %q is not a valid public user nkey", p.userPubKey)
+	}
 	if err := p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
