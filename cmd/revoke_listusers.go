@@ -29,6 +29,7 @@ func createRevokeListUsersCmd() *cobra.Command {
 	var params RevokeListUserParams
 	cmd := &cobra.Command{
 		Use:          "list_users",
+		Aliases:      []string{"list-users"},
 		Short:        "List users revoked in an account",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,

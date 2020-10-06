@@ -77,9 +77,13 @@ func TestRevokeClearUserInteractive(t *testing.T) {
 	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
 	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
 
-	input := []interface{}{0, 0}
+	input := []interface{}{0, 1}
 	cmd := createClearRevokeUserCmd()
 	HoistRootFlags(cmd)
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Revocations, 0)
 }
