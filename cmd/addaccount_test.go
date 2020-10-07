@@ -52,8 +52,9 @@ func Test_AddAccount(t *testing.T) {
 
 func Test_AddAccountNoStore(t *testing.T) {
 	// reset the store
-	ForceStoreRoot(t, "")
+	require.NoError(t, ForceStoreRoot(t, ""))
 	_, _, err := ExecuteCmd(CreateAddAccountCmd())
+	require.NotNil(t, err)
 	require.Equal(t, "no stores available", err.Error())
 }
 
@@ -196,4 +197,30 @@ func Test_AddManagedAccountWithExistingKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pk, ac.Subject)
 	require.Equal(t, pk, ac.Issuer)
+}
+
+func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	kp, err := nkeys.CreateOperator()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.True(t, ts.KeyStore.HasPrivateKey(pk))
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pk)
+	require.NoError(t, err)
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NotNil(t, oc)
+	require.NoError(t, ts.KeyStore.Remove(oc.Subject))
+	require.False(t, ts.KeyStore.HasPrivateKey(oc.Subject))
+
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+
+	_, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 }

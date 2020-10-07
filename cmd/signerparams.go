@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -154,21 +154,40 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if p.signerKP != nil {
 		return nil
 	}
-
 	var err error
-	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
-	if err != nil {
+	// if they specified -K resolve or fail
+	if KeyPathFlag != "" {
+		p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+		if err != nil {
+			return err
+		}
+		if p.signerKP == nil {
+			signers, err := p.getSigners(ctx)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("unable to resolve any of the following signing keys in the keystore: %s", strings.Join(signers, ", "))
+		}
 		return err
 	}
-	if p.signerKP == nil {
-		// if they specified a key, the file didn't resolve lets see if we can find another
-		signers, err := p.getSigners(ctx)
-		if err != nil {
-			return fmt.Errorf("error reading signers: %v", err)
+	// if nothing specified, autoselect anything we can find
+	signers, err := p.getSigners(ctx)
+	if err != nil {
+		return fmt.Errorf("error reading signers: %v", err)
+	}
+	var selected string
+	for _, s := range signers {
+		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)
+		_, err = os.Stat(fp)
+		if err == nil {
+			selected = fp
+			break
 		}
+	}
+	if selected == "" {
 		return fmt.Errorf("unable to resolve any of the following signing keys in the keystore: %s", strings.Join(signers, ", "))
 	}
-
+	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, selected)
 	return err
 }
 
