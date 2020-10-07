@@ -381,6 +381,7 @@ func Test_AddUserWithSigningKeyOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
 	require.NotNil(t, ac)
 	ts.KeyStore.Remove(ac.Subject)
 	require.False(t, ts.KeyStore.HasPrivateKey(ac.Subject))

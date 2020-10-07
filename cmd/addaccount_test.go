@@ -214,6 +214,7 @@ func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
 	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pk)
 	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
 	require.NotNil(t, oc)
 	require.NoError(t, ts.KeyStore.Remove(oc.Subject))
 	require.False(t, ts.KeyStore.HasPrivateKey(oc.Subject))
