@@ -22,12 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats.go"
-
-	"github.com/nats-io/nsc/cmd/store"
-
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -206,7 +204,7 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *PullParams) storeJwtIf(ctx ActionCtx, sub *store.Report, token string) {
+func (p *PullParams) maybeStoreJWT(ctx ActionCtx, sub *store.Report, token string) {
 	remoteClaim, err := jwt.DecodeGeneric(token)
 	if err != nil {
 		sub.AddError("error decoding remote token: %v %s", err, token)
@@ -271,7 +269,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 				subR.AddError("pull response bad")
 				break
 			} else {
-				p.storeJwtIf(ctx, subR, tk[1])
+				p.maybeStoreJWT(ctx, subR, tk[1])
 			}
 		}
 		return r, nil
@@ -304,7 +302,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		if j.PullStatus.OK() {
 			token, _ := j.Token()
-			p.storeJwtIf(ctx, sub, token)
+			p.maybeStoreJWT(ctx, sub, token)
 		}
 	}
 	return r, nil

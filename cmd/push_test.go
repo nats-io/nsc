@@ -151,7 +151,7 @@ func Test_SyncNatsResolver(t *testing.T) {
 	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
 	require.NoError(t, err)
 	defer os.Remove(dir)
-	data = bytes.ReplaceAll(data, []byte(`dir: "./jwt"`), []byte(fmt.Sprintf(`dir: "%s"`, dir)))
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
 	err = ioutil.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
 	ports := ts.RunServerWithConfig(t, serverconf)

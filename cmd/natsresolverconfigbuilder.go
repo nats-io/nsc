@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+
 	"github.com/nats-io/jwt"
 )
 
@@ -77,7 +78,7 @@ system_account: %s
 resolver {
     type: full
     # Directory in which the account jwt will be stored
-    dir: "./jwt"
+    dir: './jwt'
     # Interval at which a nats-server with a nats based account resolver will compare
     # it's state with one random nats based account resolver in the cluster and if needed, 
     # exchange jwt and converge on the same set of jwt.

@@ -23,10 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/nats.go"
-
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -124,6 +123,7 @@ func systemAccountUser(ctx ActionCtx, sysAccUserName string) (string, string, na
 }
 
 func isHttpUrl(url string) bool {
+	url = strings.ToLower(strings.TrimSpace(url))
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") ||
 		strings.Contains(url, ",http://") || strings.Contains(url, ",https://")
 }
