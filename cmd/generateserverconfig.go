@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nats-io/nkeys"
+
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -51,6 +53,7 @@ nsc generate config --mem-resolver --config-file <outfile> --force
 	}
 	cmd.Flags().BoolVarP(&params.nkeyConfig, "nkey", "", false, "generates an nkey account server configuration")
 	cmd.Flags().BoolVarP(&params.memResolverConfig, "mem-resolver", "", false, "generates a mem resolver server configuration")
+	cmd.Flags().BoolVarP(&params.natsResolverConfig, "nats-resolver", "", false, "generates a full nats resolver server configuration")
 	cmd.Flags().StringVarP(&params.outputFile, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
 	cmd.Flags().StringVarP(&params.dirOut, "dir", "", "", "output configuration dir (only valid when --mem-resolver is specified)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "overwrite output files if they exist")
@@ -65,17 +68,18 @@ func init() {
 }
 
 type GenerateServerConfigParams struct {
-	sysAccount        string
-	dirOut            string
-	outputFile        string
-	force             bool
-	nkeyConfig        bool
-	memResolverConfig bool
-	generator         ServerConfigGenerator
+	sysAccount         string
+	dirOut             string
+	outputFile         string
+	force              bool
+	nkeyConfig         bool
+	memResolverConfig  bool
+	natsResolverConfig bool
+	generator          ServerConfigGenerator
 }
 
 func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
-	if ctx.NothingToDo("nkey", "mem-resolver", "dir") {
+	if ctx.NothingToDo("nkey", "mem-resolver", "dir", "nats-resolver") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify a config type option")
 	}
@@ -84,16 +88,38 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is not valid with nkey configuration")
 	}
+	if p.dirOut != "" && p.natsResolverConfig {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("--dir is not valid with nats-resolver configuration")
+	}
 
 	if p.dirOut != "" && p.outputFile != "--" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is exclusive of --config-file")
 	}
 
+	cfgCnt := 0
+	for _, c := range []bool{p.memResolverConfig, p.natsResolverConfig, p.nkeyConfig} {
+		if c {
+			cfgCnt++
+		}
+	}
+	if cfgCnt > 1 {
+		return fmt.Errorf("can only generate one config at a time")
+	}
+
+	if p.sysAccount == "" {
+		if o, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); o != nil {
+			p.sysAccount = o.SystemAccount
+		}
+	}
+
 	if p.nkeyConfig {
 		p.generator = NewNKeyConfigBuilder()
 	} else if p.memResolverConfig {
 		p.generator = NewMemResolverConfigBuilder()
+	} else if p.natsResolverConfig {
+		p.generator = NewNatsResolverConfigBuilder()
 	}
 	return nil
 }
@@ -173,11 +199,17 @@ func (p *GenerateServerConfigParams) Validate(ctx ActionCtx) error {
 	}
 
 	if p.sysAccount != "" {
-		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAccount)
-		if err != nil {
-			return fmt.Errorf("error reading account %q: %v", p.sysAccount, err)
+		accSubj := ""
+		if nkeys.IsValidPublicAccountKey(p.sysAccount) {
+			accSubj = p.sysAccount
+		} else {
+			ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAccount)
+			if err != nil {
+				return fmt.Errorf("error reading account %q: %v", p.sysAccount, err)
+			}
+			accSubj = ac.Subject
 		}
-		if err := p.generator.SetSystemAccount(ac.Subject); err != nil {
+		if err := p.generator.SetSystemAccount(accSubj); err != nil {
 			return err
 		}
 	}

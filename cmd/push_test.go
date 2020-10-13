@@ -16,6 +16,11 @@
 package cmd
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -65,7 +70,7 @@ func Test_SyncNoURL(t *testing.T) {
 	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
 	t.Log(err.Error())
-	require.Contains(t, err.Error(), "no account server url was provided by the operator jwt")
+	require.Contains(t, err.Error(), "no account server url or nats-server url was provided by the operator jwt")
 }
 
 func Test_SyncNoServer(t *testing.T) {
@@ -126,4 +131,59 @@ func Test_SyncManualServer(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Contains(t, ac.Tags, "a")
+}
+
+func Test_SyncNatsResolver(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	require.NoError(t, err)
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC2")
+	require.NoError(t, err)
+	// modify the generated file so testing becomes easier by knowing where the jwt directory is
+	data, err := ioutil.ReadFile(serverconf)
+	require.NoError(t, err)
+	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	require.NoError(t, err)
+	defer os.Remove(dir)
+	data = bytes.ReplaceAll(data, []byte(`dir: "./jwt"`), []byte(fmt.Sprintf(`dir: "%s"`, dir)))
+	err = ioutil.WriteFile(serverconf, data, 0660)
+	require.NoError(t, err)
+	ports := ts.RunServerWithConfig(t, serverconf)
+	require.NotNil(t, ports)
+	// only after server start as ports are not yet known in tests
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--service-url", ports.Nats[0])
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	require.NoError(t, err)
+	// test to assure AC1/AC2/SYS where pushed
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, len(filesPre), 3)
+	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "--name", "AC2")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC3") // exists as nsc has a bad default account now
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createPushCmd(), "--prune", "--all")
+	require.NoError(t, err)
+	// test to assure AC1/AC3/SYS where pushed/pruned
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(filesPost))
+	// assert only AC1/SYS overlap in pre/post
+	sameCnt := 0
+	for _, f1 := range filesPost {
+		for _, f2 := range filesPre {
+			if f1 == f2 {
+				sameCnt++
+				break
+			}
+		}
+	}
+	require.Equal(t, 2, sameCnt)
 }

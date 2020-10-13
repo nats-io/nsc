@@ -1,4 +1,4 @@
-// Copyright 2018 The NATS Authors
+// Copyright 2018-2019 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,12 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"regexp"
 	"strings"
+	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
 
@@ -28,8 +30,8 @@ var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:
 // All JWTs once encoded start with this
 const jwtPrefix = "eyJ"
 
-// readOperatorJWT
-func readOperatorJWT(jwtfile string) (*jwt.OperatorClaims, error) {
+// ReadOperatorJWT will read a jwt file for an operator claim. This can be a decorated file.
+func ReadOperatorJWT(jwtfile string) (*jwt.OperatorClaims, error) {
 	contents, err := ioutil.ReadFile(jwtfile)
 	if err != nil {
 		// Check to see if the JWT has been inlined.
@@ -89,6 +91,40 @@ func validateTrustedOperators(o *Options) error {
 	if len(o.TrustedOperators) > 0 && len(o.TrustedKeys) > 0 {
 		return fmt.Errorf("conflicting options for 'TrustedKeys' and 'TrustedOperators'")
 	}
+	if o.SystemAccount != "" {
+		foundSys := false
+		foundNonEmpty := false
+		for _, op := range o.TrustedOperators {
+			if op.SystemAccount != "" {
+				foundNonEmpty = true
+			}
+			if op.SystemAccount == o.SystemAccount {
+				foundSys = true
+				break
+			}
+		}
+		if foundNonEmpty && !foundSys {
+			return fmt.Errorf("system_account in config and operator JWT must be identical")
+		}
+	}
+	srvMajor, srvMinor, srvUpdate, _ := jwt.ParseServerVersion(strings.Split(VERSION, "-")[0])
+	for _, opc := range o.TrustedOperators {
+		if major, minor, update, err := jwt.ParseServerVersion(opc.AssertServerVersion); err != nil {
+			return fmt.Errorf("operator %s expects version %s got error instead: %s",
+				opc.Subject, opc.AssertServerVersion, err)
+		} else if major > srvMajor {
+			return fmt.Errorf("operator %s expected major version %d > server major version %d",
+				opc.Subject, major, srvMajor)
+		} else if srvMajor > major {
+		} else if minor > srvMinor {
+			return fmt.Errorf("operator %s expected minor version %d > server minor version %d",
+				opc.Subject, minor, srvMinor)
+		} else if srvMinor > minor {
+		} else if update > srvUpdate {
+			return fmt.Errorf("operator %s expected update version %d > server update version %d",
+				opc.Subject, update, srvUpdate)
+		}
+	}
 	// If we have operators, fill in the trusted keys.
 	// FIXME(dlc) - We had TrustedKeys before TrustedOperators. The jwt.OperatorClaims
 	// has a DidSign(). Use that longer term. For now we can expand in place.
@@ -105,4 +141,69 @@ func validateTrustedOperators(o *Options) error {
 		}
 	}
 	return nil
+}
+
+func validateSrc(claims *jwt.UserClaims, host string) bool {
+	if claims == nil {
+		return false
+	} else if len(claims.Src) == 0 {
+		return true
+	} else if host == "" {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, cidr := range claims.Src {
+		if _, net, err := net.ParseCIDR(cidr); err != nil {
+			return false // should not happen as this jwt is invalid
+		} else if net.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateTimes(claims *jwt.UserClaims) (bool, time.Duration) {
+	if claims == nil {
+		return false, time.Duration(0)
+	} else if len(claims.Times) == 0 {
+		return true, time.Duration(0)
+	}
+	now := time.Now()
+	loc := time.Local
+	if claims.Locale != "" {
+		var err error
+		if loc, err = time.LoadLocation(claims.Locale); err != nil {
+			return false, time.Duration(0) // parsing not expected to fail at this point
+		}
+		now = now.In(loc)
+	}
+	for _, timeRange := range claims.Times {
+		y, m, d := now.Date()
+		m = m - 1
+		d = d - 1
+		start, err := time.ParseInLocation("15:04:05", timeRange.Start, loc)
+		if err != nil {
+			return false, time.Duration(0) // parsing not expected to fail at this point
+		}
+		end, err := time.ParseInLocation("15:04:05", timeRange.End, loc)
+		if err != nil {
+			return false, time.Duration(0) // parsing not expected to fail at this point
+		}
+		if start.After(end) {
+			start = start.AddDate(y, int(m), d)
+			d++ // the intent is to be the next day
+		} else {
+			start = start.AddDate(y, int(m), d)
+		}
+		if start.Before(now) {
+			end = end.AddDate(y, int(m), d)
+			if end.After(now) {
+				return true, end.Sub(now)
+			}
+		}
+	}
+	return false, time.Duration(0)
 }

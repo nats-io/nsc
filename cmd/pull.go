@@ -18,7 +18,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/nats-io/nats.go"
 
 	"github.com/nats-io/nsc/cmd/store"
 
@@ -49,10 +53,9 @@ func init() {
 
 type PullParams struct {
 	AccountContextParams
-	All              bool
-	AccountServerURL string
-	Jobs             PullJobs
-	Overwrite        bool
+	All       bool
+	Jobs      PullJobs
+	Overwrite bool
 }
 
 type PullJob struct {
@@ -147,8 +150,11 @@ func (p *PullParams) Validate(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if oc.AccountServerURL == "" {
-		return fmt.Errorf("operator %q doesn't set account server url - unable to pull", ctx.StoreCtx().Operator.Name)
+	if oc.AccountServerURL == "" && len(oc.OperatorServiceURLs) == 0 {
+		return fmt.Errorf("operator %q doesn't set account server url or operator service url - unable to pull", ctx.StoreCtx().Operator.Name)
+	}
+	if oc.AccountServerURL == "" && len(oc.OperatorServiceURLs) > 0 && !p.All {
+		return fmt.Errorf("operator %q can only pull all jwt - unable to pull by account", ctx.StoreCtx().Operator.Name)
 	}
 	return nil
 }
@@ -200,7 +206,77 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *PullParams) storeJwtIf(ctx ActionCtx, sub *store.Report, token string) {
+	remoteClaim, err := jwt.DecodeGeneric(token)
+	if err != nil {
+		sub.AddError("error decoding remote token: %v %s", err, token)
+		return
+	}
+	orig := int64(0)
+	if localClaim, err := ctx.StoreCtx().Store.ReadAccountClaim(remoteClaim.Name); err == nil {
+		orig = localClaim.IssuedAt
+	}
+	remote := remoteClaim.IssuedAt
+	if (orig > remote) && !p.Overwrite {
+		sub.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", remoteClaim.Name)
+		return
+	}
+	if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
+		sub.AddError("error storing %q: %v", remoteClaim.Name, err)
+		return
+	}
+	sub.AddOK("stored %s %q", remoteClaim.Type, remoteClaim.Name)
+	if sub.OK() {
+		sub.Label = fmt.Sprintf("pulled %q from the account server", remoteClaim.Name)
+	}
+}
+
 func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
+	r := store.NewDetailedReport(true)
+	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
+		r.AddError("could not read operator claim: %v", err)
+		return r, err
+	} else if op.AccountServerURL == "" && op.SystemAccount != "" && len(op.OperatorServiceURLs) != 0 {
+		subR := store.NewReport(store.OK, `pull from cluster using system account`)
+		r.Add(subR)
+		_, _, opt, err := systemAccountUser(ctx, "")
+		if err != nil {
+			subR.AddError("failed to obtain system user: %v", err)
+			return r, nil
+		}
+		url := strings.Join(op.OperatorServiceURLs, ",")
+		nc, err := nats.Connect(url, opt, nats.Name("nsc-client"))
+		if err != nil {
+			subR.AddError("failed to connect to %s: %v", url, err)
+			return r, nil
+		}
+		defer nc.Close()
+		ib := nats.NewInbox()
+		sub, err := nc.SubscribeSync(ib)
+		if err != nil {
+			subR.AddError("failed to subscribe to response subject: %v", err)
+			return r, nil
+		}
+		if err := nc.PublishRequest("$SYS.REQ.CLAIMS.PACK", ib, nil); err != nil {
+			subR.AddError("failed to pull accounts: %v", err)
+			return r, nil
+		}
+		for {
+			if resp, err := sub.NextMsg(time.Second); err != nil {
+				subR.AddError("failed to get response to pull: %v", err)
+				break
+			} else if msg := string(resp.Data); msg == "" { // empty response means end
+				break
+			} else if tk := strings.Split(string(resp.Data), "|"); len(tk) != 2 {
+				subR.AddError("pull response bad")
+				break
+			} else {
+				p.storeJwtIf(ctx, subR, tk[1])
+			}
+		}
+		return r, nil
+	}
+
 	ctx.CurrentCmd().SilenceUsage = true
 	if err := p.setupJobs(ctx); err != nil {
 		return nil, err
@@ -215,7 +291,6 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	wg.Wait()
 
-	r := store.NewDetailedReport(true)
 	for _, j := range p.Jobs {
 		sub := store.NewReport(store.OK, "pull %q from the account server", j.Name)
 		sub.Opt = store.DetailsOnErrorOrWarning
@@ -229,25 +304,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		if j.PullStatus.OK() {
 			token, _ := j.Token()
-			remoteClaim, err := jwt.DecodeGeneric(token)
-			if err != nil {
-				sub.AddError("error decoding remote token for %q: %v", j.Name, err)
-				continue
-			}
-			orig := j.LocalClaim.Claims().IssuedAt
-			remote := remoteClaim.IssuedAt
-			if (orig > remote) && !p.Overwrite {
-				sub.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", j.Name)
-				continue
-			}
-			if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
-				sub.AddError("error storing %q: %v", j.Name, err)
-				continue
-			}
-			sub.AddOK("stored %s %q", remoteClaim.Type, j.Name)
-			if sub.OK() {
-				sub.Label = fmt.Sprintf("pulled %q from the account server", j.Name)
-			}
+			p.storeJwtIf(ctx, sub, token)
 		}
 	}
 	return r, nil
