@@ -61,9 +61,9 @@ github.com/mitchellh/mapstructure
 github.com/nats-io/cliprompts/v2
 # github.com/nats-io/jwt v1.0.1
 github.com/nats-io/jwt
-# github.com/nats-io/jwt/v2 v2.0.0-20201006231922-e00ffcea7738
+# github.com/nats-io/jwt/v2 v2.0.0-20201015190852-e11ce317263c
 github.com/nats-io/jwt/v2
-# github.com/nats-io/nats-server/v2 v2.1.8-0.20201013002018-a4c68521bafa
+# github.com/nats-io/nats-server/v2 v2.1.8-0.20201020210511-496d18468a7d
 github.com/nats-io/nats-server/v2/conf
 github.com/nats-io/nats-server/v2/internal/ldap
 github.com/nats-io/nats-server/v2/logger

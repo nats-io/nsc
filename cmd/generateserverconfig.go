@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/nats-io/nkeys"
-
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +88,7 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is not valid with nkey configuration")
 	}
-	if p.dirOut != "" && p.natsResolverConfig {
+	if p.natsResolverConfig && p.dirOut != "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is not valid with nats-resolver configuration")
 	}

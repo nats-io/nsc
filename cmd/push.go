@@ -76,23 +76,34 @@ type PushCmdParams struct {
 }
 
 func processResponse(report *store.Report, resp *nats.Msg) (bool, string, interface{}) {
-	serverResp := map[string]interface{}{}
+	// ServerInfo copied from nats-server, refresh as needed. Error and Data are mutually exclusive
+	serverResp := struct {
+		Server *struct {
+			Name      string    `json:"name"`
+			Host      string    `json:"host"`
+			ID        string    `json:"id"`
+			Cluster   string    `json:"cluster,omitempty"`
+			Version   string    `json:"ver"`
+			Seq       uint64    `json:"seq"`
+			JetStream bool      `json:"jetstream"`
+			Time      time.Time `json:"time"`
+		} `json:"server"`
+		Error *struct {
+			Description string `json:"description"`
+			Code        int    `json:"code"`
+		} `json:"error"`
+		Data interface{} `json:"data"`
+	}{}
 	if err := json.Unmarshal(resp.Data, &serverResp); err != nil {
 		report.AddError("failed to parse response: %v data: %s", err, string(resp.Data))
-	} else if srv, ok := serverResp["server"]; !ok {
-		report.AddError("server responded without server info: %s", string(resp.Data))
-	} else if srv, ok := srv.(map[string]interface{}); !ok {
-		report.AddError("server responded with bad server info: %s", string(resp.Data))
-	} else if error, hasErr := serverResp["error"]; hasErr {
-		if error, ok := error.(map[string]interface{}); ok {
-			report.AddError("server %s responded with error: %s", srv["name"], error["description"])
-		} else {
-			report.AddError("server %s responded with bad error: %v", srv["name"], error)
-		}
-	} else if data, ok := serverResp["data"]; !ok {
-		report.AddError("server %s responded without data: %s", srv["name"], string(resp.Data))
+	} else if srvName := serverResp.Server.Name; srvName == "" {
+		report.AddError("server responded without server name in info: %s", string(resp.Data))
+	} else if err := serverResp.Error; err != nil {
+		report.AddError("server %s responded with error: %s", srvName, err.Description)
+	} else if data := serverResp.Data; data == nil {
+		report.AddError("server %s responded without data: %s", srvName, string(resp.Data))
 	} else {
-		return true, srv["name"].(string), data
+		return true, srvName, data
 	}
 	return false, "", nil
 }
@@ -104,7 +115,7 @@ func getSystemAccountUser(ctx ActionCtx, sysAccName string, sysAccUserName strin
 	} else if accNames, err := friendlyNames(ctx.StoreCtx().Operator.Name); err != nil {
 		return "", "", nil, err
 	} else if sysAccName == "" {
-		if sysAccName, _ = accNames[op.SystemAccount]; sysAccName == "" {
+		if sysAccName = accNames[op.SystemAccount]; sysAccName == "" {
 			return "", "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
 		}
 	}
@@ -435,6 +446,10 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 				claim := jwt.NewGenericClaims(opPk)
 				claim.Data["accounts"] = deleteList
 				pruneJwt, err := claim.Encode(okp)
+				if err != nil {
+					subPrune.AddError("Could not encode delete request (err:%v)", err)
+					return r, nil
+				}
 				respPrune := multiRequest(nc, subPrune, "prune accounts", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt),
 					func(srv string, data interface{}) {
 						if data, ok := data.(map[string]interface{}); ok {

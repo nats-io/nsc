@@ -151,7 +151,7 @@ func (p *PullParams) Validate(ctx ActionCtx) error {
 	if oc.AccountServerURL == "" {
 		return fmt.Errorf("operator %q doesn't set account server url - unable to pull", ctx.StoreCtx().Operator.Name)
 	}
-	if IsNatsUrl(oc.AccountServerURL ) && !p.All {
+	if IsNatsUrl(oc.AccountServerURL) && !p.All {
 		return fmt.Errorf("operator %q can only pull all jwt - unable to pull by account", ctx.StoreCtx().Operator.Name)
 	}
 	return nil
@@ -234,11 +234,11 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
 		r.AddError("could not read operator claim: %v", err)
 		return r, err
-	}else if op.AccountServerURL == "" {
+	} else if op.AccountServerURL == "" {
 		err := fmt.Errorf("operator has no account server url")
 		r.AddError("operator %s: %v", op.Name, err)
 		return r, err
-	} else if url:= op.AccountServerURL; IsNatsUrl(url) {
+	} else if url := op.AccountServerURL; IsNatsUrl(url) {
 		subR := store.NewReport(store.OK, `pull from cluster using system account`)
 		r.Add(subR)
 		_, _, opt, err := getSystemAccountUser(ctx, "", "")

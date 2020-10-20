@@ -82,7 +82,8 @@ resolver {
     # In order to support jwt deletion, set to true
     # If the resolver type is full delete will rename the jwt.
     # This is to allow manual restoration in case of inadvertent deletion.
-    # To free up storage you must manually delete the file.
+    # To restore a jwt, remove the added suffix .delete and restart or send a reload signal.
+    # To free up storage you must manually delete files with the suffix .delete.
     allow_delete: false
     # Interval at which a nats-server with a nats based account resolver will compare
     # it's state with one random nats based account resolver in the cluster and if needed, 
@@ -94,14 +95,16 @@ resolver {
 # This is not necessary but avoids a bootstrapping system account. 
 # This only applies to the system account. Therefore other account jwt are not included here.
 # To populate the resolver:
-# 1) make sure that your operator has Service URLs set and account server URL unset. 
-#        nsc edit operator --account-jwt-server-url "" --service-url <nats-url1> --service-url <nats-url...> 
+# 1) make sure that your operator has the account server URL pointing at your nats servers.
+#    The url must start with: "nats://" 
+#    nsc edit operator --account-jwt-server-url nats://localhost:4222
 # 2) push your accounts using: nsc push --all
-# 3) prune accounts use: nsc push --prune 
-# The argument to push -u is optional if your operator has Service URLs set.
+#    The argument to push -u is optional if your account server url is set as described.
+# 3) to prune accounts use: nsc push --prune 
+#    In order to enable prune you must set above allow_delete to true
 # Later changes to the system account take precedence over the system account jwt listed here.
 resolver_preload: {
-	%s:%s,
+	%s: %s,
 }
 `
 

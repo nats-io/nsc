@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -227,4 +228,44 @@ func Test_SyncNatsResolverNoDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(filesPost))
 	require.Equal(t, filesPre, filesPost)
+}
+
+func Test_SyncBadUrl(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	require.NoError(t, err)
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	require.NoError(t, err)
+	// modify the generated file so testing becomes easier by knowing where the jwt directory is
+	data, err := ioutil.ReadFile(serverconf)
+	require.NoError(t, err)
+	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	require.NoError(t, err)
+	defer os.Remove(dir)
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	err = ioutil.WriteFile(serverconf, data, 0660)
+	require.NoError(t, err)
+	ports := ts.RunServerWithConfig(t, serverconf)
+	require.NotNil(t, ports)
+	// deliberately test if http push to a nats server kills it or not
+	badUrl := strings.ReplaceAll(ports.Nats[0], "nats://", "http://")
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", badUrl)
+	require.NoError(t, err)
+	_, errOut, err := ExecuteCmd(createPushCmd(), "--all")
+	require.Error(t, err)
+	require.Contains(t, errOut, `Post "`+badUrl)
+	// Fix bad url
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	require.NoError(t, err)
+	// Try again, thus also testing if the server is still around
+	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	require.NoError(t, err)
+	// test to assure AC1/AC2/SYS where pushed
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, len(filesPre), 2)
 }
