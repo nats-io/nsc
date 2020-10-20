@@ -148,10 +148,10 @@ func (p *PullParams) Validate(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if oc.AccountServerURL == "" && len(oc.OperatorServiceURLs) == 0 {
-		return fmt.Errorf("operator %q doesn't set account server url or operator service url - unable to pull", ctx.StoreCtx().Operator.Name)
+	if oc.AccountServerURL == "" {
+		return fmt.Errorf("operator %q doesn't set account server url - unable to pull", ctx.StoreCtx().Operator.Name)
 	}
-	if oc.AccountServerURL == "" && len(oc.OperatorServiceURLs) > 0 && !p.All {
+	if IsNatsUrl(oc.AccountServerURL ) && !p.All {
 		return fmt.Errorf("operator %q can only pull all jwt - unable to pull by account", ctx.StoreCtx().Operator.Name)
 	}
 	return nil
@@ -234,15 +234,18 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
 		r.AddError("could not read operator claim: %v", err)
 		return r, err
-	} else if op.AccountServerURL == "" && op.SystemAccount != "" && len(op.OperatorServiceURLs) != 0 {
+	}else if op.AccountServerURL == "" {
+		err := fmt.Errorf("operator has no account server url")
+		r.AddError("operator %s: %v", op.Name, err)
+		return r, err
+	} else if url:= op.AccountServerURL; IsNatsUrl(url) {
 		subR := store.NewReport(store.OK, `pull from cluster using system account`)
 		r.Add(subR)
-		_, _, opt, err := systemAccountUser(ctx, "")
+		_, _, opt, err := getSystemAccountUser(ctx, "", "")
 		if err != nil {
 			subR.AddError("failed to obtain system user: %v", err)
 			return r, nil
 		}
-		url := strings.Join(op.OperatorServiceURLs, ",")
 		nc, err := nats.Connect(url, opt, nats.Name("nsc-client"))
 		if err != nil {
 			subR.AddError("failed to connect to %s: %v", url, err)

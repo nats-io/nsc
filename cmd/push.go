@@ -46,9 +46,13 @@ push -P -A (all accounts)`,
 		},
 	}
 	cmd.Flags().BoolVarP(&params.allAccounts, "all", "A", false, "push all accounts under the current operator (exclusive of -a)")
-	cmd.Flags().BoolVarP(&params.prune, "prune", "P", false, "prune all accounts not under the current operator (exclusive of -a). Only works with nats based resolver.")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "push regardless of validation issues")
 	cmd.Flags().StringVarP(&params.ASU, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https/nats urls supported if updating with nsc) If a nats url is provided ")
+
+	cmd.Flags().BoolVarP(&params.prune, "prune", "P", false, "prune all accounts not under the current operator (exclusive of -a). Only works with nats-resolver enabled nats-server.")
+	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server.")
+	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server.")
+
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -93,23 +97,33 @@ func processResponse(report *store.Report, resp *nats.Msg) (bool, string, interf
 	return false, "", nil
 }
 
-func systemAccountUser(ctx ActionCtx, sysAccUserName string) (string, string, nats.Option, error) {
+// when sysAccName or sysAccUserName are "" we will try to find a suitable user
+func getSystemAccountUser(ctx ActionCtx, sysAccName string, sysAccUserName string) (string, string, nats.Option, error) {
 	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
 		return "", "", nil, err
 	} else if accNames, err := friendlyNames(ctx.StoreCtx().Operator.Name); err != nil {
 		return "", "", nil, err
-	} else if sysAccName, ok := accNames[op.SystemAccount]; !ok {
-		return "", "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
-	} else {
-		if sysAccUserName == "" {
-			sysAccUserName = "sys"
+	} else if sysAccName == "" {
+		if sysAccName, _ = accNames[op.SystemAccount]; sysAccName == "" {
+			return "", "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
 		}
-		if claim, err := ctx.StoreCtx().Store.ReadUserClaim(sysAccName, sysAccUserName); err != nil {
+	}
+	users := []string{sysAccUserName}
+	if sysAccUserName == "" {
+		var err error
+		if users, err = ctx.StoreCtx().Store.ListEntries(store.Accounts, sysAccName, store.Users); err != nil {
 			return "", "", nil, err
+		} else if len(users) == 0 {
+			return "", "", nil, err
+		}
+	}
+	for _, sysUser := range users {
+		if claim, err := ctx.StoreCtx().Store.ReadUserClaim(sysAccName, sysUser); err != nil {
+			continue
 		} else if kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(claim.Subject); err != nil {
-			return "", "", nil, err
-		} else if theJWT, err := ctx.StoreCtx().Store.ReadRawUserClaim(sysAccName, sysAccUserName); err != nil {
-			return "", "", nil, err
+			continue
+		} else if theJWT, err := ctx.StoreCtx().Store.ReadRawUserClaim(sysAccName, sysUser); err != nil {
+			continue
 		} else {
 			jwtCb := func() (string, error) {
 				return string(theJWT), nil
@@ -117,40 +131,30 @@ func systemAccountUser(ctx ActionCtx, sysAccUserName string) (string, string, na
 			signCb := func(nonce []byte) ([]byte, error) {
 				return kp.Sign(nonce)
 			}
-			return sysAccName, sysAccUserName, nats.UserJWT(jwtCb, signCb), nil
+			return sysAccName, sysUser, nats.UserJWT(jwtCb, signCb), nil
 		}
 	}
-}
-
-func isHttpUrl(url string) bool {
-	url = strings.ToLower(strings.TrimSpace(url))
-	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") ||
-		strings.Contains(url, ",http://") || strings.Contains(url, ",https://")
+	return "", "", nil, fmt.Errorf(`no system account user found`)
 }
 
 func (p *PushCmdParams) SetDefaults(ctx ActionCtx) error {
 	if p.allAccounts && p.Name != "" {
 		return errors.New("specify only one of --account or --all-accounts")
 	}
-
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}
-	if p.ASU == "" || !isHttpUrl(p.ASU) {
-		op, err := ctx.StoreCtx().Store.ReadOperatorClaim()
-		if err != nil {
+	if p.ASU == "" {
+		if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
 			return err
-		}
-		if p.ASU == "" {
+		} else {
 			p.ASU = op.AccountServerURL
 		}
-		if op.SystemAccount != "" && op.AccountServerURL == "" {
-			if p.ASU == "" {
-				p.ASU = strings.Join(op.OperatorServiceURLs, ",")
-			}
-			if p.sysAcc, p.sysAccUser, p.sysAccUserJwtOpt, err = systemAccountUser(ctx, ""); err != nil {
-				return err
-			}
+	}
+	if IsNatsUrl(p.ASU) {
+		var err error
+		if p.sysAcc, p.sysAccUser, p.sysAccUserJwtOpt, err = getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser); err != nil {
+			return err
 		}
 	}
 	c := GetConfig()
@@ -212,10 +216,16 @@ func (p *PushCmdParams) PreInteractive(ctx ActionCtx) error {
 	if p.ASU, err = cli.Prompt("Account Server URL or nats-resolver enabled nats-server URL", p.ASU, cli.Val(p.validURL)); err != nil {
 		return err
 	}
-	if p.sysAcc != "" && !isHttpUrl(p.ASU) {
-		p.sysAccUser, err = ctx.StoreCtx().PickUser(p.sysAcc)
+	if IsNatsUrl(p.ASU) {
+		if p.sysAcc == "" {
+			if p.sysAcc, err = ctx.StoreCtx().PickAccount(p.sysAcc); err != nil {
+				return err
+			}
+		}
+		if p.sysAccUser == "" {
+			p.sysAccUser, err = ctx.StoreCtx().PickUser(p.sysAcc)
+		}
 	}
-
 	return err
 }
 
@@ -333,7 +343,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	r := store.NewDetailedReport(true)
-	if p.sysAccUser == "" {
+	if !IsNatsUrl(p.ASU) {
 		for _, v := range p.targeted {
 			sub := store.NewReport(store.OK, "push %s to account server", v)
 			sub.Opt = store.DetailsOnErrorOrWarning
@@ -350,7 +360,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			}
 		}
 	} else {
-		sysAcc, sysAccUser, opt, err := systemAccountUser(ctx, p.sysAccUser)
+		sysAcc, sysAccUser, opt, err := getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser)
 		if err != nil {
 			r.AddError("error obtaining system account user: %v", err)
 			return r, nil
@@ -415,9 +425,17 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			if len(deleteList) == 0 {
 				subPrune.AddOK("nothing to prune")
 			} else {
-				subPrune.AddOK("pruning %d accounts", len(deleteList))
-				deleteMsg := []byte(strings.Join(deleteList, "\n"))
-				respPrune := multiRequest(nc, subPrune, "prune accounts", "$SYS.REQ.CLAIMS.DELETE", deleteMsg,
+				opPk := ctx.StoreCtx().Operator.PublicKey
+				okp, err := ctx.StoreCtx().KeyStore.GetKeyPair(opPk)
+				if okp == nil {
+					subPrune.AddError("Operator private key needed to prune (err:%v)", err)
+					return r, nil
+				}
+				defer okp.Wipe()
+				claim := jwt.NewGenericClaims(opPk)
+				claim.Data["accounts"] = deleteList
+				pruneJwt, err := claim.Encode(okp)
+				respPrune := multiRequest(nc, subPrune, "prune accounts", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt),
 					func(srv string, data interface{}) {
 						if data, ok := data.(map[string]interface{}); ok {
 							subPrune.AddOK("pruned nats-server %s: %s", srv, data["message"])

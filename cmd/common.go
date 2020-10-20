@@ -459,6 +459,11 @@ func OperatorJwtURL(oc *jwt.OperatorClaims) (string, error) {
 	return OperatorJwtURLFromString(oc.AccountServerURL)
 }
 
+func IsNatsUrl(url string) bool {
+	url = strings.ToLower(strings.TrimSpace(url))
+	return strings.HasPrefix(url, "nats://") || strings.HasPrefix(url, ",nats://")
+}
+
 func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
 	pk, err := kp.PublicKey()
 	if err != nil {

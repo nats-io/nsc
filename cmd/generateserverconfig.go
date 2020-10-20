@@ -37,6 +37,7 @@ func createServerConfigCmd() *cobra.Command {
 		Example: `nsc generate config --mem-resolver
 nsc generate config --mem-resolver --config-file <outfile>
 nsc generate config --mem-resolver --config-file <outfile> --force
+nsc generate config --nats-resolver
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {

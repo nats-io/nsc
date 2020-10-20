@@ -179,7 +179,7 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
 	// only after server start as ports are not yet known in tests
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--service-url", ports.Nats[0])
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createPullCmd(), "--all")
 	require.NoError(t, err)
