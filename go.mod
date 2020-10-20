@@ -14,9 +14,9 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jwt v1.0.1
-	github.com/nats-io/nats-server/v2 v2.0.1-0.20190625001713-2db76bde3329
-	github.com/nats-io/nats.go v1.8.1
-	github.com/nats-io/nkeys v0.1.4
+	github.com/nats-io/nats-server/v2 v2.1.8-0.20201020210511-496d18468a7d
+	github.com/nats-io/nats.go v1.10.1-0.20200606002146-fc6fed82929a
+	github.com/nats-io/nkeys v0.2.0
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
@@ -29,7 +29,6 @@ require (
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
-	golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e // indirect
 	golang.org/x/text v0.3.2 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )

@@ -1,4 +1,4 @@
-// Copyright 2012-2018 The NATS Authors
+// Copyright 2012-2019 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,11 +15,17 @@ package server
 
 import (
 	"crypto/tls"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
+	"fmt"
 	"net"
+	"regexp"
 	"strings"
+	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nats-server/v2/internal/ldap"
 	"github.com/nats-io/nkeys"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -44,18 +50,20 @@ type ClientAuthentication interface {
 
 // NkeyUser is for multiple nkey based users
 type NkeyUser struct {
-	Nkey        string       `json:"user"`
-	Permissions *Permissions `json:"permissions,omitempty"`
-	Account     *Account     `json:"account,omitempty"`
-	SigningKey  string       `json:"signing_key,omitempty"`
+	Nkey                   string              `json:"user"`
+	Permissions            *Permissions        `json:"permissions,omitempty"`
+	Account                *Account            `json:"account,omitempty"`
+	SigningKey             string              `json:"signing_key,omitempty"`
+	AllowedConnectionTypes map[string]struct{} `json:"connection_types,omitempty"`
 }
 
 // User is for multiple accounts/users.
 type User struct {
-	Username    string       `json:"user"`
-	Password    string       `json:"password"`
-	Permissions *Permissions `json:"permissions,omitempty"`
-	Account     *Account     `json:"account,omitempty"`
+	Username               string              `json:"user"`
+	Password               string              `json:"password"`
+	Permissions            *Permissions        `json:"permissions,omitempty"`
+	Account                *Account            `json:"account,omitempty"`
+	AllowedConnectionTypes map[string]struct{} `json:"connection_types,omitempty"`
 }
 
 // clone performs a deep copy of the User struct, returning a new clone with
@@ -89,11 +97,19 @@ type SubjectPermission struct {
 	Deny  []string `json:"deny,omitempty"`
 }
 
+// ResponsePermission can be used to allow responses to any reply subject
+// that is received on a valid subscription.
+type ResponsePermission struct {
+	MaxMsgs int           `json:"max"`
+	Expires time.Duration `json:"ttl"`
+}
+
 // Permissions are the allowed subjects on a per
 // publish or subscribe basis.
 type Permissions struct {
-	Publish   *SubjectPermission `json:"publish"`
-	Subscribe *SubjectPermission `json:"subscribe"`
+	Publish   *SubjectPermission  `json:"publish"`
+	Subscribe *SubjectPermission  `json:"subscribe"`
+	Response  *ResponsePermission `json:"responses,omitempty"`
 }
 
 // RoutePermissions are similar to user permissions
@@ -134,6 +150,12 @@ func (p *Permissions) clone() *Permissions {
 	if p.Subscribe != nil {
 		clone.Subscribe = p.Subscribe.clone()
 	}
+	if p.Response != nil {
+		clone.Response = &ResponsePermission{
+			MaxMsgs: p.Response.MaxMsgs,
+			Expires: p.Response.Expires,
+		}
+	}
 	return clone
 }
 
@@ -158,35 +180,58 @@ func (s *Server) checkAuthforWarnings() {
 	}
 	if warn {
 		// Warning about using plaintext passwords.
-		s.Warnf("Plaintext passwords detected, use nkeys or bcrypt.")
+		s.Warnf("Plaintext passwords detected, use nkeys or bcrypt")
 	}
 }
 
-// If opts.Users or opts.Nkeys have definitions without an account
-// defined assign them to the default global account.
+// If Users or Nkeys options have definitions without an account defined,
+// assign them to the default global account.
 // Lock should be held.
-func (s *Server) assignGlobalAccountToOrphanUsers() {
-	for _, u := range s.users {
+func (s *Server) assignGlobalAccountToOrphanUsers(nkeys map[string]*NkeyUser, users map[string]*User) {
+	for _, u := range users {
 		if u.Account == nil {
 			u.Account = s.gacc
 		}
 	}
-	for _, u := range s.nkeys {
+	for _, u := range nkeys {
 		if u.Account == nil {
 			u.Account = s.gacc
 		}
+	}
+}
+
+// If the given permissions has a ResponsePermission
+// set, ensure that defaults are set (if values are 0)
+// and that a Publish permission is set, and Allow
+// is disabled if not explicitly set.
+func validateResponsePermissions(p *Permissions) {
+	if p == nil || p.Response == nil {
+		return
+	}
+	if p.Publish == nil {
+		p.Publish = &SubjectPermission{}
+	}
+	if p.Publish.Allow == nil {
+		// We turn off the blanket allow statement.
+		p.Publish.Allow = []string{}
+	}
+	// If there is a response permission, ensure
+	// that if value is 0, we set the default value.
+	if p.Response.MaxMsgs == 0 {
+		p.Response.MaxMsgs = DEFAULT_ALLOW_RESPONSE_MAX_MSGS
+	}
+	if p.Response.Expires == 0 {
+		p.Response.Expires = DEFAULT_ALLOW_RESPONSE_EXPIRATION
 	}
 }
 
 // configureAuthorization will do any setup needed for authorization.
 // Lock is assumed held.
 func (s *Server) configureAuthorization() {
-	if s.opts == nil {
+	opts := s.getOpts()
+	if opts == nil {
 		return
 	}
-
-	// Snapshot server options.
-	opts := s.getOpts()
 
 	// Check for multiple users first
 	// This just checks and sets up the user map if we have multiple users.
@@ -195,39 +240,62 @@ func (s *Server) configureAuthorization() {
 	} else if len(s.trustedKeys) > 0 {
 		s.info.AuthRequired = true
 	} else if opts.Nkeys != nil || opts.Users != nil {
-		// Support both at the same time.
-		if opts.Nkeys != nil {
-			s.nkeys = make(map[string]*NkeyUser)
-			for _, u := range opts.Nkeys {
-				copy := u.clone()
-				if u.Account != nil {
-					if v, ok := s.accounts.Load(u.Account.Name); ok {
-						copy.Account = v.(*Account)
-					}
-				}
-				s.nkeys[u.Nkey] = copy
-			}
-		}
-		if opts.Users != nil {
-			s.users = make(map[string]*User)
-			for _, u := range opts.Users {
-				copy := u.clone()
-				if u.Account != nil {
-					if v, ok := s.accounts.Load(u.Account.Name); ok {
-						copy.Account = v.(*Account)
-					}
-				}
-				s.users[u.Username] = copy
-			}
-		}
-		s.assignGlobalAccountToOrphanUsers()
+		s.nkeys, s.users = s.buildNkeysAndUsersFromOptions(opts.Nkeys, opts.Users)
 		s.info.AuthRequired = true
 	} else if opts.Username != "" || opts.Authorization != "" {
 		s.info.AuthRequired = true
 	} else {
 		s.users = nil
+		s.nkeys = nil
 		s.info.AuthRequired = false
 	}
+
+	// Do similar for websocket config
+	s.wsConfigAuth(&opts.Websocket)
+}
+
+// Takes the given slices of NkeyUser and User options and build
+// corresponding maps used by the server. The users are cloned
+// so that server does not reference options.
+// The global account is assigned to users that don't have an
+// existing account.
+// Server lock is held on entry.
+func (s *Server) buildNkeysAndUsersFromOptions(nko []*NkeyUser, uo []*User) (map[string]*NkeyUser, map[string]*User) {
+	var nkeys map[string]*NkeyUser
+	var users map[string]*User
+
+	if nko != nil {
+		nkeys = make(map[string]*NkeyUser, len(nko))
+		for _, u := range nko {
+			copy := u.clone()
+			if u.Account != nil {
+				if v, ok := s.accounts.Load(u.Account.Name); ok {
+					copy.Account = v.(*Account)
+				}
+			}
+			if copy.Permissions != nil {
+				validateResponsePermissions(copy.Permissions)
+			}
+			nkeys[u.Nkey] = copy
+		}
+	}
+	if uo != nil {
+		users = make(map[string]*User, len(uo))
+		for _, u := range uo {
+			copy := u.clone()
+			if u.Account != nil {
+				if v, ok := s.accounts.Load(u.Account.Name); ok {
+					copy.Account = v.(*Account)
+				}
+			}
+			if copy.Permissions != nil {
+				validateResponsePermissions(copy.Permissions)
+			}
+			users[u.Username] = copy
+		}
+	}
+	s.assignGlobalAccountToOrphanUsers(nkeys, users)
+	return nkeys, users
 }
 
 // checkAuthentication will check based on client type and
@@ -250,23 +318,19 @@ func (s *Server) checkAuthentication(c *client) bool {
 // isClientAuthorized will check the client against the proper authorization method and data.
 // This could be nkey, token, or username/password based.
 func (s *Server) isClientAuthorized(c *client) bool {
-	// Snapshot server options by hand and only grab what we really need.
-	s.optsMu.RLock()
-	customClientAuthentication := s.opts.CustomClientAuthentication
-	authorization := s.opts.Authorization
-	username := s.opts.Username
-	password := s.opts.Password
-	tlsMap := s.opts.TLSMap
-	s.optsMu.RUnlock()
+	opts := s.getOpts()
 
 	// Check custom auth first, then jwts, then nkeys, then
 	// multiple users with TLS map if enabled, then token,
 	// then single user/pass.
-	if customClientAuthentication != nil {
-		return customClientAuthentication.Check(c)
+	if opts.CustomClientAuthentication != nil {
+		return opts.CustomClientAuthentication.Check(c)
 	}
 
-	// Grab under lock but process after.
+	return s.processClientOrLeafAuthentication(c, opts)
+}
+
+func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) bool {
 	var (
 		nkey *NkeyUser
 		juc  *jwt.UserClaims
@@ -274,14 +338,49 @@ func (s *Server) isClientAuthorized(c *client) bool {
 		user *User
 		ok   bool
 		err  error
+		ao   bool // auth override
 	)
-
 	s.mu.Lock()
 	authRequired := s.info.AuthRequired
+	// c.ws is immutable, but may need lock if we get race reports.
+	if !authRequired && c.ws != nil {
+		// If no auth required for regular clients, then check if
+		// we have an override for websocket clients.
+		authRequired = s.websocket.authOverride
+	}
 	if !authRequired {
 		// TODO(dlc) - If they send us credentials should we fail?
 		s.mu.Unlock()
 		return true
+	}
+	var (
+		username   string
+		password   string
+		token      string
+		noAuthUser string
+	)
+	tlsMap := opts.TLSMap
+	if c.ws != nil {
+		wo := &opts.Websocket
+		// Always override TLSMap.
+		tlsMap = wo.TLSMap
+		// The rest depends on if there was any auth override in
+		// the websocket's config.
+		if s.websocket.authOverride {
+			noAuthUser = wo.NoAuthUser
+			username = wo.Username
+			password = wo.Password
+			token = wo.Token
+			ao = true
+		}
+	} else if c.kind == LEAF {
+		tlsMap = opts.LeafNode.TLSMap
+	}
+	if !ao {
+		noAuthUser = opts.NoAuthUser
+		username = opts.Username
+		password = opts.Password
+		token = opts.Authorization
 	}
 
 	// Check if we have trustedKeys defined in the server. If so we require a user jwt.
@@ -308,43 +407,75 @@ func (s *Server) isClientAuthorized(c *client) bool {
 	}
 
 	// Check if we have nkeys or users for client.
-	hasNkeys := s.nkeys != nil
-	hasUsers := s.users != nil
+	hasNkeys := len(s.nkeys) > 0
+	hasUsers := len(s.users) > 0
 	if hasNkeys && c.opts.Nkey != "" {
 		nkey, ok = s.nkeys[c.opts.Nkey]
-		if !ok {
+		if !ok || !c.connectionTypeAllowed(nkey.AllowedConnectionTypes) {
 			s.mu.Unlock()
 			return false
 		}
 	} else if hasUsers {
-		// Check if we are tls verify and are mapping users from the client_certificate
+		// Check if we are tls verify and are mapping users from the client_certificate.
 		if tlsMap {
-			var euser string
-			authorized := checkClientTLSCertSubject(c, func(u string) bool {
-				var ok bool
-				user, ok = s.users[u]
-				if !ok {
-					c.Debugf("User in cert [%q], not found", u)
-					return false
+			authorized := checkClientTLSCertSubject(c, func(u string, certRDN *ldap.DN) (string, bool) {
+				// First do literal lookup using the resulting string representation
+				// of RDNSequence as implemented by the pkix package from Go.
+				if u != "" {
+					usr, ok := s.users[u]
+					if !ok || !c.connectionTypeAllowed(usr.AllowedConnectionTypes) {
+						return "", ok
+					}
+					user = usr
+					return usr.Username, ok
 				}
-				euser = u
-				return true
+
+				if certRDN == nil {
+					return "", false
+				}
+
+				// Look through the accounts for an RDN that is equal to the one
+				// presented by the certificate.
+				for _, usr := range s.users {
+					if !c.connectionTypeAllowed(usr.AllowedConnectionTypes) {
+						continue
+					}
+					// TODO: Use this utility to make a full validation pass
+					// on start in case tlsmap feature is being used.
+					inputRDN, err := ldap.ParseDN(usr.Username)
+					if err != nil {
+						continue
+					}
+					if inputRDN.Equal(certRDN) {
+						user = usr
+						return usr.Username, true
+					}
+				}
+				return "", false
 			})
 			if !authorized {
 				s.mu.Unlock()
 				return false
 			}
 			if c.opts.Username != "" {
-				s.Warnf("User found in connect proto, but user required from cert - %v", c)
+				s.Warnf("User %q found in connect proto, but user required from cert", c.opts.Username)
 			}
 			// Already checked that the client didn't send a user in connect
 			// but we set it here to be able to identify it in the logs.
-			c.opts.Username = euser
-		} else if c.opts.Username != "" {
-			user, ok = s.users[c.opts.Username]
-			if !ok {
-				s.mu.Unlock()
-				return false
+			c.opts.Username = user.Username
+		} else {
+			if c.kind == CLIENT && c.opts.Username == "" && noAuthUser != "" {
+				if u, exists := s.users[noAuthUser]; exists {
+					c.opts.Username = u.Username
+					c.opts.Password = u.Password
+				}
+			}
+			if c.opts.Username != "" {
+				user, ok = s.users[c.opts.Username]
+				if !ok || !c.connectionTypeAllowed(user.AllowedConnectionTypes) {
+					s.mu.Unlock()
+					return false
+				}
 			}
 		}
 	}
@@ -353,6 +484,34 @@ func (s *Server) isClientAuthorized(c *client) bool {
 	// If we have a jwt and a userClaim, make sure we have the Account, etc associated.
 	// We need to look up the account. This will use an account resolver if one is present.
 	if juc != nil {
+		allowedConnTypes, err := convertAllowedConnectionTypes(juc.AllowedConnectionTypes)
+		if err != nil {
+			// We got an error, which means some connection types were unknown. As long as
+			// a valid one is returned, we proceed with auth. If not, we have to reject.
+			// In other words, suppose that JWT allows "WEBSOCKET" in the array. No error
+			// is returned and allowedConnTypes will contain "WEBSOCKET" only.
+			// Client will be rejected if not a websocket client, or proceed with rest of
+			// auth if it is.
+			// Now suppose JWT allows "WEBSOCKET, MQTT" and say MQTT is not known by this
+			// server. In this case, allowedConnTypes would contain "WEBSOCKET" and we
+			// would get `err` indicating that "MQTT" is an unknown connection type.
+			// If a websocket client connects, it should still be allowed, since after all
+			// the admin wanted to allow websocket and mqtt connection types.
+			// However, say that the JWT only allows "MQTT" (and again suppose this server
+			// does not know about MQTT connection type), then since the allowedConnTypes
+			// map would be empty (no valid types found), and since empty means allow-all,
+			// then we should reject because the intent was to allow connections for this
+			// user only as an MQTT client.
+			c.Debugf("%v", err)
+			if len(allowedConnTypes) == 0 {
+				return false
+			}
+			err = nil
+		}
+		if !c.connectionTypeAllowed(allowedConnTypes) {
+			c.Debugf("Connection type not allowed")
+			return false
+		}
 		issuer := juc.Issuer
 		if juc.IssuerAccount != "" {
 			issuer = juc.IssuerAccount
@@ -373,37 +532,59 @@ func (s *Server) isClientAuthorized(c *client) bool {
 			c.Debugf("Account JWT has expired")
 			return false
 		}
-		// Verify the signature against the nonce.
-		if c.opts.Sig == "" {
-			c.Debugf("Signature missing")
-			return false
-		}
-		sig, err := base64.RawURLEncoding.DecodeString(c.opts.Sig)
-		if err != nil {
-			// Allow fallback to normal base64.
-			sig, err = base64.StdEncoding.DecodeString(c.opts.Sig)
+		// skip validation of nonce when presented with a bearer token
+		// FIXME: if BearerToken is only for WSS, need check for server with that port enabled
+		if !juc.BearerToken {
+			// Verify the signature against the nonce.
+			if c.opts.Sig == "" {
+				c.Debugf("Signature missing")
+				return false
+			}
+			sig, err := base64.RawURLEncoding.DecodeString(c.opts.Sig)
 			if err != nil {
-				c.Debugf("Signature not valid base64")
+				// Allow fallback to normal base64.
+				sig, err = base64.StdEncoding.DecodeString(c.opts.Sig)
+				if err != nil {
+					c.Debugf("Signature not valid base64")
+					return false
+				}
+			}
+			pub, err := nkeys.FromPublicKey(juc.Subject)
+			if err != nil {
+				c.Debugf("User nkey not valid: %v", err)
+				return false
+			}
+			if err := pub.Verify(c.nonce, sig); err != nil {
+				c.Debugf("Signature not verified")
 				return false
 			}
 		}
-		pub, err := nkeys.FromPublicKey(juc.Subject)
-		if err != nil {
-			c.Debugf("User nkey not valid: %v", err)
+		if acc.checkUserRevoked(juc.Subject, juc.IssuedAt) {
+			c.Debugf("User authentication revoked")
 			return false
 		}
-		if err := pub.Verify(c.nonce, sig); err != nil {
-			c.Debugf("Signature not verified")
+		if !validateSrc(juc, c.host) {
+			c.Errorf("Bad src Ip %s", c.host)
 			return false
 		}
-		nkey = buildInternalNkeyUser(juc, acc)
-		c.RegisterNkeyUser(nkey)
+		allowNow, validFor := validateTimes(juc)
+		if !allowNow {
+			c.Errorf("Outside connect times")
+			return false
+		}
+
+		nkey = buildInternalNkeyUser(juc, allowedConnTypes, acc)
+		if err := c.RegisterNkeyUser(nkey); err != nil {
+			return false
+		}
+		// Hold onto the user's public key.
+		c.pubKey = juc.Subject
 
 		// Generate an event if we have a system account.
 		s.accountConnectEvent(c)
 
 		// Check if we need to set an auth timer if the user jwt expires.
-		c.checkExpiration(juc.Claims())
+		c.setExpiration(juc.Claims(), validFor)
 		return true
 	}
 
@@ -430,33 +611,65 @@ func (s *Server) isClientAuthorized(c *client) bool {
 			c.Debugf("Signature not verified")
 			return false
 		}
-		c.RegisterNkeyUser(nkey)
+		if err := c.RegisterNkeyUser(nkey); err != nil {
+			return false
+		}
 		return true
 	}
-
 	if user != nil {
 		ok = comparePasswords(user.Password, c.opts.Password)
 		// If we are authorized, register the user which will properly setup any permissions
 		// for pub/sub authorizations.
 		if ok {
 			c.RegisterUser(user)
+			// Generate an event if we have a system account and this is not the $G account.
+			s.accountConnectEvent(c)
 		}
 		return ok
 	}
 
-	if authorization != "" {
-		return comparePasswords(authorization, c.opts.Authorization)
-	} else if username != "" {
-		if username != c.opts.Username {
-			return false
+	if c.kind == CLIENT {
+		if token != "" {
+			return comparePasswords(token, c.opts.Token)
+		} else if username != "" {
+			if username != c.opts.Username {
+				return false
+			}
+			return comparePasswords(password, c.opts.Password)
 		}
-		return comparePasswords(password, c.opts.Password)
+	} else if c.kind == LEAF {
+		// There is no required username/password to connect and
+		// there was no u/p in the CONNECT or none that matches the
+		// know users. Register the leaf connection with global account
+		// or the one specified in config (if provided).
+		return s.registerLeafWithAccount(c, opts.LeafNode.Account)
 	}
-
 	return false
 }
 
-func checkClientTLSCertSubject(c *client, fn func(string) bool) bool {
+func getTLSAuthDCs(rdns *pkix.RDNSequence) string {
+	dcOID := asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}
+	dcs := []string{}
+	for _, rdn := range *rdns {
+		if len(rdn) == 0 {
+			continue
+		}
+		for _, atv := range rdn {
+			value, ok := atv.Value.(string)
+			if !ok {
+				continue
+			}
+			if atv.Type.Equal(dcOID) {
+				dcs = append(dcs, "DC="+value)
+			}
+		}
+	}
+	return strings.Join(dcs, ",")
+}
+
+type tlsMapAuthFn func(string, *ldap.DN) (string, bool)
+
+func checkClientTLSCertSubject(c *client, fn tlsMapAuthFn) bool {
 	tlsState := c.GetTLSConnectionState()
 	if tlsState == nil {
 		c.Debugf("User required in cert, no TLS connection state")
@@ -474,7 +687,8 @@ func checkClientTLSCertSubject(c *client, fn func(string) bool) bool {
 	hasSANs := len(cert.DNSNames) > 0
 	hasEmailAddresses := len(cert.EmailAddresses) > 0
 	hasSubject := len(cert.Subject.String()) > 0
-	if !hasEmailAddresses && !hasSubject {
+	hasURIs := len(cert.URIs) > 0
+	if !hasEmailAddresses && !hasSubject && !hasURIs {
 		c.Debugf("User required in cert, none found")
 		return false
 	}
@@ -482,25 +696,72 @@ func checkClientTLSCertSubject(c *client, fn func(string) bool) bool {
 	switch {
 	case hasEmailAddresses:
 		for _, u := range cert.EmailAddresses {
-			if fn(u) {
-				c.Debugf("Using email found in cert for auth [%q]", u)
+			if match, ok := fn(u, nil); ok {
+				c.Debugf("Using email found in cert for auth [%q]", match)
 				return true
 			}
 		}
 		fallthrough
 	case hasSANs:
 		for _, u := range cert.DNSNames {
-			if fn(u) {
-				c.Debugf("Using SAN found in cert for auth [%q]", u)
+			if match, ok := fn(u, nil); ok {
+				c.Debugf("Using SAN found in cert for auth [%q]", match)
+				return true
+			}
+		}
+		fallthrough
+	case hasURIs:
+		for _, u := range cert.URIs {
+			if match, ok := fn(u.String(), nil); ok {
+				c.Debugf("Using URI found in cert for auth [%q]", match)
 				return true
 			}
 		}
 	}
 
-	// Use the subject of the certificate.
-	u := cert.Subject.String()
-	c.Debugf("Using certificate subject for auth [%q]", u)
-	return fn(u)
+	// Use the string representation of the full RDN Sequence including
+	// the domain components in case there are any.
+	rdn := cert.Subject.ToRDNSequence().String()
+
+	// Match that follows original order from the subject takes precedence.
+	dn, err := ldap.FromCertSubject(cert.Subject)
+	if err == nil {
+		if match, ok := fn("", dn); ok {
+			c.Debugf("Using DistinguishedNameMatch for auth [%q]", match)
+			return true
+		}
+		c.Debugf("DistinguishedNameMatch could not be used for auth [%q]", rdn)
+	}
+
+	var rdns pkix.RDNSequence
+	if _, err := asn1.Unmarshal(cert.RawSubject, &rdns); err == nil {
+		// If found domain components then include roughly following
+		// the order from https://tools.ietf.org/html/rfc2253
+		//
+		// NOTE: The original sequence from string representation by ToRDNSequence does not follow
+		// the correct ordering, so this addition ofdomainComponents would likely be deprecated in
+		// another release in favor of using the correct ordered as parsed by the go-ldap library.
+		//
+		dcs := getTLSAuthDCs(&rdns)
+		if len(dcs) > 0 {
+			u := strings.Join([]string{rdn, dcs}, ",")
+			if match, ok := fn(u, nil); ok {
+				c.Debugf("Using RDNSequence for auth [%q]", match)
+				return true
+			}
+			c.Debugf("RDNSequence could not be used for auth [%q]", u)
+		}
+	}
+
+	// If no match, then use the string representation of the RDNSequence
+	// from the subject without the domainComponents.
+	if match, ok := fn(rdn, nil); ok {
+		c.Debugf("Using certificate subject for auth [%q]", match)
+		return true
+	}
+
+	c.Debugf("User in cert [%q], not found", rdn)
+	return false
 }
 
 // checkRouterAuth checks optional router authorization which can be nil or username/password.
@@ -519,8 +780,8 @@ func (s *Server) isRouterAuthorized(c *client) bool {
 	}
 
 	if opts.Cluster.TLSMap {
-		return checkClientTLSCertSubject(c, func(user string) bool {
-			return opts.Cluster.Username == user
+		return checkClientTLSCertSubject(c, func(user string, _ *ldap.DN) (string, bool) {
+			return "", opts.Cluster.Username == user
 		})
 	}
 
@@ -543,8 +804,8 @@ func (s *Server) isGatewayAuthorized(c *client) bool {
 
 	// Check whether TLS map is enabled, otherwise use single user/pass.
 	if opts.Gateway.TLSMap {
-		return checkClientTLSCertSubject(c, func(user string) bool {
-			return opts.Gateway.Username == user
+		return checkClientTLSCertSubject(c, func(user string, _ *ldap.DN) (string, bool) {
+			return "", opts.Gateway.Username == user
 		})
 	}
 
@@ -554,120 +815,98 @@ func (s *Server) isGatewayAuthorized(c *client) bool {
 	return comparePasswords(opts.Gateway.Password, c.opts.Password)
 }
 
-// isLeafNodeAuthorized will check for auth for an inbound leaf node connection.
-func (s *Server) isLeafNodeAuthorized(c *client) bool {
-	// FIXME(dlc) - This is duplicated from client auth, should be able to combine
-	// and not fail so bad on DRY.
-
-	// Grab under lock but process after.
-	var (
-		juc *jwt.UserClaims
-		acc *Account
-		err error
-	)
-
-	s.mu.Lock()
-
-	// Check if we have trustedKeys defined in the server. If so we require a user jwt.
-	if s.trustedKeys != nil {
-		if c.opts.JWT == "" {
-			s.mu.Unlock()
-			c.Debugf("Authentication requires a user JWT")
-			return false
-		}
-		// So we have a valid user jwt here.
-		juc, err = jwt.DecodeUserClaims(c.opts.JWT)
+func (s *Server) registerLeafWithAccount(c *client, account string) bool {
+	var err error
+	acc := s.globalAccount()
+	if account != _EMPTY_ {
+		acc, err = s.lookupAccount(account)
 		if err != nil {
-			s.mu.Unlock()
-			c.Debugf("User JWT not valid: %v", err)
-			return false
-		}
-		vr := jwt.CreateValidationResults()
-		juc.Validate(vr)
-		if vr.IsBlocking(true) {
-			s.mu.Unlock()
-			c.Debugf("User JWT no longer valid: %+v", vr)
+			s.Errorf("authentication of user %q failed, unable to lookup account %q: %v",
+				c.opts.Username, account, err)
 			return false
 		}
 	}
-	s.mu.Unlock()
-
-	// If we have a jwt and a userClaim, make sure we have the Account, etc associated.
-	// We need to look up the account. This will use an account resolver if one is present.
-	if juc != nil {
-		if acc, _ = s.LookupAccount(juc.Issuer); acc == nil {
-			c.Debugf("Account JWT can not be found")
-			return false
-		}
-		if !s.isTrustedIssuer(acc.Issuer) {
-			c.Debugf("Account JWT not signed by trusted operator")
-			return false
-		}
-		if acc.IsExpired() {
-			c.Debugf("Account JWT has expired")
-			return false
-		}
-		// Verify the signature against the nonce.
-		if c.opts.Sig == "" {
-			c.Debugf("Signature missing")
-			return false
-		}
-		sig, err := base64.RawURLEncoding.DecodeString(c.opts.Sig)
-		if err != nil {
-			// Allow fallback to normal base64.
-			sig, err = base64.StdEncoding.DecodeString(c.opts.Sig)
-			if err != nil {
-				c.Debugf("Signature not valid base64")
-				return false
-			}
-		}
-		pub, err := nkeys.FromPublicKey(juc.Subject)
-		if err != nil {
-			c.Debugf("User nkey not valid: %v", err)
-			return false
-		}
-		if err := pub.Verify(c.nonce, sig); err != nil {
-			c.Debugf("Signature not verified")
-			return false
-		}
-
-		nkey := buildInternalNkeyUser(juc, acc)
-		if err := c.RegisterNkeyUser(nkey); err != nil {
-			return false
-		}
-
-		// Generate an event if we have a system account.
-		s.accountConnectEvent(c)
-
-		// Check if we need to set an auth timer if the user jwt expires.
-		c.checkExpiration(juc.Claims())
-		return true
-	}
-
-	// FIXME(dlc) - Add ability to support remote account bindings via
-	// other auth like user or nkey and tlsMapping.
-
-	// For now this means we are binding the leafnode to the global account.
-	c.registerWithAccount(s.globalAccount())
-
-	// Snapshot server options.
-	opts := s.getOpts()
-
-	if opts.LeafNode.Username == "" {
-		return true
-	}
-	if opts.LeafNode.Username != c.opts.Username {
+	if err = c.registerWithAccount(acc); err != nil {
 		return false
 	}
-	return comparePasswords(opts.LeafNode.Password, c.opts.Password)
+	return true
+}
+
+// isLeafNodeAuthorized will check for auth for an inbound leaf node connection.
+func (s *Server) isLeafNodeAuthorized(c *client) bool {
+	opts := s.getOpts()
+
+	isAuthorized := func(username, password, account string) bool {
+		if username != c.opts.Username {
+			return false
+		}
+		if !comparePasswords(password, c.opts.Password) {
+			return false
+		}
+		return s.registerLeafWithAccount(c, account)
+	}
+
+	// If leafnodes config has an authorization{} stanza, this takes precedence.
+	// The user in CONNECT mutch match. We will bind to the account associated
+	// with that user (from the leafnode's authorization{} config).
+	if opts.LeafNode.Username != _EMPTY_ {
+		return isAuthorized(opts.LeafNode.Username, opts.LeafNode.Password, opts.LeafNode.Account)
+	} else if len(opts.LeafNode.Users) > 0 {
+		if opts.LeafNode.TLSMap {
+			var user *User
+			found := checkClientTLSCertSubject(c, func(u string, _ *ldap.DN) (string, bool) {
+				// This is expected to be a very small array.
+				for _, usr := range opts.LeafNode.Users {
+					if u == usr.Username {
+						user = usr
+						return u, true
+					}
+				}
+				return "", false
+			})
+			if !found {
+				return false
+			}
+			if c.opts.Username != "" {
+				s.Warnf("User %q found in connect proto, but user required from cert", c.opts.Username)
+			}
+			c.opts.Username = user.Username
+			// This will authorize since are using an existing user,
+			// but it will also register with proper account.
+			return isAuthorized(user.Username, user.Password, user.Account.GetName())
+		}
+
+		// This is expected to be a very small array.
+		for _, u := range opts.LeafNode.Users {
+			if u.Username == c.opts.Username {
+				var accName string
+				if u.Account != nil {
+					accName = u.Account.Name
+				}
+				return isAuthorized(u.Username, u.Password, accName)
+			}
+		}
+		return false
+	}
+
+	// We are here if we accept leafnode connections without any credentials.
+
+	// Still, if the CONNECT has some user info, we will bind to the
+	// user's account or to the specified default account (if provided)
+	// or to the global account.
+	return s.processClientOrLeafAuthentication(c, opts)
 }
 
 // Support for bcrypt stored passwords and tokens.
-const bcryptPrefix = "$2a$"
+var validBcryptPrefix = regexp.MustCompile(`^\$2[a,b,x,y]{1}\$\d{2}\$.*`)
 
 // isBcrypt checks whether the given password or token is bcrypted.
 func isBcrypt(password string) bool {
-	return strings.HasPrefix(password, bcryptPrefix)
+	if strings.HasPrefix(password, "$") {
+		return validBcryptPrefix.MatchString(password)
+	}
+
+	return false
 }
 
 func comparePasswords(serverPassword, clientPassword string) bool {
@@ -680,4 +919,54 @@ func comparePasswords(serverPassword, clientPassword string) bool {
 		return false
 	}
 	return true
+}
+
+func validateAuth(o *Options) error {
+	for _, u := range o.Users {
+		if err := validateAllowedConnectionTypes(u.AllowedConnectionTypes); err != nil {
+			return err
+		}
+	}
+	for _, u := range o.Nkeys {
+		if err := validateAllowedConnectionTypes(u.AllowedConnectionTypes); err != nil {
+			return err
+		}
+	}
+	return validateNoAuthUser(o, o.NoAuthUser)
+}
+
+func validateAllowedConnectionTypes(m map[string]struct{}) error {
+	for ct := range m {
+		ctuc := strings.ToUpper(ct)
+		switch ctuc {
+		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnode:
+		default:
+			return fmt.Errorf("unknown connection type %q", ct)
+		}
+		if ctuc != ct {
+			delete(m, ct)
+			m[ctuc] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func validateNoAuthUser(o *Options, noAuthUser string) error {
+	if noAuthUser == "" {
+		return nil
+	}
+	if len(o.TrustedOperators) > 0 {
+		return fmt.Errorf("no_auth_user not compatible with Trusted Operator")
+	}
+	if o.Users == nil {
+		return fmt.Errorf(`no_auth_user: "%s" present, but users are not defined`, noAuthUser)
+	}
+	for _, u := range o.Users {
+		if u.Username == noAuthUser {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		`no_auth_user: "%s" not present as user in authorization block or account configuration`,
+		noAuthUser)
 }

@@ -16,7 +16,13 @@
 package cmd
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -65,7 +71,7 @@ func Test_SyncNoURL(t *testing.T) {
 	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
 	t.Log(err.Error())
-	require.Contains(t, err.Error(), "no account server url was provided by the operator jwt")
+	require.Contains(t, err.Error(), "no account server url or nats-server url was provided by the operator jwt")
 }
 
 func Test_SyncNoServer(t *testing.T) {
@@ -126,4 +132,140 @@ func Test_SyncManualServer(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Contains(t, ac.Tags, "a")
+}
+
+func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
+	t.Helper()
+	ts := NewEmptyStore(t)
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	require.NoError(t, err)
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC2")
+	require.NoError(t, err)
+	// modify the generated file so testing becomes easier by knowing where the jwt directory is
+	data, err := ioutil.ReadFile(serverconf)
+	require.NoError(t, err)
+	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	require.NoError(t, err)
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	data = bytes.ReplaceAll(data, []byte(`allow_delete: false`), []byte(fmt.Sprintf(`allow_delete: %t`, del)))
+	err = ioutil.WriteFile(serverconf, data, 0660)
+	require.NoError(t, err)
+	ports := ts.RunServerWithConfig(t, serverconf)
+	require.NotNil(t, ports)
+	// only after server start as ports are not yet known in tests
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	require.NoError(t, err)
+	// test to assure AC1/AC2/SYS where pushed
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, len(filesPre), 3)
+	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "--name", "AC2")
+	require.NoError(t, err)
+	// exists as nsc has a bad default account now (is not pushed, hence not in file counts)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC3")
+	require.NoError(t, err)
+	return dir, filesPre, ts
+}
+
+func Test_SyncNatsResolverDelete(t *testing.T) {
+	dir, filesPre, ts := deleteSetup(t, true)
+	defer os.Remove(dir)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
+	require.NoError(t, err)
+	// test to assure AC1/SYS where pushed/pruned
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(filesPost))
+	// assert only AC1/SYS overlap in pre/post
+	sameCnt := 0
+	for _, f1 := range filesPost {
+		for _, f2 := range filesPre {
+			if f1 == f2 {
+				sameCnt++
+				break
+			}
+		}
+	}
+	require.Equal(t, 2, sameCnt)
+	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt.deleted")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(filesDeleted))
+}
+
+func Test_SyncNatsResolverDeleteSYS(t *testing.T) {
+	dir, filesPre, ts := deleteSetup(t, true)
+	defer os.Remove(dir)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createDeleteAccountCmd(), "--name", "SYS")
+	require.NoError(t, err)
+	// exists as nsc has a bad default account now (is not pushed, hence not in file counts)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC4")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createPushCmd(), "--prune") // will fail as system acc can't be deleted
+	require.Error(t, err)                              // this will actually not hit the server as the system account is already deleted
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(filesPost))
+	require.Equal(t, filesPre, filesPost)
+}
+
+func Test_SyncNatsResolverNoDelete(t *testing.T) {
+	dir, filesPre, ts := deleteSetup(t, false)
+	defer os.Remove(dir)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
+	require.Error(t, err)
+	// test to assure that pruning did not happen
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(filesPost))
+	require.Equal(t, filesPre, filesPost)
+}
+
+func Test_SyncBadUrl(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	require.NoError(t, err)
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	require.NoError(t, err)
+	// modify the generated file so testing becomes easier by knowing where the jwt directory is
+	data, err := ioutil.ReadFile(serverconf)
+	require.NoError(t, err)
+	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	require.NoError(t, err)
+	defer os.Remove(dir)
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	err = ioutil.WriteFile(serverconf, data, 0660)
+	require.NoError(t, err)
+	ports := ts.RunServerWithConfig(t, serverconf)
+	require.NotNil(t, ports)
+	// deliberately test if http push to a nats server kills it or not
+	badUrl := strings.ReplaceAll(ports.Nats[0], "nats://", "http://")
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", badUrl)
+	require.NoError(t, err)
+	_, errOut, err := ExecuteCmd(createPushCmd(), "--all")
+	require.Error(t, err)
+	require.Contains(t, errOut, `Post "`+badUrl)
+	// Fix bad url
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	require.NoError(t, err)
+	// Try again, thus also testing if the server is still around
+	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	require.NoError(t, err)
+	// test to assure AC1/AC2/SYS where pushed
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, len(filesPre), 2)
 }
