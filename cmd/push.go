@@ -376,7 +376,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			r.AddError("error obtaining system account user: %v", err)
 			return r, nil
 		}
-		nc, err := nats.Connect(p.ASU, opt, nats.Name("nsc-client"))
+		nc, err := nats.Connect(p.ASU, createDefaultToolOptions("nsc_push", ctx, opt)...)
 		if err != nil {
 			r.AddError("failed to connect: %v", err)
 			return r, nil

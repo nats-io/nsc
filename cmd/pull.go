@@ -246,7 +246,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 			subR.AddError("failed to obtain system user: %v", err)
 			return r, nil
 		}
-		nc, err := nats.Connect(url, opt, nats.Name("nsc-client"))
+		nc, err := nats.Connect(url, createDefaultToolOptions("nsc_pull", ctx, opt)...)
 		if err != nil {
 			subR.AddError("failed to connect to %s: %v", url, err)
 			return r, nil

@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/jwt"
-
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/jwt"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
 )
 
@@ -35,6 +35,7 @@ import (
 const NscHomeEnv = "NSC_HOME"
 const NscCwdOnlyEnv = "NSC_CWD_ONLY"
 const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
+const NscRootCasNatsEnv = "NATS_CA"
 
 type ToolConfig struct {
 	ContextConfig
@@ -47,6 +48,8 @@ var toolName = strings.ReplaceAll(filepath.Base(os.Args[0]), ".exe", "")
 var config ToolConfig
 var toolHome string
 var homeEnv string
+var rootCAsNats nats.Option // Will be skipped, when nil and passed to a connection
+var rootCAsFile string
 
 func SetToolName(name string) {
 	toolName = name

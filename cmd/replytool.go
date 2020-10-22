@@ -111,9 +111,8 @@ func (p *RepParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *RepParams) Run(ctx ActionCtx) (store.Status, error) {
-	opts := createDefaultToolOptions("nscreply", ctx)
-	opts = append(opts, nats.UserCredentials(p.credsPath))
-	nc, err := nats.Connect(strings.Join(p.natsURLs, ","), opts...)
+	nc, err := nats.Connect(strings.Join(p.natsURLs, ","),
+		createDefaultToolOptions("nsc_reply", ctx, nats.UserCredentials(p.credsPath))...)
 	if err != nil {
 		return nil, err
 	}

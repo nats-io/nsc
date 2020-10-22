@@ -106,9 +106,8 @@ func (p *PubParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *PubParams) Run(ctx ActionCtx) (store.Status, error) {
-	opts := createDefaultToolOptions("nsc_pub", ctx)
-	opts = append(opts, nats.UserCredentials(p.credsPath))
-	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
+	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "),
+		createDefaultToolOptions("nsc_pub", ctx, nats.UserCredentials(p.credsPath))...)
 	if err != nil {
 		return nil, err
 	}

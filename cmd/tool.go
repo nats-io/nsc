@@ -44,13 +44,14 @@ func init() {
 	GetRootCmd().AddCommand(toolCmd)
 }
 
-func createDefaultToolOptions(name string, ctx ActionCtx) []nats.Option {
+func createDefaultToolOptions(name string, ctx ActionCtx, o ...nats.Option) []nats.Option {
 	connectTimeout := 5 * time.Second
 	totalWait := 10 * time.Minute
 	reconnectDelay := 2 * time.Second
 
 	opts := []nats.Option{nats.Name(name)}
 	opts = append(opts, nats.Timeout(connectTimeout))
+	opts = append(opts, rootCAsNats)
 	opts = append(opts, nats.ReconnectWait(reconnectDelay))
 	opts = append(opts, nats.MaxReconnects(int(totalWait/reconnectDelay)))
 	opts = append(opts, nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
@@ -71,6 +72,7 @@ func createDefaultToolOptions(name string, ctx ActionCtx) []nats.Option {
 		}
 		ctx.CurrentCmd().Printf("Exiting, no servers available, or connection closed")
 	}))
+	opts = append(opts, o...)
 	return opts
 }
 
