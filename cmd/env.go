@@ -98,6 +98,9 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
 	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
 	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
+	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
+		"If set, root CAs in the referenced file will be used for nats connections")
+	table.AddRow("", "", "If not set, will default to the system trust store")
 	table.AddSeparator()
 	r := conf.StoreRoot
 	if r == "" {
@@ -107,5 +110,12 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
 	table.AddRow("Default Operator", "", conf.Operator)
 	table.AddRow("Default Account", "", conf.Account)
+	caFile := rootCAsFile
+	if caFile == "" {
+		caFile = "Default: System Trust Store"
+	} else {
+		caFile = "File: " + caFile
+	}
+	table.AddRow("Root CAs to trust", "", caFile)
 	cmd.Println(table.Render())
 }

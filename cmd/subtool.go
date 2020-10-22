@@ -115,9 +115,8 @@ func (p *SubParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
-	opts := createDefaultToolOptions("nscsub", ctx)
-	opts = append(opts, nats.UserCredentials(p.credsPath))
-	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "), opts...)
+	nc, err := nats.Connect(strings.Join(p.natsURLs, ", "),
+		createDefaultToolOptions("nsc_sub", ctx, nats.UserCredentials(p.credsPath))...)
 	if err != nil {
 		return nil, err
 	}

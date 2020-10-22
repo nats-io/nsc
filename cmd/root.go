@@ -21,9 +21,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	cli "github.com/nats-io/cliprompts/v2"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -154,6 +156,10 @@ func SetEnvOptions() {
 	}
 	if _, ok := os.LookupEnv(NscCwdOnlyEnv); ok {
 		NscCwdOnly = true
+	}
+	if f, ok := os.LookupEnv(NscRootCasNatsEnv); ok {
+		rootCAsFile = strings.TrimSpace(f)
+		rootCAsNats = nats.RootCAs(rootCAsFile)
 	}
 }
 

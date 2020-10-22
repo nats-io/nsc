@@ -112,7 +112,7 @@ func TestSub(t *testing.T) {
 	}()
 
 	// wait for client
-	ts.WaitForClient(t, "nscsub", 1, 60*time.Second)
+	ts.WaitForClient(t, "nsc_sub", 1, 60*time.Second)
 
 	// create a conn to the server
 	creds := ts.KeyStore.CalcUserCredsPath("A", "U")
@@ -213,7 +213,7 @@ func TestReply(t *testing.T) {
 	}()
 
 	// wait for client
-	ts.WaitForClient(t, "nscreply", 1, 60*time.Second)
+	ts.WaitForClient(t, "nsc_reply", 1, 60*time.Second)
 
 	// create a conn to the server
 	creds := ts.KeyStore.CalcUserCredsPath("A", "U")
