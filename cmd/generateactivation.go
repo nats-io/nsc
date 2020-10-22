@@ -270,7 +270,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 			return nil, err
 		}
 		if !IsStdOut(p.out) {
-			r.AddOK("wrote account description to %#q", AbbrevHomePaths(p.out))
+			r.AddOK("wrote activation token to %#q", AbbrevHomePaths(p.out))
 		}
 	}
 
