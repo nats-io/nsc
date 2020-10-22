@@ -72,7 +72,7 @@ type AddImportParams struct {
 func (p *AddImportParams) longHelp() string {
 	v := `toolname add import -i
 toolname add import --token <filepath> --local-subject <sub>
-toolname add import --token <some http url> --local-subject <sub>
+toolname add import --token <some-http-url> --local-subject <sub>
 toolname add import --src-account <account_pubkey> --remote-subject <remote-sub> --local-subject <sub>`
 
 	return strings.Replace(v, "toolname", GetToolName(), -1)
