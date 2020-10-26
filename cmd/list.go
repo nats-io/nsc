@@ -212,7 +212,6 @@ func createListUsersCmd() *cobra.Command {
 
 func listEntities(title string, infos []*listEntry, current string) string {
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle(title)
 	if len(infos) == 0 {
 		table.AddRow("No entries defined")

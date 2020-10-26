@@ -41,8 +41,6 @@ func (a *AccountDescriber) Describe() string {
 	var buf bytes.Buffer
 
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
-
 	table.AddTitle("Account Details")
 	AddStandardClaimInfo(table, &a.AccountClaims)
 	table.AddSeparator()
@@ -158,8 +156,6 @@ func toYesNo(tf bool) string {
 
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
-
 	table.AddTitle("Exports")
 	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
 	for _, v := range e.Exports {
@@ -304,7 +300,6 @@ func (c *ActivationDescriber) Describe() string {
 	hash, _ := c.HashID()
 
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("Activation")
 	AddStandardClaimInfo(table, &c.ActivationClaims)
 	table.AddSeparator()
@@ -374,7 +369,6 @@ func NewUserDescriber(u jwt.UserClaims) *UserDescriber {
 
 func (u *UserDescriber) Describe() string {
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("User")
 	AddStandardClaimInfo(table, &u.UserClaims)
 	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
@@ -416,7 +410,6 @@ func NewOperatorDescriber(o jwt.OperatorClaims) *OperatorDescriber {
 
 func (o *OperatorDescriber) Describe() string {
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("Operator Details")
 	AddStandardClaimInfo(table, &o.OperatorClaims)
 	if o.AccountServerURL != "" {
