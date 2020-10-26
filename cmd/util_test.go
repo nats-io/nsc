@@ -404,7 +404,7 @@ func ForceOperator(t *testing.T, operator string) {
 }
 
 func StripTableDecorations(s string) string {
-	decorations := []string{"╭", "─", "┬", "╮", "├", "│", "┤", "┼", "╰", "┴", "╯"}
+	decorations := []string{"╭", "─", "┬", "╮", "├", "│", "┤", "┼", "╰", "┴", "╯", "-", "+", "|"}
 	for _, c := range decorations {
 		s = strings.Replace(s, c, "", -1)
 	}

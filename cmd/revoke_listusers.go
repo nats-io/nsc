@@ -93,15 +93,12 @@ func (p *RevokeListUserParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *RevokeListUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	table := tablewriter.CreateTable()
-	table.UTF8Box()
-
 	name := p.claim.Name
-
 	if name == "" {
 		name = p.claim.Subject
 	}
 
+	table := tablewriter.CreateTable()
 	table.AddTitle(fmt.Sprintf("Revoked Users for %s", name))
 	table.AddHeaders("Public Key", "Revoke Credentials Before")
 

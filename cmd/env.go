@@ -90,7 +90,6 @@ func (p *SetContextParams) Run(cmd *cobra.Command) error {
 func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	conf := GetConfig()
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("NSC Environment")
 	table.AddHeaders("Setting", "Set", "Effective Value")
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")

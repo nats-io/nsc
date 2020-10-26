@@ -135,7 +135,6 @@ func (p *ListKeysParams) Report(ks Keys) string {
 	}
 	var hasUnreferenced bool
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("Keys")
 	table.AddHeaders("Entity", "Key", "Signing Key", "Stored")
 	for _, k := range ks.KeyList {
@@ -176,7 +175,6 @@ func (p *ListKeysParams) Report(ks Keys) string {
 
 func (p *ListKeysParams) ReportSeeds(ks Keys) string {
 	table := tablewriter.CreateTable()
-	table.UTF8Box()
 	table.AddTitle("Seeds Keys")
 	table.AddHeaders("Entity", "Private Key", "Signing Key")
 	for _, k := range ks.KeyList {

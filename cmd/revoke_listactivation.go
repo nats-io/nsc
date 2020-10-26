@@ -183,15 +183,12 @@ func (p *RevokeListActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, fmt.Errorf("unable to locate export")
 	}
 
-	table := tablewriter.CreateTable()
-	table.UTF8Box()
-
 	name := p.export.Name
-
 	if name == "" {
 		name = string(p.export.Subject)
 	}
 
+	table := tablewriter.CreateTable()
 	table.AddTitle(fmt.Sprintf("Revoked Accounts for %s", name))
 	table.AddHeaders("Public Key", "Revoke Credentials Before")
 
