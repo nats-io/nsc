@@ -460,8 +460,7 @@ func OperatorJwtURL(oc *jwt.OperatorClaims) (string, error) {
 }
 
 func IsNatsUrl(url string) bool {
-	url = strings.ToLower(strings.TrimSpace(url))
-	return strings.HasPrefix(url, "nats://") || strings.HasPrefix(url, ",nats://")
+	return store.IsNatsUrl(url)
 }
 
 func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
