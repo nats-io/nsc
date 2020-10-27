@@ -381,7 +381,7 @@ func (p *InitCmdParams) setOperatorDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *InitCmdParams) createAccount(ctx ActionCtx) (store.Status, error) {
+func (p *InitCmdParams) createAccount(ctx ActionCtx) (*store.Report, error) {
 	var err error
 	p.Account.KP, err = nkeys.CreateAccount()
 	if err != nil {
