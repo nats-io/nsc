@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -127,9 +128,10 @@ func (r *Report) AddFromError(err error) {
 
 func (r *Report) Add(status ...Status) {
 	for _, s := range status {
-		if s != nil {
-			r.Details = append(r.Details, s)
+		if s == nil || reflect.ValueOf(s).IsNil() {
+			continue
 		}
+		r.Details = append(r.Details, s)
 	}
 	r.updateCode()
 }
@@ -160,6 +162,9 @@ func (r *Report) updateCode() StatusCode {
 	}
 	r.StatusCode = NONE
 	for _, d := range r.Details {
+		if d == nil || reflect.ValueOf(d).IsNil() {
+			continue
+		}
 		cc := d.Code()
 		if cc > r.StatusCode {
 			r.StatusCode = cc
@@ -199,6 +204,9 @@ func (r *Report) printsDetails() bool {
 
 func (r *Report) HasServerMessages() bool {
 	for _, v := range r.Details {
+		if v == nil || reflect.ValueOf(v).IsNil() {
+			continue
+		}
 		if _, ok := v.(*ServerMessage); ok {
 			return true
 		}
@@ -230,6 +238,9 @@ func (r *Report) Format(indent string) string {
 	}
 	if r.printsDetails() {
 		for i, c := range r.Details {
+			if c == nil || reflect.ValueOf(c).IsNil() {
+				continue
+			}
 			if i > 0 {
 				buf.WriteRune('\n')
 			}
@@ -251,6 +262,10 @@ func (r *Report) Summary() (string, error) {
 	c := len(r.Details)
 	var ok, warn, err int
 	for _, j := range r.Details {
+		if j == nil || reflect.ValueOf(j).IsNil() {
+			c--
+			continue
+		}
 		switch j.Code() {
 		case OK:
 			ok++
