@@ -401,7 +401,7 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	return r, nil
 }
 
-func (s *Store) StoreClaim(data []byte) (Status, error) {
+func (s *Store) StoreClaim(data []byte) (*Report, error) {
 	ct, err := s.ClaimType(data)
 	if err != nil {
 		return nil, err
