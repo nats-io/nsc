@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,16 +28,13 @@ import (
 func createRevokeListUsersCmd() *cobra.Command {
 	var params RevokeListUserParams
 	cmd := &cobra.Command{
-		Use:          "list_users",
-		Aliases:      []string{"list-users"},
+		Use:          "list-users",
+		Aliases:      []string{"list_users"},
 		Short:        "List users revoked in an account",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 	params.AccountContextParams.BindFlags(cmd)
@@ -56,8 +53,7 @@ type RevokeListUserParams struct {
 }
 
 func (p *RevokeListUserParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
-	return nil
+	return p.AccountContextParams.SetDefaults(ctx)
 }
 
 func (p *RevokeListUserParams) PreInteractive(ctx ActionCtx) error {
@@ -98,15 +94,21 @@ func (p *RevokeListUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		name = p.claim.Subject
 	}
 
+	if len(p.claim.Revocations) == 0 {
+		return nil, fmt.Errorf("account %s does not have revoked users\n", name)
+	}
+
 	table := tablewriter.CreateTable()
 	table.AddTitle(fmt.Sprintf("Revoked Users for %s", name))
 	table.AddHeaders("Public Key", "Revoke Credentials Before")
 
 	for pubKey, at := range p.claim.Revocations {
+		if pubKey == jwt.All {
+			pubKey = fmt.Sprintf("%s [All Users]", pubKey)
+		}
 		t := time.Unix(at, 0)
 		formatted := t.Format(time.RFC1123)
 		table.AddRow(pubKey, formatted)
 	}
-
 	return nil, Write("--", []byte(table.Render()))
 }

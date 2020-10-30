@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -40,10 +40,10 @@ func init() {
 	listCmd.AddCommand(createListUsersCmd())
 }
 
-type listEntry struct {
-	name   string
-	claims jwt.Claims
-	err    error
+type EntryInfo struct {
+	Name   string
+	Claims jwt.Claims
+	Err    error
 }
 
 func createListOperatorsCmd() *cobra.Command {
@@ -61,26 +61,26 @@ func createListOperatorsCmd() *cobra.Command {
 				fmt.Println("no operators defined - init an environment")
 			} else {
 				sort.Strings(operators)
-				var infos []*listEntry
+				var infos []*EntryInfo
 				for _, v := range operators {
-					var i listEntry
+					var i EntryInfo
 					infos = append(infos, &i)
-					i.name = v
+					i.Name = v
 					s, err := config.LoadStore(v)
 					if err != nil {
-						i.err = err
+						i.Err = err
 						continue
 					}
 					c, err := s.LoadRootClaim()
 					if err != nil {
-						i.err = err
+						i.Err = err
 						continue
 					}
 					if c == nil {
-						i.err = fmt.Errorf("%q jwt not found", v)
+						i.Err = fmt.Errorf("%q jwt not found", v)
 						continue
 					}
-					i.claims = c
+					i.Claims = c
 				}
 				cmd.Println(listEntities("Operators", infos, config.Operator))
 			}
@@ -89,6 +89,28 @@ func createListOperatorsCmd() *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+func ListAccounts(s *store.Store) ([]*EntryInfo, error) {
+	accounts, err := s.ListSubContainers(store.Accounts)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(accounts)
+
+	var infos []*EntryInfo
+	for _, v := range accounts {
+		var i EntryInfo
+		i.Name = v
+		infos = append(infos, &i)
+		ac, err := s.ReadAccountClaim(v)
+		if err != nil {
+			i.Err = err
+			continue
+		}
+		i.Claims = ac
+	}
+	return infos, nil
 }
 
 func createListAccountsCmd() *cobra.Command {
@@ -121,17 +143,17 @@ func createListAccountsCmd() *cobra.Command {
 				return err
 			}
 
-			var infos []*listEntry
+			var infos []*EntryInfo
 			for _, v := range containers {
-				var i listEntry
-				i.name = v
+				var i EntryInfo
+				i.Name = v
 				infos = append(infos, &i)
 				ac, err := s.ReadAccountClaim(v)
 				if err != nil {
-					i.err = err
+					i.Err = err
 					continue
 				}
-				i.claims = ac
+				i.Claims = ac
 			}
 			cmd.Println(listEntities("Accounts", infos, config.Account))
 			return nil
@@ -141,6 +163,32 @@ func createListAccountsCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&operator, "operator", "o", "", "operator name")
 
 	return cmd
+}
+
+func ListUsers(s *store.Store, accountName string) ([]*EntryInfo, error) {
+	names, err := s.ListEntries(store.Accounts, accountName, store.Users)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+
+	var infos []*EntryInfo
+	for _, v := range names {
+		var i EntryInfo
+		i.Name = v
+		infos = append(infos, &i)
+		uc, err := s.ReadUserClaim(accountName, v)
+		if err != nil {
+			i.Err = err
+			continue
+		}
+		if uc == nil {
+			i.Err = fmt.Errorf("%q jwt not found", v)
+			continue
+		}
+		i.Claims = uc
+	}
+	return infos, nil
 }
 
 func createListUsersCmd() *cobra.Command {
@@ -177,28 +225,11 @@ func createListUsersCmd() *cobra.Command {
 				return err
 			}
 
-			names, err := s.ListEntries(store.Accounts, config.Account, store.Users)
+			infos, err := ListUsers(s, config.Account)
 			if err != nil {
 				return err
 			}
-			sort.Strings(names)
 
-			var infos []*listEntry
-			for _, v := range names {
-				var i listEntry
-				i.name = v
-				infos = append(infos, &i)
-				uc, err := s.ReadUserClaim(config.Account, v)
-				if err != nil {
-					i.err = err
-					continue
-				}
-				if uc == nil {
-					i.err = fmt.Errorf("%q jwt not found", v)
-					continue
-				}
-				i.claims = uc
-			}
 			cmd.Println(listEntities("Users", infos, config.Account))
 			return nil
 		},
@@ -210,7 +241,7 @@ func createListUsersCmd() *cobra.Command {
 	return cmd
 }
 
-func listEntities(title string, infos []*listEntry, current string) string {
+func listEntities(title string, infos []*EntryInfo, current string) string {
 	table := tablewriter.CreateTable()
 	table.AddTitle(title)
 	if len(infos) == 0 {
@@ -218,12 +249,12 @@ func listEntities(title string, infos []*listEntry, current string) string {
 	} else {
 		table.AddHeaders("Name", "Public Key")
 		for _, v := range infos {
-			n := v.name
+			n := v.Name
 			var p string
-			if v.err != nil || v.claims == nil {
-				p = fmt.Sprintf("error loading jwt - %v", v.err)
+			if v.Err != nil || v.Claims == nil {
+				p = fmt.Sprintf("error loading jwt - %v", v.Err)
 			} else {
-				c := v.claims.Claims()
+				c := v.Claims.Claims()
 				if c != nil {
 					tn := c.Name
 					if n != tn {

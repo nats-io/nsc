@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -194,4 +194,79 @@ func TestRevokeUserByNkey(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
 	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
+}
+
+func TestRevokeUserNameKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user and user-public-key are mutually exclusive")
+}
+
+func TestRevokeUserNameNotFound(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "a")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+
+	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "U")
+	require.NoError(t, err)
+}
+
+func TestRevokeDefaultUser(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	require.NoError(t, err)
+
+	upk := ts.GetUserPublicKey(t, "A", "U")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	_, ok := ac.Revocations[upk]
+	require.True(t, ok)
+}
+
+func TestRevokeUserRequired(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	ts.AddUser(t, "A", "Y")
+	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no default user available")
+}
+
+func TestRevokeAllUsers(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	require.NoError(t, err)
+}
+
+func TestRevokeBadUnixTime(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*", "--at", "hello")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid argument")
+}
+
+func TestRevokeBadUnixTimeInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	input := []interface{}{"*", "hello"}
+	_, _, err := ExecuteInteractiveCmd(createRevokeUserCmd(), input)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "hello is invalid:")
 }

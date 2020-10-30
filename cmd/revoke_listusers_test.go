@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -50,4 +50,32 @@ func TestRevokeListUsers(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, strings.Contains(stdout, u.Subject))
 	require.True(t, strings.Contains(stdout, time.Unix(2001, 0).Format(time.RFC1123)))
+}
+
+func TestRevokeListUsersNoAccount(t *testing.T) {
+	ts := NewTestStore(t, "revoke_clear_user")
+	defer ts.Done(t)
+	_, _, err := ExecuteInteractiveCmd(createRevokeListUsersCmd(), []interface{}{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no accounts defined")
+}
+
+func TestRevokeListUsersNoRevocations(t *testing.T) {
+	ts := NewTestStore(t, "revoke_clear_user")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeListUsersCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not have revoked users")
+}
+
+func TestRevokeListUsersAllUsers(t *testing.T) {
+	ts := NewTestStore(t, "revoke_clear_user")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	require.NoError(t, err)
+	stdout, _, err := ExecuteCmd(createRevokeListUsersCmd())
+	require.NoError(t, err)
+	require.Contains(t, stdout, "* [All Users]")
 }

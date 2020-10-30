@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -816,6 +816,18 @@ func (ctx *Context) DefaultUser(accountName string) *string {
 		return &users[0]
 	}
 	return nil
+}
+
+func (ctx *Context) DefaultUserClaim(accountName string) (*jwt.UserClaims, error) {
+	n := ctx.DefaultUser(accountName)
+	if n != nil {
+		userClaim, err := ctx.Store.ReadUserClaim(accountName, *n)
+		if err != nil {
+			return nil, err
+		}
+		return userClaim, nil
+	}
+	return nil, fmt.Errorf("no default user available for account %s", accountName)
 }
 
 func (ctx *Context) PickUser(accountName string) (string, error) {

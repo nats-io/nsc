@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -156,4 +156,90 @@ func TestRevokeActivationForServiceInteractive(t *testing.T) {
 		require.True(t, exp.IsRevokedAt(pub, time.Unix(999, 0)))
 		require.False(t, exp.IsRevokedAt(pub, time.Unix(1001, 0)))
 	}
+}
+
+func TestRevokeActivationNoExports(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "doesn't have exports")
+}
+
+func TestRevokeActivationServiceNoExports(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "doesn't have stream exports")
+}
+
+func TestRevokeActivationStreamNoExports(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "q", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "doesn't have service exports")
+}
+
+func TestRevokeActivationSubjectRequired(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "qq", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "a subject is required")
+}
+
+func TestRevokeActivationExportNotFound(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "foo")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to locate export")
+}
+
+func TestRevokeActivationDefaultSubject(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	require.NoError(t, err)
+}
+
+func TestRevokeActivationAll(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "q")
+	require.NoError(t, err)
+}
+
+func TestRevokeActivationBadInteractiveAt(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", false)
+
+	input := []interface{}{true, 0, "*", "hello"}
+	_, _, err := ExecuteInteractiveCmd(createRevokeActivationCmd(), input)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "hello is invalid:")
 }

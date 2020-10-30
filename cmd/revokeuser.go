@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -30,8 +31,8 @@ import (
 func createRevokeUserCmd() *cobra.Command {
 	var params RevokeUserParams
 	cmd := &cobra.Command{
-		Use:          "add_user",
-		Aliases:      []string{"add-user"},
+		Use:          "add-user",
+		Aliases:      []string{"add_user"},
 		Short:        "Revoke a user",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
@@ -41,8 +42,7 @@ func createRevokeUserCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
 	cmd.Flags().IntVarP(&params.at, "at", "", 0, "revokes all user credentials created before a Unix timestamp ('0' is treated as now)")
-	cmd.Flags().StringVarP(&params.userPubKey, "user-public-key", "u", "", "public user key (use when user was generated outside of nsc)")
-
+	params.userKey.BindFlags("user-public-key", "u", nkeys.PrefixByteUser, cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -55,14 +55,18 @@ func init() {
 // RevokeUserParams hold the info necessary to add a user to the revocation list in an account
 type RevokeUserParams struct {
 	AccountContextParams
-	at         int
-	user       string
-	userPubKey string
-	claim      *jwt.AccountClaims
+	at      int
+	user    string
+	userKey PubKeyParams
+	claim   *jwt.AccountClaims
 	SignerParams
 }
 
 func (p *RevokeUserParams) SetDefaults(ctx ActionCtx) error {
+	if p.userKey.publicKey != "" && p.user != "" {
+		return fmt.Errorf("user and user-public-key are mutually exclusive")
+	}
+	p.userKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
@@ -77,23 +81,83 @@ func (p *RevokeUserParams) canParse(s string) error {
 }
 
 func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
-	if err := p.AccountContextParams.Edit(ctx); err != nil {
+	return p.AccountContextParams.Edit(ctx)
+}
+
+func (p *RevokeUserParams) Load(ctx ActionCtx) error {
+	var err error
+	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
-	byName, err := cli.Confirm("Do you want to revoke a user (known to nsc) by name?", true)
-	if err != nil {
-		return err
-	}
-	if byName {
-		if p.user == "" {
-			p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
-			if err != nil {
-				return err
+
+	if p.user != "" {
+		entries, err := ListUsers(ctx.StoreCtx().Store, p.AccountContextParams.Name)
+		if err != nil {
+			return err
+		}
+
+		n := strings.ToLower(p.user)
+		for _, e := range entries {
+			if e.Err == nil && strings.ToLower(e.Name) == n {
+				p.userKey.publicKey = e.Claims.Claims().Subject
+				break
 			}
 		}
-	} else if p.userPubKey, err = cli.Prompt("Enter user public nkey", ""); err != nil {
+		if p.userKey.publicKey == "" {
+			return fmt.Errorf("user %q not found", p.user)
+		}
+	} else if p.user == "" && p.userKey.publicKey == "" && !InteractiveFlag {
+		uc, err := ctx.StoreCtx().DefaultUserClaim(p.AccountContextParams.Name)
+		if err != nil {
+			return err
+		}
+		p.userKey.publicKey = uc.Subject
+	}
+
+	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+	return err
+}
+
+func buildUserPublicKeyChoices(accountName string, ctx ActionCtx) ([]PubKeyChoice, error) {
+	var choices []PubKeyChoice
+	keyToName := map[string]string{}
+	keyToName[jwt.All] = "All Users"
+	infos, err := ListUsers(ctx.StoreCtx().Store, accountName)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range infos {
+		if i.Err == nil {
+			pkc := PubKeyChoice{}
+			pkc.Key = i.Claims.Claims().Subject
+			pkc.Label = i.Name
+			choices = append(choices, pkc)
+		}
+	}
+	return choices, nil
+}
+
+func (p *RevokeUserParams) PostInteractive(ctx ActionCtx) error {
+	choices, err := buildUserPublicKeyChoices(p.AccountContextParams.Name, ctx)
+	byName := false
+
+	if len(choices) > 0 {
+		byName, err = cli.Confirm("Revoke a user by name", true)
+		if err != nil {
+			return err
+		}
+	}
+	if byName {
+		if err != nil || len(choices) == 0 {
+			return err
+		}
+		if err := p.userKey.Select("Select revoked user to clear", choices...); err != nil {
+			return err
+		}
+	} else if err := p.userKey.Edit(); err != nil {
 		return err
 	}
+
 	if p.at == 0 {
 		at := fmt.Sprintf("%d", p.at)
 		at, err := cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
@@ -112,77 +176,38 @@ func (p *RevokeUserParams) PreInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *RevokeUserParams) Load(ctx ActionCtx) error {
-	var err error
-
-	if err = p.AccountContextParams.Validate(ctx); err != nil {
-		return err
-	}
-
-	if p.user == "" && p.userPubKey == "" {
-		n := ctx.StoreCtx().DefaultUser(p.AccountContextParams.Name)
-		if n != nil {
-			p.user = *n
-		}
-	}
-	if p.userPubKey == "" && p.user == "" {
-		return fmt.Errorf("user or user-public-key are required")
-	}
-	if p.userPubKey != "" && p.user != "" {
-		return fmt.Errorf("user and user-public-key are mutually exclusive")
-	}
-	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
-	if err != nil {
-		return err
-	}
-	if p.userPubKey != "" {
-		return nil
-	}
-	userClaim, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
-	if err != nil {
-		return err
-	}
-
-	if err != nil || userClaim == nil {
-		return fmt.Errorf("user is required")
-	}
-
-	p.userPubKey = userClaim.Subject
-
-	return nil
-}
-
 func (p *RevokeUserParams) Validate(ctx ActionCtx) error {
-	if !nkeys.IsValidPublicUserKey(p.userPubKey) {
-		return fmt.Errorf("user-public-key %q is not a valid public user nkey", p.userPubKey)
+	if p.userKey.publicKey == "" && p.user == "" {
+		return fmt.Errorf("user or user-public-key is required")
 	}
-	if err := p.SignerParams.Resolve(ctx); err != nil {
+	if err := p.userKey.Valid(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (p *RevokeUserParams) PostInteractive(ctx ActionCtx) error {
-	return nil
+	return p.SignerParams.Resolve(ctx)
 }
 
 func (p *RevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.at == 0 {
-		p.claim.Revoke(p.userPubKey)
+		p.claim.Revoke(p.userKey.publicKey)
 	} else {
-		p.claim.RevokeAt(p.userPubKey, time.Unix(int64(p.at), 0))
+		p.claim.RevokeAt(p.userKey.publicKey, time.Unix(int64(p.at), 0))
 	}
-
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {
 		return nil, err
 	}
-
 	r := store.NewDetailedReport(true)
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
-		r.AddOK("revoked user %s", p.userPubKey)
+		if p.userKey.publicKey == "*" {
+			when := int64(p.at)
+			if when == 0 {
+				when = time.Now().Unix()
+			}
+			r.AddOK("revoked all users issued before %s", time.Unix(when, 0).String())
+		} else {
+			r.AddOK("revoked user %q", p.userKey.publicKey)
+		}
 	}
 	return r, nil
 }

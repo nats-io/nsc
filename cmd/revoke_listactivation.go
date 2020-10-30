@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -36,11 +36,7 @@ func createRevokeListActivationCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -117,8 +113,8 @@ func (p *RevokeListActivationParams) Load(ctx ActionCtx) error {
 	}
 
 	if len(p.possibleExports) == 0 {
-		return fmt.Errorf("account %q doesn't have %s exports that qualify",
-			p.AccountContextParams.Name, kind.String())
+		return fmt.Errorf("account %q doesn't have %v exports",
+			p.AccountContextParams.Name, kind)
 	}
 
 	return nil
@@ -182,6 +178,13 @@ func (p *RevokeListActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.export == nil {
 		return nil, fmt.Errorf("unable to locate export")
 	}
+	kind := jwt.Stream
+	if p.service {
+		kind = jwt.Service
+	}
+	if len(p.export.Revocations) == 0 {
+		return nil, fmt.Errorf("%v %s has no revocations\n", kind, p.export.Name)
+	}
 
 	name := p.export.Name
 	if name == "" {
@@ -189,10 +192,13 @@ func (p *RevokeListActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	table := tablewriter.CreateTable()
-	table.AddTitle(fmt.Sprintf("Revoked Accounts for %s", name))
+	table.AddTitle(fmt.Sprintf("Revoked Accounts for %v %s", kind, name))
 	table.AddHeaders("Public Key", "Revoke Credentials Before")
 
 	for pubKey, at := range p.export.Revocations {
+		if pubKey == "*" {
+			pubKey = "* [All Accounts]"
+		}
 		t := time.Unix(at, 0)
 		formatted := t.Format(time.RFC1123)
 		table.AddRow(pubKey, formatted)
