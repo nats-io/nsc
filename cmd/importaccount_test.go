@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2020-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -47,12 +47,12 @@ func Test_ImportAccountSelfSigned(t *testing.T) {
 	file := filepath.Join(ts.Dir, "account-selfsigned.jwt")
 	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--jwt", file)
+	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
 	require.NoError(t, err)
 	check()
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--jwt", file)
+	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
 	require.Error(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--jwt", file, "--overwrite")
+	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file, "--overwrite")
 	require.NoError(t, err)
 	check()
 }
@@ -71,6 +71,6 @@ func Test_ImportAccountOtherOperator(t *testing.T) {
 	file := filepath.Join(ts.Dir, "account.jwt")
 	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--jwt", file)
+	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
 	require.Error(t, err)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2020-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,9 +16,7 @@
 package cmd
 
 import (
-	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/nats-io/jwt"
@@ -31,8 +29,8 @@ func createImportUserCmd() *cobra.Command {
 	var params ImportUser
 	cmd := &cobra.Command{
 		Use:          "user --file <user-jwt/user-creds>",
-		Short:        "Imports an account from a jwt or account and nkey from a creds file",
-		Example:      `nsc import account --jwt <account-jwt>`,
+		Short:        "Imports an user from a jwt or user and nkey from a creds file",
+		Example:      `nsc import user --file <account-jwt>`,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,7 +43,6 @@ func createImportUserCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.skip, "skip", "", false, "skip validation issues")
 	cmd.Flags().BoolVarP(&params.overwrite, "overwrite", "", false, "overwrite existing user")
 	cmd.Flags().StringVarP(&params.file, "file", "f", "", "user jwt or creds to import")
-	cmd.MarkFlagRequired("file")
 	return cmd
 }
 
@@ -53,36 +50,16 @@ func init() {
 	importCmd.AddCommand(createImportUserCmd())
 }
 
-type ImportUser fileImport
+type ImportUser struct {
+	fileImport
+}
 
 func (p *ImportUser) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ImportUser) PreInteractive(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *ImportUser) Load(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *ImportUser) PostInteractive(ctx ActionCtx) error {
-	return nil
-}
-
 func (p *ImportUser) Validate(ctx ActionCtx) error {
-	fi, err := os.Stat(p.file)
-	if err != nil {
-		return err
-	}
-	if fi.IsDir() {
-		return fmt.Errorf("%#q is a directory", p.file)
-	}
-	if !(strings.HasSuffix(p.file, ".jwt") || strings.HasSuffix(p.file, ".creds")) {
-		return fmt.Errorf("expected .jwt or .creds file")
-	}
-	return nil
+	return p.fileImport.Validate(ctx, ".jwt", ".creds")
 }
 
 // returns true when blocking and not skipped
@@ -91,13 +68,13 @@ func validateAndReport(claim jwt.Claims, force bool, r *store.Report) bool {
 	claim.Validate(&vr)
 	for _, i := range vr.Issues {
 		if i.Blocking {
-			r.AddError("Validation resulted in: %s", i.Description)
+			r.AddError("validation resulted in: %s", i.Description)
 		} else {
-			r.AddWarning("Validation resulted in: %s", i.Description)
+			r.AddWarning("validation resulted in: %s", i.Description)
 		}
 	}
 	if vr.IsBlocking(true) && !force {
-		r.AddError("Validation is blocking, skip with --skip")
+		r.AddError("validation is blocking, skip with --skip")
 		return true
 	}
 	return false
@@ -145,19 +122,19 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 	if accClaim == nil {
-		r.AddError("Referenced Account %s not found, import first", acc)
+		r.AddError("referenced Account %s not found, import first", acc)
 		return r, nil
 	}
 	if ctx.StoreCtx().Store.Has(store.Accounts, accClaim.Name, store.Users, store.JwtName(claim.Name)) {
 		if !p.overwrite {
-			r.AddError("User already exists, overwrite with --overwrite")
+			r.AddError("user already exists, overwrite with --overwrite")
 			return r, nil
 		}
 		if old, err := ctx.StoreCtx().Store.ReadUserClaim(accClaim.Name, claim.Name); err != nil {
-			r.AddError("Existing User not found: %v", err)
+			r.AddError("existing User not found: %v", err)
 			return r, nil
 		} else if old.Subject != claim.Subject {
-			r.AddError("Existing User has a name collision only and does not reference the same entity "+
+			r.AddError("existing User has a name collision only and does not reference the same entity "+
 				"(Subject is %s and differs from %s). This problem needs to be resolved manually.",
 				old.Subject, claim.Subject)
 			return r, nil
@@ -173,16 +150,16 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 	if !sameAccount {
-		r.AddError("Can only import user signed by exiting account. Possibly update your account")
+		r.AddError("can only import user signed by exiting account. Possibly update your account")
 		return r, nil
 	}
 	if kp != nil {
 		keyPath, err := ctx.StoreCtx().KeyStore.Store(kp)
 		if err != nil {
-			r.AddError("Key could not be stored: %v", err)
+			r.AddError("key could not be stored: %v", err)
 			return r, nil
 		}
-		r.AddOK("Key stored %s", keyPath)
+		r.AddOK("key stored %s", keyPath)
 	}
 	sub, err := ctx.StoreCtx().Store.StoreClaim([]byte(theJWT))
 	if err != nil {
@@ -190,9 +167,9 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	r.Add(sub)
 	if r.HasNoErrors() {
-		r.AddOK("User %s was successfully imported", claim.Name)
+		r.AddOK("user %s was successfully imported", claim.Name)
 	} else {
-		r.AddOK("User %s was not imported: %v", claim.Name, err)
+		r.AddOK("user %s was not imported: %v", claim.Name, err)
 	}
 	return r, nil
 }

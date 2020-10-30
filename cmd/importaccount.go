@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2020-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nkeys"
@@ -30,9 +31,9 @@ import (
 func createImportAccountCmd() *cobra.Command {
 	var params ImportAccount
 	cmd := &cobra.Command{
-		Use:          "account --jwt <account-jwt>",
+		Use:          "account --file <account-jwt>",
 		Short:        "Imports an account from a jwt file and resign with operator if self signed",
-		Example:      `nsc import account --jwt <account-jwt>`,
+		Example:      `nsc import account --file <account-jwt>`,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,10 +43,9 @@ func createImportAccountCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&params.skip, "skip", "", false, "skip validation issues, they can be edited out")
+	cmd.Flags().BoolVarP(&params.skip, "skip", "", false, "skip validation issues, they can be edited out prior to push")
 	cmd.Flags().BoolVarP(&params.overwrite, "overwrite", "", false, "overwrite existing account")
-	cmd.Flags().StringVarP(&params.file, "jwt", "j", "", "account jwt to import")
-	cmd.MarkFlagRequired("jwt")
+	cmd.Flags().StringVarP(&params.file, "file", "j", "", "account jwt to import")
 	return cmd
 }
 
@@ -57,6 +57,36 @@ type fileImport struct {
 	file      string
 	skip      bool
 	overwrite bool
+	content   []byte
+}
+
+func (p *fileImport) PreInteractive(ctx ActionCtx) (err error) {
+	return nil
+}
+
+func (p *fileImport) PostInteractive(ctx ActionCtx) (err error) {
+	return nil
+}
+
+func (p *fileImport) Load(ctx ActionCtx) (err error) {
+	p.content, err = ioutil.ReadFile(p.file)
+	return
+}
+
+func (p *fileImport) Validate(xtx ActionCtx, fileEndings ...string) error {
+	fi, err := os.Stat(p.file)
+	if err != nil {
+		return err
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("%#q is a directory", p.file)
+	}
+	for _, ending := range fileEndings {
+		if strings.HasSuffix(p.file, ending) {
+			return nil
+		}
+	}
+	return fmt.Errorf("expected these file endings: %v", fileEndings)
 }
 
 type ImportAccount struct {
@@ -69,30 +99,9 @@ func (p *ImportAccount) SetDefaults(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *ImportAccount) PreInteractive(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *ImportAccount) Load(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *ImportAccount) PostInteractive(ctx ActionCtx) error {
-	signers, err := GetOperatorSigners(ctx)
-	if err != nil {
-		return err
-	}
-	p.SignerParams.SetPrompt("select the key to sign the account")
-	return p.SignerParams.SelectFromSigners(ctx, signers)
-}
-
 func (p *ImportAccount) Validate(ctx ActionCtx) error {
-	fi, err := os.Stat(p.file)
-	if err != nil {
+	if err := p.fileImport.Validate(ctx, ".jwt"); err != nil {
 		return err
-	}
-	if fi.IsDir() {
-		return fmt.Errorf("%#q is a directory", p.file)
 	}
 	if err := p.SignerParams.Resolve(ctx); err != nil {
 		return err
@@ -116,11 +125,7 @@ func (p *ImportAccount) Validate(ctx ActionCtx) error {
 
 func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
-	theJWT, err := ioutil.ReadFile(p.file)
-	if err != nil {
-		r.AddError("failed to import %#q: %v", p.file, err)
-		return r, err
-	}
+	theJWT := p.content
 	claim, err := jwt.DecodeAccountClaims(string(theJWT))
 	if err != nil {
 		r.AddError("failed to decode %#q: %v", p.file, err)
@@ -131,14 +136,14 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	if ctx.StoreCtx().Store.HasAccount(claim.Name) {
 		if !p.overwrite {
-			r.AddError("Account already exists, overwrite with --overwrite")
+			r.AddError("account already exists, overwrite with --overwrite")
 			return r, nil
 		}
 		if old, err := ctx.StoreCtx().Store.ReadAccountClaim(claim.Name); err != nil {
-			r.AddError("Existing Account not found: %v", err)
+			r.AddError("existing Account not found: %v", err)
 			return r, nil
 		} else if old.Subject != claim.Subject {
-			r.AddError("Existing Account has a name collision only and does not reference the same entity "+
+			r.AddError("existing Account has a name collision only and does not reference the same entity "+
 				"(Subject is %s and differs from %s). This problem needs to be resolved manually.",
 				old.Subject, claim.Subject)
 			return r, nil
@@ -154,12 +159,12 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	if ctx.StoreCtx().Store.IsManaged() {
 		if claim.IsSelfSigned() {
-			r.AddError("Only a non managed store can import a self signed account")
+			r.AddError("only a non managed store can import a self signed account")
 			return r, nil
 		}
 	} else if claim.IsSelfSigned() {
 		if jwt, err := claim.Encode(p.signerKP); err != nil {
-			r.AddError("Error during encoding of self signed account jwt: %v", err)
+			r.AddError("error during encoding of self signed account jwt: %v", err)
 			return r, nil
 		} else {
 			theJWT = []byte(jwt)
@@ -167,18 +172,18 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 	if !sameOperator {
-		r.AddError("Can only import account signed by same operator. Possibly update your operator")
+		r.AddError("can only import account signed by same operator. Possibly update your operator")
 		return r, nil
 	}
 	sub, err := ctx.StoreCtx().Store.StoreClaim(theJWT)
 	if err != nil {
-		r.AddError("Error when storing account: %v", err)
+		r.AddError("error when storing account: %v", err)
 	}
 	r.Add(sub)
 	if r.HasNoErrors() {
-		r.AddOK("Account %s was successfully imported", claim.Name)
+		r.AddOK("account %s was successfully imported", claim.Name)
 	} else {
-		r.AddOK("Account %s was not imported: %v", claim.Name, err)
+		r.AddOK("account %s was not imported: %v", claim.Name, err)
 	}
 	return r, nil
 }
