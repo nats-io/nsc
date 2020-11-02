@@ -13,7 +13,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
-	github.com/nats-io/jwt v1.1.1
+	github.com/nats-io/jwt v1.2.0
 	github.com/nats-io/nats-server/v2 v2.1.8-0.20201020210511-496d18468a7d
 	github.com/nats-io/nats.go v1.10.1-0.20200606002146-fc6fed82929a
 	github.com/nats-io/nkeys v0.2.0

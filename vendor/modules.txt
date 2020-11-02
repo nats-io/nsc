@@ -59,7 +59,7 @@ github.com/mitchellh/go-wordwrap
 github.com/mitchellh/mapstructure
 # github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 github.com/nats-io/cliprompts/v2
-# github.com/nats-io/jwt v1.1.1
+# github.com/nats-io/jwt v1.2.0
 github.com/nats-io/jwt
 # github.com/nats-io/jwt/v2 v2.0.0-20201015190852-e11ce317263c
 github.com/nats-io/jwt/v2
