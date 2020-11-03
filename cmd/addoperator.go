@@ -45,6 +45,7 @@ func createAddOperatorCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
 	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url, file, or well known operator")
 	cmd.Flags().BoolVarP(&params.sysAcc, "sys", "s", false, "generate system account with the operator")
+	cmd.Flags().BoolVarP(&params.force, "force", "", false, "on import, overwrite existing when already present")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -62,6 +63,7 @@ type AddOperatorParams struct {
 	name     string
 	generate bool
 	sysAcc   bool
+	force    bool
 	keyPath  string
 }
 
@@ -216,8 +218,14 @@ func (p *AddOperatorParams) PostInteractive(ctx ActionCtx) error {
 func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 	var err error
 	if p.token != "" {
+		if p.sysAcc {
+			return fmt.Errorf("importing an operator is not compatible with system account generation")
+		}
 		// validated on load
 		return nil
+	}
+	if p.force {
+		return fmt.Errorf("force only works with -u")
 	}
 	if p.name == "" {
 		ctx.CurrentCmd().SilenceUsage = false
@@ -245,22 +253,29 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
-	if p.sysAcc && p.signerKP == nil {
-		return fmt.Errorf("generating system account requires a key")
-	}
-
 	if err := p.Resolve(ctx); err != nil {
 		return err
+	}
+
+	if p.sysAcc && p.signerKP == nil {
+		return fmt.Errorf("generating system account requires a key")
 	}
 
 	return nil
 }
 
 func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
+	r := store.NewDetailedReport(false)
 	operator := &store.NamedKey{Name: p.name, KP: p.signerKP}
-	s, err := store.CreateStore(p.name, GetConfig().StoreRoot, operator)
+	s, err := GetConfig().LoadStore(p.name)
+	if s == nil {
+		s, err = store.CreateStore(p.name, GetConfig().StoreRoot, operator)
+	} else if !p.force {
+		err = fmt.Errorf("operator named %s exists already", p.name)
+		r.AddError("%v please inspect and use --force to overwrite", err)
+	}
 	if err != nil {
-		return nil, err
+		return r, err
 	}
 
 	var sAcc *keys
@@ -306,10 +321,27 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 		if err != nil {
 			return nil, err
 		}
-
+	} else {
+		ctx, err := s.GetContext()
+		if err != nil {
+			return nil, err
+		}
+		oc, err := ctx.Store.ReadOperatorClaim()
+		if err == nil {
+			ocNew, err := jwt.DecodeOperatorClaims(p.token)
+			if err != nil {
+				return nil, err
+			}
+			if oc.Subject != ocNew.Subject {
+				err := fmt.Errorf("existing and new operator represent different entities")
+				r.AddError("%v resolve conflict first", err)
+				return r, err
+			}
+		} else if err.(*store.ResourceErr).Err != store.ErrNotExist {
+			return nil, err
+		}
 	}
 
-	r := store.NewDetailedReport(false)
 	if p.generate && p.signerKP != nil {
 		pk, _ := p.signerKP.PublicKey()
 		r.AddOK("generated and stored operator key %q", pk)

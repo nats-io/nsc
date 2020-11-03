@@ -68,18 +68,29 @@ func TestImportOperator(t *testing.T) {
 	storeFile := filepath.Join(ts.Dir, "store", "O", ".nsc")
 	require.FileExists(t, storeFile)
 
-	d, err := Read(storeFile)
-	require.NoError(t, err)
-	var info store.Info
-	json.Unmarshal(d, &info)
-	require.True(t, info.Managed)
-	require.Equal(t, "O", info.Name)
+	check := func() {
+		d, err := Read(storeFile)
+		require.NoError(t, err)
+		var info store.Info
+		json.Unmarshal(d, &info)
+		require.True(t, info.Managed)
+		require.Equal(t, "O", info.Name)
 
-	target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
-	require.FileExists(t, target)
-	d, err = Read(target)
+		target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
+		require.FileExists(t, target)
+		d, err = Read(target)
+		require.NoError(t, err)
+		require.Equal(t, token, string(d))
+	}
+	check()
+
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf, "--force")
 	require.NoError(t, err)
-	require.Equal(t, token, string(d))
+	check()
+
 }
 
 func TestAddOperatorInteractive(t *testing.T) {
