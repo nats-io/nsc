@@ -168,6 +168,7 @@ func TestRevokeListActivationInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", false)
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--service", "--subject", "s", "--target-account", "*")
+	require.NoError(t, err)
 	args := []interface{}{true, 0}
 	_, _, err = ExecuteInteractiveCmd(createRevokeListActivationCmd(), args)
 	require.NoError(t, err)

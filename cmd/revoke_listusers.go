@@ -95,7 +95,7 @@ func (p *RevokeListUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	if len(p.claim.Revocations) == 0 {
-		return nil, fmt.Errorf("account %s does not have revoked users\n", name)
+		return nil, fmt.Errorf("account %s does not have revoked users", name)
 	}
 
 	table := tablewriter.CreateTable()

@@ -183,7 +183,7 @@ func (p *RevokeListActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 		kind = jwt.Service
 	}
 	if len(p.export.Revocations) == 0 {
-		return nil, fmt.Errorf("%v %s has no revocations\n", kind, p.export.Name)
+		return nil, fmt.Errorf("%v %s has no revocations", kind, p.export.Name)
 	}
 
 	name := p.export.Name

@@ -179,6 +179,7 @@ func TestClearRevokeActivationNotFound(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "s", false)
 	ts.AddExport(t, "A", jwt.Stream, "r", false)
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--target-account", "*", "--subject", "s")
+	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--target-account", "*", "--subject", "r")
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createClearRevokeActivationCmd(), "--target-account", "*", "--subject", "k")
