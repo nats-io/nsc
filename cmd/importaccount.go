@@ -103,10 +103,10 @@ func (p *ImportAccount) Validate(ctx ActionCtx) error {
 	if err := p.fileImport.Validate(ctx, ".jwt"); err != nil {
 		return err
 	}
-	if err := p.SignerParams.Resolve(ctx); err != nil {
-		return err
-	}
 	if !ctx.StoreCtx().Store.IsManaged() {
+		if err := p.SignerParams.Resolve(ctx); err != nil {
+			return err
+		}
 		signers, err := GetOperatorSigners(ctx)
 		if err != nil {
 			return err
@@ -119,7 +119,6 @@ func (p *ImportAccount) Validate(ctx ActionCtx) error {
 			return errors.New("invalid account signer")
 		}
 	}
-
 	return nil
 }
 
