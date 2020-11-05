@@ -250,7 +250,7 @@ func Test_AddUserWithInteractiveAccountCtx(t *testing.T) {
 	ts.AddAccount(t, "B")
 
 	// adding to user bb to B
-	inputs := []interface{}{1, "bb", true, "0", "0"}
+	inputs := []interface{}{1, "bb", true, "0", "0", 0}
 	cmd := CreateAddUserCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, inputs)
@@ -263,7 +263,7 @@ func Test_AddUserWithInteractiveAccountCtx(t *testing.T) {
 	require.Empty(t, uc.IssuerAccount)
 
 	// adding to user aa to A
-	inputs = []interface{}{0, "aa", true, "0", "0"}
+	inputs = []interface{}{0, "aa", true, "0", "0", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
 	require.NoError(t, err)
 	apk := ts.GetAccountPublicKey(t, "A")

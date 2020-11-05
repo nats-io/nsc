@@ -17,6 +17,8 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt"
@@ -122,6 +124,45 @@ func Test_AddAccountManagedStore(t *testing.T) {
 
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
+}
+
+func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	s1, psk, sk := CreateOperatorKey(t)
+	ts.KeyStore.Store(sk)
+	oc.SigningKeys.Add(psk)
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "O.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	require.NoError(t, err)
+	// sign with the signing key
+	inputs := []interface{}{"A", true, "0", "0", 0, string(s1)}
+	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	require.NoError(t, err)
+	accJWT, err := ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "Accounts", "A", "A.jwt"))
+	require.NoError(t, err)
+	ac, err := jwt.DecodeAccountClaims(string(accJWT))
+	require.NoError(t, err)
+	require.False(t, ac.IsSelfSigned())
+	require.Equal(t, ac.Issuer, psk)
+	require.True(t, oc.DidSign(ac))
+	// sign with the account key
+	inputs = []interface{}{"B", true, "0", "0", 1, string(s1)}
+	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	require.NoError(t, err)
+	accJWT, err = ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "Accounts", "B", "B.jwt"))
+	require.NoError(t, err)
+	ac, err = jwt.DecodeAccountClaims(string(accJWT))
+	require.NoError(t, err)
+	require.True(t, ac.IsSelfSigned())
+	require.False(t, oc.DidSign(ac))
 }
 
 func Test_AddAccountInteractiveSigningKey(t *testing.T) {

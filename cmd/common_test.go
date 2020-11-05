@@ -406,7 +406,7 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 		{string(as1), true},
 	}
 
-	fun := SeedNKeyValidatorMatching(nkeys.PrefixByteAccount, validPubs)
+	fun := SeedNKeyValidatorMatching(validPubs, nkeys.PrefixByteAccount)
 	for i, kt := range keyTests {
 		err := fun(kt.arg)
 		var failed bool
