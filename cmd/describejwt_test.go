@@ -18,6 +18,8 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -141,4 +143,36 @@ func TestDescribe_ActivationWithSigner(t *testing.T) {
 	out, _, err = ExecuteCmd(createDescribeJwtCmd(), "--file", tp2)
 	require.NoError(t, err)
 	require.Contains(t, out, "Issuer Account")
+}
+
+func TestDescribeJwt_Json(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	fp := filepath.Join(ts.Store.Dir, "accounts", "A", "A.jwt")
+	t.Log(fp)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "jwt", "--json", "--file", fp)
+	require.NoError(t, err)
+	m := make(map[string]interface{})
+	err = json.Unmarshal([]byte(out), &m)
+	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Subject, m["sub"])
+}
+
+func TestDescribeJwt_JsonPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	fp := filepath.Join(ts.Store.Dir, "accounts", "A", "A.jwt")
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "jwt", "--json", "--file", fp, "--field", "sub")
+	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)
 }
