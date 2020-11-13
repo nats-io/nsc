@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sort"
@@ -26,6 +27,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
 )
+
+var Csv bool
+var OutputFile string
 
 // addCmd represents the add command
 var listCmd = &cobra.Command{
@@ -38,6 +42,8 @@ func init() {
 	listCmd.AddCommand(createListOperatorsCmd())
 	listCmd.AddCommand(createListAccountsCmd())
 	listCmd.AddCommand(createListUsersCmd())
+	listCmd.PersistentFlags().BoolVarP(&Csv, "csv", "C", false, "output the operators, accounts & users in CSV ")
+	listCmd.PersistentFlags().StringVarP(&OutputFile, "output-file", "F", "--", "output file, '--' is stdout")
 }
 
 type listEntry struct {
@@ -82,7 +88,13 @@ func createListOperatorsCmd() *cobra.Command {
 					}
 					i.claims = c
 				}
-				cmd.Println(listEntities("Operators", infos, config.Operator))
+				output := listEntities("Operators", infos, config.Operator)
+				if IsStdOut(OutputFile) {
+					cmd.Println(output)
+				} else if err := Write(OutputFile, []byte(output)); err != nil {
+					return nil
+				}
+
 			}
 
 			return nil
@@ -133,7 +145,12 @@ func createListAccountsCmd() *cobra.Command {
 				}
 				i.claims = ac
 			}
-			cmd.Println(listEntities("Accounts", infos, config.Account))
+			output := listEntities("Accounts", infos, config.Account)
+			if IsStdOut(OutputFile) {
+				cmd.Println(output)
+			} else if err := Write(OutputFile, []byte(output)); err != nil {
+				return nil
+			}
 			return nil
 		},
 	}
@@ -199,7 +216,13 @@ func createListUsersCmd() *cobra.Command {
 				}
 				i.claims = uc
 			}
-			cmd.Println(listEntities("Users", infos, config.Account))
+
+			output := listEntities("Users", infos, config.Account)
+			if IsStdOut(OutputFile) {
+				cmd.Println(output)
+			} else if err := Write(OutputFile, []byte(output)); err != nil {
+				return nil
+			}
 			return nil
 		},
 	}
@@ -211,12 +234,50 @@ func createListUsersCmd() *cobra.Command {
 }
 
 func listEntities(title string, infos []*listEntry, current string) string {
-	table := tablewriter.CreateTable()
-	table.AddTitle(title)
-	if len(infos) == 0 {
-		table.AddRow("No entries defined")
+	if Csv {
+
+		return listEntitiesAsCsv(title, infos, current)
+
 	} else {
-		table.AddHeaders("Name", "Public Key")
+
+		table := tablewriter.CreateTable()
+		table.AddTitle(title)
+		if len(infos) == 0 {
+			table.AddRow("No entries defined")
+		} else {
+			table.AddHeaders("Name", "Public Key")
+			for _, v := range infos {
+				n := v.name
+				var p string
+				if v.err != nil || v.claims == nil {
+					p = fmt.Sprintf("error loading jwt - %v", v.err)
+				} else {
+					c := v.claims.Claims()
+					if c != nil {
+						tn := c.Name
+						if n != tn {
+							n = fmt.Sprintf("%s (%s)", n, c.Name)
+						}
+						p = c.Subject
+					}
+				}
+				if n == current {
+					n = cli.Bold(n)
+					p = cli.Bold(p)
+				}
+				table.AddRow(n, p)
+			}
+		}
+		return table.Render()
+	}
+}
+
+func listEntitiesAsCsv(title string, infos []*listEntry, current string) string {
+
+	var csvStr bytes.Buffer
+	if len(infos) == 0 {
+		return "No entries defined"
+	} else {
 		for _, v := range infos {
 			n := v.name
 			var p string
@@ -232,12 +293,15 @@ func listEntities(title string, infos []*listEntry, current string) string {
 					p = c.Subject
 				}
 			}
-			if n == current {
+			/*if n == current {
 				n = cli.Bold(n)
 				p = cli.Bold(p)
-			}
-			table.AddRow(n, p)
+			}*/
+			csvStr.WriteString(n)
+			csvStr.WriteString(",")
+			csvStr.WriteString(p)
+			csvStr.WriteString("\n")
 		}
 	}
-	return table.Render()
+	return csvStr.String()
 }
