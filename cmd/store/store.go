@@ -768,23 +768,24 @@ func (ctx *Context) ResolveKey(flagValue string, kinds ...nkeys.PrefixByte) (nke
 			if pk != "" {
 				kp, err = ctx.KeyStore.GetKeyPair(pk)
 				if err != nil {
-					return nil, err
+					continue
 				}
 			}
 			// not found
 			if kp == nil {
-				return nil, nil
+				continue
 			}
 		}
 		if !KeyPairTypeOk(kind, kp) {
 			err = fmt.Errorf("unexpected resolved keytype type")
+			continue
 		}
 		if kp != nil {
 			err = nil
 			break
 		}
 	}
-	return kp, nil
+	return kp, err
 }
 
 func (ctx *Context) PickAccount(name string) (string, error) {
