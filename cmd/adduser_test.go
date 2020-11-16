@@ -389,6 +389,44 @@ func Test_AddUserWithSigningKeyOnly(t *testing.T) {
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "AAA")
 	require.NoError(t, err)
 
-	_, err = ts.Store.ReadUserClaim("A", "AAA")
+	claim, err := ts.Store.ReadUserClaim("A", "AAA")
 	require.NoError(t, err)
+	require.NotEmpty(t, claim.IssuerAccount)
+	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
+	require.Equal(t, claim.Issuer, pk)
+}
+
+func Test_AddUserWithSigningKeyInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// create a signing key
+	kp, err := nkeys.CreateAccount()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.True(t, ts.KeyStore.HasPrivateKey(pk))
+
+	ts.AddAccount(t, "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.True(t, ts.KeyStore.HasPrivateKey(ac.Subject))
+
+	inputs := []interface{}{"AAA", true, "0", "0", 1}
+	cmd := CreateAddUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs)
+	require.NoError(t, err)
+
+	claim, err := ts.Store.ReadUserClaim("A", "AAA")
+	require.NoError(t, err)
+	require.NotEmpty(t, claim.IssuerAccount)
+	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
+	require.Equal(t, claim.Issuer, pk)
 }

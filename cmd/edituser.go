@@ -156,7 +156,12 @@ func (p *EditUserParams) PreInteractive(ctx ActionCtx) error {
 		}
 	}
 
-	return nil
+	signers, err := validUserSigners(ctx, p.Name)
+	if err != nil {
+		return err
+	}
+	p.SignerParams.SetPrompt("select the key to sign the user")
+	return p.SignerParams.SelectFromSigners(ctx, signers)
 }
 
 func (p *EditUserParams) Load(ctx ActionCtx) error {
@@ -209,9 +214,6 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 		p.GenericClaimsParams.Expiry = UnixToDate(p.claim.Expires)
 	}
 	if err := p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
-		return err
-	}
-	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
 	return nil
