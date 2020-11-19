@@ -174,15 +174,33 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	if err = p.SignerParams.Edit(ctx); err != nil {
+	signers, err := validUserSigners(ctx, p.Name)
+	if err != nil {
 		return err
 	}
-
-	return nil
+	p.SignerParams.SetPrompt("select the key to sign the user")
+	return p.SignerParams.SelectFromSigners(ctx, signers)
 }
 
 func (p *AddUserParams) Load(_ ActionCtx) error {
 	return nil
+}
+
+func validUserSigners(ctx ActionCtx, accName string) ([]string, error) {
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(accName)
+	if err != nil {
+		return nil, err
+	}
+	var signers []string
+	if ctx.StoreCtx().KeyStore.HasPrivateKey(ac.Subject) {
+		signers = append(signers, ac.Subject)
+	}
+	for _, signingKey := range ac.SigningKeys {
+		if ctx.StoreCtx().KeyStore.HasPrivateKey(signingKey) {
+			signers = append(signers, signingKey)
+		}
+	}
+	return signers, nil
 }
 
 func (p *AddUserParams) PostInteractive(_ ActionCtx) error {
