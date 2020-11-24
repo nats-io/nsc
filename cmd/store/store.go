@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -753,6 +754,18 @@ func (ctx *Context) ResolveKey(flagValue string, kinds ...nkeys.PrefixByte) (nke
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(kinds, func(i, j int) bool {
+		switch kind := kinds[i]; {
+		case kind == nkeys.PrefixByteAccount && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteAccount:
+			return false
+		default:
+			return true
+		}
+	})
 	for _, kind := range kinds {
 		if kp == nil {
 			var pk string
