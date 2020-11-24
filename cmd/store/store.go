@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -748,37 +749,56 @@ func (s *Store) GetContext() (*Context, error) {
 	return &c, nil
 }
 
-func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.KeyPair, error) {
+func (ctx *Context) ResolveKey(flagValue string, kinds ...nkeys.PrefixByte) (nkeys.KeyPair, error) {
 	kp, err := ResolveKey(flagValue)
 	if err != nil {
 		return nil, err
 	}
-	if kp == nil {
-		var pk string
-		switch kind {
-		case nkeys.PrefixByteAccount:
-			pk = ctx.Account.PublicKey
-		case nkeys.PrefixByteOperator:
-			pk = ctx.Operator.PublicKey
+	sort.Slice(kinds, func(i, j int) bool {
+		switch kind := kinds[i]; {
+		case kind == nkeys.PrefixByteAccount && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteAccount:
+			return false
 		default:
-			return nil, fmt.Errorf("unsupported key %d resolution", kind)
+			return true
 		}
-		// don't try to resolve empty
-		if pk != "" {
-			kp, err = ctx.KeyStore.GetKeyPair(pk)
-			if err != nil {
-				return nil, err
+	})
+	for _, kind := range kinds {
+		if kp == nil {
+			var pk string
+			switch kind {
+			case nkeys.PrefixByteAccount:
+				pk = ctx.Account.PublicKey
+			case nkeys.PrefixByteOperator:
+				pk = ctx.Operator.PublicKey
+			default:
+				return nil, fmt.Errorf("unsupported key %d resolution", kind)
+			}
+			// don't try to resolve empty
+			if pk != "" {
+				kp, err = ctx.KeyStore.GetKeyPair(pk)
+				if err != nil {
+					continue
+				}
+			}
+			// not found
+			if kp == nil {
+				continue
 			}
 		}
-		// not found
-		if kp == nil {
-			return nil, nil
+		if !KeyPairTypeOk(kind, kp) {
+			err = fmt.Errorf("unexpected resolved keytype type")
+			continue
+		}
+		if kp != nil {
+			err = nil
+			break
 		}
 	}
-	if !KeyPairTypeOk(kind, kp) {
-		return nil, fmt.Errorf("unexpected resolved keytype type")
-	}
-	return kp, nil
+	return kp, err
 }
 
 func (ctx *Context) PickAccount(name string) (string, error) {

@@ -33,7 +33,6 @@ import (
 
 func Test_AddOperator(t *testing.T) {
 	ts := NewEmptyStore(t)
-	t.Log(ts.Dir)
 
 	_, err := os.Lstat(filepath.Join(ts.Dir, "store"))
 	if err != nil && !os.IsNotExist(err) {
