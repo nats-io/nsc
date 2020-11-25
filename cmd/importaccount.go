@@ -127,7 +127,11 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 	theJWT := p.content
 	claim, err := jwt.DecodeAccountClaims(string(theJWT))
 	if err != nil {
-		r.AddError("failed to decode %#q: %v", p.file, err)
+		if err.Error() == JWTV2DecodeError {
+			r.AddError("%sfailed to decode %#q: %v", JWTUpgradeBannerJWT(), p.file, err)
+		} else {
+			r.AddError("failed to decode %#q: %v", p.file, err)
+		}
 		return r, err
 	}
 	if validateAndReport(claim, p.skip, r) {

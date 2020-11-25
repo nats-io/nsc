@@ -43,6 +43,24 @@ var cfgFile string
 
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
 
+const JWTV2DecodeError = `unexpected "ed25519-nkey" algorithm`
+
+func JWTUpgradeBannerJWT() string {
+	return fmt.Sprintf(`This version of nsc (%s) is incompatible with the provided jwt.
+If you wish to proceed, you need to upgrade nsc with: "nsc upgrade".
+Note that you’ll always be able to return to this version by typing "nsc upgrade --version %s".
+In order to use jwt v2 you need to upgrade ALL your nats-server to be at least 2.1.9.
+`, GetRootCmd().Version, GetRootCmd().Version)
+}
+
+func JWTUpgradeBannerStore() string {
+	return fmt.Sprintf(`This version of nsc (%s) is incompatible with the stored operator version jwt.
+If you wish to proceed, you need to upgrade nsc with: "nsc upgrade".
+Note that you’ll always be able to return to this version by typing "nsc upgrade --version %s".
+In order to use jwt v2 you need to upgrade ALL your nats-server to be at least 2.1.9.
+`, "", "")
+}
+
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
 
 func GetStoreForOperator(operator string) (*store.Store, error) {
@@ -112,6 +130,11 @@ var rootCmd = &cobra.Command{
 	Use:   "nsc",
 	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if store, _ := GetStore(); store != nil {
+			if _, err := store.ReadOperatorClaim(); err != nil && err.Error() == JWTV2DecodeError {
+				return fmt.Errorf(JWTUpgradeBannerStore())
+			}
+		}
 		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
 			return nil
 		}
