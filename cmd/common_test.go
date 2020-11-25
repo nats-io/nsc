@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mitchellh/go-homedir"
-
+	jwtv2 "github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -476,4 +476,20 @@ func Test_NameFlagArgOnlyOnEmpty(t *testing.T) {
 		r := nameFlagOrArgument(v.n, v.a)
 		require.Equal(t, v.out, r, "failed test %d", i)
 	}
+}
+
+func Test_OperatorV2(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	dir := filepath.Join(ts.Dir, "store", "O")
+	tf := filepath.Join(dir, "O.jwt")
+	oc := jwtv2.NewOperatorClaims(ts.GetOperatorPublicKey(t))
+	oc.Name = "O"
+	theJwt, err := oc.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	err = ioutil.WriteFile(tf, []byte(theJwt), 0700)
+	require.NoError(t, err)
+	_, stdErr, err := ExecuteCmd(rootCmd, "env")
+	require.Error(t, err)
+	require.Contains(t, stdErr, JWTUpgradeBannerStore())
 }

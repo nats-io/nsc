@@ -155,6 +155,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		}
 		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
+			if err.Error() == JWTV2DecodeError {
+				return fmt.Errorf("%sfailed to decode: %v", JWTUpgradeBannerJWT(), err)
+			}
 			return fmt.Errorf("error importing operator jwt: %v", err)
 		}
 		p.token = token
@@ -330,6 +333,9 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 		if err == nil {
 			ocNew, err := jwt.DecodeOperatorClaims(p.token)
 			if err != nil {
+				if err.Error() == JWTV2DecodeError {
+					r.AddError("%sfailed to decode: %v", JWTUpgradeBannerJWT(), err)
+				}
 				return nil, err
 			}
 			if oc.Subject != ocNew.Subject {

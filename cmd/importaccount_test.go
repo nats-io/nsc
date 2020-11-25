@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt"
+	jwtv2 "github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -73,4 +74,20 @@ func Test_ImportAccountOtherOperator(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
 	require.Error(t, err)
+}
+
+func Test_ImportAccountV2(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	aKp, _ := nkeys.CreateAccount()
+	pk, _ := aKp.PublicKey()
+	acp := jwtv2.NewAccountClaims(pk)
+	theJWT, err := acp.Encode(aKp) // this account being self signed does not matter for this test
+	require.NoError(t, err)
+	file := filepath.Join(ts.Dir, "account.jwt")
+	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+	require.NoError(t, err)
+	_, stdErr, err := ExecuteCmd(createImportAccountCmd(), "--file", file)
+	require.Error(t, err)
+	require.Contains(t, stdErr, JWTUpgradeBannerJWT())
 }
