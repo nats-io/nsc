@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	jwtv1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -257,4 +258,22 @@ func Test_AddOperatorNameArg(t *testing.T) {
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.Equal(t, "X", oc.Name)
+}
+
+func TestImportOperatorV2(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwtv1.NewOperatorClaims(pub)
+	oc.Name = "O"
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "O.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+
+	_, stdErr, err := ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	require.Error(t, err)
+	require.Contains(t, stdErr, JWTUpgradeBannerJWT(1).Error())
 }

@@ -43,24 +43,6 @@ var cfgFile string
 
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
 
-const JWTV2DecodeError = `more recent jwt version`
-
-func JWTUpgradeBannerJWT() string {
-	return fmt.Sprintf(`This version of nsc (%s) is incompatible with the provided jwt.
-If you wish to proceed, you need to upgrade nsc with: "nsc upgrade".
-Note that you’ll always be able to return to this version by typing "nsc upgrade --version %s".
-In order to use jwt v2 you need to upgrade ALL your nats-server to be at least 2.1.9.
-`, GetRootCmd().Version, GetRootCmd().Version)
-}
-
-func JWTUpgradeBannerStore() string {
-	return fmt.Sprintf(`This version of nsc (%s) is incompatible with the stored operator version jwt.
-If you wish to proceed, you need to upgrade nsc with: "nsc upgrade".
-Note that you’ll always be able to return to this version by typing "nsc upgrade --version %s".
-In order to use jwt v2 you need to upgrade ALL your nats-server to be at least 2.1.9.
-`, "", "")
-}
-
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
 
 func GetStoreForOperator(operator string) (*store.Store, error) {
@@ -132,8 +114,23 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if store, _ := GetStore(); store != nil {
 			if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
-				if cmd.Name() != "upgrade-jwt" {
-					return fmt.Errorf("the store %#q needs to upgrade - type `%s upgrade-jwt` to update", store.GetName(), os.Args[0])
+				if c.Version > 2 {
+					return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
+						store.GetName(), c.Version, os.Args[0])
+				} else if c.Version == 1 {
+					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help"
+					if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
+						for _, v := range addCmd.Commands() {
+							if v == cmd {
+								allowCmdWithJWTV1Store = true
+								break
+							}
+						}
+					}
+					if !allowCmdWithJWTV1Store {
+						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt"`,
+							store.GetName(), os.Args[0])
+					}
 				}
 			}
 		}

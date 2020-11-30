@@ -101,11 +101,7 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	claim, err := jwt.DecodeUserClaims(theJWT)
 	if err != nil {
-		if err.Error() == JWTV2DecodeError {
-			r.AddError("%sfailed to decode %#q: %v", JWTUpgradeBannerJWT(), p.file, err)
-		} else {
-			r.AddError("failed to decode %#q: %v", p.file, err)
-		}
+		r.AddError("failed to decode %#q: %v", p.file, err)
 		return r, err
 	}
 	if validateAndReport(claim, p.skip, r) {

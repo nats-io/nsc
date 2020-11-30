@@ -16,7 +16,15 @@
 package cmd
 
 import (
+	"archive/zip"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nsc/cmd/store"
@@ -24,110 +32,143 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func backup(file string, dir string) error {
+	fp, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	w := zip.NewWriter(fp)
+	defer w.Close()
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		wrtr, err := w.Create(strings.TrimPrefix(path, dir))
+		if err != nil {
+			return err
+		}
+		dat, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		_, err = wrtr.Write(dat)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
+	op, err := s.ReadOperatorClaim()
+	if err != nil {
+		rep.AddError(`Could not find Operator, please check your environment using "nsc env"`)
+		return
+	}
+	opName := op.Name
+	// check for Version > 2 happens in root
+	if op.Version == 2 {
+		rep.AddOK("Operator %s is already upgraded to version %d. No change was applied", opName, op.Version)
+		return
+	}
+	if s.IsManaged() {
+		cmd.Print(cliprompts.WrapString(80,
+			`DID YOU UPGRADE nats-server AND DO YOU WANT TO CONVERT ALL NON MANAGED 
+OPERATOR / ACCOUNTS / USER JWT TO V2?
+Once converted you need to re-distribute the operator jwt wherever used.
+This includes ALL nats-server, which need to be restarted (one by one is ok), and nsc stores in managed mode.
+If you `))
+		rep.AddError(`NO CHANGE WAS MADE!
+Your store is in managed mode and was set up using:
+"nsc add operator --force --url <file or url>""
+You need to contact "%s", obtain a V2 jwt and re issue the above command.`, opName)
+		return
+	}
+	// obtain private identity key needed to recode the operator jwt
+	var opKp nkeys.KeyPair
+	if ctx, err := s.GetContext(); err != nil {
+		rep.AddError("Loading Operator Context %s failed: %v", opName, err)
+	} else {
+		opKp, err = ctx.KeyStore.GetKeyPair(op.Subject)
+		if opKp == nil {
+			errString := "not found"
+			if err != nil {
+				errString = fmt.Sprintf("failed with error: %v", err)
+			}
+			rep.AddError(`Identity Key for Operator %s %s.
+This key needs to be present in order to rewrite the Operator to be v2.
+If you intentionally removed it, you need to restore it for this command to work.`, opName, errString)
+		}
+	}
+	if opKp == nil {
+		return
+	}
+	if conv, _ := cliprompts.Confirm(cliprompts.WrapString(80, `It is advisable to create a backup of the store.
+Do you want to create a backup in the form of a zip file now?`), true); conv {
+		dir, _ := os.Getwd()
+		zipFileDefault := filepath.Join(dir, fmt.Sprintf("%s-jwtV1-upgrade-backup.zip", opName))
+		backupFile, err := cliprompts.Prompt("zip file name:", zipFileDefault)
+		if err != nil {
+			rep.AddError("Error obtaining file name")
+			return
+		}
+		if err = backup(backupFile, s.Dir); err != nil {
+			rep.AddError("Error creating backup zip file")
+			return
+		}
+		cmd.Print(cliprompts.WrapSprintf(80, `Backup file "%s" created. 
+This backup does `+cliprompts.Bold("NOT CONTAIN private nkeys")+`!
+`+cliprompts.Bold("If you need to restore this state")+`:
+	Delete the directory "%s"
+	Extract the backup 
+	Move the created directory in place of the deleted one
+	Downgrade nsc using: "nsc update -version <previous release>"
+`, backupFile, s.Dir))
+	}
+	cmd.Print(cliprompts.WrapString(80,
+		`In order to use jwt V2, `+cliprompts.Bold("YOU MUST UPGRADE ALL nats-server")+` prior to usage!
+If you are `+cliprompts.Bold("NOT READY")+` to switch over to jwt V2, downgrade nsc using:
+"nsc update -version <previous release>"
+`))
+	if conv, _ := cliprompts.Confirm(cliprompts.WrapString(80,
+		`DID YOU UPGRADE nats-server AND DO YOU WANT TO CONVERT ALL NON MANAGED 
+OPERATOR / ACCOUNTS / USER JWT TO V2?
+Once converted you need to re-distribute the operator jwt wherever used.
+This includes, but is not limited to:
+    ALL nats-server, which need to be restarted (one by one is ok)
+    ALL dependent nsc stores in managed mode `), false); !conv {
+		rep.AddOK("Declined to convert at this time. Rerun command when ready.")
+		return
+	}
+	if newJwt, err := op.Encode(opKp); err != nil {
+		rep.AddError("Re-Encoding Operator jwt %s failed: %v", opName, err)
+	} else if _, err = s.StoreClaim([]byte(newJwt)); err != nil {
+		rep.AddError("Storing Re-Encoded Operator jwt %s failed: %v", opName, err)
+	} else {
+		rep.AddOK("Converted Operator: %s", opName)
+	}
+}
+
 func createUpgradeJwtCommand() *cobra.Command {
 	var cmd = &cobra.Command{
 		Example: "nsc upgrade-jwt",
 		Use:     "upgrade-jwt",
 		Short:   "Update jwt w",
 		Args:    MaxArgs(0),
+		Hidden:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
 				return errors.New("no store set - `env --store <dir>`")
 			}
-			rep := store.Report{}
-			operators := config.ListOperators()
-			if len(operators) == 0 {
-				return errors.New("no operators defined - init an environment")
-			}
-			cmd.Print(cliprompts.WrapString(80,
-				`In order to use jwt V2, `+cliprompts.Bold("YOU MUST UPGRADE ALL nats-server")+` prior to usage!
-If you are not ready to switch over to jwt V2 downgrade nsc using:
-"nsc update -version <previous release>"
-
-`))
-			if conv, err := cliprompts.Confirm(cliprompts.WrapString(80,
-				`DID YOU UPGRADE nats-server AND DO YOU WANT TO CONVERT ALL NON MANAGED 
-OPERATOR / ACCOUNTS / USER JWT TO V2?`), false); err != nil {
+			rep := store.Report{Label: "Upgrade operator jwt to v2"}
+			s, err := GetStore()
+			if err != nil {
 				return err
-			} else if !conv {
-				rep.AddOK("Declined to convert at this time. Rerun command when ready.")
-				cmd.Print(rep.Message())
-				return nil
 			}
-			rep.AddOK("Inspecting all Operator(s)")
-			for _, opName := range operators {
-				if s, err := config.LoadStore(opName); err != nil {
-					rep.AddError("Loading Operator Store %s failed: %v", opName, err)
-				} else if op, err := s.ReadOperatorClaim(); err != nil {
-					rep.AddError("Reading Operator Claim %s failed: %v", opName, err)
-				} else if ctx, err := s.GetContext(); err != nil {
-					rep.AddError("Loading Operator Context %s failed: %v", opName, err)
-				} else {
-					if op.Version == 1 {
-						if kp, err := ctx.KeyStore.GetKeyPair(op.Issuer); err != nil {
-							rep.AddError("Loading Operator Issuer Key %s failed: %v", opName, err)
-						} else if kp == nil {
-							if s.IsManaged() {
-								rep.AddOK("Skipping Managed Operator %s", opName)
-							} else {
-								rep.AddError("Loading Operator Issuer Key %s failed: not found", opName)
-							}
-						} else if newJwt, err := op.Encode(kp); err != nil {
-							rep.AddError("Re-Encoding Operator jwt %s failed: %v", opName, err)
-						} else if _, err = s.StoreClaim([]byte(newJwt)); err != nil {
-							rep.AddError("Storing Re-Encoded Operator jwt %s failed: %v", opName, err)
-						} else {
-							rep.AddOK("Converted Operator: %s", opName)
-						}
-					}
-					accs, _ := s.ListSubContainers(store.Accounts)
-					for _, accSubj := range accs {
-						accName := ""
-						if ac, err := s.ReadAccountClaim(accSubj); err != nil {
-							rep.AddError("Operator %s: Reading Account Claim %s failed: %v", opName, accSubj, err)
-						} else if accName = ac.Name; ac.Version == 1 {
-							if kp, err := ctx.KeyStore.GetKeyPair(ac.Issuer); err != nil {
-								rep.AddError("Operator %s: Loading Issuer Key %s of Account %s failed: %v", opName, ac.Issuer, accName, err)
-							} else if kp == nil {
-								if s.IsManaged() {
-									rep.AddOK("Operator %s: Skipping Managed Account %s", opName, accName)
-								} else {
-									rep.AddError("Operator %s: Loading Issuer Key %s of Account %s failed: not found", opName, ac.Issuer, accName)
-								}
-							} else if newJwt, err := ac.Encode(kp); err != nil {
-								rep.AddError("Operator %s: Re-Encoding Account jwt %s failed: %v", opName, accName, err)
-							} else if _, err = s.StoreClaim([]byte(newJwt)); err != nil {
-								rep.AddError("Operator %s: Storing Re-Encoded Account jwt %s failed: %v", opName, accName, err)
-							} else {
-								rep.AddOK("Operator %s: Converted Account: %s", opName, accName)
-							}
-						}
-						if names, err := s.ListEntries(store.Accounts, accName, store.Users); err != nil {
-							rep.AddError("Account %s: Listing Users failed: %v", accName, err)
-							continue
-						} else {
-							for _, usrName := range names {
-								uc, err := s.ReadUserClaim(accName, usrName)
-								if err != nil {
-									rep.AddError("Account %s: Reading User Claim %s failed: %v", usrName, accName, err)
-								} else if uc.Version != 1 {
-								} else if kp, err := ctx.KeyStore.GetKeyPair(uc.Issuer); err != nil {
-									rep.AddError("Account %s: Loading Issuer Key of Claim %s failed: %v", accName, usrName, err)
-								} else if kp == nil {
-									rep.AddError("Account %s: Loading Issuer Key of Claim %s not found", accName, usrName)
-								} else if newJwt, err := uc.Encode(kp); err != nil {
-									rep.AddError("Account %s: Re-Encoding User Claim %s failed: %v", accName, usrName, err)
-								} else if _, err = s.StoreClaim([]byte(newJwt)); err != nil {
-									rep.AddError("Account %s: Storing Re-Encoded User jwt %s failed: %v", accName, usrName, err)
-								} else {
-									rep.AddOK("Account %s: Converted User: %s", accName, usrName)
-								}
-							}
-						}
-					}
-				}
-			}
+			upgradeOperator(cmd, s, &rep)
 			cmd.Print(rep.Message())
 			return nil
 		},

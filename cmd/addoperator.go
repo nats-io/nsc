@@ -55,6 +55,11 @@ func init() {
 	addCmd.AddCommand(createAddOperatorCmd())
 }
 
+func JWTUpgradeBannerJWT(ver int) error {
+	return fmt.Errorf(`this version of nsc (%s) is incompatible with the provided jwt v%d`,
+		GetRootCmd().Version, ver)
+}
+
 type AddOperatorParams struct {
 	SignerParams
 	TimeParams
@@ -155,10 +160,10 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		}
 		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
-			if err.Error() == JWTV2DecodeError {
-				return fmt.Errorf("%sfailed to decode: %v", JWTUpgradeBannerJWT(), err)
-			}
 			return fmt.Errorf("error importing operator jwt: %v", err)
+		}
+		if op.Version != 2 {
+			return JWTUpgradeBannerJWT(op.Version)
 		}
 		p.token = token
 		if p.name == "" {
@@ -333,10 +338,10 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 		if err == nil {
 			ocNew, err := jwt.DecodeOperatorClaims(p.token)
 			if err != nil {
-				if err.Error() == JWTV2DecodeError {
-					r.AddError("%sfailed to decode: %v", JWTUpgradeBannerJWT(), err)
-				}
 				return nil, err
+			}
+			if ocNew.Version != 2 {
+				return nil, JWTUpgradeBannerJWT(ocNew.Version)
 			}
 			if oc.Subject != ocNew.Subject {
 				err := fmt.Errorf("existing and new operator represent different entities")
