@@ -43,7 +43,7 @@ var cfgFile string
 
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
 
-const JWTV2DecodeError = `unexpected "ed25519-nkey" algorithm`
+const JWTV2DecodeError = `more recent jwt version`
 
 func JWTUpgradeBannerJWT() string {
 	return fmt.Sprintf(`This version of nsc (%s) is incompatible with the provided jwt.
