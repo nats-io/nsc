@@ -50,12 +50,20 @@ func (a *AccountDescriber) Describe() string {
 		table.AddSeparator()
 	}
 
-	lim := a.Limits
-	if lim.Conn > -1 {
-		table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
-	} else {
-		table.AddRow("Max Connections", "Unlimited")
+	addLimitRow := func(table *tablewriter.Table, name string, limit int64, inBytes bool) {
+		if limit > -1 {
+			val := fmt.Sprintf("%d", limit)
+			if inBytes {
+				val = fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(limit)), limit)
+			}
+			table.AddRow(name, val)
+		} else {
+			table.AddRow(name, "Unlimited")
+		}
 	}
+
+	lim := a.Limits
+	addLimitRow(table, "Max Connections", lim.Conn, false)
 
 	if lim.LeafNodeConn == 0 {
 		table.AddRow("Max Leaf Node Connections", "Not Allowed")
@@ -65,41 +73,42 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Max Leaf Node Connections", "Unlimited")
 	}
 
-	if lim.Data > -1 {
-		table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
-	} else {
-		table.AddRow("Max Data", "Unlimited")
-	}
-
-	if lim.Exports > -1 {
-		table.AddRow("Max Exports", fmt.Sprintf("%d", lim.Exports))
-	} else {
-		table.AddRow("Max Exports", "Unlimited")
-	}
-
-	if lim.Imports > -1 {
-		table.AddRow("Max Imports", fmt.Sprintf("%d", lim.Imports))
-	} else {
-		table.AddRow("Max Imports", "Unlimited")
-	}
-
-	if lim.Payload > -1 {
-		table.AddRow("Max Msg Payload", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Payload)), lim.Payload))
-	} else {
-		table.AddRow("Max Msg Payload", "Unlimited")
-	}
-
-	if lim.Subs > -1 {
-		table.AddRow("Max Subscriptions", fmt.Sprintf("%d", lim.Subs))
-	} else {
-		table.AddRow("Max Subscriptions", "Unlimited")
-	}
+	addLimitRow(table, "Max Data", lim.Data, true)
+	addLimitRow(table, "Max Exports", lim.Exports, false)
+	addLimitRow(table, "Max Imports", lim.Imports, false)
+	addLimitRow(table, "Max Msg Payload", lim.Payload, true)
+	addLimitRow(table, "Max Subscriptions", lim.Subs, false)
 
 	we := "False"
 	if lim.WildcardExports {
 		we = "True"
 	}
 	table.AddRow("Exports Allows Wildcards", we)
+
+	table.AddSeparator()
+	if a.Limits.DiskStorage == 0 && a.Limits.MemoryStorage == 0 {
+		table.AddRow("Jetstream", "Disabled")
+	} else {
+		table.AddRow("Jetstream", "Enabled")
+		switch {
+		case lim.DiskStorage > 0:
+			table.AddRow("Max Disk Storage", humanize.Bytes(uint64(lim.DiskStorage)))
+		case lim.DiskStorage == 0:
+			table.AddRow("Max Disk Storage", "Disabled")
+		default:
+			table.AddRow("Max Disk Storage", "Unlimited")
+		}
+		switch {
+		case lim.MemoryStorage > 0:
+			table.AddRow("Max Mem Storage", humanize.Bytes(uint64(lim.MemoryStorage)))
+		case lim.MemoryStorage == 0:
+			table.AddRow("Max Mem Storage", "Disabled")
+		default:
+			table.AddRow("Max Mem Storage", "Unlimited")
+		}
+		addLimitRow(table, "Max Streams", lim.Streams, false)
+		addLimitRow(table, "Max Consumer", lim.Consumer, false)
+	}
 
 	table.AddSeparator()
 
