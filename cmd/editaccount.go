@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	cli "github.com/nats-io/cliprompts/v2"
 
 	"github.com/nats-io/nsc/cmd/store"
 
@@ -24,6 +25,24 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 )
+
+func validatorUrlOrEmpty() cli.Opt {
+	return cli.Val(func (v string) error {
+		if v == "" {
+			return nil
+		}
+		return cli.URLValidator("http", "https")(v)
+	})
+}
+
+func validatorMaxLen(max int) cli.Opt {
+	return cli.Val(func (v string) error {
+		if len(v) > max {
+			return fmt.Errorf("value exceeds %d character", max)
+		}
+		return nil
+	})
+}
 
 func createEditAccount() *cobra.Command {
 	var params EditAccountParams
@@ -51,6 +70,8 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "consumer", "", -1, "set maximum consumer for the account (-1 is unlimited)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
+	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this account")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
@@ -68,6 +89,8 @@ type EditAccountParams struct {
 	GenericClaimsParams
 	claim         *jwt.AccountClaims
 	token         string
+	infoUrl 	  string
+	description   string
 	conns         NumberParams
 	leafConns     NumberParams
 	exports       NumberParams
@@ -91,7 +114,9 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk") {
+	if !InteractiveFlag && ctx.NothingToDo(
+		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports",
+		"subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -162,6 +187,14 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.consumer.NumberValue = p.claim.Limits.Consumer
 	}
 
+	if !ctx.CurrentCmd().Flags().Changed("description") {
+		p.description = p.claim.Description
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("info-url") {
+		p.infoUrl = p.claim.InfoURL
+	}
+
 	return err
 }
 
@@ -230,6 +263,15 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
+
+	if p.description, err = cli.Prompt("Account Description", p.description, validatorMaxLen(jwt.MaxInfoLength)); err != nil {
+		return err
+	}
+
+	if p.infoUrl, err = cli.Prompt("Info url", p.infoUrl, validatorUrlOrEmpty()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -342,6 +384,16 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Consumer = p.consumer.NumberValue
 	if flags.Changed("consumer") {
 		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
+	}
+
+	p.claim.Description = p.description
+	if flags.Changed("description") {
+		r.AddOK(`changed description to %q`, p.claim.Description)
+	}
+
+	p.claim.InfoURL = p.infoUrl
+	if flags.Changed("info-url") {
+		r.AddOK(`changed info url to %q`, p.claim.InfoURL)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)

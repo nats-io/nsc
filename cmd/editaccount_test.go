@@ -32,6 +32,8 @@ func Test_EditAccount(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditAccount(), []string{"edit", "account"}, nil, []string{"specify an edit option"}, true},
+		{createEditAccount(), []string{"edit", "account", "--info-url", "http://foo/bar"}, nil, []string{"changed info url to"}, false},
+		{createEditAccount(), []string{"edit", "account", "--description", "my account is about this"}, nil, []string{"changed description to"}, false},
 		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--name", "A"}, nil, []string{"edited account \"A\""}, false},
 	}
 

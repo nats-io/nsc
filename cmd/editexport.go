@@ -46,6 +46,8 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
 	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
 	cmd.Flags().BoolVarP(&params.rmLatencySampling, "rm-latency-sampling", "", false, "remove latency sampling")
+	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this export")
+	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this export")
 
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
@@ -72,11 +74,14 @@ type EditExportParams struct {
 	private           bool
 	responseType      string
 	rmLatencySampling bool
+	infoUrl 	  string
+	description   string
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {
 	if !InteractiveFlag {
-		if ctx.NothingToDo("name", "subject", "service", "private", "latency", "sampling", "response-type") {
+		if ctx.NothingToDo("name", "subject", "service", "private", "latency", "sampling", "response-type",
+			"description", "info-url") {
 			return errors.New("please specify some options")
 		}
 	}
@@ -234,6 +239,14 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	if p.description, err = cli.Prompt("Export Description", p.description, validatorMaxLen(jwt.MaxInfoLength)); err != nil {
+		return err
+	}
+
+	if p.infoUrl, err = cli.Prompt("Info url", p.infoUrl, validatorUrlOrEmpty()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -302,6 +315,13 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 		p.responseType = string(old.ResponseType)
 	}
 
+	if !(cmd.Flag("description").Changed) {
+		p.description = old.Description
+	}
+
+	if !(cmd.Flag("info-url").Changed) {
+		p.infoUrl = old.InfoURL
+	}
 }
 
 func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
@@ -372,6 +392,16 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 			export.ResponseType = rt
 			r.AddOK("changed response type to %s", p.responseType)
 		}
+	}
+
+	export.Description = p.description
+	if export.Description != old.Description {
+		r.AddOK(`changed description to %q`, p.description)
+	}
+
+	export.InfoURL = p.infoUrl
+	if export.InfoURL != old.InfoURL {
+		r.AddOK(`changed info url to %q`, p.infoUrl)
 	}
 
 	p.claim.Exports[p.index] = &export

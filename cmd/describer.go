@@ -45,6 +45,19 @@ func (a *AccountDescriber) Describe() string {
 	AddStandardClaimInfo(table, &a.AccountClaims)
 	table.AddSeparator()
 
+	info := false
+	if a.Description != "" {
+		table.AddRow("Description", strings.ReplaceAll(a.Description, "\n", " "))
+		info = true
+	}
+	if a.InfoURL != "" {
+		table.AddRow("Info Url", a.InfoURL)
+		info = true
+	}
+	if info {
+		table.AddSeparator()
+	}
+
 	if len(a.SigningKeys) > 0 {
 		AddListValues(table, "Signing Keys", a.SigningKeys)
 		table.AddSeparator()
@@ -166,7 +179,7 @@ func toYesNo(tf bool) string {
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
+	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking", "Description", "Info URL")
 	for _, v := range e.Exports {
 		mon := "N/A"
 		rt := ""
@@ -186,7 +199,8 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := strings.Title(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
+		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon,
+			strings.ReplaceAll(v.Description, "\n", " "), v.InfoURL)
 	}
 	return table.Render()
 }
