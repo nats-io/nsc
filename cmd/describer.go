@@ -411,7 +411,13 @@ func (o *OperatorDescriber) Describe() string {
 	AddListValues(table, "Operator Service URLs", o.OperatorServiceURLs)
 
 	if o.SystemAccount != "" {
-		table.AddRow("System Account", o.SystemAccount)
+		decoration := ""
+		if fn, err := friendlyNames(o.Name); err == nil {
+			if name, ok := fn[o.SystemAccount]; ok {
+				decoration = " / " + name
+			}
+		}
+		table.AddRow("System Account", o.SystemAccount+decoration)
 	}
 
 	if len(o.SigningKeys) > 0 {
