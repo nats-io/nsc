@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -113,7 +114,7 @@ func Test_EditAccountLimits(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10M", "--exports", "15",
 		"--imports", "20", "--payload", "1K", "--subscriptions", "30", "--leaf-conns", "31",
-		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8" )
+		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -153,4 +154,56 @@ func Test_EditAccountSigningKeys(t *testing.T) {
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotContains(t, ac.SigningKeys, pk)
+}
+
+func Test_EditAccount_Pubs(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(createEditAccount(), "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	require.NoError(t, err)
+
+	cc, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Allow, []string{"a", "b", "c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Allow, []string{"c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo", "bar"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Deny, []string{"bar"})
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--rm", "c,bar")
+	require.NoError(t, err)
+	cc, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Allow, []string{"a", "b"})
+	require.Len(t, cc.DefaultPermissions.Sub.Allow, 0)
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo"})
+	require.Len(t, cc.DefaultPermissions.Sub.Deny, 0)
+}
+
+func Test_EditAccountResponsePermissions(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(createEditAccount(), "--max-responses", "1000", "--response-ttl", "4ms")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, uc.DefaultPermissions.Resp)
+	require.Equal(t, 1000, uc.DefaultPermissions.Resp.MaxMsgs)
+	d, _ := time.ParseDuration("4ms")
+	require.Equal(t, d, uc.DefaultPermissions.Resp.Expires)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--rm-response-perms")
+	require.NoError(t, err)
+
+	uc, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Nil(t, uc.DefaultPermissions.Resp)
 }

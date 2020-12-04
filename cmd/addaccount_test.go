@@ -266,3 +266,19 @@ func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
 	_, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 }
+
+func Test_AddAccount_Pubs(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A",  "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	require.NoError(t, err)
+
+	cc, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Allow, []string{"a", "b", "c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Allow, []string{"c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo", "bar"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Deny, []string{"bar"})
+}

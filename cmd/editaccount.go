@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+
 	cli "github.com/nats-io/cliprompts/v2"
 
 	"github.com/nats-io/nsc/cmd/store"
@@ -27,7 +28,7 @@ import (
 )
 
 func validatorUrlOrEmpty() cli.Opt {
-	return cli.Val(func (v string) error {
+	return cli.Val(func(v string) error {
 		if v == "" {
 			return nil
 		}
@@ -36,7 +37,7 @@ func validatorUrlOrEmpty() cli.Opt {
 }
 
 func validatorMaxLen(max int) cli.Opt {
-	return cli.Val(func (v string) error {
+	return cli.Val(func(v string) error {
 		if len(v) > max {
 			return fmt.Errorf("value exceeds %d character", max)
 		}
@@ -72,6 +73,8 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this account")
+	params.PermissionsParams.bindSetFlags(cmd, "default permissions")
+	params.PermissionsParams.bindRemoveFlags(cmd, "default permissions")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
@@ -87,9 +90,10 @@ type EditAccountParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
+	PermissionsParams
 	claim         *jwt.AccountClaims
 	token         string
-	infoUrl 	  string
+	infoUrl       string
 	description   string
 	conns         NumberParams
 	leafConns     NumberParams
@@ -115,8 +119,10 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo(
-		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports",
-		"subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url") {
+		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions",
+		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
+		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
+		"rm-response-perms", "rm", "max-responses") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -289,6 +295,9 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
 		return fmt.Errorf("jetstream not available for system account")
 	}
+	if err := p.PermissionsParams.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -394,6 +403,14 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.InfoURL = p.infoUrl
 	if flags.Changed("info-url") {
 		r.AddOK(`changed info url to %q`, p.claim.InfoURL)
+	}
+
+	s, err := p.PermissionsParams.Run(&p.claim.DefaultPermissions, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil {
+		r.Add(s.Details...)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)

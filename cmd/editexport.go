@@ -74,8 +74,8 @@ type EditExportParams struct {
 	private           bool
 	responseType      string
 	rmLatencySampling bool
-	infoUrl 	  string
-	description   string
+	infoUrl           string
+	description       string
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {

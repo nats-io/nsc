@@ -70,16 +70,6 @@ nsc edit user --name <n> --rm-response-perms
 	cmd.Flags().VarP(&params.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
 	cmd.Flags().StringSliceVarP(&params.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
 
-	cmd.Flags().StringSliceVarP(&params.remove, "rm", "", nil, "remove publish/subscribe and deny permissions - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "add publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowPubsub, "allow-pubsub", "", nil, "add publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowSubs, "allow-sub", "", nil, "add subscribe permissions - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.denyPubs, "deny-pub", "", nil, "add deny publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "add deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "add deny subscribe permissions - comma separated list or option can be specified multiple times")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 
@@ -94,8 +84,8 @@ nsc edit user --name <n> --rm-response-perms
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
-	params.ResponsePermsParams.bindSetFlags(cmd)
-	params.ResponsePermsParams.bindRemoveFlags(cmd)
+	params.PermissionsParams.bindSetFlags(cmd, "permissions")
+	params.PermissionsParams.bindRemoveFlags(cmd, "permissions")
 
 	return cmd
 }
@@ -108,25 +98,18 @@ type EditUserParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
-	ResponsePermsParams
+	PermissionsParams
 	claim         *jwt.UserClaims
 	name          string
 	token         string
 	credsFilePath string
 
-	allowPubs   []string
-	allowPubsub []string
-	allowSubs   []string
-	denyPubs    []string
-	denyPubsub  []string
-	denySubs    []string
-	remove      []string
-	rmSrc       []string
-	src         []string
-	times       timeSlice
-	rmTimes     []string
-	payload     DataParams
-	bearer      bool
+	rmSrc   []string
+	src     []string
+	times   timeSlice
+	rmTimes []string
+	payload DataParams
+	bearer  bool
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -201,7 +184,7 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 
 func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
-	//if err := p.ResponsePermsParams.Edit(p.claim.Resp != nil); err != nil {
+	//if err := p.PermissionsParams.Edit(p.claim.Resp != nil); err != nil {
 	//	return err
 	//}
 	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
@@ -236,7 +219,7 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.ResponsePermsParams.Validate(); err != nil {
+	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
 	}
 
@@ -249,53 +232,6 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	var err error
 	p.GenericClaimsParams.Run(ctx, p.claim, r)
-
-	var ap []string
-	p.claim.Permissions.Pub.Allow.Add(p.allowPubs...)
-	ap = append(ap, p.allowPubs...)
-	p.claim.Permissions.Pub.Allow.Add(p.allowPubsub...)
-	ap = append(ap, p.allowPubsub...)
-	for _, v := range ap {
-		r.AddOK("added pub pub %q", v)
-	}
-	p.claim.Permissions.Pub.Allow.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed pub %q", v)
-	}
-	sort.Strings(p.claim.Pub.Allow)
-
-	var dp []string
-	p.claim.Permissions.Pub.Deny.Add(p.denyPubs...)
-	dp = append(dp, p.denyPubs...)
-	p.claim.Permissions.Pub.Deny.Add(p.denyPubsub...)
-	dp = append(dp, p.denyPubsub...)
-	for _, v := range dp {
-		r.AddOK("added deny pub %q", v)
-	}
-	p.claim.Permissions.Pub.Deny.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed deny pub %q", v)
-	}
-	sort.Strings(p.claim.Permissions.Pub.Deny)
-
-	var sa []string
-	p.claim.Permissions.Sub.Allow.Add(p.allowSubs...)
-	sa = append(sa, p.allowSubs...)
-	p.claim.Permissions.Sub.Allow.Add(p.allowPubsub...)
-	sa = append(sa, p.allowPubsub...)
-	for _, v := range sa {
-		r.AddOK("added sub %q", v)
-	}
-	p.claim.Permissions.Sub.Allow.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed sub %q", v)
-	}
-	sort.Strings(p.claim.Permissions.Sub.Allow)
-
-	p.claim.Permissions.Sub.Deny.Add(p.denySubs...)
-	p.claim.Permissions.Sub.Deny.Add(p.denyPubsub...)
-	p.claim.Permissions.Sub.Deny.Remove(p.remove...)
-	sort.Strings(p.claim.Permissions.Sub.Deny)
 
 	flags := ctx.CurrentCmd().Flags()
 	p.claim.Limits.Payload = p.payload.Number
@@ -339,7 +275,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 
-	s, err := p.ResponsePermsParams.Run(p.claim, ctx)
+	s, err := p.PermissionsParams.Run(&p.claim.Permissions, ctx)
 	if err != nil {
 		return nil, err
 	}

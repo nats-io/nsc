@@ -98,6 +98,8 @@ func (a *AccountDescriber) Describe() string {
 	}
 	table.AddRow("Exports Allows Wildcards", we)
 
+	AddPermissions(table, a.DefaultPermissions)
+
 	table.AddSeparator()
 	if a.Limits.DiskStorage == 0 && a.Limits.MemoryStorage == 0 {
 		table.AddRow("Jetstream", "Disabled")
@@ -382,12 +384,7 @@ func NewUserDescriber(u jwt.UserClaims) *UserDescriber {
 	return &UserDescriber{UserClaims: u}
 }
 
-func (u *UserDescriber) Describe() string {
-	table := tablewriter.CreateTable()
-	table.AddTitle("User")
-	AddStandardClaimInfo(table, &u.UserClaims)
-	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
-
+func AddPermissions(table *tablewriter.Table, u jwt.Permissions) {
 	if len(u.Pub.Allow) > 0 || len(u.Pub.Deny) > 0 ||
 		len(u.Sub.Allow) > 0 || len(u.Sub.Deny) > 0 {
 		table.AddSeparator()
@@ -396,13 +393,21 @@ func (u *UserDescriber) Describe() string {
 		AddListValues(table, "Sub Allow", u.Sub.Allow)
 		AddListValues(table, "Sub Deny", u.Sub.Deny)
 	}
-	table.AddSeparator()
 	if u.Resp == nil {
 		table.AddRow("Response Permissions", "Not Set")
 	} else {
 		table.AddRow("Max Responses", u.Resp.MaxMsgs)
 		table.AddRow("Response Permission TTL", u.Resp.Expires.String())
 	}
+}
+
+func (u *UserDescriber) Describe() string {
+	table := tablewriter.CreateTable()
+	table.AddTitle("User")
+	AddStandardClaimInfo(table, &u.UserClaims)
+	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
+
+	AddPermissions(table, u.Permissions)
 
 	table.AddSeparator()
 	AddLimits(table, u.Limits)
