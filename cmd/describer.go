@@ -417,6 +417,11 @@ func (u *UserDescriber) Describe() string {
 		AddListValues(table, "Tags", u.Tags)
 	}
 
+	if len(u.Tags) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Allowed Connection Types", u.AllowedConnectionTypes)
+	}
+
 	return table.Render()
 }
 

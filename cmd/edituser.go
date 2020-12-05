@@ -79,6 +79,10 @@ nsc edit user --name <n> --rm-response-perms
 	cmd.Flags().Int64VarP(&params.payload.Number, "payload", "", -1, "set maximum message payload in bytes for the account (-1 is unlimited)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
+	cmd.Flags().StringSliceVarP(&params.connTypes, "conn-type", "", nil,
+		fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
+			jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
+	cmd.Flags().StringSliceVarP(&params.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
 
 	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
 
@@ -104,12 +108,14 @@ type EditUserParams struct {
 	token         string
 	credsFilePath string
 
-	rmSrc   []string
-	src     []string
-	times   timeSlice
-	rmTimes []string
-	payload DataParams
-	bearer  bool
+	rmSrc       []string
+	src         []string
+	times       timeSlice
+	rmTimes     []string
+	payload     DataParams
+	bearer      bool
+	connTypes   []string
+	rmConnTypes []string
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -119,7 +125,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time") {
+		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time", "conn-type", "rm-conn-type") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -205,6 +211,22 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	var err error
 
+	connTypes := make([]string, len(p.connTypes))
+	for i, k := range p.connTypes {
+		u := strings.ToUpper(k)
+		switch u {
+		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket:
+		default:
+			return fmt.Errorf("unknown connection type %s", k)
+		}
+		connTypes[i] = u
+	}
+	rmConnTypes := make([]string, len(p.rmConnTypes))
+	for i, k := range p.rmConnTypes {
+		rmConnTypes[i] = strings.ToUpper(k)
+	}
+	p.rmConnTypes = rmConnTypes
+
 	_, err = p.payload.NumberValue()
 	if err != nil {
 		return fmt.Errorf("error parsing %s: %s", "payload", p.payload.Value)
@@ -244,10 +266,22 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed bearer to %t", p.bearer)
 	}
 
+	var connTypes jwt.StringList
+	connTypes.Add(p.claim.AllowedConnectionTypes...)
+	connTypes.Add(p.connTypes...)
+	for _, v := range p.connTypes {
+		r.AddOK("added connection type %s", v)
+	}
+	connTypes.Remove(p.rmConnTypes...)
+	for _, v := range p.rmConnTypes {
+		r.AddOK("removed connection type %s", v)
+	}
+	p.claim.AllowedConnectionTypes = connTypes
+
 	var srcList jwt.CIDRList
 	srcList.Add(p.claim.Src...)
 	srcList.Add(p.src...)
-	for _, v := range p.claim.Src {
+	for _, v := range p.src {
 		r.AddOK("added src network %s", v)
 	}
 	srcList.Remove(p.rmSrc...)
