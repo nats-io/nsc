@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nkeys"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -206,4 +208,30 @@ func Test_EditAccountResponsePermissions(t *testing.T) {
 	uc, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Nil(t, uc.DefaultPermissions.Resp)
+}
+
+func Test_EditAccountSk(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	sk, err := nkeys.CreateOperator()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(sk)
+	require.NoError(t, err)
+	pSk, err := sk.PublicKey()
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pSk)
+	require.NoError(t, err)
+
+	ts.AddAccountWithSigner(t, "A", sk)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Issuer, pSk)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "foo")
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Issuer, pSk)
 }

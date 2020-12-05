@@ -212,7 +212,7 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
-	if err = p.SignerParams.Resolve(ctx); err != nil {
+	if err = p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
 		return err
 	}
 	if err = p.payload.Valid(); err != nil {

@@ -441,3 +441,30 @@ func Test_EditUserWithSigningKeyInteractive(t *testing.T) {
 	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
 	require.Equal(t, claim.Issuer, pk)
 }
+
+func Test_EditUserSk(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	sk, err := nkeys.CreateAccount()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(sk)
+	require.NoError(t, err)
+	pSk, err := sk.PublicKey()
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pSk)
+	require.NoError(t, err)
+
+	ts.AddUserWithSigner(t, "A", "u", sk)
+	uc, err := ts.Store.ReadUserClaim("A", "u")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, pSk)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--tag", "foo")
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "u")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, pSk)
+}

@@ -271,7 +271,7 @@ func Test_AddAccount_Pubs(t *testing.T) {
 	ts := NewTestStore(t, "edit user")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A",  "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A", "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
 	require.NoError(t, err)
 
 	cc, err := ts.Store.ReadAccountClaim("A")
