@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -127,11 +127,7 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 	theJWT := p.content
 	claim, err := jwt.DecodeAccountClaims(string(theJWT))
 	if err != nil {
-		if err.Error() == JWTV2DecodeError {
-			r.AddError("%sfailed to decode %#q: %v", JWTUpgradeBannerJWT(), p.file, err)
-		} else {
-			r.AddError("failed to decode %#q: %v", p.file, err)
-		}
+		r.AddError("failed to decode %#q: %v", p.file, err)
 		return r, err
 	}
 	if validateAndReport(claim, p.skip, r) {

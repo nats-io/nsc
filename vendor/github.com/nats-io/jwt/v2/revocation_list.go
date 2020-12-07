@@ -19,6 +19,8 @@ import (
 	"time"
 )
 
+const All = "*"
+
 // RevocationList is used to store a mapping of public keys to unix timestamps
 type RevocationList map[string]int64
 
@@ -42,6 +44,16 @@ func (r RevocationList) ClearRevocation(pubKey string) {
 // the one passed in. Generally this method is called with an issue time but other time's can
 // be used for testing.
 func (r RevocationList) IsRevoked(pubKey string, timestamp time.Time) bool {
+	if r.allRevoked(timestamp) {
+		return true
+	}
 	ts, ok := r[pubKey]
+	return ok && ts >= timestamp.Unix()
+}
+
+// allRevoked returns true if All is set and the timestamp is later or same as the
+// one passed. This is called by IsRevoked.
+func (r RevocationList) allRevoked(timestamp time.Time) bool {
+	ts, ok := r[All]
 	return ok && ts >= timestamp.Unix()
 }

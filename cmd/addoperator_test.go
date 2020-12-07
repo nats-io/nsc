@@ -26,8 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt"
-	jwtv2 "github.com/nats-io/jwt/v2"
+	jwtv1 "github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -265,7 +265,7 @@ func TestImportOperatorV2(t *testing.T) {
 	defer ts.Done(t)
 
 	_, pub, kp := CreateOperatorKey(t)
-	oc := jwtv2.NewOperatorClaims(pub)
+	oc := jwtv1.NewOperatorClaims(pub)
 	oc.Name = "O"
 	token, err := oc.Encode(kp)
 	require.NoError(t, err)
@@ -275,5 +275,5 @@ func TestImportOperatorV2(t *testing.T) {
 
 	_, stdErr, err := ExecuteCmd(createAddOperatorCmd(), "--url", tf)
 	require.Error(t, err)
-	require.Contains(t, stdErr, JWTUpgradeBannerJWT())
+	require.Contains(t, stdErr, JWTUpgradeBannerJWT(1).Error())
 }

@@ -112,7 +112,7 @@ const (
 	JSApiConsumerCreate  = "$JS.API.CONSUMER.CREATE.*"
 	JSApiConsumerCreateT = "$JS.API.CONSUMER.CREATE.%s"
 
-	// JSApiDurableCreate is the endpoint to create ephemeral consumers for streams.
+	// JSApiDurableCreate is the endpoint to create durable consumers for streams.
 	// You need to include the stream and consumer name in the subject.
 	JSApiDurableCreate  = "$JS.API.CONSUMER.DURABLE.CREATE.*.*"
 	JSApiDurableCreateT = "$JS.API.CONSUMER.DURABLE.CREATE.%s.%s"
@@ -143,13 +143,8 @@ const (
 	jsSnapshotAckT    = "$JS.SNAPSHOT.ACK.%s.%s"
 	jsRestoreDeliverT = "$JS.SNAPSHOT.RESTORE.%s.%s"
 
-	///////////////////////
-	// FIXME(dlc)
-	///////////////////////
-
 	// JetStreamAckT is the template for the ack message stream coming back from a consumer
 	// when they ACK/NAK, etc a message.
-	// FIXME(dlc) - What do we really need here??
 	jsAckT   = "$JS.ACK.%s.%s"
 	jsAckPre = "$JS.ACK."
 
@@ -269,6 +264,8 @@ const JSApiListLimit = 256
 
 type JSApiStreamNamesRequest struct {
 	ApiPagedRequest
+	// These are filters that can be applied to the list.
+	Subject string `json:"subject,omitempty"`
 }
 
 // JSApiStreamNamesResponse list of streams.
@@ -295,7 +292,7 @@ const JSApiStreamListResponseType = "io.nats.jetstream.api.v1.stream_list_respon
 type JSApiStreamPurgeResponse struct {
 	ApiResponse
 	Success bool   `json:"success,omitempty"`
-	Purged  uint64 `json:"purged,omitempty"`
+	Purged  uint64 `json:"purged"`
 }
 
 const JSApiStreamPurgeResponseType = "io.nats.jetstream.api.v1.stream_purge_response"
@@ -366,6 +363,9 @@ type JSApiMsgGetResponse struct {
 
 const JSApiMsgGetResponseType = "io.nats.jetstream.api.v1.stream_msg_get_response"
 
+// JSWaitQueueDefaultMax is the default max number of outstanding requests for pull consumers.
+const JSWaitQueueDefaultMax = 512
+
 // JSApiConsumerCreateResponse.
 type JSApiConsumerCreateResponse struct {
 	ApiResponse
@@ -412,6 +412,13 @@ type JSApiConsumerListResponse struct {
 }
 
 const JSApiConsumerListResponseType = "io.nats.jetstream.api.v1.consumer_list_response"
+
+// JSApiConsumerGetNextRequest is for getting next messages for pull based consumers.
+type JSApiConsumerGetNextRequest struct {
+	Expires time.Time `json:"expires,omitempty"`
+	Batch   int       `json:"batch,omitempty"`
+	NoWait  bool      `json:"no_wait,omitempty"`
+}
 
 // JSApiStreamTemplateCreateResponse for creating templates.
 type JSApiStreamTemplateCreateResponse struct {
@@ -522,7 +529,7 @@ func (s *Server) setJetStreamExportSubs() error {
 }
 
 func (s *Server) sendAPIResponse(c *client, subject, reply, request, response string) {
-	s.sendInternalAccountMsg(c.acc, reply, response)
+	s.sendInternalAccountMsg(nil, reply, response)
 	s.sendJetStreamAPIAuditAdvisory(c, subject, request, response)
 }
 
@@ -828,6 +835,8 @@ func (s *Server) jsStreamNamesRequest(sub *subscription, c *client, subject, rep
 	}
 
 	var offset int
+	var filter string
+
 	if !isEmptyRequest(msg) {
 		var req JSApiStreamNamesRequest
 		if err := json.Unmarshal(msg, &req); err != nil {
@@ -836,11 +845,15 @@ func (s *Server) jsStreamNamesRequest(sub *subscription, c *client, subject, rep
 			return
 		}
 		offset = req.Offset
+		if req.Subject != _EMPTY_ {
+			filter = req.Subject
+		}
 	}
 
 	// TODO(dlc) - Maybe hold these results for large results that we expect to be paged.
 	// TODO(dlc) - If this list is long maybe do this in a Go routine?
-	msets := c.acc.Streams()
+	msets := c.acc.filteredStreams(filter)
+	// Since we page results order matters.
 	sort.Slice(msets, func(i, j int) bool {
 		return strings.Compare(msets[i].config.Name, msets[j].config.Name) < 0
 	})

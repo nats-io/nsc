@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -238,11 +238,11 @@ func (a *AccountClaims) Revoke(pubKey string) {
 // RevokeAt enters a revocation by public key and timestamp into this account
 // This will revoke all jwt issued for pubKey, prior to timestamp
 // If there is already a revocation for this public key that is newer, it is kept.
+// The value is expected to be a public key or "*" (means all public keys)
 func (a *AccountClaims) RevokeAt(pubKey string, timestamp time.Time) {
 	if a.Revocations == nil {
 		a.Revocations = RevocationList{}
 	}
-
 	a.Revocations.Revoke(pubKey, timestamp)
 }
 

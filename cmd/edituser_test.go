@@ -16,14 +16,13 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/nats-io/nkeys"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -166,7 +165,7 @@ func Test_EditUser_Src(t *testing.T) {
 	cc, err := ts.Store.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 	require.NotNil(t, cc)
-	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.2.0/24", "192.0.1.0/8"})
+	require.ElementsMatch(t, cc.Src, []string{"192.0.2.0/24", "192.0.1.0/8"})
 
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-source-network", "192.0.2.0/24")
 	require.NoError(t, err)
@@ -174,7 +173,7 @@ func Test_EditUser_Src(t *testing.T) {
 	cc, err = ts.Store.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 	require.NotNil(t, cc)
-	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.1.0/8"})
+	require.ElementsMatch(t, cc.Src, []string{"192.0.1.0/8"})
 }
 
 func Test_EditUser_Times(t *testing.T) {

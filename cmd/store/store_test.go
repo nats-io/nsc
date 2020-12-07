@@ -22,8 +22,9 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -175,9 +176,10 @@ func TestStoreOperator(t *testing.T) {
 	c, err := s.LoadClaim("x.jwt")
 	require.NoError(t, err)
 	require.NotNil(t, c)
-	require.Empty(t, c.Tags)
+	exp := time.Now().Unix() + 5
+	require.Zero(t, c.Expires)
 
-	c.Tags.Add("A", "B", "C")
+	c.Expires = exp
 	token, err := c.Encode(kp)
 	require.NoError(t, err)
 
@@ -185,7 +187,7 @@ func TestStoreOperator(t *testing.T) {
 	require.NoError(t, err)
 	c, err = s.LoadClaim("x.jwt")
 	require.NoError(t, err)
-	require.Len(t, c.Tags, 3)
+	require.Equal(t, c.Expires, exp)
 }
 
 func TestStoreAccount(t *testing.T) {
