@@ -18,12 +18,32 @@ package cmd
 import (
 	"fmt"
 
+	cli "github.com/nats-io/cliprompts/v2"
+
 	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 )
+
+func validatorUrlOrEmpty() cli.Opt {
+	return cli.Val(func(v string) error {
+		if v == "" {
+			return nil
+		}
+		return cli.URLValidator("http", "https")(v)
+	})
+}
+
+func validatorMaxLen(max int) cli.Opt {
+	return cli.Val(func(v string) error {
+		if len(v) > max {
+			return fmt.Errorf("value exceeds %d character", max)
+		}
+		return nil
+	})
+}
 
 func createEditAccount() *cobra.Command {
 	var params EditAccountParams
@@ -45,13 +65,20 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
 	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
 	cmd.Flags().Int64VarP(&params.subscriptions.NumberValue, "subscriptions", "", -1, "set maximum subscription for the account (-1 is unlimited)")
+	cmd.Flags().StringVarP(&params.memStorage.Value, "mem-storage", "", "0", "set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled)")
+	cmd.Flags().StringVarP(&params.diskStorage.Value, "disk-storage", "", "0", "set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled)")
+	cmd.Flags().Int64VarP(&params.streams.NumberValue, "streams", "", -1, "set maximum streams for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "consumer", "", -1, "set maximum consumer for the account (-1 is unlimited)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
+	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this account")
+	params.PermissionsParams.bindSetFlags(cmd, "default permissions")
+	params.PermissionsParams.bindRemoveFlags(cmd, "default permissions")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
-
 	return cmd
 }
 
@@ -63,11 +90,18 @@ type EditAccountParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
+	PermissionsParams
 	claim         *jwt.AccountClaims
 	token         string
+	infoUrl       string
+	description   string
 	conns         NumberParams
 	leafConns     NumberParams
 	exports       NumberParams
+	memStorage    DataParams
+	diskStorage   DataParams
+	streams       NumberParams
+	consumer      NumberParams
 	exportsWc     bool
 	imports       NumberParams
 	subscriptions NumberParams
@@ -84,7 +118,11 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions", "payload", "data", "wildcard-exports", "sk", "rm-sk") {
+	if !InteractiveFlag && ctx.NothingToDo(
+		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions",
+		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
+		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
+		"rm-response-perms", "rm", "max-responses") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -139,6 +177,30 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.subscriptions.NumberValue = p.claim.Limits.Subs
 	}
 
+	if !ctx.CurrentCmd().Flags().Changed("mem-storage") {
+		p.memStorage.Value = fmt.Sprintf("%d", p.claim.Limits.MemoryStorage)
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("disk-storage") {
+		p.diskStorage.Value = fmt.Sprintf("%d", p.claim.Limits.DiskStorage)
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("streams") {
+		p.streams.NumberValue = p.claim.Limits.Streams
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("consumer") {
+		p.consumer.NumberValue = p.claim.Limits.Consumer
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("description") {
+		p.description = p.claim.Description
+	}
+
+	if !ctx.CurrentCmd().Flags().Changed("info-url") {
+		p.infoUrl = p.claim.InfoURL
+	}
+
 	return err
 }
 
@@ -176,6 +238,24 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	if err = p.memStorage.Edit("max mem storage (-1 unlimited / 0 disabled)"); err != nil {
+		return err
+	}
+
+	if err = p.diskStorage.Edit("max disk storage (-1 unlimited / 0 disabled)"); err != nil {
+		return err
+	}
+
+	if p.memStorage.Number != 0 || p.diskStorage.Number != 0 {
+		if err = p.streams.Edit("max streams (-1 unlimited)"); err != nil {
+			return err
+		}
+
+		if err = p.consumer.Edit("max consumer (-1 unlimited)"); err != nil {
+			return err
+		}
+	}
+
 	if p.claim.NotBefore > 0 {
 		p.GenericClaimsParams.Start = UnixToDate(p.claim.NotBefore)
 	}
@@ -189,6 +269,15 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	if err := p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
+
+	if p.description, err = cli.Prompt("Account Description", p.description, validatorMaxLen(jwt.MaxInfoLength)); err != nil {
+		return err
+	}
+
+	if p.infoUrl, err = cli.Prompt("Info url", p.infoUrl, validatorUrlOrEmpty()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -200,7 +289,13 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
-	if err = p.SignerParams.Resolve(ctx); err != nil {
+	if err = p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
+		return err
+	}
+	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
+		return fmt.Errorf("jetstream not available for system account")
+	}
+	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
 	}
 	return nil
@@ -272,6 +367,50 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Subs = p.subscriptions.NumberValue
 	if flags.Changed("subscriptions") {
 		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
+	}
+
+	p.claim.Limits.MemoryStorage, err = p.memStorage.NumberValue()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %s: %s", "mem-storage", p.memStorage.Value)
+	}
+	if flags.Changed("mem-storage") {
+		r.AddOK("changed max mem storage to %d", p.claim.Limits.MemoryStorage)
+	}
+
+	p.claim.Limits.DiskStorage, err = p.diskStorage.NumberValue()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %s: %s", "disk-storage", p.diskStorage.Value)
+	}
+	if flags.Changed("disk-storage") {
+		r.AddOK("changed max disk storage to %d", p.claim.Limits.DiskStorage)
+	}
+
+	p.claim.Limits.Streams = p.streams.NumberValue
+	if flags.Changed("streams") {
+		r.AddOK("changed max streams to %d", p.claim.Limits.Streams)
+	}
+
+	p.claim.Limits.Consumer = p.consumer.NumberValue
+	if flags.Changed("consumer") {
+		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
+	}
+
+	p.claim.Description = p.description
+	if flags.Changed("description") {
+		r.AddOK(`changed description to %q`, p.claim.Description)
+	}
+
+	p.claim.InfoURL = p.infoUrl
+	if flags.Changed("info-url") {
+		r.AddOK(`changed info url to %q`, p.claim.InfoURL)
+	}
+
+	s, err := p.PermissionsParams.Run(&p.claim.DefaultPermissions, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil {
+		r.Add(s.Details...)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)

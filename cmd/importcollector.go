@@ -63,7 +63,14 @@ func (aes AccountExportChoices) String() []string {
 func (aec *AccountExportChoice) String() string {
 	// label
 	if aec.Selection == nil {
-		return fmt.Sprintf("%s:", aec.Name)
+		footer := ""
+		if aec.AccountExport.Description != "" {
+			footer = fmt.Sprintf("%s", aec.AccountExport.Description)
+		}
+		if aec.AccountExport.InfoURL != "" {
+			footer = fmt.Sprintf("%s\n  Link: %s", footer, aec.AccountExport.InfoURL)
+		}
+		return fmt.Sprintf("%s: %s", aec.Name, footer)
 	}
 	// an actual export
 	k := "->"
@@ -76,11 +83,19 @@ func (aec *AccountExportChoice) String() string {
 		p = "[!]"
 	}
 
-	if aec.Selection.Name == string(aec.Selection.Subject) {
-		return fmt.Sprintf("  %s %s %s", k, aec.Selection.Subject, p)
+	footer := ""
+	if aec.Selection.Description != "" {
+		footer = fmt.Sprintf("\n       Description: %s", aec.Selection.Description)
+	}
+	if aec.Selection.InfoURL != "" {
+		footer = fmt.Sprintf("%s\n       Link: %s", footer, aec.Selection.InfoURL)
 	}
 
-	return fmt.Sprintf("  %s [%s] %s %s", k, aec.Selection.Name, aec.Selection.Subject, p)
+	if aec.Selection.Name == string(aec.Selection.Subject) {
+		return fmt.Sprintf("  %s %s %s%s", k, aec.Selection.Subject, p, footer)
+	}
+
+	return fmt.Sprintf("  %s [%s] %s %s%s", k, aec.Selection.Name, aec.Selection.Subject, p, footer)
 }
 
 type AccountImport struct {

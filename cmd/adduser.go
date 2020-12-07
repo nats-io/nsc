@@ -67,14 +67,6 @@ nsc add user --name <n> --allow-pub-response=5
 		},
 	}
 
-	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowPubsub, "allow-pubsub", "", nil, "publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowSubs, "allow-sub", "", nil, "subscribe permissions - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.denyPubs, "deny-pub", "", nil, "deny publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "deny subscribe permissions - comma separated list or option can be specified multiple times")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "source network for connection - comma separated list or option can be specified multiple times")
 
@@ -85,7 +77,7 @@ nsc add user --name <n> --allow-pub-response=5
 
 	params.TimeParams.BindFlags(cmd)
 	params.AccountContextParams.BindFlags(cmd)
-	params.ResponsePermsParams.bindSetFlags(cmd)
+	params.PermissionsParams.bindSetFlags(cmd, "permissions")
 
 	return cmd
 }
@@ -98,13 +90,7 @@ type AddUserParams struct {
 	AccountContextParams
 	SignerParams
 	TimeParams
-	ResponsePermsParams
-	allowPubs     []string
-	allowPubsub   []string
-	allowSubs     []string
-	denyPubs      []string
-	denyPubsub    []string
-	denySubs      []string
+	PermissionsParams
 	src           []string
 	tags          []string
 	credsFilePath string
@@ -166,7 +152,7 @@ func (p *AddUserParams) PreInteractive(ctx ActionCtx) error {
 	}
 
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
-	//if err := p.ResponsePermsParams.Edit(false); err != nil {
+	//if err := p.PermissionsParams.Edit(false); err != nil {
 	//	return err
 	//}
 
@@ -230,7 +216,7 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if err := p.ResponsePermsParams.Validate(); err != nil {
+	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
 	}
 
@@ -258,7 +244,8 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	uc, err := p.generateUserClaim(ctx)
+	r := store.NewDetailedReport(false)
+	uc, err := p.generateUserClaim(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +255,6 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	r := store.NewDetailedReport(false)
 	st, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
 	if err != nil {
 		r.AddFromError(err)
@@ -315,7 +301,7 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	return r, nil
 }
 
-func (p *AddUserParams) generateUserClaim(ctx ActionCtx) (*jwt.UserClaims, error) {
+func (p *AddUserParams) generateUserClaim(ctx ActionCtx, r *store.Report) (*jwt.UserClaims, error) {
 	pub, err := p.kp.PublicKey()
 	if err != nil {
 		return nil, err
@@ -339,25 +325,11 @@ func (p *AddUserParams) generateUserClaim(ctx ActionCtx) (*jwt.UserClaims, error
 		uc.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
-	if _, err := p.ResponsePermsParams.Run(uc, ctx); err != nil {
+	if s, err := p.PermissionsParams.Run(&uc.Permissions, ctx); err != nil {
 		return nil, err
+	} else if s != nil {
+		r.Add(s.Details...)
 	}
-
-	uc.Permissions.Pub.Allow.Add(p.allowPubs...)
-	uc.Permissions.Pub.Allow.Add(p.allowPubsub...)
-	sort.Strings(uc.Pub.Allow)
-
-	uc.Permissions.Pub.Deny.Add(p.denyPubs...)
-	uc.Permissions.Pub.Deny.Add(p.denyPubsub...)
-	sort.Strings(uc.Permissions.Pub.Deny)
-
-	uc.Permissions.Sub.Allow.Add(p.allowSubs...)
-	uc.Permissions.Sub.Allow.Add(p.allowPubsub...)
-	sort.Strings(uc.Permissions.Sub.Allow)
-
-	uc.Permissions.Sub.Deny.Add(p.denySubs...)
-	uc.Permissions.Sub.Deny.Add(p.denyPubsub...)
-	sort.Strings(uc.Permissions.Sub.Deny)
 
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
@@ -366,52 +338,67 @@ func (p *AddUserParams) generateUserClaim(ctx ActionCtx) (*jwt.UserClaims, error
 	return uc, nil
 }
 
-type ResponsePermsParams struct {
-	respTTL string
-	respMax int
-	rmResp  bool
+type PermissionsParams struct {
+	respTTL     string
+	respMax     int
+	rmResp      bool
+	allowPubs   []string
+	allowPubsub []string
+	allowSubs   []string
+	denyPubs    []string
+	denyPubsub  []string
+	denySubs    []string
+	rmPerms     []string
 }
 
-func (p *ResponsePermsParams) bindSetFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&p.respTTL, "response-ttl", "", "", "the amount of time the permission is valid (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)] - Default is no time limit.")
+func (p *PermissionsParams) bindSetFlags(cmd *cobra.Command, typeName string) {
+	cmd.Flags().StringVarP(&p.respTTL, "response-ttl", "", "", fmt.Sprintf("the amount of time the %s is valid (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)] - Default is no time limit.", typeName))
 
-	cmd.Flags().IntVarP(&p.respMax, "allow-pub-response", "", 0, "client can publish only to reply subjects [with an optional count] (global)")
+	cmd.Flags().IntVarP(&p.respMax, "allow-pub-response", "", 0, fmt.Sprintf("%s to limit how often a client can publish to reply subjects [with an optional count, --allow-pub-response=n] (global)", typeName))
 	cmd.Flag("allow-pub-response").NoOptDefVal = "1"
 
-	cmd.Flags().IntVarP(&p.respMax, "max-responses", "", 0, "client can publish only to reply subjects [with an optional count] (global)")
+	cmd.Flags().IntVarP(&p.respMax, "max-responses", "", 0, fmt.Sprintf("%s to limit how ofthen a client can publish to reply subjects [with an optional count] (global)", typeName))
 	cmd.Flag("max-responses").Hidden = true
-	cmd.Flag("max-responses").Deprecated = "use --allow-pub-n-responses or --allow-pub-response"
+	cmd.Flag("max-responses").Deprecated = "use --allow-pub-response or --allow-pub-response=n"
+
+	cmd.Flags().StringSliceVarP(&p.allowPubs, "allow-pub", "", nil, fmt.Sprintf("add publish %s - comma separated list or option can be specified multiple times", typeName))
+	cmd.Flags().StringSliceVarP(&p.allowPubsub, "allow-pubsub", "", nil, fmt.Sprintf("add publish and subscribe %s - comma separated list or option can be specified multiple times", typeName))
+	cmd.Flags().StringSliceVarP(&p.allowSubs, "allow-sub", "", nil, fmt.Sprintf("add subscribe %s - comma separated list or option can be specified multiple times", typeName))
+	cmd.Flags().StringSliceVarP(&p.denyPubs, "deny-pub", "", nil, fmt.Sprintf("add deny publish %s - comma separated list or option can be specified multiple times", typeName))
+	cmd.Flags().StringSliceVarP(&p.denyPubsub, "deny-pubsub", "", nil, fmt.Sprintf("add deny publish and subscribe %s - comma separated list or option can be specified multiple times", typeName))
+	cmd.Flags().StringSliceVarP(&p.denySubs, "deny-sub", "", nil, fmt.Sprintf("add deny subscribe %s - comma separated list or option can be specified multiple times", typeName))
 }
 
-func (p *ResponsePermsParams) bindRemoveFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&p.rmResp, "rm-response-perms", "", false, "remove response settings")
+func (p *PermissionsParams) bindRemoveFlags(cmd *cobra.Command, typeName string) {
+	cmd.Flags().BoolVarP(&p.rmResp, "rm-response-perms", "", false, fmt.Sprintf("remove response settings from %s", typeName))
+	cmd.Flags().StringSliceVarP(&p.rmPerms, "rm", "", nil, fmt.Sprintf("remove publish/subscribe and deny %s - comma separated list or option can be specified multiple times", typeName))
 }
 
-func (p *ResponsePermsParams) maxResponseValidator(s string) error {
+func (p *PermissionsParams) maxResponseValidator(s string) error {
 	_, err := p.parseMaxResponse(s)
 	return err
 }
 
-func (p *ResponsePermsParams) parseMaxResponse(s string) (int, error) {
+func (p *PermissionsParams) parseMaxResponse(s string) (int, error) {
 	if s == "" {
 		return 0, nil
 	}
 	return strconv.Atoi(s)
 }
 
-func (p *ResponsePermsParams) ttlValidator(s string) error {
+func (p *PermissionsParams) ttlValidator(s string) error {
 	_, err := p.parseTTL(s)
 	return err
 }
 
-func (p *ResponsePermsParams) parseTTL(s string) (time.Duration, error) {
+func (p *PermissionsParams) parseTTL(s string) (time.Duration, error) {
 	if s == "" {
 		return time.Duration(0), nil
 	}
 	return time.ParseDuration(s)
 }
 
-func (p *ResponsePermsParams) Edit(hasPerm bool) error {
+func (p *PermissionsParams) Edit(hasPerm bool) error {
 	verb := "Set"
 	if hasPerm {
 		verb = "Edit"
@@ -442,25 +429,28 @@ func (p *ResponsePermsParams) Edit(hasPerm bool) error {
 	return nil
 }
 
-func (p *ResponsePermsParams) Validate() error {
+func (p *PermissionsParams) Validate() error {
 	if err := p.ttlValidator(p.respTTL); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *ResponsePermsParams) Run(uc *jwt.UserClaims, ctx ActionCtx) (*store.Report, error) {
+func (p *PermissionsParams) Run(perms *jwt.Permissions, ctx ActionCtx) (*store.Report, error) {
 	r := store.NewDetailedReport(true)
 	if p.rmResp {
-		uc.Resp = nil
+		perms.Resp = nil
 		r.AddOK("removed response permissions")
 		return r, nil
 	}
+
+	fmt.Printf("%v\n", ctx.CurrentCmd().Flag("max-responses").Value)
+
 	if ctx.CurrentCmd().Flag("max-responses").Changed || p.respMax != 0 {
-		if uc.Resp == nil {
-			uc.Resp = &jwt.ResponsePermission{}
+		if perms.Resp == nil {
+			perms.Resp = &jwt.ResponsePermission{}
 		}
-		uc.Resp.MaxMsgs = p.respMax
+		perms.Resp.MaxMsgs = p.respMax
 		r.AddOK("set max responses to %d", p.respMax)
 	}
 
@@ -469,11 +459,58 @@ func (p *ResponsePermsParams) Run(uc *jwt.UserClaims, ctx ActionCtx) (*store.Rep
 		if err != nil {
 			return nil, err
 		}
-		if uc.Resp == nil {
-			uc.Resp = &jwt.ResponsePermission{}
+		if perms.Resp == nil {
+			perms.Resp = &jwt.ResponsePermission{}
 		}
-		uc.Resp.Expires = v
+		perms.Resp.Expires = v
 		r.AddOK("set response ttl to %v", v)
 	}
+
+	var ap []string
+	perms.Pub.Allow.Add(p.allowPubs...)
+	ap = append(ap, p.allowPubs...)
+	perms.Pub.Allow.Add(p.allowPubsub...)
+	ap = append(ap, p.allowPubsub...)
+	for _, v := range ap {
+		r.AddOK("added pub pub %q", v)
+	}
+	perms.Pub.Allow.Remove(p.rmPerms...)
+	for _, v := range p.rmPerms {
+		r.AddOK("removed pub %q", v)
+	}
+	sort.Strings(perms.Pub.Allow)
+
+	var dp []string
+	perms.Pub.Deny.Add(p.denyPubs...)
+	dp = append(dp, p.denyPubs...)
+	perms.Pub.Deny.Add(p.denyPubsub...)
+	dp = append(dp, p.denyPubsub...)
+	for _, v := range dp {
+		r.AddOK("added deny pub %q", v)
+	}
+	perms.Pub.Deny.Remove(p.rmPerms...)
+	for _, v := range p.rmPerms {
+		r.AddOK("removed deny pub %q", v)
+	}
+	sort.Strings(perms.Pub.Deny)
+
+	var sa []string
+	perms.Sub.Allow.Add(p.allowSubs...)
+	sa = append(sa, p.allowSubs...)
+	perms.Sub.Allow.Add(p.allowPubsub...)
+	sa = append(sa, p.allowPubsub...)
+	for _, v := range sa {
+		r.AddOK("added sub %q", v)
+	}
+	perms.Sub.Allow.Remove(p.rmPerms...)
+	for _, v := range p.rmPerms {
+		r.AddOK("removed sub %q", v)
+	}
+	sort.Strings(perms.Sub.Allow)
+
+	perms.Sub.Deny.Add(p.denySubs...)
+	perms.Sub.Deny.Add(p.denyPubsub...)
+	perms.Sub.Deny.Remove(p.rmPerms...)
+	sort.Strings(perms.Sub.Deny)
 	return r, nil
 }

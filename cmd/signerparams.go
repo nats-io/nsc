@@ -157,6 +157,10 @@ func (p *SignerParams) getSigners(ctx ActionCtx) ([]string, error) {
 }
 
 func (p *SignerParams) Resolve(ctx ActionCtx) error {
+	return p.ResolveWithPriority(ctx, "")
+}
+
+func (p *SignerParams) ResolveWithPriority(ctx ActionCtx, preferKey string) error {
 	if p.signerKP != nil {
 		return nil
 	}
@@ -181,6 +185,13 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if err != nil {
 		return fmt.Errorf("error reading signers: %v", err)
 	}
+	for _, s := range signers {
+		if s == preferKey {
+			signers = append([]string{s}, signers...)
+			break
+		}
+	}
+
 	var selected string
 	for _, s := range signers {
 		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)

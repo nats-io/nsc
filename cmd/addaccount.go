@@ -47,6 +47,7 @@ func CreateAddAccountCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "account name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the account")
 	params.TimeParams.BindFlags(cmd)
+	params.PermissionsParams.bindSetFlags(cmd, "default permissions")
 
 	return cmd
 }
@@ -58,6 +59,7 @@ func init() {
 type AddAccountParams struct {
 	SignerParams
 	TimeParams
+	PermissionsParams
 	token    string
 	name     string
 	generate bool
@@ -213,6 +215,10 @@ func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
+	if err := p.PermissionsParams.Validate(); err != nil {
+		return err
+	}
+
 	// the account doesn't exist, so insure self signed works
 	p.SignerParams.ForceManagedAccountKey(ctx, p.akp)
 	if err := p.SignerParams.Resolve(ctx); err != nil {
@@ -239,6 +245,7 @@ func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	r := store.NewDetailedReport(false)
 
 	ac := jwt.NewAccountClaims(pk)
 	ac.Name = p.name
@@ -250,6 +257,12 @@ func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		ac.Expires, _ = p.TimeParams.ExpiryDate()
 	}
 
+	if s, err := p.PermissionsParams.Run(&ac.DefaultPermissions, ctx); err != nil {
+		return nil, err
+	} else if s != nil {
+		r.Add(s.Details...)
+	}
+
 	signer := p.akp
 	if !ctx.StoreCtx().Store.IsManaged() || p.signerKP != nil {
 		signer = p.signerKP
@@ -259,7 +272,6 @@ func (p *AddAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	r := store.NewDetailedReport(false)
 	if p.generate {
 		r.AddOK("generated and stored account key %q", pk)
 	}

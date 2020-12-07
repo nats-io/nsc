@@ -92,6 +92,7 @@ type Account struct {
 	SigningKeys        StringList     `json:"signing_keys,omitempty"`
 	Revocations        RevocationList `json:"revocations,omitempty"`
 	DefaultPermissions Permissions    `json:"default_permissions,omitempty"`
+	Info
 	GenericFields
 }
 
@@ -131,6 +132,7 @@ func (a *Account) Validate(acct *AccountClaims, vr *ValidationResults) {
 			vr.AddError("%s is not an account public key", k)
 		}
 	}
+	a.Info.Validate(vr)
 }
 
 // AccountClaims defines the body of an account JWT
