@@ -63,6 +63,13 @@ func backup(file string, dir string) error {
 	})
 }
 
+const upgradeQuestion = `Did you upgrade all nats-server and do you want to convert all non managed 
+operator / account / user jwt to V2?
+Once converted you need to re-distribute the operator jwt wherever used.
+This includes, but is not limited to:
+    ALL nats-server, which need to be restarted (one by one is ok)
+    ALL dependent nsc stores in managed mode`
+
 func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
 	op, err := s.ReadOperatorClaim()
 	if err != nil {
@@ -76,13 +83,8 @@ func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
 		return
 	}
 	if s.IsManaged() {
-		cmd.Print(cliprompts.WrapString(80,
-			`DID YOU UPGRADE nats-server AND DO YOU WANT TO CONVERT ALL NON MANAGED 
-OPERATOR / ACCOUNTS / USER JWT TO V2?
-Once converted you need to re-distribute the operator jwt wherever used.
-This includes ALL nats-server, which need to be restarted (one by one is ok), and nsc stores in managed mode.
-If you `))
-		rep.AddError(`NO CHANGE WAS MADE!
+		cmd.Print(cliprompts.WrapString(80, upgradeQuestion))
+		rep.AddError(`No change was made!
 Your store is in managed mode and was set up using:
 "nsc add operator --force --url <file or url>""
 You need to contact "%s", obtain a V2 jwt and re issue the above command.`, opName)
@@ -121,7 +123,7 @@ Do you want to create a backup in the form of a zip file now?`), true); conv {
 			return
 		}
 		cmd.Print(cliprompts.WrapSprintf(80, `Backup file "%s" created. 
-This backup does `+cliprompts.Bold("NOT CONTAIN private nkeys")+`!
+This backup does `+cliprompts.Bold("not contain private nkeys")+`!
 `+cliprompts.Bold("If you need to restore this state")+`:
 	Delete the directory "%s"
 	Extract the backup 
@@ -130,17 +132,11 @@ This backup does `+cliprompts.Bold("NOT CONTAIN private nkeys")+`!
 `, backupFile, s.Dir))
 	}
 	cmd.Print(cliprompts.WrapString(80,
-		`In order to use jwt V2, `+cliprompts.Bold("YOU MUST UPGRADE ALL nats-server")+` prior to usage!
-If you are `+cliprompts.Bold("NOT READY")+` to switch over to jwt V2, downgrade nsc using:
+		`In order to use jwt V2, `+cliprompts.Bold("you must upgrade all nats-server")+` prior to usage!
+If you are `+cliprompts.Bold("not ready")+` to switch over to jwt V2, downgrade nsc using:
 "nsc update -version <previous release>"
 `))
-	if conv, _ := cliprompts.Confirm(cliprompts.WrapString(80,
-		`DID YOU UPGRADE nats-server AND DO YOU WANT TO CONVERT ALL NON MANAGED 
-OPERATOR / ACCOUNTS / USER JWT TO V2?
-Once converted you need to re-distribute the operator jwt wherever used.
-This includes, but is not limited to:
-    ALL nats-server, which need to be restarted (one by one is ok)
-    ALL dependent nsc stores in managed mode `), false); !conv {
+	if conv, _ := cliprompts.Confirm(cliprompts.WrapString(80, upgradeQuestion), false); !conv {
 		rep.AddOK("Declined to convert at this time. Rerun command when ready.")
 		return
 	}
