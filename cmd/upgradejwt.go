@@ -40,7 +40,10 @@ func backup(file string, dir string) error {
 	defer fp.Close()
 	w := zip.NewWriter(fp)
 	defer w.Close()
-	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
@@ -58,7 +61,6 @@ func backup(file string, dir string) error {
 		}
 		return nil
 	})
-	return err
 }
 
 func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
