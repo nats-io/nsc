@@ -198,6 +198,7 @@ func TestUpgradeBackup(t *testing.T) {
 	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{true, backup, false}, "upgrade-jwt") // only works in interactive mode
 	require.NoError(t, err)
 	closer, err := zip.OpenReader(backup)
+	require.NoError(t, err)
 	defer closer.Close()
 	require.NoError(t, err)
 	require.Len(t, closer.File, 2) // .nsc and O.jwt

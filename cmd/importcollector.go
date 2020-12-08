@@ -65,7 +65,7 @@ func (aec *AccountExportChoice) String() string {
 	if aec.Selection == nil {
 		footer := ""
 		if aec.AccountExport.Description != "" {
-			footer = fmt.Sprintf("%s", aec.AccountExport.Description)
+			footer = aec.AccountExport.Description
 		}
 		if aec.AccountExport.InfoURL != "" {
 			footer = fmt.Sprintf("%s\n  Link: %s", footer, aec.AccountExport.InfoURL)
