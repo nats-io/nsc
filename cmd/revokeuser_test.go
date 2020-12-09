@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -216,6 +218,11 @@ func TestRevokeUserNameNotFound(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "U")
 	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	upk := ts.GetUserPublicKey(t, "A", "U")
+	require.NotEmpty(t, upk)
+	require.Contains(t, ac.Revocations, upk)
 }
 
 func TestRevokeDefaultUser(t *testing.T) {
@@ -250,6 +257,10 @@ func TestRevokeAllUsers(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
 	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Revocations, jwt.All)
 }
 
 func TestRevokeBadUnixTime(t *testing.T) {

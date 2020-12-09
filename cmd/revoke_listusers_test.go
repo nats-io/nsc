@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/jwt"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,6 +77,11 @@ func TestRevokeListUsersAllUsers(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
 	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Revocations, jwt.All)
+
 	stdout, _, err := ExecuteCmd(createRevokeListUsersCmd())
 	require.NoError(t, err)
 	require.Contains(t, stdout, "* [All Users]")

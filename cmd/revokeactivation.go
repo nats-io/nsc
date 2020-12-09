@@ -220,7 +220,7 @@ func (p *RevokeActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
-		if p.accountKey.publicKey == "*" {
+		if p.accountKey.publicKey == jwt.All {
 			when := int64(p.at)
 			if when == 0 {
 				when = time.Now().Unix()
