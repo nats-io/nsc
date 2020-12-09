@@ -362,6 +362,11 @@ func PushAccount(u string, data []byte) (Status, error) {
 	return PushReport(resp.StatusCode, message), err
 }
 
+func IsNatsUrl(url string) bool {
+	url = strings.ToLower(strings.TrimSpace(url))
+	return strings.HasPrefix(url, "nats://") || strings.HasPrefix(url, ",nats://")
+}
+
 func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	ac, err := jwt.DecodeAccountClaims(string(data))
 	if err != nil {
@@ -372,8 +377,11 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to push to the operator - failed to read operator claim: %v", err)
 	}
-	if oc.AccountServerURL == "" {
-		return nil, fmt.Errorf("unable to push to %q - operator doesn't set an account server url", oc.Name)
+	r := NewDetailedReport(false)
+	if oc.AccountServerURL == "" || IsNatsUrl(oc.AccountServerURL) {
+		r.Label = "stored self signed account jwt"
+		r.AddWarning("unable to push to %q - operator doesn't set an account server url or manual exchange necessary", oc.Name)
+		return r, nil
 	}
 
 	u, err := url.Parse(oc.AccountServerURL)
@@ -381,7 +389,6 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 		return nil, fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
 	}
 
-	r := NewDetailedReport(false)
 	r.Label = "synchronized account jwt with account server"
 	// this is an url - join with path
 	u.Path = path.Join(u.Path, "accounts", ac.Subject)
@@ -401,19 +408,15 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	return r, nil
 }
 
-func (s *Store) StoreClaim(data []byte) (Status, error) {
+func (s *Store) StoreClaim(data []byte) (*Report, error) {
 	ct, err := s.ClaimType(data)
 	if err != nil {
 		return nil, err
 	}
 	if *ct == jwt.AccountClaim && s.IsManaged() {
 		var pull Report
-		var push Report
 		pp, err := s.handleManagedAccount(data)
 		if pp != nil {
-			if len(pp.Details) >= 1 {
-				push = *pp.Details[0].(*Report)
-			}
 			if len(pp.Details) >= 2 {
 				pull = *pp.Details[1].(*Report)
 			}
@@ -428,12 +431,13 @@ func (s *Store) StoreClaim(data []byte) (Status, error) {
 				pp.AddError("failed to store jwt: %v", err)
 				return pp, err
 			}
-		} else if push.Code() == OK || push.Code() == WARN {
+		} else {
 			// Push OK but failed pull, store self-signed
 			if err := s.StoreRaw(data); err != nil {
 				pp.AddError("failed to store self-signed jwt: %v", err)
 				return pp, err
 			}
+			pp.AddWarning("perform push/pull again or exchange self-signed JWT manually")
 		}
 		return pp, nil
 	} else {

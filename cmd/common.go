@@ -460,8 +460,7 @@ func OperatorJwtURL(oc *jwt.OperatorClaims) (string, error) {
 }
 
 func IsNatsUrl(url string) bool {
-	url = strings.ToLower(strings.TrimSpace(url))
-	return strings.HasPrefix(url, "nats://") || strings.HasPrefix(url, ",nats://")
+	return store.IsNatsUrl(url)
 }
 
 func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
@@ -477,6 +476,17 @@ func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
 		}
 	}
 	return ok, nil
+}
+
+func GetOperatorSigners(ctx ActionCtx) ([]string, error) {
+	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
+	var signers []string
+	signers = append(signers, oc.Subject)
+	signers = append(signers, oc.SigningKeys...)
+	return signers, nil
 }
 
 func diffDates(format string, a, b int64) store.Status {
