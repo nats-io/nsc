@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/nats-io/nuid"
@@ -644,7 +644,7 @@ func (p *FixCmd) ReadOperatorJwt(fp string) (*jwt.OperatorClaims, string, error)
 	if err != nil {
 		return nil, "", err
 	}
-	if gc.Type != jwt.OperatorClaim {
+	if gc.ClaimType() != jwt.OperatorClaim {
 		return nil, "", nil
 	}
 	oc, err := jwt.DecodeOperatorClaims(tok)
@@ -660,7 +660,7 @@ func (p *FixCmd) ReadAccountJwt(fp string) (*jwt.AccountClaims, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	if gc.Type != jwt.AccountClaim {
+	if gc.ClaimType() != jwt.AccountClaim {
 		return nil, "", nil
 	}
 
@@ -680,7 +680,7 @@ func (p *FixCmd) ReadUserJwt(fp string) (*jwt.UserClaims, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	if gc.Type != jwt.UserClaim {
+	if gc.ClaimType() != jwt.UserClaim {
 		return nil, "", nil
 	}
 	uc, err := jwt.DecodeUserClaims(tok)

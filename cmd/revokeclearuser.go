@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -163,12 +163,9 @@ func (p *ClearRevokeUserParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *ClearRevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
-	// we test for the explicit entry - as checking for revocations
-	_, ok := p.claim.Revocations[p.userKey.publicKey]
-	if !ok {
-		return nil, fmt.Errorf("revocation for user %q was not found", p.userKey.publicKey)
+	if _, ok := p.claim.Revocations[p.userKey.publicKey]; !ok {
+		return nil, fmt.Errorf("user with public key %s is not revoked", p.userKey.publicKey)
 	}
-
 	p.claim.ClearRevocation(p.userKey.publicKey)
 	token, err := p.claim.Encode(p.signerKP)
 	if err != nil {

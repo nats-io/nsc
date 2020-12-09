@@ -18,7 +18,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +66,7 @@ func Test_DeleteExportInteractiveManagedStore(t *testing.T) {
 	cmd := createDeleteExportCmd()
 	HoistRootFlags(cmd)
 
-	input := []interface{}{0, 0, ts.GetAccountKeyPath(t, "A")}
+	input := []interface{}{0, 0, 0, ts.GetAccountKeyPath(t, "A")}
 	_, _, err := ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 

@@ -20,7 +20,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -28,9 +28,13 @@ import (
 func Test_EditOperator(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
+	ts.AddAccount(t, "TEST")
 
 	tests := CmdTests{
 		{createEditOperatorCmd(), []string{"edit", "operator"}, nil, []string{"specify an edit option"}, true},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--system-account", "ABTFVAXATJEOKIBESJ3LO3JTAAMDCZ755DLAAGGSDMH5TU6HSFL7YNYY"}, nil, []string{"set system account"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--system-account", "TEST"}, nil, []string{"set system account"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--system-account", "DOESNOTEXIST"}, nil, []string{"account DOESNOTEXIST does not exist in the current operator"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk"}, nil, []string{"flag needs an argument"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
@@ -109,12 +113,16 @@ func Test_EditOperatorServiceURLs(t *testing.T) {
 func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
+	ts.AddAccount(t, "SYS")
+	pub := ts.GetAccountPublicKey(t, "SYS")
 
 	u1 := "nats://localhost:4222"
 	u2 := "tls://localhost:4333"
+	as := "nats://localhost:4222"
 
-	// valid from, valid until, add tags, acc jwt server, add service url, url, add another, url, add another, add signing key
-	inputs := []interface{}{"0", "0", true, "xxx", false, "", true, u1, true, u2, false, false}
+	// valid from, valid until, add tags, acc jwt server, add service url, url, add another, url, add another,
+	// system account (defaults to SYS), add signing key
+	inputs := []interface{}{"0", "0", true, "xxx", false, as, true, u1, true, u2, false, true, false, false}
 
 	_, _, err := ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
 	require.NoError(t, err)
@@ -124,9 +132,11 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	require.Contains(t, oc.OperatorServiceURLs, u1)
 	require.Contains(t, oc.OperatorServiceURLs, u2)
 	require.Contains(t, oc.Tags, "xxx")
+	require.Equal(t, oc.AccountServerURL, as)
+	require.Equal(t, oc.SystemAccount, pub)
 
 	// valid from, valid until, acc jwt server, add service url, remove server urls, add signing key
-	inputs = []interface{}{"0", "0", true, []int{0}, false, "", false, true, []int{0}, false}
+	inputs = []interface{}{"0", "0", true, []int{0}, false, "", false, true, []int{0}, false, false}
 
 	_, _, err = ExecuteInteractiveCmd(createEditOperatorCmd(), inputs)
 	require.NoError(t, err)
@@ -135,4 +145,6 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	require.NotContains(t, oc.OperatorServiceURLs, u1)
 	require.Contains(t, oc.OperatorServiceURLs, u2)
 	require.NotContains(t, oc.Tags, "xxx")
+	require.Equal(t, oc.AccountServerURL, "")
+	require.Equal(t, oc.SystemAccount, pub)
 }

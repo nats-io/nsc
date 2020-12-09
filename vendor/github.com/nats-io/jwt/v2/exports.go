@@ -81,6 +81,7 @@ type Export struct {
 	ResponseThreshold    time.Duration   `json:"response_threshold,omitempty"`
 	Latency              *ServiceLatency `json:"service_latency,omitempty"`
 	AccountTokenPosition uint            `json:"account_token_position,omitempty"`
+	Info
 }
 
 // IsService returns true if an export is for a service
@@ -153,6 +154,7 @@ func (e *Export) Validate(vr *ValidationResults) {
 			}
 		}
 	}
+	e.Info.Validate(vr)
 }
 
 // Revoke enters a revocation by publickey using time.Now().

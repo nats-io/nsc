@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -70,16 +70,6 @@ nsc edit user --name <n> --rm-response-perms
 	cmd.Flags().VarP(&params.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
 	cmd.Flags().StringSliceVarP(&params.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
 
-	cmd.Flags().StringSliceVarP(&params.remove, "rm", "", nil, "remove publish/subscribe and deny permissions - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.allowPubs, "allow-pub", "", nil, "add publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowPubsub, "allow-pubsub", "", nil, "add publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.allowSubs, "allow-sub", "", nil, "add subscribe permissions - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.denyPubs, "deny-pub", "", nil, "add deny publish permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denyPubsub, "deny-pubsub", "", nil, "add deny publish and subscribe permissions - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.denySubs, "deny-sub", "", nil, "add deny subscribe permissions - comma separated list or option can be specified multiple times")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 
@@ -89,13 +79,17 @@ nsc edit user --name <n> --rm-response-perms
 	cmd.Flags().Int64VarP(&params.payload.Number, "payload", "", -1, "set maximum message payload in bytes for the account (-1 is unlimited)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
+	cmd.Flags().StringSliceVarP(&params.connTypes, "conn-type", "", nil,
+		fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
+			jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
+	cmd.Flags().StringSliceVarP(&params.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
 
 	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
-	params.ResponsePermsParams.bindSetFlags(cmd)
-	params.ResponsePermsParams.bindRemoveFlags(cmd)
+	params.PermissionsParams.bindSetFlags(cmd, "permissions")
+	params.PermissionsParams.bindRemoveFlags(cmd, "permissions")
 
 	return cmd
 }
@@ -108,25 +102,20 @@ type EditUserParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
-	ResponsePermsParams
+	PermissionsParams
 	claim         *jwt.UserClaims
 	name          string
 	token         string
 	credsFilePath string
 
-	allowPubs   []string
-	allowPubsub []string
-	allowSubs   []string
-	denyPubs    []string
-	denyPubsub  []string
-	denySubs    []string
-	remove      []string
 	rmSrc       []string
 	src         []string
 	times       timeSlice
 	rmTimes     []string
 	payload     DataParams
 	bearer      bool
+	connTypes   []string
+	rmConnTypes []string
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -136,7 +125,7 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time") {
+		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time", "conn-type", "rm-conn-type") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -156,7 +145,12 @@ func (p *EditUserParams) PreInteractive(ctx ActionCtx) error {
 		}
 	}
 
-	return nil
+	signers, err := validUserSigners(ctx, p.Name)
+	if err != nil {
+		return err
+	}
+	p.SignerParams.SetPrompt("select the key to sign the user")
+	return p.SignerParams.SelectFromSigners(ctx, signers)
 }
 
 func (p *EditUserParams) Load(ctx ActionCtx) error {
@@ -196,7 +190,7 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 
 func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
-	//if err := p.ResponsePermsParams.Edit(p.claim.Resp != nil); err != nil {
+	//if err := p.PermissionsParams.Edit(p.claim.Resp != nil); err != nil {
 	//	return err
 	//}
 	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
@@ -211,14 +205,27 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 	if err := p.GenericClaimsParams.Edit(p.claim.Tags); err != nil {
 		return err
 	}
-	if err := p.SignerParams.Edit(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	var err error
+
+	connTypes := make([]string, len(p.connTypes))
+	for i, k := range p.connTypes {
+		u := strings.ToUpper(k)
+		switch u {
+		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket:
+		default:
+			return fmt.Errorf("unknown connection type %s", k)
+		}
+		connTypes[i] = u
+	}
+	rmConnTypes := make([]string, len(p.rmConnTypes))
+	for i, k := range p.rmConnTypes {
+		rmConnTypes[i] = strings.ToUpper(k)
+	}
+	p.rmConnTypes = rmConnTypes
 
 	_, err = p.payload.NumberValue()
 	if err != nil {
@@ -227,14 +234,14 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
-	if err = p.SignerParams.Resolve(ctx); err != nil {
+	if err = p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
 		return err
 	}
 	if err = p.payload.Valid(); err != nil {
 		return err
 	}
 
-	if err := p.ResponsePermsParams.Validate(); err != nil {
+	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
 	}
 
@@ -248,53 +255,6 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	p.GenericClaimsParams.Run(ctx, p.claim, r)
 
-	var ap []string
-	p.claim.Permissions.Pub.Allow.Add(p.allowPubs...)
-	ap = append(ap, p.allowPubs...)
-	p.claim.Permissions.Pub.Allow.Add(p.allowPubsub...)
-	ap = append(ap, p.allowPubsub...)
-	for _, v := range ap {
-		r.AddOK("added pub pub %q", v)
-	}
-	p.claim.Permissions.Pub.Allow.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed pub %q", v)
-	}
-	sort.Strings(p.claim.Pub.Allow)
-
-	var dp []string
-	p.claim.Permissions.Pub.Deny.Add(p.denyPubs...)
-	dp = append(dp, p.denyPubs...)
-	p.claim.Permissions.Pub.Deny.Add(p.denyPubsub...)
-	dp = append(dp, p.denyPubsub...)
-	for _, v := range dp {
-		r.AddOK("added deny pub %q", v)
-	}
-	p.claim.Permissions.Pub.Deny.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed deny pub %q", v)
-	}
-	sort.Strings(p.claim.Permissions.Pub.Deny)
-
-	var sa []string
-	p.claim.Permissions.Sub.Allow.Add(p.allowSubs...)
-	sa = append(sa, p.allowSubs...)
-	p.claim.Permissions.Sub.Allow.Add(p.allowPubsub...)
-	sa = append(sa, p.allowPubsub...)
-	for _, v := range sa {
-		r.AddOK("added sub %q", v)
-	}
-	p.claim.Permissions.Sub.Allow.Remove(p.remove...)
-	for _, v := range p.remove {
-		r.AddOK("removed sub %q", v)
-	}
-	sort.Strings(p.claim.Permissions.Sub.Allow)
-
-	p.claim.Permissions.Sub.Deny.Add(p.denySubs...)
-	p.claim.Permissions.Sub.Deny.Add(p.denyPubsub...)
-	p.claim.Permissions.Sub.Deny.Remove(p.remove...)
-	sort.Strings(p.claim.Permissions.Sub.Deny)
-
 	flags := ctx.CurrentCmd().Flags()
 	p.claim.Limits.Payload = p.payload.Number
 	if flags.Changed("payload") {
@@ -306,9 +266,20 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed bearer to %t", p.bearer)
 	}
 
-	src := strings.Split(p.claim.Src, ",")
-	var srcList jwt.StringList
-	srcList.Add(src...)
+	var connTypes jwt.StringList
+	connTypes.Add(p.claim.AllowedConnectionTypes...)
+	connTypes.Add(p.connTypes...)
+	for _, v := range p.connTypes {
+		r.AddOK("added connection type %s", v)
+	}
+	connTypes.Remove(p.rmConnTypes...)
+	for _, v := range p.rmConnTypes {
+		r.AddOK("removed connection type %s", v)
+	}
+	p.claim.AllowedConnectionTypes = connTypes
+
+	var srcList jwt.CIDRList
+	srcList.Add(p.claim.Src...)
 	srcList.Add(p.src...)
 	for _, v := range p.src {
 		r.AddOK("added src network %s", v)
@@ -318,7 +289,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("removed src network %s", v)
 	}
 	sort.Strings(srcList)
-	p.claim.Src = strings.Join(srcList, ",")
+	p.claim.Src = srcList
 
 	for _, v := range p.times {
 		r.AddOK("added time range %s-%s", v.Start, v.End)
@@ -338,7 +309,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 
-	s, err := p.ResponsePermsParams.Run(p.claim, ctx)
+	s, err := p.PermissionsParams.Run(&p.claim.Permissions, ctx)
 	if err != nil {
 		return nil, err
 	}

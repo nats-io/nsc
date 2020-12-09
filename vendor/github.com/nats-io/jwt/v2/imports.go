@@ -107,13 +107,14 @@ func (i *Import) Validate(actPubKey string, vr *ValidationResults) {
 	}
 
 	if act != nil {
-		if act.Issuer != i.Account {
-			vr.AddWarning("activation token doesn't match account for import %q", i.Subject)
+		if !(act.Issuer == i.Account || act.IssuerAccount == i.Account) {
+			vr.AddError("activation token doesn't match account for import %q", i.Subject)
 		}
 
 		if act.ClaimsData.Subject != actPubKey {
-			vr.AddWarning("activation token doesn't match account it is being included in, %q", i.Subject)
+			vr.AddError("activation token doesn't match account it is being included in, %q", i.Subject)
 		}
+		act.Validate(vr)
 	} else {
 		vr.AddWarning("no activation provided for import %s", i.Subject)
 	}

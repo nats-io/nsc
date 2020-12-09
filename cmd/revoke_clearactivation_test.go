@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +40,7 @@ func TestClearRevokeActivation(t *testing.T) {
 	require.Len(t, ac.Exports, 1)
 
 	for _, exp := range ac.Exports {
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(0, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(0, 0)))
 	}
 
 	_, _, err = ExecuteCmd(createClearRevokeActivationCmd(), "--subject", "foo.bar", "--target-account", pub)
@@ -50,7 +50,7 @@ func TestClearRevokeActivation(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Exports, 1)
 	for _, exp := range ac.Exports {
-		require.False(t, exp.IsRevokedAt(pub, time.Unix(0, 0)))
+		require.False(t, exp.Revocations.IsRevoked(pub, time.Unix(0, 0)))
 	}
 }
 
@@ -82,8 +82,8 @@ func TestClearRevokeActivationInteractive(t *testing.T) {
 			continue
 		}
 		require.Len(t, exp.Revocations, 1)
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(999, 0)))
-		require.False(t, exp.IsRevokedAt(pub, time.Unix(1001, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(999, 0)))
+		require.False(t, exp.Revocations.IsRevoked(pub, time.Unix(1001, 0)))
 	}
 
 	input = []interface{}{1, true, 0, 0} // second account "B"

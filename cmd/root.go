@@ -112,6 +112,28 @@ var rootCmd = &cobra.Command{
 	Use:   "nsc",
 	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if store, _ := GetStore(); store != nil {
+			if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
+				if c.Version > 2 {
+					return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
+						store.GetName(), c.Version, os.Args[0])
+				} else if c.Version == 1 {
+					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help"
+					if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
+						for _, v := range addCmd.Commands() {
+							if v == cmd {
+								allowCmdWithJWTV1Store = true
+								break
+							}
+						}
+					}
+					if !allowCmdWithJWTV1Store {
+						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt"`,
+							store.GetName(), os.Args[0])
+					}
+				}
+			}
+		}
 		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
 			return nil
 		}

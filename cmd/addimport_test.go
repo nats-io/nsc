@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -399,7 +399,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.Equal(t, apub, ac.Imports[0].Account)
 
 	// B, pick, service q, name q service, local subj qq
-	input = []interface{}{1, true, 2, "q service", "qq"}
+	input = []interface{}{1, true, 2, "q service", "qq", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 

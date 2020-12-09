@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/dustin/go-humanize"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/xlab/tablewriter"
 )
 
@@ -45,17 +45,38 @@ func (a *AccountDescriber) Describe() string {
 	AddStandardClaimInfo(table, &a.AccountClaims)
 	table.AddSeparator()
 
+	info := false
+	if a.Description != "" {
+		table.AddRow("Description", strings.ReplaceAll(a.Description, "\n", " "))
+		info = true
+	}
+	if a.InfoURL != "" {
+		table.AddRow("Info Url", a.InfoURL)
+		info = true
+	}
+	if info {
+		table.AddSeparator()
+	}
+
 	if len(a.SigningKeys) > 0 {
 		AddListValues(table, "Signing Keys", a.SigningKeys)
 		table.AddSeparator()
 	}
 
-	lim := a.Limits
-	if lim.Conn > -1 {
-		table.AddRow("Max Connections", fmt.Sprintf("%d", lim.Conn))
-	} else {
-		table.AddRow("Max Connections", "Unlimited")
+	addLimitRow := func(table *tablewriter.Table, name string, limit int64, inBytes bool) {
+		if limit > -1 {
+			val := fmt.Sprintf("%d", limit)
+			if inBytes {
+				val = fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(limit)), limit)
+			}
+			table.AddRow(name, val)
+		} else {
+			table.AddRow(name, "Unlimited")
+		}
 	}
+
+	lim := a.Limits
+	addLimitRow(table, "Max Connections", lim.Conn, false)
 
 	if lim.LeafNodeConn == 0 {
 		table.AddRow("Max Leaf Node Connections", "Not Allowed")
@@ -65,41 +86,44 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Max Leaf Node Connections", "Unlimited")
 	}
 
-	if lim.Data > -1 {
-		table.AddRow("Max Data", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Data)), lim.Data))
-	} else {
-		table.AddRow("Max Data", "Unlimited")
-	}
-
-	if lim.Exports > -1 {
-		table.AddRow("Max Exports", fmt.Sprintf("%d", lim.Exports))
-	} else {
-		table.AddRow("Max Exports", "Unlimited")
-	}
-
-	if lim.Imports > -1 {
-		table.AddRow("Max Imports", fmt.Sprintf("%d", lim.Imports))
-	} else {
-		table.AddRow("Max Imports", "Unlimited")
-	}
-
-	if lim.Payload > -1 {
-		table.AddRow("Max Msg Payload", fmt.Sprintf("%s (%d bytes)", humanize.Bytes(uint64(lim.Payload)), lim.Payload))
-	} else {
-		table.AddRow("Max Msg Payload", "Unlimited")
-	}
-
-	if lim.Subs > -1 {
-		table.AddRow("Max Subscriptions", fmt.Sprintf("%d", lim.Subs))
-	} else {
-		table.AddRow("Max Subscriptions", "Unlimited")
-	}
+	addLimitRow(table, "Max Data", lim.Data, true)
+	addLimitRow(table, "Max Exports", lim.Exports, false)
+	addLimitRow(table, "Max Imports", lim.Imports, false)
+	addLimitRow(table, "Max Msg Payload", lim.Payload, true)
+	addLimitRow(table, "Max Subscriptions", lim.Subs, false)
 
 	we := "False"
 	if lim.WildcardExports {
 		we = "True"
 	}
 	table.AddRow("Exports Allows Wildcards", we)
+
+	AddPermissions(table, a.DefaultPermissions)
+
+	table.AddSeparator()
+	if a.Limits.DiskStorage == 0 && a.Limits.MemoryStorage == 0 {
+		table.AddRow("Jetstream", "Disabled")
+	} else {
+		table.AddRow("Jetstream", "Enabled")
+		switch {
+		case lim.DiskStorage > 0:
+			table.AddRow("Max Disk Storage", humanize.Bytes(uint64(lim.DiskStorage)))
+		case lim.DiskStorage == 0:
+			table.AddRow("Max Disk Storage", "Disabled")
+		default:
+			table.AddRow("Max Disk Storage", "Unlimited")
+		}
+		switch {
+		case lim.MemoryStorage > 0:
+			table.AddRow("Max Mem Storage", humanize.Bytes(uint64(lim.MemoryStorage)))
+		case lim.MemoryStorage == 0:
+			table.AddRow("Max Mem Storage", "Disabled")
+		default:
+			table.AddRow("Max Mem Storage", "Unlimited")
+		}
+		addLimitRow(table, "Max Streams", lim.Streams, false)
+		addLimitRow(table, "Max Consumer", lim.Consumer, false)
+	}
 
 	table.AddSeparator()
 
@@ -157,7 +181,7 @@ func toYesNo(tf bool) string {
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
+	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking", "Description", "Info URL")
 	for _, v := range e.Exports {
 		mon := "N/A"
 		rt := ""
@@ -177,7 +201,8 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := strings.Title(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
+		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon,
+			strings.ReplaceAll(v.Description, "\n", " "), v.InfoURL)
 	}
 	return table.Render()
 }
@@ -309,18 +334,10 @@ func (c *ActivationDescriber) Describe() string {
 	table.AddRow("Import Subject", string(c.ImportSubject))
 	table.AddSeparator()
 
-	AddLimits(table, c.Limits)
-
 	return table.Render()
 }
 
 func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
-	if lim.Max > 0 {
-		table.AddRow("Max Messages", fmt.Sprintf("%d", lim.Max))
-	} else {
-		table.AddRow("Max Messages", "Unlimited")
-	}
-
 	if lim.Payload > 0 {
 		v := fmt.Sprintf("%d bytes (≈%s)", lim.Payload, humanize.Bytes(uint64(lim.Payload)))
 		table.AddRow("Max Msg Payload", v)
@@ -328,7 +345,7 @@ func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
 		table.AddRow("Max Msg Payload", "Unlimited")
 	}
 
-	if lim.Src != "" {
+	if len(lim.Src) != 0 {
 		table.AddRow("Network Src", lim.Src)
 	} else {
 		table.AddRow("Network Src", "Any")
@@ -367,12 +384,7 @@ func NewUserDescriber(u jwt.UserClaims) *UserDescriber {
 	return &UserDescriber{UserClaims: u}
 }
 
-func (u *UserDescriber) Describe() string {
-	table := tablewriter.CreateTable()
-	table.AddTitle("User")
-	AddStandardClaimInfo(table, &u.UserClaims)
-	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
-
+func AddPermissions(table *tablewriter.Table, u jwt.Permissions) {
 	if len(u.Pub.Allow) > 0 || len(u.Pub.Deny) > 0 ||
 		len(u.Sub.Allow) > 0 || len(u.Sub.Deny) > 0 {
 		table.AddSeparator()
@@ -381,13 +393,21 @@ func (u *UserDescriber) Describe() string {
 		AddListValues(table, "Sub Allow", u.Sub.Allow)
 		AddListValues(table, "Sub Deny", u.Sub.Deny)
 	}
-	table.AddSeparator()
 	if u.Resp == nil {
 		table.AddRow("Response Permissions", "Not Set")
 	} else {
 		table.AddRow("Max Responses", u.Resp.MaxMsgs)
 		table.AddRow("Response Permission TTL", u.Resp.Expires.String())
 	}
+}
+
+func (u *UserDescriber) Describe() string {
+	table := tablewriter.CreateTable()
+	table.AddTitle("User")
+	AddStandardClaimInfo(table, &u.UserClaims)
+	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
+
+	AddPermissions(table, u.Permissions)
 
 	table.AddSeparator()
 	AddLimits(table, u.Limits)
@@ -395,6 +415,11 @@ func (u *UserDescriber) Describe() string {
 	if len(u.Tags) > 0 {
 		table.AddSeparator()
 		AddListValues(table, "Tags", u.Tags)
+	}
+
+	if len(u.Tags) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Allowed Connection Types", u.AllowedConnectionTypes)
 	}
 
 	return table.Render()
@@ -419,14 +444,13 @@ func (o *OperatorDescriber) Describe() string {
 	AddListValues(table, "Operator Service URLs", o.OperatorServiceURLs)
 
 	if o.SystemAccount != "" {
-		table.AddRow("System Account", o.SystemAccount)
-	}
-
-	if len(o.Identities) > 0 {
-		table.AddSeparator()
-		for _, v := range o.Identities {
-			table.AddRow(fmt.Sprintf("ID %s", v.ID), v.Proof)
+		decoration := ""
+		if fn, err := friendlyNames(o.Name); err == nil {
+			if name, ok := fn[o.SystemAccount]; ok {
+				decoration = " / " + name
+			}
 		}
+		table.AddRow("System Account", o.SystemAccount+decoration)
 	}
 
 	if len(o.SigningKeys) > 0 {

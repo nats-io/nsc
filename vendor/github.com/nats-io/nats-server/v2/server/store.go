@@ -50,17 +50,26 @@ var (
 	ErrStoreSnapshotInProgress = errors.New("snapshot in progress")
 	// ErrMsgTooBig is returned when a message is considered too large.
 	ErrMsgTooLarge = errors.New("message to large")
+	// ErrStoreWrongType is for when you access the wrong storage type.
+	ErrStoreWrongType = errors.New("wrong storage type")
+	// ErrNoAckPolicy is returned when trying to update a consumer's acks with no ack policy.
+	ErrNoAckPolicy = errors.New("ack policy is none")
 )
+
+// Used to call back into the upper layers to report on changes in storage resources.
+// For the cases where its a single message we will also supply sequence number and subject.
+type StorageUpdateHandler func(msgs, bytes int64, seq uint64, subj string)
 
 type StreamStore interface {
 	StoreMsg(subj string, hdr, msg []byte) (uint64, int64, error)
+	SkipMsg() uint64
 	LoadMsg(seq uint64) (subj string, hdr, msg []byte, ts int64, err error)
 	RemoveMsg(seq uint64) (bool, error)
 	EraseMsg(seq uint64) (bool, error)
 	Purge() uint64
 	GetSeqFromTime(t time.Time) uint64
 	State() StreamState
-	StorageBytesUpdate(func(int64))
+	RegisterStorageUpdates(StorageUpdateHandler)
 	UpdateConfig(cfg *StreamConfig) error
 	Delete() error
 	Stop() error
@@ -112,16 +121,18 @@ type SnapshotResult struct {
 
 // ConsumerStore stores state on consumers for streams.
 type ConsumerStore interface {
-	State() (*ConsumerState, error)
+	UpdateDelivered(dseq, sseq, dc uint64, ts int64) error
+	UpdateAcks(dseq, sseq uint64) error
 	Update(*ConsumerState) error
+	State() (*ConsumerState, error)
 	Stop() error
 	Delete() error
 }
 
 // SequencePair has both the consumer and the stream sequence. They point to same message.
 type SequencePair struct {
-	ConsumerSeq uint64 `json:"consumer_seq"`
-	StreamSeq   uint64 `json:"stream_seq"`
+	Consumer uint64 `json:"consumer_seq"`
+	Stream   uint64 `json:"stream_seq"`
 }
 
 // ConsumerState represents a stored state for a consumer.
@@ -133,9 +144,16 @@ type ConsumerState struct {
 	// These are both in stream sequence context.
 	// Pending is for all messages pending and the timestamp for the delivered time.
 	// This will only be present when the AckPolicy is ExplicitAck.
-	Pending map[uint64]int64 `json:"pending"`
+	Pending map[uint64]*Pending `json:"pending"`
 	// This is for messages that have been redelivered, so count > 1.
 	Redelivered map[uint64]uint64 `json:"redelivered"`
+}
+
+// Represents a pending message for explicit ack or ack all.
+// Sequence is the original consumer sequence.
+type Pending struct {
+	Sequence  uint64
+	Timestamp int64
 }
 
 // TemplateStore stores templates.

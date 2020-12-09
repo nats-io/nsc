@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"testing"
-	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
 
@@ -42,7 +41,7 @@ func TestRevokeClearUser(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
+	require.Contains(t, ac.Revocations, u.Subject)
 
 	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "--name", "one")
 	require.NoError(t, err)
@@ -76,8 +75,7 @@ func TestRevokeClearUserInteractive(t *testing.T) {
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, ac.IsRevokedAt(u.Subject, time.Unix(0, 0)))
-	require.False(t, ac.IsRevokedAt(u.Subject, time.Now().Add(1*time.Hour)))
+	require.Contains(t, ac.Revocations, u.Subject)
 
 	// first account and first user
 	input := []interface{}{0, 0}
@@ -131,7 +129,7 @@ func TestClearRevokeRevocationNotFound(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "revocation for user \"*\" was not found")
+	require.Contains(t, err.Error(), "user with public key * is not revoked")
 }
 
 func TestClearRevokeAllUsers(t *testing.T) {

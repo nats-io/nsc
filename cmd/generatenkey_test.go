@@ -152,7 +152,6 @@ func Test_GenerateAllNKeys(t *testing.T) {
 
 	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--account", "--user")
 	require.NoError(t, err)
-	t.Log(stderr)
 	lines := strings.Split(stderr, "\n")
 	require.True(t, len(lines) > 9)
 

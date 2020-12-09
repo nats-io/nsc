@@ -397,7 +397,7 @@ func NewServer(opts *Options) (*Server, error) {
 			s.mu.Unlock()
 			var a *Account
 			// perform direct lookup to avoid warning trace
-			if _, err := ar.Fetch(s.opts.SystemAccount); err == nil {
+			if _, err := fetchAccount(ar, s.opts.SystemAccount); err == nil {
 				a, _ = s.fetchAccount(s.opts.SystemAccount)
 			}
 			s.mu.Lock()
@@ -412,39 +412,6 @@ func NewServer(opts *Options) (*Server, error) {
 	// For tracking accounts
 	if err := s.configureAccounts(); err != nil {
 		return nil, err
-	}
-
-	// In local config mode, check that leafnode configuration
-	// refers to account that exist.
-	if len(opts.TrustedOperators) == 0 {
-		checkAccountExists := func(accName string) error {
-			if accName == _EMPTY_ {
-				return nil
-			}
-			if _, ok := s.accounts.Load(accName); !ok {
-				return fmt.Errorf("cannot find account %q specified in leafnode authorization", accName)
-			}
-			return nil
-		}
-		if err := checkAccountExists(opts.LeafNode.Account); err != nil {
-			return nil, err
-		}
-		for _, lu := range opts.LeafNode.Users {
-			if lu.Account == nil {
-				continue
-			}
-			if err := checkAccountExists(lu.Account.Name); err != nil {
-				return nil, err
-			}
-		}
-		for _, r := range opts.LeafNode.Remotes {
-			if r.LocalAccount == _EMPTY_ {
-				continue
-			}
-			if _, ok := s.accounts.Load(r.LocalAccount); !ok {
-				return nil, fmt.Errorf("no local account %q for remote leafnode", r.LocalAccount)
-			}
-		}
 	}
 
 	// Used to setup Authorization.
@@ -1284,7 +1251,7 @@ func (s *Server) fetchRawAccountClaims(name string) (string, error) {
 	}
 	// Need to do actual Fetch
 	start := time.Now()
-	claimJWT, err := accResolver.Fetch(name)
+	claimJWT, err := fetchAccount(accResolver, name)
 	fetchTime := time.Since(start)
 	if fetchTime > time.Second {
 		s.Warnf("Account [%s] fetch took %v", name, fetchTime)
@@ -1305,7 +1272,12 @@ func (s *Server) fetchAccountClaims(name string) (*jwt.AccountClaims, string, er
 	if err != nil {
 		return nil, _EMPTY_, err
 	}
-	return s.verifyAccountClaims(claimJWT)
+	var claim *jwt.AccountClaims
+	claim, claimJWT, err = s.verifyAccountClaims(claimJWT)
+	if claim != nil && claim.Subject != name {
+		return nil, _EMPTY_, ErrAccountValidation
+	}
+	return claim, claimJWT, err
 }
 
 // verifyAccountClaims will decode and validate any account claims.
@@ -1447,7 +1419,7 @@ func (s *Server) Start() {
 						case <-s.quitCh:
 							return
 						case <-t.C:
-							if _, err := ar.Fetch(s.opts.SystemAccount); err != nil {
+							if _, err := fetchAccount(ar, s.opts.SystemAccount); err != nil {
 								continue
 							}
 							if _, err := s.fetchAccount(s.opts.SystemAccount); err != nil {
@@ -3254,6 +3226,9 @@ func (s *Server) setFirstPingTimer(c *client) {
 		if c.kind != CLIENT {
 			if d > firstPingInterval {
 				d = firstPingInterval
+			}
+			if c.kind == GATEWAY {
+				d = adjustPingIntervalForGateway(d)
 			}
 		} else if d > firstClientPingInterval {
 			d = firstClientPingInterval

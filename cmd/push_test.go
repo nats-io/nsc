@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,7 +70,6 @@ func Test_SyncNoURL(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
-	t.Log(err.Error())
 	require.Contains(t, err.Error(), "no account server url or nats-server url was provided by the operator jwt")
 }
 

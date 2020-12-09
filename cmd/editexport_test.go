@@ -18,7 +18,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +66,8 @@ func Test_EditExportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 	ts.AddExport(t, "A", jwt.Service, "b", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1})
+	link := "http://foo/bar"
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "desc", link})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -74,6 +75,8 @@ func Test_EditExportInteractive(t *testing.T) {
 	require.Len(t, ac.Exports, 2)
 	require.Equal(t, jwt.Subject("c"), ac.Exports[1].Subject)
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[1].ResponseType)
+	require.Equal(t, ac.Exports[1].Description, "desc")
+	require.Equal(t, ac.Exports[1].InfoURL, link)
 }
 
 func Test_EditExportInteractiveLatency(t *testing.T) {
@@ -83,7 +86,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "100", "lat", 2})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "100", "lat", 2, "", ""})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

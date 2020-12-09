@@ -21,7 +21,7 @@ import (
 	"os"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -53,6 +53,11 @@ func createAddOperatorCmd() *cobra.Command {
 
 func init() {
 	addCmd.AddCommand(createAddOperatorCmd())
+}
+
+func JWTUpgradeBannerJWT(ver int) error {
+	return fmt.Errorf(`this version of nsc (%s) is incompatible with the provided jwt v%d`,
+		GetRootCmd().Version, ver)
 }
 
 type AddOperatorParams struct {
@@ -156,6 +161,9 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
 			return fmt.Errorf("error importing operator jwt: %v", err)
+		}
+		if op.Version != 2 {
+			return JWTUpgradeBannerJWT(op.Version)
 		}
 		p.token = token
 		if p.name == "" {
@@ -331,6 +339,9 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 			ocNew, err := jwt.DecodeOperatorClaims(p.token)
 			if err != nil {
 				return nil, err
+			}
+			if ocNew.Version != 2 {
+				return nil, JWTUpgradeBannerJWT(ocNew.Version)
 			}
 			if oc.Subject != ocNew.Subject {
 				err := fmt.Errorf("existing and new operator represent different entities")

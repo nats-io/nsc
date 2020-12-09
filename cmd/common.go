@@ -34,7 +34,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-homedir"
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -237,7 +237,7 @@ func NKeyValidator(kind nkeys.PrefixByte) cli.Validator {
 	}
 }
 
-func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Validator {
+func SeedNKeyValidatorMatching(pukeys []string, kinds ...nkeys.PrefixByte) cli.Validator {
 	return func(v string) error {
 		if v == "" {
 			return fmt.Errorf("value cannot be empty")
@@ -260,8 +260,17 @@ func SeedNKeyValidatorMatching(kind nkeys.PrefixByte, pukeys []string) cli.Valid
 		if err != nil {
 			return err
 		}
-		if t != kind {
-			return fmt.Errorf("specified key is not valid for an %s", kind.String())
+		foundKind := false
+		kindNames := []string{}
+		for _, kind := range kinds {
+			if t == kind {
+				foundKind = true
+				break
+			}
+			kindNames = append(kindNames, kind.String())
+		}
+		if !foundKind {
+			return fmt.Errorf("specified key is not valid for any of %v", kindNames)
 		}
 
 		pk, err := nk.PublicKey()

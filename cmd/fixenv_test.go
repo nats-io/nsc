@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
 )

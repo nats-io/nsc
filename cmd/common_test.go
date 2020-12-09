@@ -26,12 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mitchellh/go-homedir"
-
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -406,7 +405,7 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 		{string(as1), true},
 	}
 
-	fun := SeedNKeyValidatorMatching(nkeys.PrefixByteAccount, validPubs)
+	fun := SeedNKeyValidatorMatching(validPubs, nkeys.PrefixByteAccount)
 	for i, kt := range keyTests {
 		err := fun(kt.arg)
 		var failed bool

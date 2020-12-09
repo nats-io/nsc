@@ -16,12 +16,13 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/nats-io/nkeys"
+
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,6 +37,7 @@ func Test_EditUser(t *testing.T) {
 	tests := CmdTests{
 		{createEditUserCmd(), []string{"edit", "user"}, nil, []string{"specify an edit option"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "A", "--account", "A"}, nil, []string{"edited user \"a\""}, false},
+		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "MQTT", "--rm-conn-type", "LEAFNODE", "--account", "A"}, nil, []string{"added connection type MQTT", "added connection type MQTT"}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B"}, nil, []string{"user name is required"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B", "--name", "bb"}, nil, []string{"edited user \"bb\""}, false},
 	}
@@ -164,7 +166,7 @@ func Test_EditUser_Src(t *testing.T) {
 	cc, err := ts.Store.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 	require.NotNil(t, cc)
-	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.2.0/24", "192.0.1.0/8"})
+	require.ElementsMatch(t, cc.Src, []string{"192.0.2.0/24", "192.0.1.0/8"})
 
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-source-network", "192.0.2.0/24")
 	require.NoError(t, err)
@@ -172,7 +174,7 @@ func Test_EditUser_Src(t *testing.T) {
 	cc, err = ts.Store.ReadUserClaim("A", "a")
 	require.NoError(t, err)
 	require.NotNil(t, cc)
-	require.ElementsMatch(t, strings.Split(cc.Src, ","), []string{"192.0.1.0/8"})
+	require.ElementsMatch(t, cc.Src, []string{"192.0.1.0/8"})
 }
 
 func Test_EditUser_Times(t *testing.T) {
@@ -364,4 +366,106 @@ func Test_EditUserBearerToken(t *testing.T) {
 	u, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.False(t, u.BearerToken)
+}
+
+func Test_EditUserWithSigningKeyOnly(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// create a signing key
+	kp, err := nkeys.CreateAccount()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.True(t, ts.KeyStore.HasPrivateKey(pk))
+
+	ts.AddAccount(t, "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	ts.KeyStore.Remove(ac.Subject)
+	require.False(t, ts.KeyStore.HasPrivateKey(ac.Subject))
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "AAA")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--name", "AAA", "--payload", "5")
+	require.NoError(t, err)
+
+	claim, err := ts.Store.ReadUserClaim("A", "AAA")
+	require.NoError(t, err)
+	require.Equal(t, claim.Limits.Payload, int64(5))
+	require.NotEmpty(t, claim.IssuerAccount)
+	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
+	require.Equal(t, claim.Issuer, pk)
+}
+
+func Test_EditUserWithSigningKeyInteractive(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// create a signing key
+	kp, err := nkeys.CreateAccount()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+	pk, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.True(t, ts.KeyStore.HasPrivateKey(pk))
+
+	ts.AddAccount(t, "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac)
+	require.True(t, ts.KeyStore.HasPrivateKey(ac.Subject))
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "AAA")
+	require.NoError(t, err)
+
+	inputs := []interface{}{1, "5", "0", "0", false}
+	cmd := createEditUserCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteInteractiveCmd(cmd, inputs, "--name", "AAA")
+	require.NoError(t, err)
+
+	claim, err := ts.Store.ReadUserClaim("A", "AAA")
+	require.NoError(t, err)
+	require.Equal(t, claim.Limits.Payload, int64(5))
+	require.NotEmpty(t, claim.IssuerAccount)
+	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
+	require.Equal(t, claim.Issuer, pk)
+}
+
+func Test_EditUserSk(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	sk, err := nkeys.CreateAccount()
+	require.NoError(t, err)
+	_, err = ts.KeyStore.Store(sk)
+	require.NoError(t, err)
+	pSk, err := sk.PublicKey()
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pSk)
+	require.NoError(t, err)
+
+	ts.AddUserWithSigner(t, "A", "u", sk)
+	uc, err := ts.Store.ReadUserClaim("A", "u")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, pSk)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--tag", "foo")
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "u")
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, pSk)
 }

@@ -22,22 +22,21 @@ import (
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 // SignerParams is shared UI for a signer (-K flag). The key
 // for a signer is never generated and must be provided
 type SignerParams struct {
-	kind     nkeys.PrefixByte
+	kind     []nkeys.PrefixByte
 	signerKP nkeys.KeyPair
 	prompt   string
 }
 
 func (p *SignerParams) SetDefaults(kind nkeys.PrefixByte, allowManaged bool, ctx ActionCtx) {
-	p.kind = kind
-	if allowManaged {
-		if ctx.StoreCtx().Store.IsManaged() && p.kind == nkeys.PrefixByteOperator {
-			p.kind = nkeys.PrefixByteAccount
-		}
+	p.kind = append(p.kind, kind)
+	if allowManaged && ctx.StoreCtx().Store.IsManaged() && kind == nkeys.PrefixByteOperator {
+		p.kind = append(p.kind, nkeys.PrefixByteAccount)
 	}
 }
 
@@ -65,7 +64,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 	// if we have more than one key, we prompt
 	if len(keys) == 1 && len(notFound) == 0 {
 		var err error
-		p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[0])
+		p.signerKP, err = ctx.StoreCtx().ResolveKey(keys[0], p.kind...)
 		if err != nil {
 			return err
 		}
@@ -86,17 +85,21 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 		}
 		// if it is the extra option, ask for a path/key
 		if idx != -1 && choice == idx {
-			label := fmt.Sprintf("path to signer %s nkey or nkey", p.kind.String())
+			kinds := []string{}
+			for _, kind := range p.kind {
+				kinds = append(kinds, kind.String())
+			}
+			label := fmt.Sprintf("path to signer %s nkey or nkey", kinds)
 			// key must be one from signing keys
-			KeyPathFlag, err = cli.Prompt(label, "", cli.Val(SeedNKeyValidatorMatching(p.kind, signers)))
+			KeyPathFlag, err = cli.Prompt(label, "", cli.Val(SeedNKeyValidatorMatching(signers, p.kind...)))
 			if err != nil {
 				return err
 			}
-			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+			p.signerKP, err = ctx.StoreCtx().ResolveKey(KeyPathFlag, p.kind...)
 			return err
 		} else {
 			// they picked one
-			p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, keys[choice])
+			p.signerKP, err = ctx.StoreCtx().ResolveKey(keys[choice], p.kind...)
 			return err
 		}
 	}
@@ -107,7 +110,7 @@ func (p *SignerParams) SelectFromSigners(ctx ActionCtx, signers []string) error 
 func (p *SignerParams) Edit(ctx ActionCtx) error {
 	var err error
 	sctx := ctx.StoreCtx()
-	p.signerKP, _ = sctx.ResolveKey(p.kind, KeyPathFlag)
+	p.signerKP, _ = sctx.ResolveKey(KeyPathFlag, p.kind...)
 
 	if p.signerKP != nil && ctx.StoreCtx().Store.IsManaged() {
 		return nil
@@ -132,32 +135,39 @@ func (p *SignerParams) getSigners(ctx ActionCtx) ([]string, error) {
 	sctx := ctx.StoreCtx()
 	ks := sctx.KeyStore
 	var signers []string
-	var err error
-	switch p.kind {
-	case nkeys.PrefixByteOperator:
-		KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
-		signers, err = ctx.StoreCtx().GetOperatorKeys()
-		if err != nil {
-			return nil, err
-		}
-	case nkeys.PrefixByteAccount:
-		KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
-		signers, err = ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
-		if err != nil {
-			return nil, err
+	for _, kind := range p.kind {
+		switch kind {
+		case nkeys.PrefixByteOperator:
+			KeyPathFlag = ks.GetKeyPath(sctx.Operator.PublicKey)
+			sgnrs, err := ctx.StoreCtx().GetOperatorKeys()
+			if err != nil {
+				return nil, err
+			}
+			signers = append(signers, sgnrs...)
+		case nkeys.PrefixByteAccount:
+			KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
+			sgnrs, err := ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
+			if err != nil {
+				return nil, err
+			}
+			signers = append(signers, sgnrs...)
 		}
 	}
 	return signers, nil
 }
 
 func (p *SignerParams) Resolve(ctx ActionCtx) error {
+	return p.ResolveWithPriority(ctx, "")
+}
+
+func (p *SignerParams) ResolveWithPriority(ctx ActionCtx, preferKey string) error {
 	if p.signerKP != nil {
 		return nil
 	}
 	var err error
 	// if they specified -K resolve or fail
 	if KeyPathFlag != "" {
-		p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, KeyPathFlag)
+		p.signerKP, err = ctx.StoreCtx().ResolveKey(KeyPathFlag, p.kind...)
 		if err != nil {
 			return err
 		}
@@ -175,6 +185,13 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if err != nil {
 		return fmt.Errorf("error reading signers: %v", err)
 	}
+	for _, s := range signers {
+		if s == preferKey {
+			signers = append([]string{s}, signers...)
+			break
+		}
+	}
+
 	var selected string
 	for _, s := range signers {
 		fp := ctx.StoreCtx().KeyStore.GetKeyPath(s)
@@ -187,25 +204,33 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	if selected == "" {
 		return fmt.Errorf("unable to resolve any of the following signing keys in the keystore: %s", strings.Join(signers, ", "))
 	}
-	p.signerKP, err = ctx.StoreCtx().ResolveKey(p.kind, selected)
+	p.signerKP, err = ctx.StoreCtx().ResolveKey(selected, p.kind...)
 	return err
 }
 
 func (p *SignerParams) ForceManagedAccountKey(ctx ActionCtx, kp nkeys.KeyPair) {
-	if ctx.StoreCtx().Store.IsManaged() && p.signerKP == nil {
-		// use the account as the signer
-		p.signerKP = kp
-		// check we have a private key available
-		pk, _ := p.signerKP.PrivateKey()
-		if pk == nil {
-			// try to load it
-			pub, _ := p.signerKP.PublicKey()
-			kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(pub)
-			if err == nil {
-				pk, _ := kp.PrivateKey()
-				if pk != nil {
-					p.signerKP = kp
-				}
+	p.Resolve(ctx)
+	if !ctx.StoreCtx().Store.IsManaged() {
+		return
+	}
+	if p.signerKP != nil && store.KeyPairTypeOk(nkeys.PrefixByteAccount, p.signerKP) {
+		p.signerKP = nil
+	}
+	if p.signerKP != nil {
+		return
+	}
+	// use the account as the signer
+	p.signerKP = kp
+	// check we have a private key available
+	pk, _ := p.signerKP.PrivateKey()
+	if pk == nil {
+		// try to load it
+		pub, _ := p.signerKP.PublicKey()
+		kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(pub)
+		if err == nil {
+			pk, _ := kp.PrivateKey()
+			if pk != nil {
+				p.signerKP = kp
 			}
 		}
 	}

@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,7 +48,7 @@ func TestRevokeActivation(t *testing.T) {
 	require.Len(t, ac.Exports, 3)
 
 	for _, exp := range ac.Exports {
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(0, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(0, 0)))
 	}
 }
 
@@ -73,8 +73,8 @@ func TestRevokeActivationAt(t *testing.T) {
 	require.Len(t, ac.Exports, 2)
 
 	for _, exp := range ac.Exports {
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(999, 0)))
-		require.False(t, exp.IsRevokedAt(pub, time.Unix(1001, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(999, 0)))
+		require.False(t, exp.Revocations.IsRevoked(pub, time.Unix(1001, 0)))
 	}
 }
 
@@ -113,8 +113,8 @@ func TestRevokeActivationForStreamInteractive(t *testing.T) {
 			continue
 		}
 		require.Len(t, exp.Revocations, 1)
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(999, 0)))
-		require.False(t, exp.IsRevokedAt(pub, time.Unix(1001, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(999, 0)))
+		require.False(t, exp.Revocations.IsRevoked(pub, time.Unix(1001, 0)))
 	}
 }
 
@@ -153,8 +153,8 @@ func TestRevokeActivationForServiceInteractive(t *testing.T) {
 			continue
 		}
 		require.Len(t, exp.Revocations, 1)
-		require.True(t, exp.IsRevokedAt(pub, time.Unix(999, 0)))
-		require.False(t, exp.IsRevokedAt(pub, time.Unix(1001, 0)))
+		require.True(t, exp.Revocations.IsRevoked(pub, time.Unix(999, 0)))
+		require.False(t, exp.Revocations.IsRevoked(pub, time.Unix(1001, 0)))
 	}
 }
 

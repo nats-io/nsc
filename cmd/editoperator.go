@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -42,6 +42,7 @@ func createEditOperatorCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.asu, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https urls supported if updating with nsc)")
+	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "set system account by account by public key or name")
 	cmd.Flags().StringSliceVarP(&params.serviceURLs, "service-url", "n", nil, "add an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().StringSliceVarP(&params.rmServiceURLs, "rm-service-url", "", nil, "remove an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	params.TimeParams.BindFlags(cmd)
@@ -59,6 +60,7 @@ type EditOperatorParams struct {
 	claim         *jwt.OperatorClaims
 	token         string
 	asu           string
+	sysAcc        string
 	serviceURLs   []string
 	rmServiceURLs []string
 	signingKeys   SigningKeysParams
@@ -68,7 +70,7 @@ type EditOperatorParams struct {
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url") {
+	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url", "system-account") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -99,6 +101,10 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 
 	if p.asu == "" {
 		p.asu = oc.AccountServerURL
+	}
+
+	if p.sysAcc == "" {
+		p.sysAcc = oc.SystemAccount
 	}
 
 	p.claim = oc
@@ -159,6 +165,15 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 		}
 	}
 
+	if ok, err := cli.Confirm("Set system account", false); err != nil {
+		return err
+	} else if ok {
+		p.sysAcc, err = ctx.StoreCtx().PickAccount("")
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := p.signingKeys.Edit(); err != nil {
 		return err
 	}
@@ -177,7 +192,15 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			return err
 		}
 	}
-
+	if p.sysAcc != "" {
+		if !nkeys.IsValidPublicAccountKey(p.sysAcc) {
+			if acc, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAcc); err != nil {
+				return err
+			} else {
+				p.sysAcc = acc.Subject
+			}
+		}
+	}
 	if err = p.signingKeys.Valid(); err != nil {
 		return err
 	}
@@ -211,6 +234,11 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.AccountServerURL = p.asu
 	if flags.Changed("account-jwt-server-url") {
 		r.AddOK("set account jwt server url to %q", p.asu)
+	}
+
+	if p.claim.SystemAccount != p.sysAcc {
+		p.claim.SystemAccount = p.sysAcc
+		r.AddOK("set system account %q", p.sysAcc)
 	}
 
 	for _, v := range p.serviceURLs {

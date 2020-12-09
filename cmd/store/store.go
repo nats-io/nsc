@@ -27,12 +27,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
 
@@ -186,10 +187,9 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 		return "", fmt.Errorf("error reading public key: %v", err)
 	}
 
-	var v = jwt.NewGenericClaims(string(pub))
+	var v = jwt.NewOperatorClaims(string(pub))
 	s.Info.Kind = jwt.OperatorClaim
 	v.Name = operator.Name
-	v.Type = jwt.OperatorClaim
 
 	if !nkeys.IsValidPublicOperatorKey(pub) {
 		return "", fmt.Errorf("unsupported key type %q - stores require operator nkeys", pub)
@@ -325,16 +325,16 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 	return entries, nil
 }
 
-func (s *Store) ClaimType(data []byte) (*jwt.ClaimType, error) {
+func (s *Store) ClaimType(data []byte) (jwt.ClaimType, error) {
 	// Decode the jwt to figure out where it goes
 	gc, err := jwt.DecodeGeneric(string(data))
 	if err != nil {
-		return nil, fmt.Errorf("invalid jwt: %v", err)
+		return "", fmt.Errorf("invalid jwt: %v", err)
 	}
 	if gc.Name == "" {
-		return nil, errors.New("jwt claim doesn't have a name")
+		return "", errors.New("jwt claim doesn't have a name")
 	}
-	return &gc.Type, nil
+	return gc.ClaimType(), nil
 }
 
 func PullAccount(u string) (Status, error) {
@@ -413,7 +413,7 @@ func (s *Store) StoreClaim(data []byte) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
-	if *ct == jwt.AccountClaim && s.IsManaged() {
+	if ct == jwt.AccountClaim && s.IsManaged() {
 		var pull Report
 		pp, err := s.handleManagedAccount(data)
 		if pp != nil {
@@ -451,7 +451,7 @@ func (s *Store) StoreRaw(data []byte) error {
 		return err
 	}
 	var path string
-	switch *ct {
+	switch ct {
 	case jwt.AccountClaim:
 		ac, err := jwt.DecodeAccountClaims(string(data))
 		if err != nil {
@@ -495,7 +495,7 @@ func (s *Store) StoreRaw(data []byte) error {
 		}
 		path = JwtName(s.GetName())
 	default:
-		return fmt.Errorf("unsuported store claim type: %s", *ct)
+		return fmt.Errorf("unsuported store claim type: %s", ct)
 	}
 
 	return s.Write(data, path)
@@ -748,37 +748,56 @@ func (s *Store) GetContext() (*Context, error) {
 	return &c, nil
 }
 
-func (ctx *Context) ResolveKey(kind nkeys.PrefixByte, flagValue string) (nkeys.KeyPair, error) {
+func (ctx *Context) ResolveKey(flagValue string, kinds ...nkeys.PrefixByte) (nkeys.KeyPair, error) {
 	kp, err := ResolveKey(flagValue)
 	if err != nil {
 		return nil, err
 	}
-	if kp == nil {
-		var pk string
-		switch kind {
-		case nkeys.PrefixByteAccount:
-			pk = ctx.Account.PublicKey
-		case nkeys.PrefixByteOperator:
-			pk = ctx.Operator.PublicKey
+	sort.Slice(kinds, func(i, j int) bool {
+		switch kind := kinds[i]; {
+		case kind == nkeys.PrefixByteAccount && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteOperator:
+			return false
+		case kind == nkeys.PrefixByteUser && kinds[j] == nkeys.PrefixByteAccount:
+			return false
 		default:
-			return nil, fmt.Errorf("unsupported key %d resolution", kind)
+			return true
 		}
-		// don't try to resolve empty
-		if pk != "" {
-			kp, err = ctx.KeyStore.GetKeyPair(pk)
-			if err != nil {
-				return nil, err
+	})
+	for _, kind := range kinds {
+		if kp == nil {
+			var pk string
+			switch kind {
+			case nkeys.PrefixByteAccount:
+				pk = ctx.Account.PublicKey
+			case nkeys.PrefixByteOperator:
+				pk = ctx.Operator.PublicKey
+			default:
+				return nil, fmt.Errorf("unsupported key %d resolution", kind)
+			}
+			// don't try to resolve empty
+			if pk != "" {
+				kp, err = ctx.KeyStore.GetKeyPair(pk)
+				if err != nil {
+					continue
+				}
+			}
+			// not found
+			if kp == nil {
+				continue
 			}
 		}
-		// not found
-		if kp == nil {
-			return nil, nil
+		if !KeyPairTypeOk(kind, kp) {
+			err = fmt.Errorf("unexpected resolved keytype type")
+			continue
+		}
+		if kp != nil {
+			err = nil
+			break
 		}
 	}
-	if !KeyPairTypeOk(kind, kp) {
-		return nil, fmt.Errorf("unexpected resolved keytype type")
-	}
-	return kp, nil
+	return kp, err
 }
 
 func (ctx *Context) PickAccount(name string) (string, error) {

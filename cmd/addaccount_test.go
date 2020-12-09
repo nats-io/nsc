@@ -17,9 +17,11 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
@@ -124,6 +126,45 @@ func Test_AddAccountManagedStore(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	s1, psk, sk := CreateOperatorKey(t)
+	ts.KeyStore.Store(sk)
+	oc.SigningKeys.Add(psk)
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "O.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	require.NoError(t, err)
+	// sign with the signing key
+	inputs := []interface{}{"A", true, "0", "0", 0, string(s1)}
+	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	require.NoError(t, err)
+	accJWT, err := ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "accounts", "A", "A.jwt"))
+	require.NoError(t, err)
+	ac, err := jwt.DecodeAccountClaims(string(accJWT))
+	require.NoError(t, err)
+	require.False(t, ac.IsSelfSigned())
+	require.Equal(t, ac.Issuer, psk)
+	require.True(t, oc.DidSign(ac))
+	// sign with the account key
+	inputs = []interface{}{"B", true, "0", "0", 1, string(s1)}
+	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	require.NoError(t, err)
+	accJWT, err = ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "accounts", "B", "B.jwt"))
+	require.NoError(t, err)
+	ac, err = jwt.DecodeAccountClaims(string(accJWT))
+	require.NoError(t, err)
+	require.True(t, ac.IsSelfSigned())
+	require.False(t, oc.DidSign(ac))
+}
+
 func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -224,4 +265,20 @@ func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
 
 	_, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
+}
+
+func Test_AddAccount_Pubs(t *testing.T) {
+	ts := NewTestStore(t, "edit user")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A", "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	require.NoError(t, err)
+
+	cc, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, cc)
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Allow, []string{"a", "b", "c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Allow, []string{"c"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo", "bar"})
+	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Deny, []string{"bar"})
 }

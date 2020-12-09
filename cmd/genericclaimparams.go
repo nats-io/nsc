@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
 )
 
@@ -129,9 +129,24 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 		}
 	}
 
-	cd.Tags.Add(sp.tags...)
-	cd.Tags.Remove(sp.rmTags...)
-	sort.Strings(cd.Tags)
+	var tags *jwt.TagList
+
+	switch claim.ClaimType() {
+	case jwt.OperatorClaim:
+		tags = &claim.(*jwt.OperatorClaims).Tags
+	case jwt.ActivationClaim:
+		tags = &claim.(*jwt.ActivationClaims).Tags
+	case jwt.AccountClaim:
+		tags = &claim.(*jwt.AccountClaims).Tags
+	case jwt.UserClaim:
+		tags = &claim.(*jwt.UserClaims).Tags
+	default:
+		panic("unhandled claim type")
+	}
+
+	tags.Add(sp.tags...)
+	tags.Remove(sp.rmTags...)
+	sort.Strings(*tags)
 
 	if r != nil {
 		for _, t := range sp.tags {
@@ -141,6 +156,5 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 			r.AddOK("removed tag %q", strings.ToLower(t))
 		}
 	}
-	sort.Strings(cd.Tags)
 	return nil
 }
