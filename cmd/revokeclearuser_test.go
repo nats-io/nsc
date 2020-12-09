@@ -142,4 +142,8 @@ func TestClearRevokeAllUsers(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
 	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Empty(t, ac.Revocations)
 }

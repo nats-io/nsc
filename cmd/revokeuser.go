@@ -199,7 +199,7 @@ func (p *RevokeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
-		if p.userKey.publicKey == "*" {
+		if p.userKey.publicKey == jwt.All {
 			when := int64(p.at)
 			if when == 0 {
 				when = time.Now().Unix()
