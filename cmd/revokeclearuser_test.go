@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,6 +17,8 @@ package cmd
 
 import (
 	"testing"
+
+	cli "github.com/nats-io/cliprompts/v2"
 
 	"github.com/stretchr/testify/require"
 )
@@ -75,13 +77,71 @@ func TestRevokeClearUserInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, ac.Revocations, u.Subject)
 
-	input := []interface{}{0, 1}
+	// first account and first user
+	input := []interface{}{0, 0}
 	cmd := createClearRevokeUserCmd()
 	HoistRootFlags(cmd)
+	cli.LogFn = t.Log
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Len(t, ac.Revocations, 0)
+}
+
+func TestClearRevokeUserUserAndKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createClearRevokeUserCmd(), "--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user and user-public-key are mutually exclusive")
+}
+
+func TestClearRevokeUserNotFound(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createClearRevokeUserCmd(), "--name", "uu")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+}
+
+func TestClearRevokeDefaultUser(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createClearRevokeUserCmd())
+	require.NoError(t, err)
+}
+
+func TestClearRevokeRevocationNotFound(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user with public key * is not revoked")
+}
+
+func TestClearRevokeAllUsers(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Empty(t, ac.Revocations)
 }

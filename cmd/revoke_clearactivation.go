@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -34,14 +34,7 @@ func createClearRevokeActivationCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			if !QuietMode() {
-				cmd.Printf("Cleared revocation for account %s from export %s\n", params.accountKey.publicKey, params.export.Subject)
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -71,6 +64,7 @@ type RevokeClearActivationParams struct {
 }
 
 func (p *RevokeClearActivationParams) SetDefaults(ctx ActionCtx) error {
+	p.accountKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
@@ -120,18 +114,18 @@ func (p *RevokeClearActivationParams) Load(ctx ActionCtx) error {
 	}
 
 	if len(p.possibleExports) == 0 {
-		return fmt.Errorf("account %q doesn't have %s exports that qualify",
-			p.AccountContextParams.Name, kind.String())
+		return fmt.Errorf("account %q doesn't have %v exports",
+			p.AccountContextParams.Name, kind)
 	}
 
 	return nil
 }
 
 func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
-	var choices []string
+	var exports []string
 	if p.subject == "" {
 		for _, v := range p.possibleExports {
-			choices = append(choices, string(v.Subject))
+			exports = append(exports, string(v.Subject))
 		}
 	}
 	kind := jwt.Stream
@@ -139,7 +133,7 @@ func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 		kind = jwt.Service
 	}
 
-	i, err := cli.Select(fmt.Sprintf("select %s export", kind.String()), "", choices)
+	i, err := cli.Select(fmt.Sprintf("select %v export", kind), "", exports)
 	if err != nil {
 		return err
 	}
@@ -147,33 +141,46 @@ func (p *RevokeClearActivationParams) PostInteractive(ctx ActionCtx) error {
 	if p.subject == "" {
 		p.subject = string(p.export.Subject)
 	}
-
-	if err = p.accountKey.Edit(); err != nil {
+	if len(p.export.Revocations) == 0 {
+		return fmt.Errorf("%v export %s doesn't have revocations", kind, p.export.Name)
+	}
+	accounts, err := ListAccounts(ctx.StoreCtx().Store)
+	if err != nil {
 		return err
 	}
-
-	if err := p.SignerParams.Edit(ctx); err != nil {
+	keyToName := make(map[string]string)
+	keyToName["*"] = "* [All Accounts]"
+	for _, a := range accounts {
+		if a.Err == nil {
+			keyToName[a.Claims.Claims().Subject] = a.Name
+		}
+	}
+	var keys []PubKeyChoice
+	for k := range p.export.Revocations {
+		n := keyToName[k]
+		if n == "" {
+			n = "[Unknown Account]"
+		}
+		n = fmt.Sprintf("%s: %s", k, n)
+		keys = append(keys, PubKeyChoice{Key: k, Label: n})
+	}
+	if err = p.accountKey.Select("select account revocation to delete", keys...); err != nil {
 		return err
 	}
-
-	return nil
+	return p.SignerParams.Edit(ctx)
 }
 
 func (p *RevokeClearActivationParams) Validate(ctx ActionCtx) error {
-
 	if len(p.possibleExports) == 1 && p.subject == "" {
 		p.subject = string(p.possibleExports[0].Subject)
 	}
-
 	if p.subject == "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("a subject is required")
 	}
-
 	if err := p.accountKey.Valid(); err != nil {
 		return err
 	}
-
 	sub := jwt.Subject(p.subject)
 	for _, e := range p.possibleExports {
 		if sub.IsContainedIn(e.Subject) {
@@ -184,12 +191,7 @@ func (p *RevokeClearActivationParams) Validate(ctx ActionCtx) error {
 	if p.export == nil {
 		return fmt.Errorf("unable to locate export")
 	}
-
-	if err := p.SignerParams.Resolve(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return p.SignerParams.Resolve(ctx)
 }
 
 func (p *RevokeClearActivationParams) Run(ctx ActionCtx) (store.Status, error) {
@@ -201,7 +203,16 @@ func (p *RevokeClearActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
-		r.AddOK("cleared export revocation %s for account %s", p.export.Name, p.accountKey.publicKey)
+		kind := jwt.Stream
+		if p.service {
+			kind = jwt.Service
+		}
+
+		if p.accountKey.publicKey == jwt.All {
+			r.AddOK("deleted %v %s revocation for all accounts", kind, p.export.Name)
+		} else {
+			r.AddOK("deleted %v %s revocation for account %s", kind, p.export.Name, p.accountKey.publicKey)
+		}
 	}
 	return r, nil
 }

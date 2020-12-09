@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,16 +18,24 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nats-io/jwt"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
+type PubKeyChoice struct {
+	Label string
+	Key   string
+}
+
 type PubKeyParams struct {
-	flagName  string
-	kind      nkeys.PrefixByte
-	publicKey string
+	flagName      string
+	kind          nkeys.PrefixByte
+	publicKey     string
+	AllowWildcard bool
 }
 
 func (e *PubKeyParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
@@ -39,6 +47,9 @@ func (e *PubKeyParams) BindFlags(flagName string, shorthand string, kind nkeys.P
 func (e *PubKeyParams) valid(s string) error {
 	if s == "" {
 		return fmt.Errorf("%s cannot be empty", e.flagName)
+	}
+	if e.AllowWildcard && s == jwt.All {
+		return nil
 	}
 
 	if !store.IsPublicKey(e.kind, s) {
@@ -52,8 +63,28 @@ func (e *PubKeyParams) Valid() error {
 	return e.valid(e.publicKey)
 }
 
+func (e *PubKeyParams) Select(label string, choices ...PubKeyChoice) error {
+	var labels []string
+	for _, c := range choices {
+		labels = append(labels, c.Label)
+	}
+	sel, err := cli.Select(label, "", labels)
+	if err != nil {
+		return err
+	}
+	if sel == -1 {
+		return fmt.Errorf("nothing selected")
+	}
+	e.publicKey = choices[sel].Key
+	return nil
+}
+
 func (e *PubKeyParams) Edit() error {
-	sv, err := cli.Prompt(fmt.Sprintf("%s public key", e.flagName), e.publicKey, cli.Val(e.valid))
+	m := fmt.Sprintf("%s public key", e.flagName)
+	if e.AllowWildcard {
+		m = fmt.Sprintf("%s or '*' to match any %s", m, e.flagName)
+	}
+	sv, err := cli.Prompt(m, e.publicKey, cli.Val(e.valid))
 	if err != nil {
 		return err
 	}

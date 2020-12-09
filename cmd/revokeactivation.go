@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -36,14 +36,7 @@ func createRevokeActivationCmd() *cobra.Command {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := RunAction(cmd, args, &params); err != nil {
-				return err
-			}
-
-			if !QuietMode() {
-				cmd.Printf("Revoked account %s from export %s\n", params.accountKey.publicKey, params.export.Subject)
-			}
-			return nil
+			return RunAction(cmd, args, &params)
 		},
 	}
 
@@ -75,6 +68,7 @@ type RevokeActivationParams struct {
 }
 
 func (p *RevokeActivationParams) SetDefaults(ctx ActionCtx) error {
+	p.accountKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
@@ -132,38 +126,8 @@ func (p *RevokeActivationParams) Load(ctx ActionCtx) error {
 	}
 
 	if len(p.possibleExports) == 0 {
-		return fmt.Errorf("account %q doesn't have %s exports that qualify",
-			p.AccountContextParams.Name, kind.String())
-	}
-
-	return nil
-}
-
-func (p *RevokeActivationParams) Validate(ctx ActionCtx) error {
-
-	if len(p.possibleExports) == 1 && p.subject == "" {
-		p.subject = string(p.possibleExports[0].Subject)
-	}
-
-	if p.subject == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("a subject is required")
-	}
-
-	if err := p.accountKey.Valid(); err != nil {
-		return err
-	}
-
-	sub := jwt.Subject(p.subject)
-	for _, e := range p.possibleExports {
-		if sub.IsContainedIn(e.Subject) {
-			p.export = e
-			break
-		}
-	}
-
-	if err := p.SignerParams.Resolve(ctx); err != nil {
-		return err
+		return fmt.Errorf("account %q doesn't have %v exports",
+			p.AccountContextParams.Name, kind)
 	}
 
 	return nil
@@ -209,6 +173,35 @@ func (p *RevokeActivationParams) PostInteractive(ctx ActionCtx) error {
 	return p.SignerParams.Edit(ctx)
 }
 
+func (p *RevokeActivationParams) Validate(ctx ActionCtx) error {
+
+	if len(p.possibleExports) == 1 && p.subject == "" {
+		p.subject = string(p.possibleExports[0].Subject)
+	}
+
+	if p.subject == "" {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("a subject is required")
+	}
+	if err := p.accountKey.Valid(); err != nil {
+		return err
+	}
+
+	sub := jwt.Subject(p.subject)
+	for _, e := range p.possibleExports {
+		if sub.IsContainedIn(e.Subject) {
+			p.export = e
+			break
+		}
+	}
+
+	if err := p.SignerParams.Resolve(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *RevokeActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.export == nil {
 		return nil, fmt.Errorf("unable to locate export")
@@ -227,7 +220,15 @@ func (p *RevokeActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
-		r.AddOK("revoked activation %s for account %s", p.export.Name, p.accountKey.publicKey)
+		if p.accountKey.publicKey == jwt.All {
+			when := int64(p.at)
+			if when == 0 {
+				when = time.Now().Unix()
+			}
+			r.AddOK("revoked all activations for %q issued before %s", p.export.Name, time.Unix(when, 0).String())
+		} else {
+			r.AddOK("revoked activation %q for account %s", p.export.Name, p.accountKey.publicKey)
+		}
 	}
 	return r, nil
 }
