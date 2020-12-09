@@ -118,7 +118,7 @@ var rootCmd = &cobra.Command{
 					return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
 						store.GetName(), c.Version, os.Args[0])
 				} else if c.Version == 1 {
-					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help"
+					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help"  || cmd.Name() == "update"
 					if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
 						for _, v := range addCmd.Commands() {
 							if v == cmd {
