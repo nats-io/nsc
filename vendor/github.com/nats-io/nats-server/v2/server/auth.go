@@ -253,6 +253,8 @@ func (s *Server) configureAuthorization() {
 
 	// Do similar for websocket config
 	s.wsConfigAuth(&opts.Websocket)
+	// And for mqtt config
+	s.mqttConfigAuth(&opts.MQTT)
 }
 
 // Takes the given slices of NkeyUser and User options and build
@@ -343,11 +345,15 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 	)
 	s.mu.Lock()
 	authRequired := s.info.AuthRequired
-	// c.ws is immutable, but may need lock if we get race reports.
-	if !authRequired && c.ws != nil {
+	if !authRequired {
 		// If no auth required for regular clients, then check if
-		// we have an override for websocket clients.
-		authRequired = s.websocket.authOverride
+		// we have an override for MQTT or Websocket clients.
+		switch c.clientType() {
+		case MQTT:
+			authRequired = s.mqtt.authOverride
+		case WS:
+			authRequired = s.websocket.authOverride
+		}
 	}
 	if !authRequired {
 		// TODO(dlc) - If they send us credentials should we fail?
@@ -361,20 +367,36 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 		noAuthUser string
 	)
 	tlsMap := opts.TLSMap
-	if c.ws != nil {
-		wo := &opts.Websocket
-		// Always override TLSMap.
-		tlsMap = wo.TLSMap
-		// The rest depends on if there was any auth override in
-		// the websocket's config.
-		if s.websocket.authOverride {
-			noAuthUser = wo.NoAuthUser
-			username = wo.Username
-			password = wo.Password
-			token = wo.Token
-			ao = true
+	if c.kind == CLIENT {
+		switch c.clientType() {
+		case MQTT:
+			mo := &opts.MQTT
+			// Always override TLSMap.
+			tlsMap = mo.TLSMap
+			// The rest depends on if there was any auth override in
+			// the mqtt's config.
+			if s.mqtt.authOverride {
+				noAuthUser = mo.NoAuthUser
+				username = mo.Username
+				password = mo.Password
+				token = mo.Token
+				ao = true
+			}
+		case WS:
+			wo := &opts.Websocket
+			// Always override TLSMap.
+			tlsMap = wo.TLSMap
+			// The rest depends on if there was any auth override in
+			// the websocket's config.
+			if s.websocket.authOverride {
+				noAuthUser = wo.NoAuthUser
+				username = wo.Username
+				password = wo.Password
+				token = wo.Token
+				ao = true
+			}
 		}
-	} else if c.kind == LEAF {
+	} else {
 		tlsMap = opts.LeafNode.TLSMap
 	}
 	if !ao {
@@ -419,7 +441,7 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 	} else if hasUsers {
 		// Check if we are tls verify and are mapping users from the client_certificate.
 		if tlsMap {
-			authorized := checkClientTLSCertSubject(c, func(u string, certRDN *ldap.DN, _ bool) (string, bool) {
+			authorized := checkClientTLSCertSubject(c, func(u string, certDN *ldap.DN, _ bool) (string, bool) {
 				// First do literal lookup using the resulting string representation
 				// of RDNSequence as implemented by the pkix package from Go.
 				if u != "" {
@@ -431,23 +453,36 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 					return usr.Username, ok
 				}
 
-				if certRDN == nil {
+				if certDN == nil {
 					return "", false
 				}
 
-				// Look through the accounts for an RDN that is equal to the one
+				// Look through the accounts for a DN that is equal to the one
 				// presented by the certificate.
+				dns := make(map[*User]*ldap.DN)
 				for _, usr := range s.users {
 					if !c.connectionTypeAllowed(usr.AllowedConnectionTypes) {
 						continue
 					}
 					// TODO: Use this utility to make a full validation pass
 					// on start in case tlsmap feature is being used.
-					inputRDN, err := ldap.ParseDN(usr.Username)
+					inputDN, err := ldap.ParseDN(usr.Username)
 					if err != nil {
 						continue
 					}
-					if inputRDN.Equal(certRDN) {
+					if inputDN.Equal(certDN) {
+						user = usr
+						return usr.Username, true
+					}
+
+					// In case it did not match exactly, then collect the DNs
+					// and try to match later in case the DN was reordered.
+					dns[usr] = inputDN
+				}
+
+				// Check in case the DN was reordered.
+				for usr, inputDN := range dns {
+					if inputDN.RDNsMatch(certDN) {
 						user = usr
 						return usr.Username, true
 					}
@@ -525,6 +560,7 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 			c.Debugf("Account JWT not signed by trusted operator")
 			return false
 		}
+		// this only executes IF there's an issuer on the Juc - otherwise the account is already vetted
 		if juc.IssuerAccount != "" && !acc.hasIssuer(juc.Issuer) {
 			c.Debugf("User JWT issuer is not known")
 			return false
@@ -724,8 +760,9 @@ func checkClientTLSCertSubject(c *client, fn tlsMapAuthFn) bool {
 	// the domain components in case there are any.
 	rdn := cert.Subject.ToRDNSequence().String()
 
-	// Match that follows original order from the subject takes precedence.
-	dn, err := ldap.FromCertSubject(cert.Subject)
+	// Match using the raw subject to avoid ignoring attributes.
+	// https://github.com/golang/go/issues/12342
+	dn, err := ldap.FromRawCertSubject(cert.RawSubject)
 	if err == nil {
 		if match, ok := fn("", dn, false); ok {
 			c.Debugf("Using DistinguishedNameMatch for auth [%q]", match)
@@ -998,7 +1035,7 @@ func validateAllowedConnectionTypes(m map[string]struct{}) error {
 	for ct := range m {
 		ctuc := strings.ToUpper(ct)
 		switch ctuc {
-		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnode:
+		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt:
 		default:
 			return fmt.Errorf("unknown connection type %q", ct)
 		}

@@ -189,7 +189,7 @@ func TestAddServiceLatency(t *testing.T) {
 	require.Equal(t, "q", string(ac.Exports[0].Subject))
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
-	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
 }
 
@@ -223,6 +223,6 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	require.Equal(t, "q", string(ac.Exports[0].Subject))
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
-	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
 }
