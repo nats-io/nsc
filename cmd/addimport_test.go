@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -175,13 +175,14 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "barfoo.xx", "my import", "foobar.yy"}
+	input := []interface{}{1, true, 1, "barfoo.xx", true, "my import", "foobar.yy"}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
+	require.Equal(t, true, ac.Imports[0].Share)
 	require.Equal(t, "my import", ac.Imports[0].Name)
 	require.Equal(t, "barfoo.xx", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.yy", string(ac.Imports[0].Subject))
@@ -392,6 +393,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
+	require.Equal(t, false, ac.Imports[0].Share)
 	require.Equal(t, "test", ac.Imports[0].Name)
 	require.Equal(t, "test.foobar", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
@@ -399,13 +401,14 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.Equal(t, apub, ac.Imports[0].Account)
 
 	// B, pick, service q, name q service, local subj qq
-	input = []interface{}{1, true, 2, "q service", "qq", 0}
+	input = []interface{}{1, true, 2, true, "q service", "qq", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 2)
+	require.Equal(t, true, ac.Imports[1].Share)
 	require.Equal(t, "q service", ac.Imports[1].Name)
 	require.Equal(t, "q", string(ac.Imports[1].To))
 	require.Equal(t, "qq", string(ac.Imports[1].Subject))

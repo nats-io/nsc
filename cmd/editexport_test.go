@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -86,7 +86,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "100", "lat", 2, "", ""})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", ""})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -94,7 +94,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	require.Equal(t, jwt.Subject("c"), ac.Exports[0].Subject)
 	require.Equal(t, "c", ac.Exports[0].Name)
 	require.NotNil(t, ac.Exports[0].Latency)
-	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
+	require.Equal(t, jwt.Headers, ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
 	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
 }
@@ -106,12 +106,13 @@ func Test_EditExportRmLatencySampling(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "metrics.a")
+	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "header", "--latency", "metrics.a")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotNil(t, ac.Exports[0].Latency)
+	require.Equal(t, jwt.Headers, ac.Exports[0].Latency.Sampling)
 
 	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--rm-latency-sampling")
 	require.NoError(t, err)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,7 +45,7 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
-	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [1-100]  (services only)")
+	cmd.Flags().StringVarP(&params.latSampling, "sampling", "", "", "latency sampling percentage [1-100] or `header`  (services only)")
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
@@ -67,7 +67,7 @@ type AddExportParams struct {
 	SignerParams
 	subject      string
 	latSubject   string
-	latSampling  int
+	latSampling  string
 	responseType string
 }
 
@@ -152,12 +152,11 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if ok {
-			samp, err := cli.Prompt("sampling percentage [1-100]", "", cli.Val(SamplingValidator))
+			samp, err := cli.Prompt("sampling percentage [1-100] or `header`", "", cli.Val(SamplingValidator))
 			if err != nil {
 				return err
 			}
-			// cannot fail
-			p.latSampling, _ = strconv.Atoi(samp)
+			p.latSampling = samp
 
 			p.latSubject, err = cli.Prompt("latency metrics subject", "", cli.Val(LatencyMetricsSubjectValidator))
 			if err != nil {
@@ -181,6 +180,9 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 }
 
 func SamplingValidator(s string) error {
+	if strings.ToLower(s) == "header" {
+		return nil
+	}
 	v, err := strconv.Atoi(s)
 	if err != nil {
 		return err
@@ -189,6 +191,25 @@ func SamplingValidator(s string) error {
 		return errors.New("sampling must be between 1 and 100 inclusive")
 	}
 	return nil
+}
+
+func latSamplingRate(latSampling string) jwt.SamplingRate {
+	samp := 0
+	if strings.ToLower(latSampling) == "header" {
+		samp = int(jwt.Headers)
+	} else {
+		// cannot fail
+		samp, _ = strconv.Atoi(latSampling)
+	}
+	return jwt.SamplingRate(samp)
+}
+
+func latSamplingRateToString(rate jwt.SamplingRate) string {
+	if rate == jwt.Headers {
+		return "header"
+	} else {
+		return fmt.Sprintf("%d", rate)
+	}
 }
 
 func LatencyMetricsSubjectValidator(s string) error {
@@ -238,7 +259,7 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 
 	// if we have a latency report subject create it
 	if p.latSubject != "" {
-		p.export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: jwt.SamplingRate(p.latSampling)}
+		p.export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: latSamplingRate(p.latSampling)}
 	}
 
 	// add the new export
