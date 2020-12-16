@@ -238,7 +238,7 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 
 	// if we have a latency report subject create it
 	if p.latSubject != "" {
-		p.export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: p.latSampling}
+		p.export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: jwt.SamplingRate(p.latSampling)}
 	}
 
 	// add the new export

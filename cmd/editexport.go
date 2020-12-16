@@ -206,7 +206,7 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if ok {
-			cls := 0
+			cls := jwt.SamplingRate(0)
 			results := jwt.Subject("")
 			if sel.Latency != nil {
 				cls = sel.Latency.Sampling
@@ -301,7 +301,7 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 	sampling := 0
 	latency := ""
 	if old.Latency != nil {
-		sampling = old.Latency.Sampling
+		sampling = int(old.Latency.Sampling)
 		latency = string(old.Latency.Results)
 	}
 	if !(cmd.Flag("latency").Changed) {
@@ -369,14 +369,14 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 				r.AddOK("no need to remove latency tracking as it was not set")
 			}
 		} else {
-			oldSampling := 0
+			oldSampling := jwt.SamplingRate(0)
 			oldReport := jwt.Subject("")
 			if old.Latency != nil {
 				oldSampling = old.Latency.Sampling
 				oldReport = old.Latency.Results
 			}
 			if p.latSubject != "" {
-				export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: p.latSampling}
+				export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: jwt.SamplingRate(p.latSampling)}
 				if oldSampling != export.Latency.Sampling {
 					r.AddOK("changed service latency to %d%%", export.Latency.Sampling)
 				}

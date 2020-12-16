@@ -125,8 +125,11 @@ var (
 	// ErrServiceImportAuthorization is returned when a service import is not authorized.
 	ErrServiceImportAuthorization = errors.New("service import not authorized")
 
-	// ErrServiceImportFormsCycle is returned when a service import forms a cycle.
-	ErrServiceImportFormsCycle = errors.New("service import forms cycle")
+	// ErrImportFormsCycle is returned when an import would form a cycle.
+	ErrImportFormsCycle = errors.New("import forms a cycle")
+
+	// ErrCycleSearchDepth is returned when we have exceeded our maximum search depth..
+	ErrCycleSearchDepth = errors.New("search cycle depth exhausted")
 
 	// ErrClientOrRouteConnectedToGatewayPort represents an error condition when
 	// a client or route attempted to connect to the Gateway port.

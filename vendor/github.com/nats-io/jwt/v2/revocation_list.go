@@ -23,16 +23,41 @@ const All = "*"
 
 // RevocationList is used to store a mapping of public keys to unix timestamps
 type RevocationList map[string]int64
+type RevocationEntry struct {
+	PublicKey string
+	TimeStamp int64
+}
 
 // Revoke enters a revocation by publickey and timestamp into this export
 // If there is already a revocation for this public key that is newer, it is kept.
 func (r RevocationList) Revoke(pubKey string, timestamp time.Time) {
 	newTS := timestamp.Unix()
+	// cannot move a revocation into the future - only into the past
 	if ts, ok := r[pubKey]; ok && ts > newTS {
 		return
 	}
-
 	r[pubKey] = newTS
+}
+
+// MaybeCompact will compact the revocation list if jwt.All is found. Any
+// revocation that is covered by a jwt.All revocation will be deleted, thus
+// reducing the size of the JWT. Returns a slice of entries that were removed
+// during the process.
+func (r RevocationList) MaybeCompact() []RevocationEntry {
+	var deleted []RevocationEntry
+	ats, ok := r[All]
+	if ok {
+		for k, ts := range r {
+			if k != All && ats >= ts {
+				deleted = append(deleted, RevocationEntry{
+					PublicKey: k,
+					TimeStamp: ts,
+				})
+				delete(r, k)
+			}
+		}
+	}
+	return deleted
 }
 
 // ClearRevocation removes any revocation for the public key

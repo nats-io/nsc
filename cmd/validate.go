@@ -18,7 +18,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"sort"
+	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
@@ -34,7 +36,8 @@ func createValidateCommand() *cobra.Command {
 		Example: "validate",
 		Use: `validate (current operator/current account/account users)
 validate -a <accountName> (current operator/<accountName>/account users)
-validate -A (current operator/all accounts/all users)`,
+validate -A (current operator/all accounts/all users)
+validate -f <file>`,
 		Args: MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = false
@@ -55,7 +58,8 @@ validate -A (current operator/all accounts/all users)`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&params.allAccounts, "all-accounts", "A", false, "validate all accounts under the current operator (exclusive of -a)")
+	cmd.Flags().BoolVarP(&params.allAccounts, "all-accounts", "A", false, "validate all accounts under the current operator (exclusive of -a and -f)")
+	cmd.Flags().StringVarP(&params.file, "file", "f", "", "validate all jwt (separated by newline) in the provided file (exclusive of -a and -A)")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -67,6 +71,7 @@ func init() {
 type ValidateCmdParams struct {
 	AccountContextParams
 	allAccounts        bool
+	file               string
 	operator           *jwt.ValidationResults
 	accounts           []string
 	accountValidations map[string]*jwt.ValidationResults
@@ -77,10 +82,15 @@ func (p *ValidateCmdParams) SetDefaults(ctx ActionCtx) error {
 	if p.allAccounts && p.Name != "" {
 		return errors.New("specify only one of --account or --all-accounts")
 	}
-
-	// if they specified an account name, this will validate it
-	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
-		return err
+	if p.file != "" {
+		if p.allAccounts || p.Name != "" {
+			return errors.New("specify only one of --account or --all-accounts or --file")
+		}
+	} else {
+		// if they specified an account name, this will validate it
+		if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -88,7 +98,7 @@ func (p *ValidateCmdParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *ValidateCmdParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-	if !p.allAccounts {
+	if !p.allAccounts && p.file == "" {
 		if err = p.AccountContextParams.Edit(ctx); err != nil {
 			return err
 		}
@@ -119,6 +129,67 @@ func (p *ValidateCmdParams) validateJWT(claim jwt.Claims) *jwt.ValidationResults
 }
 
 func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
+	if p.file != "" {
+		return p.validateFile(ctx)
+	}
+	return p.validate(ctx)
+}
+
+func (p *ValidateCmdParams) validateFile(ctx ActionCtx) error {
+	f, err := ioutil.ReadFile(p.file)
+	if err != nil {
+		return err
+	}
+	type entry struct {
+		issue jwt.ValidationIssue
+		cnt   int
+	}
+	summary := map[string]*entry{}
+	lines := strings.Split(string(f), "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		// cut off what is a result of pack
+		if i := strings.Index(l, "|"); i != -1 {
+			l = l[i+1:]
+		}
+		c, err := jwt.Decode(l)
+		if err != nil {
+			return fmt.Errorf("claim decoding error: '%v' claim: '%v'", err, l)
+		}
+		subj := c.Claims().Subject
+		vr := jwt.ValidationResults{}
+		c.Validate(&vr)
+		if _, ok := p.accountValidations[subj]; !ok {
+			p.accountValidations[subj] = &jwt.ValidationResults{}
+			p.accounts = append(p.accounts, subj)
+		}
+		for _, vi := range vr.Issues {
+			p.accountValidations[subj].Add(vi)
+			if val, ok := summary[vi.Description]; !ok {
+				summary[vi.Description] = &entry{*vi, 1}
+			} else {
+				val.cnt++
+			}
+		}
+	}
+	if len(p.accounts) > 1 {
+		summaryAcc := "summary of all accounts"
+		p.accounts = append(p.accounts, summaryAcc)
+		vr := &jwt.ValidationResults{}
+		p.accountValidations[summaryAcc] = vr
+		for _, v := range summary {
+			iss := v.issue
+			iss.Description = fmt.Sprintf("%s (%d occurrences)", iss.Description, v.cnt)
+			vr.Add(&iss)
+		}
+	}
+	return nil
+}
+
+func (p *ValidateCmdParams) validate(ctx ActionCtx) error {
 	var err error
 	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 	if err != nil {

@@ -118,7 +118,6 @@ type serviceImport struct {
 	sid         []byte
 	from        string
 	to          string
-	exsub       string
 	tr          *transform
 	ts          int64
 	rt          ServiceRespType
@@ -893,6 +892,7 @@ func (a *Account) AddServiceExportWithResponse(subject string, respType ServiceR
 	if a == nil {
 		return ErrMissingAccount
 	}
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -1344,24 +1344,92 @@ func (a *Account) AddServiceImportWithClaim(destination *Account, from, to strin
 		return ErrServiceImportAuthorization
 	}
 
-	if a.importFormsCycle(destination, from, to) {
-		return ErrServiceImportFormsCycle
+	// Check if this introduces a cycle before proceeding.
+	if err := a.serviceImportFormsCycle(destination, from); err != nil {
+		return err
 	}
 
 	_, err := a.addServiceImport(destination, from, to, imClaim)
 	return err
 }
 
-// Detects if we have a cycle.
-func (a *Account) importFormsCycle(destination *Account, from, to string) bool {
-	// Check that what we are importing is not something we also export.
-	if a.serviceExportOverlaps(to) {
-		// So at this point if destination account is also importing from us, that forms a cycle.
-		if destination.serviceImportOverlaps(from) {
+const MaxAccountCycleSearchDepth = 1024
+
+func (a *Account) serviceImportFormsCycle(dest *Account, from string) error {
+	return dest.checkServiceImportsForCycles(from, map[string]bool{a.Name: true})
+}
+
+func (a *Account) checkServiceImportsForCycles(from string, visited map[string]bool) error {
+	if len(visited) >= MaxAccountCycleSearchDepth {
+		return ErrCycleSearchDepth
+	}
+	a.mu.RLock()
+	for _, si := range a.imports.services {
+		if SubjectsCollide(from, si.to) {
+			a.mu.RUnlock()
+			if visited[si.acc.Name] {
+				return ErrImportFormsCycle
+			}
+			// Push ourselves and check si.acc
+			visited[a.Name] = true
+			if subjectIsSubsetMatch(si.from, from) {
+				from = si.from
+			}
+			if err := si.acc.checkServiceImportsForCycles(from, visited); err != nil {
+				return err
+			}
+			a.mu.RLock()
+		}
+	}
+	a.mu.RUnlock()
+	return nil
+}
+
+func (a *Account) streamImportFormsCycle(dest *Account, to string) error {
+	return dest.checkStreamImportsForCycles(to, map[string]bool{a.Name: true})
+}
+
+// Lock should be held.
+func (a *Account) hasStreamExportMatching(to string) bool {
+	for subj := range a.exports.streams {
+		if subjectIsSubsetMatch(to, subj) {
 			return true
 		}
 	}
 	return false
+}
+
+func (a *Account) checkStreamImportsForCycles(to string, visited map[string]bool) error {
+	if len(visited) >= MaxAccountCycleSearchDepth {
+		return ErrCycleSearchDepth
+	}
+
+	a.mu.RLock()
+
+	if !a.hasStreamExportMatching(to) {
+		a.mu.RUnlock()
+		return nil
+	}
+
+	for _, si := range a.imports.streams {
+		if SubjectsCollide(to, si.to) {
+			a.mu.RUnlock()
+			if visited[si.acc.Name] {
+				return ErrImportFormsCycle
+			}
+			// Push ourselves and check si.acc
+			visited[a.Name] = true
+			if subjectIsSubsetMatch(si.to, to) {
+				to = si.to
+			}
+			if err := si.acc.checkStreamImportsForCycles(to, visited); err != nil {
+				return err
+			}
+			a.mu.RLock()
+		}
+	}
+	a.mu.RUnlock()
+	return nil
 }
 
 // SetServiceImportSharing will allow sharing of information about requests with the export account.
@@ -1602,30 +1670,6 @@ func (a *Account) checkForReverseEntry(reply string, si *serviceImport, checkInt
 	}
 }
 
-// Internal check to see if the to subject overlaps with another export.
-func (a *Account) serviceExportOverlaps(to string) bool {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	for subj := range a.exports.services {
-		if to == subj || SubjectsCollide(to, subj) {
-			return true
-		}
-	}
-	return false
-}
-
-// Internal check to see if the from subject overlaps with another import.
-func (a *Account) serviceImportOverlaps(from string) bool {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	for subj := range a.imports.services {
-		if from == subj || SubjectsCollide(from, subj) {
-			return true
-		}
-	}
-	return false
-}
-
 // Internal check to see if a service import exists.
 func (a *Account) serviceImportExists(dest *Account, from string) bool {
 	a.mu.RLock()
@@ -1692,7 +1736,11 @@ func (a *Account) addServiceImport(dest *Account, from, to string, claim *jwt.Im
 			}
 		}
 	}
-	si := &serviceImport{dest, claim, se, nil, from, to, "", tr, 0, rt, lat, nil, nil, usePub, false, false, false, false, false, isSysAcc, nil}
+	share := false
+	if claim != nil {
+		share = claim.Share
+	}
+	si := &serviceImport{dest, claim, se, nil, from, to, tr, 0, rt, lat, nil, nil, usePub, false, false, share, false, false, isSysAcc, nil}
 	a.imports.services[from] = si
 	a.mu.Unlock()
 
@@ -2107,7 +2155,7 @@ func (a *Account) addRespServiceImport(dest *Account, to string, osi *serviceImp
 
 	// dest is the requestor's account. a is the service responder with the export.
 	// Marked as internal here, that is how we distinguish.
-	si := &serviceImport{dest, nil, osi.se, nil, nrr, to, osi.to, nil, 0, rt, nil, nil, nil, false, true, false, osi.share, false, false, false, nil}
+	si := &serviceImport{dest, nil, osi.se, nil, nrr, to, nil, 0, rt, nil, nil, nil, false, true, false, osi.share, false, false, false, nil}
 
 	if a.exports.responses == nil {
 		a.exports.responses = make(map[string]*serviceImport)
@@ -2159,6 +2207,7 @@ func (a *Account) AddStreamImportWithClaim(account *Account, from, prefix string
 			prefix = prefix + string(btsep)
 		}
 	}
+
 	return a.AddMappedStreamImportWithClaim(account, from, prefix+from, imClaim)
 }
 
@@ -2181,6 +2230,12 @@ func (a *Account) AddMappedStreamImportWithClaim(account *Account, from, to stri
 	if to == "" {
 		to = from
 	}
+
+	// Check if this forms a cycle.
+	if err := a.streamImportFormsCycle(account, to); err != nil {
+		return err
+	}
+
 	var (
 		usePub bool
 		tr     *transform
@@ -2489,7 +2544,7 @@ func (a *Account) checkActivation(importAcc *Account, claim *jwt.Import, expTime
 		clone.Token = fetchActivation(url.String())
 	}
 	vr := jwt.CreateValidationResults()
-	clone.Validate(a.Name, vr)
+	clone.Validate(importAcc.Name, vr)
 	if vr.IsBlocking(true) {
 		return false
 	}
@@ -2692,8 +2747,8 @@ func (a *Account) hasIssuer(issuer string) bool {
 
 // hasIssuerNoLock is the unlocked version of hasIssuer
 func (a *Account) hasIssuerNoLock(issuer string) bool {
-	// same issuer
-	if a.Issuer == issuer {
+	// same issuer -- keep this for safety on the calling code
+	if a.Name == issuer {
 		return true
 	}
 	for i := 0; i < len(a.signingKeys); i++ {
@@ -2846,8 +2901,12 @@ func (s *Server) updateAccountClaimsWithRefresh(a *Account, ac *jwt.AccountClaim
 				s.Debugf("Error adding service export to account [%s]: %v", a.Name, err)
 			}
 			if e.Latency != nil {
-				if err := a.TrackServiceExportWithSampling(string(e.Subject), string(e.Latency.Results), e.Latency.Sampling); err != nil {
-					s.Debugf("Error adding latency tracking for service export to account [%s]: %v", a.Name, err)
+				if err := a.TrackServiceExportWithSampling(string(e.Subject), string(e.Latency.Results), int(e.Latency.Sampling)); err != nil {
+					hdrNote := ""
+					if e.Latency.Sampling == jwt.Headers {
+						hdrNote = " (using headers)"
+					}
+					s.Debugf("Error adding latency tracking%s for service export to account [%s]: %v", hdrNote, a.Name, err)
 				}
 			}
 		}

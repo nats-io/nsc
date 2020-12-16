@@ -726,7 +726,7 @@ func (s *Server) sendAsyncInfoToClients(regCli, wsCli bool) {
 		// registered (server has received CONNECT and first PING). For
 		// clients that are not at this stage, this will happen in the
 		// processing of the first PING (see client.processPing)
-		if ((regCli && c.ws == nil) || (wsCli && c.ws != nil)) &&
+		if ((regCli && !c.isWebsocket()) || (wsCli && c.isWebsocket())) &&
 			c.opts.Protocol >= ClientProtoInfo &&
 			c.flags.isSet(firstPongSent) {
 			// sendInfo takes care of checking if the connection is still
@@ -1236,10 +1236,10 @@ func (c *client) sendRouteSubOrUnSubProtos(subs []*subscription, isSubProto, tra
 		if len(sub.origin) > 0 && c.route.lnoc {
 			if isSubProto {
 				buf = append(buf, lSubBytes...)
+				buf = append(buf, sub.origin...)
 			} else {
 				buf = append(buf, lUnsubBytes...)
 			}
-			buf = append(buf, sub.origin...)
 			buf = append(buf, ' ')
 		} else {
 			if isSubProto {

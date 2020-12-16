@@ -54,7 +54,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotNil(t, ac.Exports[0].Latency)
-	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
 }
 
@@ -94,7 +94,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	require.Equal(t, jwt.Subject("c"), ac.Exports[0].Subject)
 	require.Equal(t, "c", ac.Exports[0].Name)
 	require.NotNil(t, ac.Exports[0].Latency)
-	require.Equal(t, 100, ac.Exports[0].Latency.Sampling)
+	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
 	require.EqualValues(t, jwt.ResponseTypeChunked, ac.Exports[0].ResponseType)
 }

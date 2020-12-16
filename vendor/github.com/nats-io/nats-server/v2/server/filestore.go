@@ -56,11 +56,68 @@ type FileStreamInfo struct {
 	StreamConfig
 }
 
+// Need an alias (which does not have MarshalJSON/UnmarshalJSON) to avoid
+// recursive calls which would lead to stack overflow.
+type fileStreamInfoAlias FileStreamInfo
+
+// We will use this struct definition to serialize/deserialize FileStreamInfo
+// object. This embeds FileStreamInfo (the alias to prevent recursive calls)
+// and makes the non-public options public so they can be persisted/recovered.
+type fileStreamInfoJSON struct {
+	fileStreamInfoAlias
+	Internal       bool `json:"internal,omitempty"`
+	AllowNoSubject bool `json:"allow_no_subject,omitempty"`
+}
+
+func (fsi FileStreamInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&fileStreamInfoJSON{
+		fileStreamInfoAlias(fsi),
+		fsi.internal,
+		fsi.allowNoSubject,
+	})
+}
+
+func (fsi *FileStreamInfo) UnmarshalJSON(b []byte) error {
+	fsiJSON := &fileStreamInfoJSON{}
+	if err := json.Unmarshal(b, &fsiJSON); err != nil {
+		return err
+	}
+	*fsi = FileStreamInfo(fsiJSON.fileStreamInfoAlias)
+	fsi.internal = fsiJSON.Internal
+	fsi.allowNoSubject = fsiJSON.AllowNoSubject
+	return nil
+}
+
 // File ConsumerInfo is used for creating consumer stores.
 type FileConsumerInfo struct {
 	Created time.Time
 	Name    string
 	ConsumerConfig
+}
+
+// See fileStreamInfoAlias, etc.. for details on how this all work.
+type fileConsumerInfoAlias FileConsumerInfo
+
+type fileConsumerInfoJSON struct {
+	fileConsumerInfoAlias
+	AllowNoInterest bool `json:"allow_no_interest,omitempty"`
+}
+
+func (fci FileConsumerInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&fileConsumerInfoJSON{
+		fileConsumerInfoAlias(fci),
+		fci.allowNoInterest,
+	})
+}
+
+func (fci *FileConsumerInfo) UnmarshalJSON(b []byte) error {
+	fciJSON := &fileConsumerInfoJSON{}
+	if err := json.Unmarshal(b, &fciJSON); err != nil {
+		return err
+	}
+	*fci = FileConsumerInfo(fciJSON.fileConsumerInfoAlias)
+	fci.allowNoInterest = fciJSON.AllowNoInterest
+	return nil
 }
 
 type fileStore struct {
@@ -2232,6 +2289,12 @@ func (mb *msgBlock) readIndexInfo() error {
 	mb.last.ts = readTimeStamp()
 	dmapLen := readCount()
 
+	// Check if this is a short write index file.
+	if bi < 0 || bi+checksumSize > len(buf) {
+		defer os.Remove(mb.ifn)
+		return fmt.Errorf("short index file")
+	}
+
 	// Checksum
 	copy(mb.lchk[0:], buf[bi:bi+checksumSize])
 	bi += checksumSize
@@ -2319,11 +2382,11 @@ func (fs *fileStore) dmapEntries() int {
 
 // Purge will remove all messages from this store.
 // Will return the number of purged messages.
-func (fs *fileStore) Purge() uint64 {
+func (fs *fileStore) Purge() (uint64, error) {
 	fs.mu.Lock()
 	if fs.closed {
 		fs.mu.Unlock()
-		return 0
+		return 0, ErrStoreClosed
 	}
 
 	purged := fs.state.Msgs
@@ -2370,7 +2433,43 @@ func (fs *fileStore) Purge() uint64 {
 		cb(-int64(purged), -rbytes, 0, _EMPTY_)
 	}
 
-	return purged
+	return purged, nil
+}
+
+// Compact will remove all messages from this store up to
+// but not including the seq parameter.
+// Will return the number of purged messages.
+func (fs *fileStore) Compact(seq uint64) (uint64, error) {
+	if seq == 0 {
+		return fs.Purge()
+	}
+
+	if _, err := fs.msgForSeq(seq); err != nil {
+		return 0, err
+	}
+
+	var purged uint64
+	for fseq := fs.firstSeq(); fseq < seq; fseq = fs.firstSeq() {
+		if found, err := fs.removeMsg(fseq, false); err != nil {
+			if err == ErrStoreMsgNotFound {
+				continue
+			} else if err == ErrStoreEOF {
+				err = nil
+			}
+			return purged, err
+		} else if found {
+			purged++
+		}
+	}
+
+	return purged, nil
+}
+
+func (fs *fileStore) firstSeq() uint64 {
+	fs.mu.RLock()
+	fseq := fs.state.FirstSeq
+	fs.mu.RUnlock()
+	return fseq
 }
 
 // Returns number of msg blks.
@@ -2488,7 +2587,6 @@ func (fs *fileStore) Delete() error {
 	if fs.isClosed() {
 		return ErrStoreClosed
 	}
-	// TODO(dlc) - check error here?
 	fs.Purge()
 	if err := fs.Stop(); err != nil {
 		return err
@@ -2897,11 +2995,12 @@ func (o *consumerFileStore) UpdateDelivered(dseq, sseq, dc uint64, ts int64) err
 			o.state.Delivered.Consumer = dseq
 			o.state.Delivered.Stream = sseq
 			p = &Pending{dseq, ts}
-		} else if dc > 1 {
+		}
+		if dc > 1 {
 			if o.state.Redelivered == nil {
 				o.state.Redelivered = make(map[uint64]uint64)
 			}
-			o.state.Redelivered[sseq] = dc
+			o.state.Redelivered[sseq] = dc - 1
 		}
 		o.state.Pending[sseq] = &Pending{dseq, ts}
 	} else {
@@ -2932,27 +3031,33 @@ func (o *consumerFileStore) UpdateAcks(dseq, sseq uint64) error {
 	if p == nil {
 		return ErrStoreMsgNotFound
 	}
+	// Delete from our state.
 	delete(o.state.Pending, sseq)
+	if len(o.state.Redelivered) > 0 {
+		delete(o.state.Redelivered, sseq)
+		if len(o.state.Redelivered) == 0 {
+			o.state.Redelivered = nil
+		}
+	}
 
-	// TODO(dlc) - Check to see if we move ack floor.
 	if len(o.state.Pending) == 0 {
 		o.state.Pending = nil
 		o.state.AckFloor.Consumer = o.state.Delivered.Consumer
 		o.state.AckFloor.Stream = o.state.Delivered.Stream
-	} else if o.state.AckFloor.Consumer == 0 {
-		o.state.AckFloor.Consumer = dseq
-		o.state.AckFloor.Stream = sseq
 	} else if o.state.AckFloor.Consumer == dseq-1 {
+		notFirst := o.state.AckFloor.Consumer != 0
 		o.state.AckFloor.Consumer = dseq
 		o.state.AckFloor.Stream = sseq
-		// Close gap if needed.
-		for ss := sseq + 1; ss < o.state.Delivered.Stream; ss++ {
-			if p, ok := o.state.Pending[ss]; ok {
-				if p.Sequence > 0 {
-					o.state.AckFloor.Consumer = p.Sequence - 1
-					o.state.AckFloor.Stream = ss - 1
+		// Close the gap if needed.
+		if notFirst && o.state.Delivered.Consumer > dseq {
+			for ss := sseq + 1; ss < o.state.Delivered.Stream; ss++ {
+				if p, ok := o.state.Pending[ss]; ok {
+					if p.Sequence > 0 {
+						o.state.AckFloor.Consumer = p.Sequence - 1
+						o.state.AckFloor.Stream = ss - 1
+					}
+					break
 				}
-				break
 			}
 		}
 	}
@@ -3028,6 +3133,7 @@ func (o *consumerFileStore) encodeState() ([]byte, error) {
 			n += binary.PutUvarint(buf[n:], v)
 		}
 	}
+
 	return buf[:n], nil
 }
 
@@ -3323,6 +3429,23 @@ func (o *consumerFileStore) State() (*ConsumerState, error) {
 			state.Redelivered[seq] = n
 		}
 	}
+
+	// Copy this state into our own.
+	o.state.Delivered = state.Delivered
+	o.state.AckFloor = state.AckFloor
+	if len(state.Pending) > 0 {
+		o.state.Pending = make(map[uint64]*Pending, len(state.Pending))
+		for seq, p := range state.Pending {
+			o.state.Pending[seq] = &Pending{p.Sequence, p.Timestamp}
+		}
+	}
+	if len(state.Redelivered) > 0 {
+		o.state.Redelivered = make(map[uint64]uint64, len(state.Redelivered))
+		for seq, dc := range state.Redelivered {
+			o.state.Redelivered[seq] = dc
+		}
+	}
+
 	return state, nil
 }
 

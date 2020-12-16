@@ -47,6 +47,7 @@ type pubArg struct {
 	queues  [][]byte
 	size    int
 	hdr     int
+	psi     *serviceImport
 }
 
 // Parser constants
@@ -130,6 +131,11 @@ const (
 )
 
 func (c *client) parse(buf []byte) error {
+	// Branch out to mqtt clients. c.mqtt is immutable, but should it become
+	// an issue (say data race detection), we could branch outside in readLoop
+	if c.isMqtt() {
+		return c.mqttParse(buf)
+	}
 	var i int
 	var b byte
 	var lmsg bool
@@ -733,7 +739,12 @@ func (c *client) parse(buf []byte) error {
 					err = c.processUnsub(arg)
 				case ROUTER:
 					if trace && c.srv != nil {
-						c.traceInOp("RS-", arg)
+						switch c.op {
+						case 'R', 'r':
+							c.traceInOp("RS-", arg)
+						case 'L', 'l':
+							c.traceInOp("LS-", arg)
+						}
 					}
 					err = c.processRemoteUnsub(arg)
 				case GATEWAY:
