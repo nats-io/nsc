@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,6 +46,7 @@ func createAddImportCmd() *cobra.Command {
 	params.srcAccount.BindFlags("src-account", "", nkeys.PrefixByteAccount, cmd)
 	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
+	cmd.Flags().BoolVarP(&params.share, "share", "", false, "share data when tracking latency (service only)")
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -67,6 +68,7 @@ type AddImportParams struct {
 	service    bool
 	name       string
 	public     bool
+	share      bool
 }
 
 func (p *AddImportParams) longHelp() string {
@@ -305,7 +307,11 @@ func (p *AddImportParams) PreInteractive(ctx ActionCtx) error {
 	if !ok {
 		return p.addManualExport(ctx)
 	}
-
+	if p.service {
+		if p.share, err = cli.Confirm("share information when tracking latency?", false); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -464,6 +470,8 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	kind := jwt.Stream
 	if p.service {
 		kind = jwt.Service
+	} else if p.share {
+		return fmt.Errorf("only services can set the share property")
 	}
 
 	// local becomes Subject for services, or prefix for streams
@@ -553,6 +561,7 @@ func (p *AddImportParams) createImport() *jwt.Import {
 	if p.service {
 		im.Type = jwt.Service
 		im.Subject, im.To = im.To, im.Subject
+		im.Share = p.share
 	}
 	if p.tokenSrc != "" {
 		if IsURL(p.tokenSrc) {

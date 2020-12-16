@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2020 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
@@ -44,7 +43,7 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.service, "service", "r", false, "export type service")
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
-	cmd.Flags().IntVarP(&params.latSampling, "sampling", "", 0, "latency sampling percentage [0-100] - 0 disables it (services only)")
+	cmd.Flags().StringVarP(&params.latSampling, "sampling", "", "", "latency sampling percentage [1-100] or `header` - 0 disables it (services only)")
 	cmd.Flags().BoolVarP(&params.rmLatencySampling, "rm-latency-sampling", "", false, "remove latency sampling")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this export")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this export")
@@ -68,7 +67,7 @@ type EditExportParams struct {
 	subject string
 
 	name              string
-	latSampling       int
+	latSampling       string
 	latSubject        string
 	service           bool
 	private           bool
@@ -206,18 +205,17 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if ok {
-			cls := jwt.SamplingRate(0)
+			cls := ""
 			results := jwt.Subject("")
 			if sel.Latency != nil {
-				cls = sel.Latency.Sampling
+				cls = latSamplingRateToString(sel.Latency.Sampling)
 				results = sel.Latency.Results
 			}
-			samp, err := cli.Prompt("sampling percentage [1-100]", fmt.Sprintf("%d", cls), cli.Val(SamplingValidator))
+			samp, err := cli.Prompt("sampling percentage [1-100] or `header`", cls, cli.Val(SamplingValidator))
 			if err != nil {
 				return err
 			}
-			// cannot fail
-			p.latSampling, _ = strconv.Atoi(samp)
+			p.latSampling = samp
 
 			p.latSubject, err = cli.Prompt("latency metrics subject", string(results), cli.Val(LatencyMetricsSubjectValidator))
 			if err != nil {
@@ -298,17 +296,17 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 	if !(cmd.Flag("private").Changed) {
 		p.private = old.TokenReq
 	}
-	sampling := 0
+	sampling := jwt.SamplingRate(0)
 	latency := ""
 	if old.Latency != nil {
-		sampling = int(old.Latency.Sampling)
+		sampling = old.Latency.Sampling
 		latency = string(old.Latency.Results)
 	}
 	if !(cmd.Flag("latency").Changed) {
 		p.latSubject = latency
 	}
 	if !(cmd.Flag("sampling").Changed) {
-		p.latSampling = sampling
+		p.latSampling = latSamplingRateToString(sampling)
 	}
 
 	if !(cmd.Flag("response-type").Changed) {
@@ -376,7 +374,7 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 				oldReport = old.Latency.Results
 			}
 			if p.latSubject != "" {
-				export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: jwt.SamplingRate(p.latSampling)}
+				export.Latency = &jwt.ServiceLatency{Results: jwt.Subject(p.latSubject), Sampling: latSamplingRate(p.latSampling)}
 				if oldSampling != export.Latency.Sampling {
 					r.AddOK("changed service latency to %d%%", export.Latency.Sampling)
 				}
