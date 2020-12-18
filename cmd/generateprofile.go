@@ -466,7 +466,7 @@ func (p *ProfileCmdParams) getKeys(claim jwt.Claims) []string {
 		}
 		ac, ok := payload.(*jwt.Account)
 		if ok {
-			keys = append(keys, ac.SigningKeys...)
+			keys = append(keys, ac.SigningKeys.Keys()...)
 		}
 	}
 	return keys

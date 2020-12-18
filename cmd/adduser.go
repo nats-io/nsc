@@ -181,7 +181,7 @@ func validUserSigners(ctx ActionCtx, accName string) ([]string, error) {
 	if ctx.StoreCtx().KeyStore.HasPrivateKey(ac.Subject) {
 		signers = append(signers, ac.Subject)
 	}
-	for _, signingKey := range ac.SigningKeys {
+	for _, signingKey := range ac.SigningKeys.Keys() {
 		if ctx.StoreCtx().KeyStore.HasPrivateKey(signingKey) {
 			signers = append(signers, signingKey)
 		}

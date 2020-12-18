@@ -281,7 +281,7 @@ func (p *FixCmd) Regenerate(rr *store.Report) error {
 			p.accounts++
 
 			akeys := []string{ac.Subject}
-			akeys = append(akeys, ac.SigningKeys...)
+			akeys = append(akeys, ac.SigningKeys.Keys()...)
 
 			for _, k := range akeys {
 				kp := p.kp(k)
@@ -481,7 +481,7 @@ func (p *FixCmd) LoadAccounts(ctx ActionCtx) (*store.Report, error) {
 						ar.AddOK("ignoring older config %s", src)
 						return nil
 					}
-					for _, sk := range ac.SigningKeys {
+					for _, sk := range ac.SigningKeys.Keys() {
 						p.KeyToPrincipalKey[sk] = ac.Subject
 					}
 				}

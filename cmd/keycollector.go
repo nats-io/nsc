@@ -106,7 +106,7 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 	aki.Resolve(ks)
 	keys = append(keys, &aki)
 
-	for _, k := range ac.SigningKeys {
+	for _, k := range ac.SigningKeys.Keys() {
 		var ask Key
 		ask.Name = ac.Name
 		ask.Pub = k

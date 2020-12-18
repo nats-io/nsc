@@ -58,7 +58,7 @@ func friendlyNames(operator string) (map[string]string, error) {
 				name = fmt.Sprintf("%s/%s", oc.Name, ac.Name)
 			}
 			m[ac.Subject] = name
-			for _, sk := range ac.SigningKeys {
+			for _, sk := range ac.SigningKeys.Keys() {
 				m[sk] = name
 			}
 		}

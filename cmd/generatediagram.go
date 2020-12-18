@@ -470,7 +470,7 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 			defPermId = addPermissions(ac.Subject, ac.Name, "default", ac.DefaultPermissions)
 			bldrPrntf(`%s *-- %s`, ac.Subject, defPermId)
 		}
-		addSigningKeys(ac.Subject, ac.Name, "account", ac.SigningKeys)
+		addSigningKeys(ac.Subject, ac.Name, "account", ac.SigningKeys.Keys())
 
 		connectSigned(op.ClaimsData, ac.ClaimsData)
 		addNote(ac.Subject, ac.Info)

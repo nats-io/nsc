@@ -72,10 +72,10 @@ github.com/nats-io/cliprompts/v2
 # github.com/nats-io/jwt v1.2.2
 ## explicit
 github.com/nats-io/jwt
-# github.com/nats-io/jwt/v2 v2.0.0-20201211164018-2e78446f4e6f
+# github.com/nats-io/jwt/v2 v2.0.0-20201218001130-12bb2c357386
 ## explicit
 github.com/nats-io/jwt/v2
-# github.com/nats-io/nats-server/v2 v2.1.8-0.20201216194404-d7741b9aa16a
+# github.com/nats-io/nats-server/v2 v2.1.8-0.20201217205918-f09992a889a0
 ## explicit
 github.com/nats-io/nats-server/v2/conf
 github.com/nats-io/nats-server/v2/internal/ldap

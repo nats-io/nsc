@@ -59,7 +59,7 @@ func (a *AccountDescriber) Describe() string {
 	}
 
 	if len(a.SigningKeys) > 0 {
-		AddListValues(table, "Signing Keys", a.SigningKeys)
+		AddListValues(table, "Signing Keys", a.SigningKeys.Keys())
 		table.AddSeparator()
 	}
 
