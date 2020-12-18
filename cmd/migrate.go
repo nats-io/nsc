@@ -190,7 +190,7 @@ func (j *MigrateJob) OK() bool {
 func (j *MigrateJob) getAccountKeys() []string {
 	var keys []string
 	keys = append(keys, j.claim.Subject)
-	keys = append(keys, j.claim.SigningKeys...)
+	keys = append(keys, j.claim.SigningKeys.Keys()...)
 	return keys
 }
 
@@ -290,7 +290,7 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 	if ctx.StoreCtx().Store.IsManaged() {
 		var keys []string
 		keys = append(keys, ac.Subject)
-		keys = append(keys, ac.SigningKeys...)
+		keys = append(keys, ac.SigningKeys.Keys()...)
 
 		// need to sign it with any key we can get
 		var kp nkeys.KeyPair

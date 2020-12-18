@@ -901,7 +901,7 @@ func (ctx *Context) GetAccountKeys(name string) ([]string, error) {
 		return nil, nil
 	}
 	keys = append(keys, ac.Subject)
-	keys = append(keys, ac.SigningKeys...)
+	keys = append(keys, ac.SigningKeys.Keys()...)
 	return keys, nil
 }
 

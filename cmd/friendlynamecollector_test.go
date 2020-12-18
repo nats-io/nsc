@@ -73,7 +73,7 @@ func Test_FriendlyNameCollector(t *testing.T) {
 	require.Equal(t, "O", m[oc.Subject])
 	require.Equal(t, "O", m[oc.SigningKeys[0]])
 	require.Equal(t, "A", m[aac.Subject])
-	require.Equal(t, "A", m[aac.SigningKeys[0]])
+	require.Equal(t, "A", m[aac.SigningKeys.Keys()[0]])
 	require.Equal(t, "B", m[bac.Subject])
 
 	ts.AddOperator(t, "OO")
@@ -93,6 +93,6 @@ func Test_FriendlyNameCollector(t *testing.T) {
 	require.Equal(t, "O", m[oc.Subject])
 	require.Equal(t, "O", m[oc.SigningKeys[0]])
 	require.Equal(t, "O/A", m[aac.Subject])
-	require.Equal(t, "O/A", m[aac.SigningKeys[0]])
+	require.Equal(t, "O/A", m[aac.SigningKeys.Keys()[0]])
 	require.Equal(t, "O/B", m[bac.Subject])
 }

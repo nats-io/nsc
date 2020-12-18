@@ -142,7 +142,7 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	sameAccount := false
 	keys := []string{accClaim.Subject}
-	keys = append(keys, ([]string(accClaim.SigningKeys))...)
+	keys = append(keys, accClaim.SigningKeys.Keys()...)
 	for _, key := range keys {
 		if key == claim.Issuer {
 			sameAccount = true
