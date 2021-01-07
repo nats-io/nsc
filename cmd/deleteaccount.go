@@ -225,7 +225,7 @@ func (p *DeleteAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	if p.rmNkeys {
 		// delete the account nkeys
-		for _, sk := range p.ac.SigningKeys.Keys() {
+		for sk := range p.ac.SigningKeys {
 			if ctx.StoreCtx().KeyStore.HasPrivateKey(sk) {
 				if err := ctx.StoreCtx().KeyStore.Remove(sk); err != nil {
 					r.AddFromError(err)
