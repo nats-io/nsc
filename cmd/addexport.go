@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
@@ -46,6 +47,7 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.private, "private", "p", false, "private export - requires an activation to access")
 	cmd.Flags().StringVarP(&params.latSubject, "latency", "", "", "latency metrics subject (services only)")
 	cmd.Flags().StringVarP(&params.latSampling, "sampling", "", "", "latency sampling percentage [1-100] or `header`  (services only)")
+	cmd.Flags().DurationVarP(&params.responseThreshold, "response-threshold", "", 0, "response threshold duration (units ms/s/m/h) (services only)")
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
@@ -65,10 +67,11 @@ type AddExportParams struct {
 	private bool
 	service bool
 	SignerParams
-	subject      string
-	latSubject   string
-	latSampling  string
-	responseType string
+	subject           string
+	latSubject        string
+	latSampling       string
+	responseType      string
+	responseThreshold time.Duration
 }
 
 func (p *AddExportParams) longHelp() string {
@@ -170,6 +173,11 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 		p.export.ResponseType = jwt.ResponseType(choices[s])
+
+		p.export.ResponseThreshold, err = promptDuration("response threshold (0 disabled)", p.responseThreshold)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := p.SignerParams.Edit(ctx); err != nil {
@@ -297,6 +305,7 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 			return fmt.Errorf("unknown response type %q", p.responseType)
 		}
 		p.export.ResponseType = rt
+		p.export.ResponseThreshold = p.responseThreshold
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {

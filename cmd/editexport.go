@@ -18,6 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
@@ -47,6 +48,7 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.rmLatencySampling, "rm-latency-sampling", "", false, "remove latency sampling")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this export")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this export")
+	cmd.Flags().DurationVarP(&params.responseThreshold, "response-threshold", "", 0, "response threshold duration (units ms/s/m/h) (services only)")
 
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
@@ -75,6 +77,7 @@ type EditExportParams struct {
 	rmLatencySampling bool
 	infoUrl           string
 	description       string
+	responseThreshold time.Duration
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {
@@ -231,6 +234,10 @@ func (p *EditExportParams) PostInteractive(ctx ActionCtx) error {
 			return err
 		}
 		p.responseType = choices[s]
+		p.responseThreshold, err = promptDuration("response threshold (0 disabled)", p.responseThreshold)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err = p.SignerParams.Edit(ctx); err != nil {
@@ -265,6 +272,8 @@ func (p *EditExportParams) Validate(ctx ActionCtx) error {
 			rt != jwt.ResponseTypeChunked {
 			return fmt.Errorf("unknown response type %q", p.responseType)
 		}
+	} else if p.responseThreshold != time.Duration(0) {
+		return errors.New("response threshold is only applicable to services")
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {
@@ -311,6 +320,10 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 
 	if !(cmd.Flag("response-type").Changed) {
 		p.responseType = string(old.ResponseType)
+	}
+
+	if !(cmd.Flag("response-threshold").Changed) {
+		p.responseThreshold = old.ResponseThreshold
 	}
 
 	if !(cmd.Flag("description").Changed) {
@@ -384,6 +397,8 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 				}
 			}
 		}
+
+		export.ResponseThreshold = p.responseThreshold
 
 		rt := jwt.ResponseType(p.responseType)
 		if old.ResponseType != rt {

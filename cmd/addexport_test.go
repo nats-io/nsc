@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,8 @@ func Test_AddExport(t *testing.T) {
 		{createAddExportCmd(), []string{"add", "export", "--subject", "mar", "--name", "ar", "--service"}, nil, []string{"added public service export \"ar\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubstream", "--private"}, nil, []string{"added private stream export \"pubstream\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, nil, []string{"added private service export \"pubservice\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "th.1", "--service", "--response-threshold", "1s"}, nil, []string{"added public service export \"th.1\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`time: unknown unit`}, true},
 	}
 
 	tests.Run(t, "root", "add")
@@ -133,7 +136,7 @@ func Test_AddExportAccountNameRequired(t *testing.T) {
 	require.Equal(t, "bbbb", ac.Exports[0].Name)
 }
 
-func TestAddExportInteractive(t *testing.T) {
+func TestAddStreamExportInteractive(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
@@ -151,6 +154,31 @@ func TestAddExportInteractive(t *testing.T) {
 	require.Len(t, ac.Exports, 1)
 	require.Equal(t, "Foo Stream", ac.Exports[0].Name)
 	require.Equal(t, "foo.>", string(ac.Exports[0].Subject))
+	require.Equal(t, jwt.Stream, ac.Exports[0].Type)
+
+}
+func TestAddServiceExportInteractive(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+
+	input := []interface{}{0, 1, "bar.>", "Bar Stream", true, true, "header", "foo", 0, "1s", 0}
+	cmd := createAddExportCmd()
+	HoistRootFlags(cmd)
+	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.Exports, 1)
+	require.Equal(t, "Bar Stream", ac.Exports[0].Name)
+	require.Equal(t, "bar.>", string(ac.Exports[0].Subject))
+	require.Equal(t, jwt.Service, ac.Exports[0].Type)
+	require.Equal(t, time.Second, ac.Exports[0].ResponseThreshold)
+	require.Equal(t, jwt.Headers, ac.Exports[0].Latency.Sampling)
+
 }
 
 func TestAddExportNonInteractive(t *testing.T) {
@@ -213,7 +241,7 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	cmd := createAddExportCmd()
 
 	// service, subject, name, private, track, freq
-	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1}
+	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1, "0"}
 	_, _, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
@@ -225,4 +253,5 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	require.Equal(t, "q.lat", string(ac.Exports[0].Latency.Results))
 	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
+	require.Equal(t, time.Duration(0), ac.Exports[0].ResponseThreshold)
 }
