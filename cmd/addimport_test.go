@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -175,7 +176,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "barfoo.xx", true, "my import", "foobar.yy"}
+	input := []interface{}{1, true, 1, "barfoo.*.xx", true, "my import", "foobar.yy"}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -184,7 +185,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, true, ac.Imports[0].Share)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo.xx", string(ac.Imports[0].To))
+	require.Equal(t, "barfoo.*.xx", string(ac.Imports[0].To))
 	require.Equal(t, "foobar.yy", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -243,7 +244,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
-	input := []interface{}{1, false, true, apub, "foobar.x", true, "test", "test.foobar.alberto", 0}
+	input := []interface{}{1, false, true, apub, "foobar.x.*", true, "test", "test.foobar.alberto.*", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -252,8 +253,8 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "test", ac.Imports[0].Name)
 	// for services remote local is subject, remote is to
-	require.Equal(t, "test.foobar.alberto", string(ac.Imports[0].Subject))
-	require.Equal(t, "foobar.x", string(ac.Imports[0].To))
+	require.Equal(t, "test.foobar.alberto.*", string(ac.Imports[0].Subject))
+	require.Equal(t, "foobar.x.*", string(ac.Imports[0].To))
 	require.Equal(t, jwt.Service, ac.Imports[0].Type)
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -264,7 +265,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
-	ts.AddExport(t, "A", jwt.Service, "q", true)
+	ts.AddExport(t, "A", jwt.Service, "q.*", true)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -290,7 +291,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.Equal(t, apub, ac.Imports[0].Account)
 
 	// B, don't pick, public, A's pubkey, remote sub, service, name test, local subj "test.foobar.>, key
-	input = []interface{}{1, false, true, apub, "q", true, "q", "qq", 0}
+	input = []interface{}{1, false, true, apub, "q.*", true, "q", "qq", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -298,7 +299,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 2)
 	require.Equal(t, "q", ac.Imports[1].Name)
-	require.Equal(t, "q", string(ac.Imports[1].To))
+	require.Equal(t, "q.*", string(ac.Imports[1].To))
 	require.Equal(t, "qq", string(ac.Imports[1].Subject))
 	require.True(t, ac.Imports[1].IsService())
 	require.Equal(t, apub, ac.Imports[1].Account)
@@ -464,34 +465,6 @@ func Test_ImportServiceHandlesDecorations(t *testing.T) {
 	require.Equal(t, bc.Imports[0].To, bc.Imports[0].Subject)
 }
 
-func Test_ImportServiceLocalWildcards(t *testing.T) {
-	ts := NewTestStore(t, "test")
-	defer ts.Done(t)
-
-	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q.>", true)
-	apk := ts.GetAccountPublicKey(t, "A")
-
-	ts.AddAccount(t, "B")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--service", "--src-account", apk, "--remote-subject", "q.a", "--local-subject", "q.>")
-	require.Error(t, err)
-	require.Contains(t, "local subject cannot have wildcards", err.Error())
-}
-
-func Test_ImportStreamLocalWildcards(t *testing.T) {
-	ts := NewTestStore(t, "test")
-	defer ts.Done(t)
-
-	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "s.>", true)
-	apk := ts.GetAccountPublicKey(t, "A")
-
-	ts.AddAccount(t, "B")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", apk, "--remote-subject", "s.>", "--local-subject", "t.>")
-	require.Error(t, err)
-	require.Contains(t, "stream prefix subject cannot have wildcards", err.Error())
-}
-
 func Test_AddImportToAccount(t *testing.T) {
 	ts := NewTestStore(t, t.Name())
 	defer ts.Done(t)
@@ -507,4 +480,41 @@ func Test_AddImportToAccount(t *testing.T) {
 	bc, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Len(t, bc.Imports, 1)
+}
+
+func Test_AddWilcdardImport(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "B")
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "priv-srvc.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "priv-strm.>", false)
+	ts.AddExport(t, "A", jwt.Service, "pub-srvc.>", true)
+	ts.AddExport(t, "A", jwt.Stream, "pub-strm.>", true)
+
+	aPub := ts.GetAccountPublicKey(t, "A")
+
+	srvcToken := ts.GenerateActivation(t, "A", "priv-srvc.>", "B")
+	srvcFp := filepath.Join(ts.Dir, "srvc-token.jwt")
+	require.NoError(t, Write(srvcFp, []byte(srvcToken)))
+	defer os.Remove(srvcFp)
+
+	strmToken := ts.GenerateActivation(t, "A", "priv-strm.>", "B")
+	strmFp := filepath.Join(ts.Dir, "strm-token.jwt")
+	require.NoError(t, Write(strmFp, []byte(strmToken)))
+	defer os.Remove(strmFp)
+
+	tests := CmdTests{
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", srvcFp}, nil,
+			[]string{"added service import"}, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", strmFp}, nil,
+			[]string{"added stream import"}, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--src-account", aPub, "--service",
+			"--remote-subject", "pub-srvc.>"}, nil, []string{"added service import"}, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--src-account", aPub,
+			"--remote-subject", "pub-strm.>"}, nil, []string{"added stream import"}, false},
+	}
+
+	tests.Run(t, "root", "add")
 }

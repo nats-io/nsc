@@ -193,9 +193,6 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 				subject = strings.Join(a, ".")
 				subject, err = cli.Prompt("export subject", subject, cli.Val(func(s string) error {
 					sub := jwt.Subject(s)
-					if sub.HasWildCards() {
-						return errors.New("services cannot have wildcard subjects")
-					}
 					var vr jwt.ValidationResults
 					sub.Validate(&vr)
 					if len(vr.Issues) > 0 {
@@ -434,11 +431,6 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		if !vr.IsEmpty() {
 			return errors.New(vr.Issues[0].Error())
 		}
-
-		if sub.HasWildCards() {
-			return fmt.Errorf("%s cannot have wildcards", m)
-		}
-
 		return nil
 	}))
 	if err != nil {
@@ -477,16 +469,9 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 	// local becomes Subject for services, or prefix for streams
 	sub := jwt.Subject(p.local)
 	if sub.HasWildCards() {
-		if kind == jwt.Service {
-			return errors.New("local subject cannot have wildcards")
-		} else {
+		if kind == jwt.Stream {
 			return errors.New("stream prefix subject cannot have wildcards")
 		}
-	}
-
-	resub := jwt.Subject(p.remote)
-	if kind == jwt.Service && resub.HasWildCards() {
-		return errors.New("imported services cannot have wildcards")
 	}
 
 	for _, im := range p.filter(kind, p.claim.Imports) {
