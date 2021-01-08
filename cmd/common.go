@@ -569,3 +569,14 @@ func StoreAccountAndUpdateStatus(ctx ActionCtx, token string, status *store.Repo
 		status.AddFromError(err)
 	}
 }
+
+func promptDuration(label string, defaultValue time.Duration) (time.Duration, error) {
+	value, err := cli.Prompt(label, defaultValue.String())
+	if err != nil {
+		return time.Duration(0), err
+	}
+	if value == "" {
+		return time.Duration(0), nil
+	}
+	return time.ParseDuration(value)
+}

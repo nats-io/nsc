@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
@@ -48,7 +49,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, ac.Exports[0].Latency)
 
-	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "lat")
+	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "lat", "--response-threshold", "1s")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -56,6 +57,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.Equal(t, jwt.Subject("lat"), ac.Exports[0].Latency.Results)
+	require.Equal(t, time.Second, ac.Exports[0].ResponseThreshold)
 }
 
 func Test_EditExportInteractive(t *testing.T) {
@@ -67,7 +69,7 @@ func Test_EditExportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "b", true)
 
 	link := "http://foo/bar"
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "desc", link})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "1s", "desc", link})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -77,6 +79,7 @@ func Test_EditExportInteractive(t *testing.T) {
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[1].ResponseType)
 	require.Equal(t, ac.Exports[1].Description, "desc")
 	require.Equal(t, ac.Exports[1].InfoURL, link)
+	require.Equal(t, ac.Exports[1].ResponseThreshold, time.Second)
 }
 
 func Test_EditExportInteractiveLatency(t *testing.T) {
@@ -86,7 +89,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", ""})
+	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", "", ""})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
