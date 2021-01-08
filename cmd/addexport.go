@@ -67,10 +67,10 @@ type AddExportParams struct {
 	private bool
 	service bool
 	SignerParams
-	subject      string
-	latSubject   string
-	latSampling  string
-	responseType string
+	subject           string
+	latSubject        string
+	latSampling       string
+	responseType      string
 	responseThreshold time.Duration
 }
 
