@@ -48,7 +48,7 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.rmLatencySampling, "rm-latency-sampling", "", false, "remove latency sampling")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this export")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this export")
-	cmd.Flags().DurationVarP(&params.responseThreshold, "response-threshold", "", 0, "response threshold duration (services only)")
+	cmd.Flags().DurationVarP(&params.responseThreshold, "response-threshold", "", 0, "response threshold duration (units ms/s/m/h) (services only)")
 
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
