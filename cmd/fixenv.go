@@ -481,7 +481,7 @@ func (p *FixCmd) LoadAccounts(ctx ActionCtx) (*store.Report, error) {
 						ar.AddOK("ignoring older config %s", src)
 						return nil
 					}
-					for _, sk := range ac.SigningKeys.Keys() {
+					for sk := range ac.SigningKeys {
 						p.KeyToPrincipalKey[sk] = ac.Subject
 					}
 				}
