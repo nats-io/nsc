@@ -136,7 +136,6 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if p.subject == "" {
 		p.subject = string(p.export.Subject)
 	}
-	kind := p.export.Type
 
 	p.subject, err = cli.Prompt("subject", p.subject, cli.Val(func(v string) error {
 		t := jwt.Subject(v)
@@ -144,9 +143,6 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 		t.Validate(&vr)
 		if len(vr.Issues) > 0 {
 			return errors.New(vr.Issues[0].Description)
-		}
-		if kind == jwt.Service && t.HasWildCards() {
-			return errors.New("services cannot have wildcards")
 		}
 		if t != p.export.Subject && !t.IsContainedIn(p.export.Subject) {
 			return fmt.Errorf("%q doesn't contain %q", string(p.export.Subject), string(t))
@@ -211,10 +207,6 @@ func (p *GenerateActivationParams) Validate(ctx ActionCtx) error {
 			p.export = *e.Selection
 			break
 		}
-	}
-
-	if p.export.Type == jwt.Service && sub.HasWildCards() {
-		return fmt.Errorf("services cannot have wildcards %q", p.subject)
 	}
 
 	if p.export.Subject == "" {
