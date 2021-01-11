@@ -118,7 +118,7 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, false, fp, "my import", "barfoo", 0}
+	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -126,7 +126,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo", string(ac.Imports[0].To))
+	require.Equal(t, "barfoo.>", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -147,7 +147,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "my import", "barfoo", 0}
+	input := []interface{}{1, true, 1, "my import", "barfoo.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -155,7 +155,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo", string(ac.Imports[0].To))
+	require.Equal(t, "barfoo.>", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -176,7 +176,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "barfoo.*.xx", true, "my import", "foobar.yy"}
+	input := []interface{}{1, true, 1, "barfoo.>", true, "my import", "foobar.>"}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -185,8 +185,8 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, true, ac.Imports[0].Share)
 	require.Equal(t, "my import", ac.Imports[0].Name)
-	require.Equal(t, "barfoo.*.xx", string(ac.Imports[0].To))
-	require.Equal(t, "foobar.yy", string(ac.Imports[0].Subject))
+	require.Equal(t, "foobar.>", string(ac.Imports[0].LocalSubject))
+	require.Equal(t, "barfoo.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
 
@@ -253,8 +253,8 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "test", ac.Imports[0].Name)
 	// for services remote local is subject, remote is to
-	require.Equal(t, "test.foobar.alberto.*", string(ac.Imports[0].Subject))
-	require.Equal(t, "foobar.x.*", string(ac.Imports[0].To))
+	require.Equal(t, "foobar.x.*", string(ac.Imports[0].Subject))
+	require.Equal(t, "test.foobar.alberto.*", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, jwt.Service, ac.Imports[0].Type)
 	require.Equal(t, apub, ac.Imports[0].Account)
 }
@@ -277,7 +277,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	// B, don't pick, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar", 0}
+	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -285,13 +285,13 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, "test", ac.Imports[0].Name)
-	require.Equal(t, "test.foobar", string(ac.Imports[0].To))
+	require.Equal(t, "test.foobar.>", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
 
 	// B, don't pick, public, A's pubkey, remote sub, service, name test, local subj "test.foobar.>, key
-	input = []interface{}{1, false, true, apub, "q.*", true, "q", "qq", 0}
+	input = []interface{}{1, false, true, apub, "q.*", true, "q", "qq.*", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -299,8 +299,8 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ac.Imports, 2)
 	require.Equal(t, "q", ac.Imports[1].Name)
-	require.Equal(t, "q.*", string(ac.Imports[1].To))
-	require.Equal(t, "qq", string(ac.Imports[1].Subject))
+	require.Equal(t, "qq.*", string(ac.Imports[1].LocalSubject))
+	require.Equal(t, "q.*", string(ac.Imports[1].Subject))
 	require.True(t, ac.Imports[1].IsService())
 	require.Equal(t, apub, ac.Imports[1].Account)
 }
@@ -387,7 +387,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	HoistRootFlags(cmd)
 
 	// B, pick, stream foobar, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, true, 1, "test", "test.foobar"}
+	input := []interface{}{1, true, 1, "test", "test.foobar.>"}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -396,7 +396,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 1)
 	require.Equal(t, false, ac.Imports[0].Share)
 	require.Equal(t, "test", ac.Imports[0].Name)
-	require.Equal(t, "test.foobar", string(ac.Imports[0].To))
+	require.Equal(t, "test.foobar.>", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
@@ -411,8 +411,8 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.Len(t, ac.Imports, 2)
 	require.Equal(t, true, ac.Imports[1].Share)
 	require.Equal(t, "q service", ac.Imports[1].Name)
-	require.Equal(t, "q", string(ac.Imports[1].To))
-	require.Equal(t, "qq", string(ac.Imports[1].Subject))
+	require.Equal(t, "qq", string(ac.Imports[1].LocalSubject))
+	require.Equal(t, "q", string(ac.Imports[1].Subject))
 	require.True(t, ac.Imports[1].IsService())
 	require.Equal(t, apub, ac.Imports[1].Account)
 }
@@ -438,7 +438,7 @@ func Test_ImportStreamHandlesDecorations(t *testing.T) {
 	bc, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 	require.Len(t, bc.Imports, 1)
-	require.Empty(t, bc.Imports[0].To)
+	require.Empty(t, bc.Imports[0].LocalSubject)
 }
 
 func Test_ImportServiceHandlesDecorations(t *testing.T) {
@@ -462,7 +462,7 @@ func Test_ImportServiceHandlesDecorations(t *testing.T) {
 	bc, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 	require.Len(t, bc.Imports, 1)
-	require.Equal(t, bc.Imports[0].To, bc.Imports[0].Subject)
+	require.Equal(t, jwt.Subject(bc.Imports[0].LocalSubject), bc.Imports[0].Subject)
 }
 
 func Test_AddImportToAccount(t *testing.T) {

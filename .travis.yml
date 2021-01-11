@@ -19,7 +19,7 @@ install:
 
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then EXCLUDE_VENDOR=$(go list ./... | grep -v "/vendor/") && $(exit $(go fmt $EXCLUDE_VENDOR | wc -l)) && go vet $EXCLUDE_VENDOR; fi
-# - staticcheck ./...
+  - staticcheck ./...
 
 script:
   - mkdir cov

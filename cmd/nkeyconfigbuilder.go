@@ -171,13 +171,17 @@ func (cb *NKeyConfigBuilder) parse() error {
 			}
 			if x.IsStream() {
 				e.Stream = &src
-				if x.To != "" {
-					e.Prefix = x.To
+				if x.LocalSubject != "" {
+					e.LocalSubject = x.LocalSubject
+				} else if x.GetTo() != "" {
+					e.Prefix = jwt.Subject(x.GetTo())
 				}
 			} else {
 				e.Service = &src
-				if x.To != "" {
-					e.To = x.To
+				if x.LocalSubject != "" {
+					e.LocalSubject = x.LocalSubject
+				} else if x.GetTo() != "" {
+					e.To = jwt.Subject(x.GetTo())
 				}
 			}
 			a.Imports = append(a.Imports, e)
@@ -285,10 +289,11 @@ func (s *source) String() string {
 }
 
 type imprt struct {
-	Stream  *source     `json:"stream,omitempty"`
-	Service *source     `json:"service,omitempty"`
-	Prefix  jwt.Subject `json:"prefix,omitempty"`
-	To      jwt.Subject `json:"to,omitempty"`
+	Stream       *source             `json:"stream,omitempty"`
+	Service      *source             `json:"service,omitempty"`
+	Prefix       jwt.Subject         `json:"prefix,omitempty"`
+	To           jwt.Subject         `json:"to,omitempty"`
+	LocalSubject jwt.RenamingSubject `json:"local_subject,omitempty"`
 }
 
 func (im *imprt) String() string {
@@ -300,6 +305,9 @@ func (im *imprt) String() string {
 		if im.To != "" {
 			buf.WriteString(", to: ")
 			buf.WriteString(string(im.To))
+		} else if im.LocalSubject != "" {
+			buf.WriteString(", to: ")
+			buf.WriteString(string(im.LocalSubject))
 		}
 	} else {
 		buf.WriteString("stream: ")
@@ -307,6 +315,9 @@ func (im *imprt) String() string {
 		if im.Prefix != "" {
 			buf.WriteString(", prefix: ")
 			buf.WriteString(string(im.Prefix))
+		} else if im.LocalSubject != "" {
+			buf.WriteString(", to: ")
+			buf.WriteString(string(im.LocalSubject))
 		}
 	}
 	buf.WriteString("}")

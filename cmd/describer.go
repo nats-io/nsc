@@ -238,11 +238,13 @@ func NewImportDescriber(im jwt.Import) *ImportDescriber {
 }
 
 func (i *ImportDescriber) Brief(table *tablewriter.Table) {
-	local := string(i.To)
+	local := i.GetTo()
 	remote := string(i.Subject)
 
-	if i.Type == jwt.Service {
+	if i.Type == jwt.Service && local != "" {
 		local, remote = remote, local
+	} else {
+		local = string(i.LocalSubject)
 	}
 
 	if i.Token == "" {

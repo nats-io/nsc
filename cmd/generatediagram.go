@@ -102,13 +102,18 @@ func expId(subject string, e *jwt.Export) string {
 }
 
 func impSubj(i *jwt.Import) (local string, remote string) {
-	local = string(i.To)
-	if local == "" {
-		local = string(i.Subject)
-	}
-	remote = string(i.Subject)
-	if i.Type == jwt.Service {
-		local, remote = remote, local
+	if i.LocalSubject != "" {
+		local = string(i.LocalSubject)
+		remote = string(i.Subject)
+	} else {
+		local = i.GetTo()
+		if local == "" {
+			local = string(i.Subject)
+		}
+		remote = string(i.Subject)
+		if i.Type == jwt.Service {
+			local, remote = remote, local
+		}
 	}
 	return
 }

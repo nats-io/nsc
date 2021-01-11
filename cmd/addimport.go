@@ -466,19 +466,8 @@ func (p *AddImportParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("only services can set the share property")
 	}
 
-	// local becomes Subject for services, or prefix for streams
-	sub := jwt.Subject(p.local)
-	if sub.HasWildCards() {
-		if kind == jwt.Stream {
-			return errors.New("stream prefix subject cannot have wildcards")
-		}
-	}
-
 	for _, im := range p.filter(kind, p.claim.Imports) {
 		remote := string(im.Subject)
-		if im.Type == jwt.Service {
-			remote = string(im.To)
-		}
 		if im.Account == p.srcAccount.publicKey && remote == p.remote {
 			return fmt.Errorf("account already imports %s %q from %s", kind, im.Subject, p.srcAccount.publicKey)
 		}
@@ -539,13 +528,12 @@ func (p *AddImportParams) createImport() *jwt.Import {
 	var im jwt.Import
 	im.Name = p.name
 	im.Subject = jwt.Subject(p.remote)
-	im.To = jwt.Subject(p.local)
+	im.LocalSubject = jwt.RenamingSubject(p.local)
 	im.Account = p.srcAccount.publicKey
 	im.Type = jwt.Stream
 
 	if p.service {
 		im.Type = jwt.Service
-		im.Subject, im.To = im.To, im.Subject
 		im.Share = p.share
 	}
 	if p.tokenSrc != "" {
