@@ -46,6 +46,14 @@ func Test_AddUser(t *testing.T) {
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "bar", "--public-key", bar}, nil, nil, false},
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "badbar", "--public-key", badBar}, nil, []string{"invalid user key"}, true},
 		{CreateAddUserCmd(), []string{"add", "user", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usra", "--deny-sub", "foo queue"}, nil, []string{"added user"}, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrb", "--allow-sub", "foo queue"}, nil, []string{"added user"}, false},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrc", "--deny-pub", "foo queue"}, nil, []string{"contains illegal space"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrd", "--allow-pub", "foo queue"}, nil, []string{"contains illegal space"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usre", "--deny-pubsub", "foo queue"}, nil, []string{"contains illegal space"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrf", "--allow-pubsub", "foo queue"}, nil, []string{"contains illegal space"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrg", "--deny-sub", "foo queue doo"}, nil, []string{"can at most contain one space"}, true},
+		{CreateAddUserCmd(), []string{"add", "user", "--name", "usrh", "--allow-sub", "foo queue doo"}, nil, []string{"can at most contain one space"}, true},
 	}
 
 	tests.Run(t, "root", "add")
@@ -429,4 +437,19 @@ func Test_AddUserWithSigningKeyInteractive(t *testing.T) {
 	require.NotEmpty(t, claim.IssuerAccount)
 	require.NotEqual(t, claim.Issuer, claim.IssuerAccount)
 	require.Equal(t, claim.Issuer, pk)
+}
+
+func Test_AddUser_QueuePermissions(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA", "--allow-sub", "foo queue", "--deny-sub", "bar queue")
+	require.NoError(t, err)
+
+	u, err := ts.Store.ReadUserClaim("A", "UA")
+	require.NoError(t, err)
+	require.True(t, u.Sub.Allow.Contains("foo queue"))
+	require.True(t, u.Sub.Deny.Contains("bar queue"))
 }

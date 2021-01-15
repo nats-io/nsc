@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -49,6 +50,11 @@ nsc add user --name <n> --allow-sub <subject>,...
 nsc add user --name <n> --deny-pubsub <subject>,...
 nsc add user --name <n> --deny-pub <subject>,...
 nsc add user --name <n> --deny-sub <subject>,...
+
+# Set subscribe permissions with queue names (separated from subject by space)
+# When added this way, the corresponding remove command needs to be presented with the exact same string
+nsc add user --name <n> --deny-sub "<subject> <queue>,..."
+nsc add user --name <n> --allow-sub "<subject> <queue>,..."
 
 # To dynamically allow publishing to reply subjects, this works well for service responders:
 nsc add user --name <n> --allow-pub-response
@@ -433,6 +439,21 @@ func (p *PermissionsParams) Validate() error {
 	if err := p.ttlValidator(p.respTTL); err != nil {
 		return err
 	}
+	for _, v := range [][]string{p.allowPubs, p.allowPubsub, p.denyPubs, p.denyPubsub} {
+		for _, sub := range v {
+			if strings.Contains(sub, " ") {
+				return fmt.Errorf("publish permission subject %q contains illegal space", sub)
+			}
+		}
+	}
+	for _, v := range [][]string{p.allowSubs, p.denySubs} {
+		for _, sub := range v {
+			if strings.Count(sub, " ") > 1 {
+				return fmt.Errorf("subscribe permission subject %q can at most contain one space", sub)
+			}
+		}
+	}
+
 	return nil
 }
 
