@@ -46,6 +46,7 @@ func createImportAccountCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.skip, "skip", "", false, "skip validation issues, they can be edited out prior to push")
 	cmd.Flags().BoolVarP(&params.overwrite, "overwrite", "", false, "overwrite existing account")
 	cmd.Flags().StringVarP(&params.file, "file", "j", "", "account jwt to import")
+	cmd.Flags().BoolVarP(&params.force, "force", "", false, "import account signed by different operator")
 	return cmd
 }
 
@@ -57,6 +58,7 @@ type fileImport struct {
 	file      string
 	skip      bool
 	overwrite bool
+	force     bool
 	content   []byte
 }
 
@@ -161,7 +163,7 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 			r.AddError("only a non managed store can import a self signed account")
 			return r, nil
 		}
-	} else if claim.IsSelfSigned() {
+	} else if claim.IsSelfSigned() || (!sameOperator && p.force) {
 		if jwt, err := claim.Encode(p.signerKP); err != nil {
 			r.AddError("error during encoding of self signed account jwt: %v", err)
 			return r, nil
