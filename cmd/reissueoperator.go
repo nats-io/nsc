@@ -40,6 +40,7 @@ func createReIssueOperatorCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&params.turnIntoSigningKey, "convert-to-signing-key", "", false,
 		"turn operator identity key into signing key (avoids account re-signing)")
+	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
 	return cmd
 }
 
@@ -56,6 +57,7 @@ func init() {
 
 type reIssueOperator struct {
 	turnIntoSigningKey bool
+	name               string
 }
 
 func (p *reIssueOperator) PreInteractive(ctx ActionCtx) error {
@@ -75,18 +77,34 @@ func (p *reIssueOperator) SetDefaults(ctx ActionCtx) error {
 }
 
 func (p *reIssueOperator) Validate(ctx ActionCtx) error {
-	if ctx.StoreCtx().Store.IsManaged() {
+	store := ctx.StoreCtx().Store
+	if p.name != "" {
+		var err error
+		store, err = GetStoreForOperator(p.name)
+		if err != nil {
+			return err
+		}
+	}
+	if store.IsManaged() {
 		return fmt.Errorf("resign is only supported in non managed stores")
 	}
-	if _, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
+	if _, err := store.ReadOperatorClaim(); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
+	var err error
 	r := store.NewDetailedReport(true)
-	op, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	s := ctx.StoreCtx().Store
+	if p.name != "" {
+		if s, err = GetStoreForOperator(p.name); err != nil {
+			r.AddError("failed to load operator %s: %v", p.name, err)
+			return r, err
+		}
+	}
+	op, err := s.ReadOperatorClaim()
 	if err != nil {
 		r.AddError("failed to obtain operator: %v", err)
 		return r, err
@@ -113,7 +131,7 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 	if opJWT, err := op.Encode(opKp); err != nil {
 		r.AddError("failed to encode new operator jwt: %v", err)
 		return r, err
-	} else if err := ctx.StoreCtx().Store.StoreRaw([]byte(opJWT)); err != nil {
+	} else if err := s.StoreRaw([]byte(opJWT)); err != nil {
 		r.AddError("failed to store new operator jwt: %v", err)
 		return r, err
 	}
@@ -122,12 +140,12 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("old operator key %q turned into signing key", opPub)
 		return r, nil
 	}
-	accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
+	accounts, err := s.ListSubContainers(store.Accounts)
 	if err != nil {
 		r.AddError("failed to obtain accounts: %v", err)
 	}
 	for _, acName := range accounts {
-		claim, err := ctx.StoreCtx().Store.ReadAccountClaim(acName)
+		claim, err := s.ReadAccountClaim(acName)
 		if err != nil {
 			r.AddError("failed reading account %s: %v", acName, err)
 		}
@@ -137,7 +155,7 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		if accJWT, err := claim.Encode(opKp); err != nil {
 			r.AddError("account %q error during encoding: %v", acName, err)
-		} else if err := ctx.StoreCtx().Store.StoreRaw([]byte(accJWT)); err != nil {
+		} else if err := s.StoreRaw([]byte(accJWT)); err != nil {
 			r.AddError("failed to store new account jwt for account %q: %v", acName, err)
 		}
 		r.AddOK("account %q re-signed", acName)
