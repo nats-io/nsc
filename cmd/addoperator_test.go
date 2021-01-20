@@ -277,3 +277,40 @@ func TestImportOperatorV2(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, stdErr, JWTUpgradeBannerJWT(1).Error())
 }
+
+func TestImportReIssuedOperator(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	checkOp := func(pub string) {
+		s, err := GetStoreForOperator("O")
+		require.NoError(t, err)
+		claim, err := s.ReadOperatorClaim()
+		require.NoError(t, err)
+		require.Equal(t, claim.Subject, pub)
+	}
+
+	_, pubOld, kpOld := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pubOld)
+	oc.Name = "O"
+	token, err := oc.Encode(kpOld)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "Oold.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	require.NoError(t, err)
+	checkOp(pubOld)
+
+	// simulate reissuing operator
+	_, pubNew, kpNew := CreateOperatorKey(t)
+	oc.Subject = pubNew
+	token, err = oc.Encode(kpNew)
+	require.NoError(t, err)
+	tf = filepath.Join(ts.Dir, "Onew.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf, "--force")
+	require.NoError(t, err)
+	checkOp(pubNew)
+}

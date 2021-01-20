@@ -47,7 +47,7 @@ func Test_ReIssue(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, op3.DidSign(ac))
 
-	_, _, err = ExecuteCmd(createReIssueOperatorCmd())
+	_, _, err = ExecuteCmd(createReIssueOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
 	op4, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)

@@ -345,8 +345,11 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 			}
 			if oc.Subject != ocNew.Subject {
 				err := fmt.Errorf("existing and new operator represent different entities")
-				r.AddError("%v resolve conflict first", err)
-				return r, err
+				if !p.force {
+					r.AddError(`%v resolve conflict first or provide "--force" to continue`, err)
+					return r, err
+				}
+				r.AddWarning("%v, forced to continue", err)
 			}
 		} else if err.(*store.ResourceErr).Err != store.ErrNotExist {
 			return nil, err
