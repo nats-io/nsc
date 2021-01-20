@@ -58,19 +58,28 @@ func Test_ImportAccountSelfSigned(t *testing.T) {
 }
 
 func Test_ImportAccountOtherOperator(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-	oKp, _ := nkeys.CreateOperator()
-	akp, _ := nkeys.CreateAccount()
-	pk, _ := akp.PublicKey()
-	ac := jwt.NewAccountClaims(pk)
-	ac.Name = ac.Subject
-	theJWT, err := ac.Encode(oKp)
-	require.NoError(t, err)
-	require.False(t, ac.IsSelfSigned())
-	file := filepath.Join(ts.Dir, "account.jwt")
-	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
-	require.Error(t, err)
+	test := func(force bool) {
+		ts := NewTestStore(t, "O")
+		defer ts.Done(t)
+		oKp, _ := nkeys.CreateOperator()
+		akp, _ := nkeys.CreateAccount()
+		pk, _ := akp.PublicKey()
+		ac := jwt.NewAccountClaims(pk)
+		ac.Name = ac.Subject
+		theJWT, err := ac.Encode(oKp)
+		require.NoError(t, err)
+		require.False(t, ac.IsSelfSigned())
+		file := filepath.Join(ts.Dir, "account.jwt")
+		err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+		require.NoError(t, err)
+		if force {
+			_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file, "--force")
+			require.NoError(t, err)
+		} else {
+			_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
+			require.Error(t, err)
+		}
+	}
+	test(false)
+	test(true)
 }
