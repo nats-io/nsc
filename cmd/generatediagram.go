@@ -36,6 +36,7 @@ func init() {
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 	}
+	accDetail := false
 	comp := &cobra.Command{
 		Use:          "component",
 		Short:        "Generate a plantuml component diagram for this store",
@@ -43,9 +44,10 @@ func init() {
 		SilenceUsage: true,
 		Example:      `nsc generate diagram component`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return componentDiagram()
+			return componentDiagram(accDetail)
 		},
 	}
+	comp.Flags().BoolVarP(&accDetail, "detail", "", false, "Include account descriptions")
 	diagram.AddCommand(comp)
 	showKeys, detail, users := false, false, false
 	object := &cobra.Command{
@@ -59,8 +61,8 @@ func init() {
 		},
 	}
 	object.Flags().BoolVarP(&showKeys, "show-keys", "", false, "Include keys in diagram")
-	object.Flags().BoolVarP(&detail, "detail", "", false, "Include empty/unlimited values")
 	object.Flags().BoolVarP(&users, "users", "", false, "Include User")
+	object.Flags().BoolVarP(&detail, "detail", "", false, "Include empty/unlimited values")
 	diagram.AddCommand(object)
 	diagram.PersistentFlags().StringVarP(&outputFile, "output-file", "o", "--", "output file, '--' is stdout")
 	generateCmd.AddCommand(diagram)
@@ -118,7 +120,7 @@ func impSubj(i *jwt.Import) (local string, remote string) {
 	return
 }
 
-func componentDiagram() error {
+func componentDiagram(accDetail bool) error {
 	s, err := GetStore()
 	if err != nil {
 		return err
@@ -137,6 +139,9 @@ func componentDiagram() error {
 		fmt.Fprintln(f, fmt.Sprintf(format, args...))
 	}
 	addNote := func(ref string, i jwt.Info) {
+		if !accDetail {
+			return
+		}
 		if i.Description != "" || i.InfoURL != "" {
 			link := ""
 			if i.InfoURL != "" {
@@ -151,18 +156,24 @@ skinparam component {
 	ArrowFontColor #636363
     ArrowSize 10pt
 }
+skinparam interface {
+    backgroundColor<<not-found public service>> Red
+    backgroundColor<<not-found private service>> Red
+    backgroundColor<<not-found public stream>> Red
+    backgroundColor<<not-found private stream>> Red
+}
 `)
 	addValidationNote := func(id string, name string, vr *jwt.ValidationResults) {
 		if len(vr.Issues) == 0 {
 			return
 		}
-		if len(vr.Issues) == 1 && strings.HasPrefix(vr.Issues[0].Description, "no activation provided for import") {
+		if len(vr.Issues) == 1 && strings.HasPrefix(vr.Issues[0].Description, "the field to has been deprecated") {
 			return
 		}
 		bldrPrntf("note left of %s\n", id)
 		bldrPrntf("** Validation Issues by %s**\n", name)
 		for _, v := range vr.Issues {
-			if !strings.HasPrefix(v.Description, "no activation provided for import") {
+			if !strings.HasPrefix(v.Description, "the field to has been deprecated") {
 				bldrPrntf("* %s\n", v.Description)
 			}
 		}
@@ -176,6 +187,7 @@ skinparam component {
 		if err != nil {
 			return err
 		}
+		accBySubj[ac.Subject] = ac
 		if len(ac.Imports)+len(ac.Exports) == 0 {
 			continue
 		}
@@ -192,7 +204,6 @@ skinparam component {
 			addValidationNote(eId, ac.Name, &vr)
 		}
 		bldrPrntf("")
-		accBySubj[ac.Subject] = ac
 	}
 	for _, accSubj := range accs {
 		ac, err := s.ReadAccountClaim(accSubj)
@@ -201,28 +212,40 @@ skinparam component {
 		}
 		for _, i := range ac.Imports {
 			local, remote := impSubj(i)
-			matchingExport := &jwt.Export{Subject: i.Subject} // initialize with dummy
-			if impAcc, ok := accBySubj[i.Account]; ok {
+			foundExport := false
+			tokenReq := false
+			if i.Token != "" {
+				tokenReq = true
+			}
+			matchingExport := &jwt.Export{Subject: jwt.Subject(remote), Type: i.Type, TokenReq: tokenReq} // dummy
+			impAcc, foundExporter := accBySubj[i.Account]
+			if foundExporter {
 				for _, e := range impAcc.Exports {
-					if e.Subject.IsContainedIn(jwt.Subject(remote)) {
+					if jwt.Subject(remote).IsContainedIn(e.Subject) {
 						matchingExport = e
+						foundExport = true
 						break
 					}
 				}
 			}
 			id := expId(i.Account, matchingExport)
+			if !foundExport {
+				bldrPrntf(`interface " " << not-found %s %s >> as %s`, accessMod(matchingExport), expType(matchingExport), id)
+			}
 			if local != remote {
 				bldrPrntf(`%s "%s%s" ..> %s : "%s"`, ac.Subject, rename, local, id, remote)
 			} else {
 				bldrPrntf(`%s ..> %s : "%s"`, ac.Subject, id, remote)
 			}
-
 			vr := jwt.ValidationResults{}
 			i.Validate(ac.Subject, &vr)
 			if matchingExport.TokenReq && i.Token == "" {
 				vr.AddError("Export is private but no activation token")
 			} else if !matchingExport.TokenReq && i.Token != "" {
 				vr.AddError("Export is public but import has activation token")
+			}
+			if !foundExporter {
+				vr.AddError("Exporting account not present: %s", i.Account)
 			}
 			addValidationNote(id, ac.Name, &vr)
 		}
