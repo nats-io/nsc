@@ -1,6 +1,6 @@
 /*
  *
- *  * Copyright 2018-2019 The NATS Authors
+ *  * Copyright 2018-2021 The NATS Authors
  *  * Licensed under the Apache License, Version 2.0 (the "License");
  *  * you may not use this file except in compliance with the License.
  *  * You may obtain a copy of the License at
@@ -123,10 +123,10 @@ func Test_EditAccountLimits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(5), ac.Limits.Conn)
 	require.Equal(t, int64(31), ac.Limits.LeafNodeConn)
-	require.Equal(t, int64(1000*1000*10), ac.Limits.Data)
+	require.Equal(t, int64(1024*1024*10), ac.Limits.Data)
 	require.Equal(t, int64(15), ac.Limits.Exports)
 	require.Equal(t, int64(20), ac.Limits.Imports)
-	require.Equal(t, int64(1000), ac.Limits.Payload)
+	require.Equal(t, int64(1024), ac.Limits.Payload)
 	require.Equal(t, int64(30), ac.Limits.Subs)
 	require.Equal(t, int64(5), ac.Limits.Streams)
 	require.Equal(t, int64(6), ac.Limits.Consumer)
