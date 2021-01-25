@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -464,8 +464,6 @@ func (p *PermissionsParams) Run(perms *jwt.Permissions, ctx ActionCtx) (*store.R
 		r.AddOK("removed response permissions")
 		return r, nil
 	}
-
-	fmt.Printf("%v\n", ctx.CurrentCmd().Flag("max-responses").Value)
 
 	if ctx.CurrentCmd().Flag("max-responses").Changed || p.respMax != 0 {
 		if perms.Resp == nil {

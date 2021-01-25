@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -168,12 +168,12 @@ func TestCommon_ParseNumber(t *testing.T) {
 		{"", 0, false},
 		{"0", 0, false},
 		{"1000", 1000, false},
-		{"1K", 1000, false},
-		{"1k", 1000, false},
-		{"1M", 1000000, false},
-		{"1m", 1000000, false},
-		{"1G", 1000000000, false},
-		{"1g", 1000000000, false},
+		{"1K", 1024, false},
+		{"1k", 1024, false},
+		{"1M", 1024 * 1024, false},
+		{"1m", 1024 * 1024, false},
+		{"1G", 1024 * 1024 * 1024, false},
+		{"1g", 1024 * 1024 * 1024, false},
 		{"32a", 0, true},
 	}
 	for _, d := range tests {

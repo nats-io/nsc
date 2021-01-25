@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -165,13 +165,13 @@ func ParseNumber(s string) (int64, error) {
 			return v, nil
 		}
 		if m[2] == "K" {
-			return v * 1000, nil
+			return v * 1024, nil
 		}
 		if m[2] == "M" {
-			return v * 1000000, nil
+			return v * 1024 * 1024, nil
 		}
 		if m[2] == "G" {
-			return v * 1000000000, nil
+			return v * 1024 * 1024 * 1024, nil
 		}
 	}
 	return 0, fmt.Errorf("couldn't parse number: %v", s)
