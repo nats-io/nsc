@@ -45,6 +45,7 @@ func createEditOperatorCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "set system account by account by public key or name")
 	cmd.Flags().StringSliceVarP(&params.serviceURLs, "service-url", "n", nil, "add an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().StringSliceVarP(&params.rmServiceURLs, "rm-service-url", "", nil, "remove an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
+	cmd.Flags().BoolVarP(&params.reqSk, "require-signing-keys", "", false, "require accounts/user to be signed with a signing key")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -65,12 +66,13 @@ type EditOperatorParams struct {
 	rmServiceURLs []string
 	signingKeys   SigningKeysParams
 	rmSigningKeys []string
+	reqSk         bool
 }
 
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url", "system-account") {
+	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url", "system-account", "require-signing-keys") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -201,6 +203,31 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			}
 		}
 	}
+	if p.reqSk {
+		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
+		if err != nil {
+			return err
+		}
+		for _, accName := range accounts {
+			ac, err := ctx.StoreCtx().Store.ReadAccountClaim(accName)
+			if err != nil {
+				return err
+			}
+			if ac.Issuer != p.claim.Subject {
+				return fmt.Errorf("account %q needs to be issued with a signing key first", accName)
+			}
+			usrs, _ := ctx.StoreCtx().Store.ListEntries(store.Accounts, accName, store.Users)
+			for _, usrName := range usrs {
+				uc, err := ctx.StoreCtx().Store.ReadUserClaim(accName, usrName)
+				if err != nil {
+					return err
+				}
+				if uc.Issuer != ac.Subject {
+					return fmt.Errorf("user %q in account %q needs to be issued with a signing key first", usrName, accName)
+				}
+			}
+		}
+	}
 	if err = p.signingKeys.Valid(); err != nil {
 		return err
 	}
@@ -230,6 +257,8 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("removed signing key %q", k)
 	}
 
+	p.claim.StrictSigningKeyUsage = p.reqSk
+	r.AddOK("strict signing key usage set to: %t", p.reqSk)
 	flags := ctx.CurrentCmd().Flags()
 	p.claim.AccountServerURL = p.asu
 	if flags.Changed("account-jwt-server-url") {

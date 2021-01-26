@@ -303,6 +303,7 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 
 func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, error) {
 	var acc keys
+	var sig keys
 	var usr keys
 	var err error
 	// create system account, signed by this operator
@@ -311,8 +312,14 @@ func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, er
 	} else if acc.PubKey, err = acc.KP.PublicKey(); err != nil {
 		return nil, nil, err
 	}
+	if sig.KP, err = nkeys.CreateAccount(); err != nil {
+		return nil, nil, err
+	} else if sig.PubKey, err = sig.KP.PublicKey(); err != nil {
+		return nil, nil, err
+	}
 	sysAccClaim := jwt.NewAccountClaims(acc.PubKey)
 	sysAccClaim.Name = "SYS"
+	sysAccClaim.SigningKeys.Add(sig.PubKey)
 	if sysAccJwt, err := sysAccClaim.Encode(opKp); err != nil {
 		return nil, nil, err
 	} else if _, err := s.Store.StoreClaim([]byte(sysAccJwt)); err != nil {
@@ -328,7 +335,8 @@ func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, er
 	}
 	sysUsrClaim := jwt.NewUserClaims(usr.PubKey)
 	sysUsrClaim.Name = "sys"
-	if sysUsrJwt, err := sysUsrClaim.Encode(acc.KP); err != nil {
+	sysUsrClaim.IssuerAccount = acc.PubKey
+	if sysUsrJwt, err := sysUsrClaim.Encode(sig.KP); err != nil {
 		return nil, nil, err
 	} else if _, err := s.Store.StoreClaim([]byte(sysUsrJwt)); err != nil {
 		return nil, nil, err

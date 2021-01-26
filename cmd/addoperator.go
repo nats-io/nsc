@@ -44,7 +44,8 @@ func createAddOperatorCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "operator name")
 	cmd.Flags().StringVarP(&params.jwtPath, "url", "u", "", "import from a jwt server url, file, or well known operator")
-	cmd.Flags().BoolVarP(&params.sysAcc, "sys", "s", false, "generate system account with the operator")
+	cmd.Flags().BoolVarP(&params.genSk, "generate-signing-key", "", false, "generate a signing key with the operator")
+	cmd.Flags().BoolVarP(&params.sysAcc, "sys", "s", false, "generate system account with the operator (if specified will be signed with signing key)")
 	cmd.Flags().BoolVarP(&params.force, "force", "", false, "on import, overwrite existing when already present")
 	params.TimeParams.BindFlags(cmd)
 
@@ -69,6 +70,7 @@ type AddOperatorParams struct {
 	generate bool
 	sysAcc   bool
 	force    bool
+	genSk    bool
 	keyPath  string
 }
 
@@ -120,6 +122,9 @@ func (p *AddOperatorParams) PreInteractive(ctx ActionCtx) error {
 			return err
 		}
 		if p.sysAcc, err = cli.Confirm("Generate system account?", true); err != nil {
+			return err
+		}
+		if p.genSk, err = cli.Confirm("Generate signing key?", true); err != nil {
 			return err
 		}
 	}
@@ -252,6 +257,10 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 		if p.keyPath, err = ctx.StoreCtx().KeyStore.Store(p.signerKP); err != nil {
 			return err
 		}
+	} else {
+		if p.genSk {
+			return fmt.Errorf("signing key can not be added when importing the operator")
+		}
 	}
 
 	if p.keyPath != "" {
@@ -272,7 +281,7 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
+func (p *AddOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
 	operator := &store.NamedKey{Name: p.name, KP: p.signerKP}
 	s, err := GetConfig().LoadStore(p.name)
@@ -288,6 +297,7 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 
 	var sAcc *keys
 	var sUsr *keys
+	var skPub string
 
 	if p.token == "" {
 		ctx, err := s.GetContext()
@@ -300,7 +310,6 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 				return nil, err
 			}
 		}
-
 		oc, err := ctx.Store.ReadOperatorClaim()
 		if err != nil {
 			return nil, err
@@ -317,9 +326,23 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 				return nil, err
 			}
 		}
-
+		sysAccSigner := p.signerKP
+		if p.genSk {
+			sysAccSigner, err = nkeys.CreateOperator()
+			if err != nil {
+				return nil, err
+			}
+			if _, err = ctx.KeyStore.Store(p.signerKP); err != nil {
+				return nil, err
+			}
+			skPub, err = sysAccSigner.PublicKey()
+			if err != nil {
+				return nil, err
+			}
+			oc.SigningKeys.Add(skPub)
+		}
 		if p.sysAcc {
-			if sAcc, sUsr, err = createSystemAccount(ctx, p.signerKP); err != nil {
+			if sAcc, sUsr, err = createSystemAccount(ctx, sysAccSigner); err != nil {
 				return nil, err
 			}
 			oc.SystemAccount = sAcc.PubKey
@@ -375,6 +398,9 @@ func (p *AddOperatorParams) Run(_ ActionCtx) (store.Status, error) {
 		}
 		r.AddOK("%s operator %q", verb, p.name)
 		if sAcc != nil && sUsr != nil {
+			if skPub != "" {
+				r.AddOK("created signing key: %s", skPub)
+			}
 			r.AddOK("created system_account: name:SYS id:%s", sAcc.PubKey)
 			r.AddOK("created system account user: name:sys id:%s", sUsr.PubKey)
 			r.AddOK("system account user creds file stored in %#q", AbbrevHomePaths(sUsr.CredsPath))

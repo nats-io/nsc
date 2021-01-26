@@ -39,6 +39,7 @@ func Test_EditOperator(t *testing.T) {
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--tag", "O", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--require-signing-keys"}, nil, []string{"strict signing key usage set to: true"}, false},
 	}
 
 	tests.Run(t, "root", "edit")

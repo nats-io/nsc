@@ -40,7 +40,7 @@ func Test_AddOperator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--sys")
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--sys", "--generate-signing-key")
 	require.NoError(t, err)
 
 	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", ".nsc"))
@@ -97,7 +97,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true, true})
+	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true, true, true})
 	require.NoError(t, err)
 	d, err := Read(filepath.Join(ts.Dir, "store", "O", "O.jwt"))
 	require.NoError(t, err)
@@ -108,6 +108,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 	require.Equal(t, 2019, start.Year())
 	require.Equal(t, time.Month(12), start.Month())
 	require.Equal(t, 1, start.Day())
+	require.Len(t, oc.SigningKeys, 1)
 
 	expiry := time.Unix(oc.Expires, 0).UTC()
 	require.Equal(t, 2029, expiry.Year())
@@ -115,8 +116,22 @@ func TestAddOperatorInteractive(t *testing.T) {
 	require.Equal(t, 1, expiry.Day())
 	require.NotEmpty(t, oc.SystemAccount)
 
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt"))
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt"))
+	sys := filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt")
+	require.FileExists(t, sys)
+	sysJWT, err := Read(sys)
+	require.NoError(t, err)
+	sysClaim, err := jwt.DecodeAccountClaims(string(sysJWT))
+	require.NoError(t, err)
+	require.Equal(t, sysClaim.Issuer, oc.SigningKeys[0])
+
+	usr := filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt")
+	require.FileExists(t, usr)
+	usrJWT, err := Read(usr)
+	require.NoError(t, err)
+	usrClaim, err := jwt.DecodeUserClaims(string(usrJWT))
+	require.NoError(t, err)
+	_, ok := sysClaim.SigningKeys[usrClaim.Issuer]
+	require.True(t, ok)
 }
 
 func TestImportOperatorInteractive(t *testing.T) {
@@ -196,7 +211,7 @@ func Test_AddOperatorWithKeyInteractive(t *testing.T) {
 	cmd := createAddOperatorCmd()
 	HoistRootFlags(cmd)
 
-	args := []interface{}{false, "T", "0", "0", false, false, string(seed)}
+	args := []interface{}{false, "T", "0", "0", false, false, false, string(seed)}
 	_, _, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
