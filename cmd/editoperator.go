@@ -213,7 +213,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			if err != nil {
 				return err
 			}
-			if ac.Issuer != p.claim.Subject {
+			if ac.Issuer == p.claim.Subject {
 				return fmt.Errorf("account %q needs to be issued with a signing key first", accName)
 			}
 			usrs, _ := ctx.StoreCtx().Store.ListEntries(store.Accounts, accName, store.Users)
@@ -222,7 +222,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 				if err != nil {
 					return err
 				}
-				if uc.Issuer != ac.Subject {
+				if uc.Issuer == ac.Subject {
 					return fmt.Errorf("user %q in account %q needs to be issued with a signing key first", usrName, accName)
 				}
 			}

@@ -179,12 +179,16 @@ func (p *AddUserParams) Load(_ ActionCtx) error {
 }
 
 func validUserSigners(ctx ActionCtx, accName string) ([]string, error) {
+	opc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
 	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(accName)
 	if err != nil {
 		return nil, err
 	}
 	var signers []string
-	if ctx.StoreCtx().KeyStore.HasPrivateKey(ac.Subject) {
+	if !opc.StrictSigningKeyUsage && ctx.StoreCtx().KeyStore.HasPrivateKey(ac.Subject) {
 		signers = append(signers, ac.Subject)
 	}
 	for signingKey := range ac.SigningKeys {

@@ -493,7 +493,9 @@ func GetOperatorSigners(ctx ActionCtx) ([]string, error) {
 		return nil, err
 	}
 	var signers []string
-	signers = append(signers, oc.Subject)
+	if !oc.StrictSigningKeyUsage {
+		signers = append(signers, oc.Subject)
+	}
 	signers = append(signers, oc.SigningKeys...)
 	return signers, nil
 }

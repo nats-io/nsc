@@ -59,3 +59,29 @@ func Test_ReIssue(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, op4.DidSign(ac))
 }
+
+func Test_ReIssueStrict(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	op1, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	// add testing account
+	ts.AddAccount(t, "A")
+
+	_, _, err = ExecuteCmd(createReIssueOperatorCmd(), "--convert-to-signing-key")
+	require.NoError(t, err)
+	op3, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotEqual(t, op1.Subject, op3.Subject)
+	require.Len(t, op3.SigningKeys, 1)
+	require.True(t, op3.SigningKeys.Contains(op1.Subject))
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, op3.DidSign(ac))
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createReIssueOperatorCmd(), "--convert-to-signing-key")
+	require.NoError(t, err)
+}

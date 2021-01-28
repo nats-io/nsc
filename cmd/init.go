@@ -326,6 +326,8 @@ func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, er
 		return nil, nil, err
 	} else if acc.KeyPath, err = s.KeyStore.Store(acc.KP); err != nil {
 		return nil, nil, err
+	} else if _, err := s.KeyStore.Store(sig.KP); err != nil {
+		return nil, nil, err
 	}
 	// create system account user and creds
 	if usr.KP, err = nkeys.CreateUser(); err != nil {

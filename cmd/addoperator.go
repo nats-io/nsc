@@ -332,7 +332,7 @@ func (p *AddOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 			if err != nil {
 				return nil, err
 			}
-			if _, err = ctx.KeyStore.Store(p.signerKP); err != nil {
+			if _, err := ctx.KeyStore.Store(sysAccSigner); err != nil {
 				return nil, err
 			}
 			skPub, err = sysAccSigner.PublicKey()
@@ -399,7 +399,7 @@ func (p *AddOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("%s operator %q", verb, p.name)
 		if sAcc != nil && sUsr != nil {
 			if skPub != "" {
-				r.AddOK("created signing key: %s", skPub)
+				r.AddOK("created operator signing key: %s", skPub)
 			}
 			r.AddOK("created system_account: name:SYS id:%s", sAcc.PubKey)
 			r.AddOK("created system account user: name:sys id:%s", sUsr.PubKey)

@@ -249,6 +249,8 @@ func (p *ValidateCmdParams) validate(ctx ActionCtx) error {
 					p.accountValidations[v] = &jwt.ValidationResults{}
 				}
 				p.accountValidations[v].AddError("user %q is not issued by account or account signing keys", u)
+			} else if oc.StrictSigningKeyUsage && uc.Issuer == ac.Subject {
+				p.accountValidations[v].AddError("user %q is issued by account key but operator is in strict mode", u)
 			}
 		}
 	}

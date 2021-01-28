@@ -35,7 +35,7 @@ type SigningKeysParams struct {
 func (e *SigningKeysParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
 	e.flagName = flagName
 	e.kind = kind
-	cmd.Flags().StringSliceVarP(&e.paths, flagName, shorthand, nil, "signing key or keypath - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringSliceVarP(&e.paths, flagName, shorthand, nil, `signing key or keypath or the value "generate"" to generate a key pair on the fly - comma separated list or option can be specified multiple times`)
 }
 
 func (e *SigningKeysParams) valid(s string) error {
@@ -46,6 +46,15 @@ func (e *SigningKeysParams) valid(s string) error {
 func (e *SigningKeysParams) resolve(s string) (nkeys.KeyPair, error) {
 	if s == "" {
 		return nil, fmt.Errorf("signing key cannot be empty")
+	}
+	if s == "generate" {
+		if kp, err := nkeys.CreatePair(e.kind); err != nil {
+			return nil, err
+		} else if s, err = kp.PublicKey(); err != nil {
+			return nil, err
+		} else if _, err = store.StoreKey(kp); err != nil {
+			return nil, err
+		}
 	}
 	kp, err := store.ResolveKey(s)
 	if err != nil {

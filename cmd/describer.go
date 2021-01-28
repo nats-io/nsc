@@ -454,6 +454,7 @@ func (o *OperatorDescriber) Describe() string {
 		}
 		table.AddRow("System Account", o.SystemAccount+decoration)
 	}
+	table.AddRow("Require Signing Keys", o.StrictSigningKeyUsage)
 
 	if len(o.SigningKeys) > 0 {
 		table.AddSeparator()
