@@ -29,7 +29,7 @@ func createDescribeJwtCmd() *cobra.Command {
 	var params DescribeFile
 	var cmd = &cobra.Command{
 		Use:          "jwt",
-		Short:        "Describe a jwt file",
+		Short:        "Describe a jwt/creds file",
 		Args:         MaxArgs(0),
 		Example:      fmt.Sprintf(`%s describe -f pathorurl`, GetToolName()),
 		SilenceUsage: true,
