@@ -18,7 +18,14 @@
 package cmd
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/cmd/store"
@@ -39,9 +46,168 @@ func Test_EditOperator(t *testing.T) {
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--tag", "O", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--require-signing-keys"}, nil, []string{"needs to be issued with a signing key first"}, true},
 	}
 
 	tests.Run(t, "root", "edit")
+}
+
+func readJWT(t *testing.T, elem ...string) string {
+	t.Helper()
+	fp := filepath.Join(elem...)
+	require.FileExists(t, fp)
+	theJWT, err := ioutil.ReadFile(fp)
+	require.NoError(t, err)
+	return string(theJWT)
+}
+
+func checkAcc(t *testing.T, ts *TestStore, acc string) {
+	t.Helper()
+	opJWT := readJWT(t, ts.Dir, "store", "O", "O.jwt")
+	op, err := jwt.DecodeOperatorClaims(opJWT)
+	require.NoError(t, err)
+	require.True(t, op.StrictSigningKeyUsage)
+	accJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
+	ac, err := jwt.DecodeAccountClaims(accJWT)
+	require.NoError(t, err)
+	require.NotEqual(t, ac.Issuer, op.Subject)
+	require.Equal(t, ac.Issuer, op.SigningKeys[0])
+	_, _, err = ExecuteCmd(createValidateCommand(), "--all-accounts")
+	require.NoError(t, err)
+}
+
+func checkUsr(t *testing.T, ts *TestStore, acc string) {
+	t.Helper()
+	opJWT := readJWT(t, ts.Dir, "store", "O", "O.jwt")
+	op, err := jwt.DecodeOperatorClaims(opJWT)
+	require.NoError(t, err)
+	require.True(t, op.StrictSigningKeyUsage)
+	accJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
+	ac, err := jwt.DecodeAccountClaims(accJWT)
+	require.NoError(t, err)
+	require.NotEqual(t, ac.Issuer, op.Subject)
+	require.Equal(t, ac.Issuer, op.SigningKeys[0])
+	usrJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, "users", "U.jwt")
+	uc, err := jwt.DecodeUserClaims(usrJWT)
+	require.NoError(t, err)
+	require.NotEqual(t, uc.Issuer, ac.Subject)
+	require.Equal(t, uc.IssuerAccount, ac.Subject)
+	require.Equal(t, uc.Issuer, ac.SigningKeys.Keys()[0])
+}
+
+func Test_EditOperatorRequireSigningKeys(t *testing.T) {
+	ts := NewEmptyStore(t)
+
+	_, err := os.Lstat(filepath.Join(ts.Dir, "store"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	// Perform all operations that would end up signing account/user/activation jwt
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", "generate")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "EXPORTER")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(createEditAccount(), "--name", "EXPORTER", "--sk", "generate")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "sub.public")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(createAddExportCmd(), "--subject", "sub.private", "--private")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(createEditExportCmd(), "--account", "EXPORTER", "--subject", "sub.public", "--description", "foo")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--sk", "generate")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	aAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.Dir, "store", "O", "accounts", "A", "A.jwt"))
+	require.NoError(t, err)
+	expAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.Dir, "store", "O", "accounts", "EXPORTER", "EXPORTER.jwt"))
+	require.NoError(t, err)
+	outpath := filepath.Join(ts.Dir, "token.jwt")
+	_, _, err = ExecuteCmd(createGenerateActivationCmd(), "--account", "EXPORTER", "--subject", "sub.private",
+		"--target-account", aAc.Subject, "--output-file", outpath)
+	require.NoError(t, err)
+	act, err := jwt.DecodeActivationClaims(strings.Split(readJWT(t, outpath), "\n")[1]) // strip decoration
+	require.NoError(t, err)
+	require.NotEqual(t, act.Issuer, act.IssuerAccount)
+	require.Equal(t, act.IssuerAccount, expAc.Subject)
+	require.Equal(t, act.Issuer, expAc.SigningKeys.Keys()[0])
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "A", "--token", outpath)
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "A", "--src-account", expAc.Subject,
+		"--remote-subject", "sub.public")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--account", "A", "--subject", "sub.public")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(createDeleteExportCmd(), "--account", "EXPORTER", "--subject", "sub.public")
+	require.NoError(t, err)
+	checkAcc(t, ts, "EXPORTER")
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U")
+	require.NoError(t, err)
+	checkUsr(t, ts, "A")
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--tag", "foo")
+	require.NoError(t, err)
+	checkUsr(t, ts, "A")
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--account", "A", "--name", "U", "--revoke")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	uk, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	pubUk, err := uk.PublicKey()
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--account", "A", "--user-public-key", pubUk)
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+}
+
+func Test_EditOperatorRequireSigningKeysManaged(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, err := os.Lstat(filepath.Join(ts.Dir, "store"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	oc.StrictSigningKeyUsage = true
+	_, psk, sk := CreateOperatorKey(t)
+	ts.KeyStore.Store(sk)
+	oc.SigningKeys.Add(psk)
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "O.jwt")
+	err = Write(tf, []byte(token))
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf) // causes a managed store
+	require.NoError(t, err)
+	// perform operations in a managed store and assure identity is not used
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--sk", "generate")
+	require.NoError(t, err)
+	checkAcc(t, ts, "A")
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U")
+	require.NoError(t, err)
+	checkUsr(t, ts, "A")
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--tag", "foo")
+	require.NoError(t, err)
+	checkUsr(t, ts, "A")
 }
 
 func Test_EditOperatorSigningKeys(t *testing.T) {
@@ -51,7 +217,7 @@ func Test_EditOperatorSigningKeys(t *testing.T) {
 	s1, pk1, _ := CreateOperatorKey(t)
 	_, pk2, _ := CreateOperatorKey(t)
 
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2)
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1, "--sk", pk2, "--sk", "generate")
 	require.NoError(t, err)
 
 	d, err := ts.Store.Read(store.JwtName("O"))
@@ -62,6 +228,7 @@ func Test_EditOperatorSigningKeys(t *testing.T) {
 
 	require.Contains(t, oc.SigningKeys, pk1)
 	require.Contains(t, oc.SigningKeys, pk2)
+	require.Len(t, oc.SigningKeys, 3)
 
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "--name", "A", "-K", string(s1))
 	require.NoError(t, err)

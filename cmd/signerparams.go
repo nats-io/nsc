@@ -134,6 +134,11 @@ func (p *SignerParams) Edit(ctx ActionCtx) error {
 func (p *SignerParams) getSigners(ctx ActionCtx) ([]string, error) {
 	sctx := ctx.StoreCtx()
 	ks := sctx.KeyStore
+	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
+
 	var signers []string
 	for _, kind := range p.kind {
 		switch kind {
@@ -143,12 +148,30 @@ func (p *SignerParams) getSigners(ctx ActionCtx) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
+			if oc.StrictSigningKeyUsage {
+				if len(sgnrs) > 1 {
+					sgnrs = sgnrs[1:]
+				} else {
+					sgnrs = []string{}
+				}
+			}
 			signers = append(signers, sgnrs...)
 		case nkeys.PrefixByteAccount:
 			KeyPathFlag = ks.GetKeyPath(sctx.Account.PublicKey)
 			sgnrs, err := ctx.StoreCtx().GetAccountKeys(sctx.Account.Name)
 			if err != nil {
 				return nil, err
+			}
+			if oc.StrictSigningKeyUsage {
+				skipId := sctx.Store.IsManaged()
+				if !skipId && len(p.kind) == 1 {
+					skipId = true
+				}
+				if len(sgnrs) > 1 {
+					sgnrs = sgnrs[1:]
+				} else {
+					sgnrs = []string{}
+				}
 			}
 			signers = append(signers, sgnrs...)
 		}

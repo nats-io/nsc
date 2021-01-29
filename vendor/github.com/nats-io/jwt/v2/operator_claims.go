@@ -43,6 +43,8 @@ type Operator struct {
 	SystemAccount string `json:"system_account,omitempty"`
 	// Min Server version
 	AssertServerVersion string `json:"assert_server_version,omitempty"`
+	// Signing of subordinate objects will require signing keys
+	StrictSigningKeyUsage bool `json:"strict_signing_key_usage,omitempty"`
 	GenericFields
 }
 
@@ -164,6 +166,7 @@ func NewOperatorClaims(subject string) *OperatorClaims {
 	}
 	c := &OperatorClaims{}
 	c.Subject = subject
+	c.Issuer = subject
 	return c
 }
 
@@ -174,7 +177,10 @@ func (oc *OperatorClaims) DidSign(op Claims) bool {
 	}
 	issuer := op.Claims().Issuer
 	if issuer == oc.Subject {
-		return true
+		if !oc.StrictSigningKeyUsage {
+			return true
+		}
+		return op.Claims().Subject == oc.Subject
 	}
 	return oc.SigningKeys.Contains(issuer)
 }

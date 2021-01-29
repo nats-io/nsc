@@ -151,7 +151,9 @@ func (p *AddAccountParams) validSigners(ctx ActionCtx) ([]string, error) {
 		return nil, err
 	}
 	var signers []string
-	signers = append(signers, oc.Subject)
+	if !oc.StrictSigningKeyUsage {
+		signers = append(signers, oc.Subject)
+	}
 	signers = append(signers, oc.SigningKeys...)
 	if ctx.StoreCtx().Store.IsManaged() && p.akp != nil {
 		pk, err := p.akp.PublicKey()

@@ -233,12 +233,12 @@ func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte)
 	return fp, ioutil.WriteFile(fp, data, 0600)
 }
 
-func (k *KeyStore) keypath(kp nkeys.KeyPair) (string, error) {
+func keypath(kp nkeys.KeyPair) (string, error) {
 	pk, err := kp.PublicKey()
 	if err != nil {
 		return "", err
 	}
-	return k.GetKeyPath(pk), nil
+	return GetKeyPath(pk), nil
 }
 
 func makeKeyStore(dir string) error {
@@ -255,6 +255,10 @@ func makeKeyStore(dir string) error {
 }
 
 func (k *KeyStore) GetKeyPath(pubkey string) string {
+	return GetKeyPath(pubkey)
+}
+
+func GetKeyPath(pubkey string) string {
 	if pubkey == "" {
 		return ""
 	}
@@ -264,7 +268,7 @@ func (k *KeyStore) GetKeyPath(pubkey string) string {
 }
 
 func (k *KeyStore) GetKeyPair(pubkey string) (nkeys.KeyPair, error) {
-	return k.Read(k.GetKeyPath(pubkey))
+	return k.Read(GetKeyPath(pubkey))
 }
 
 func (k *KeyStore) GetPublicKey(pubkey string) (string, error) {
@@ -300,7 +304,7 @@ func (k *KeyStore) getSeed(kp nkeys.KeyPair, err error) (string, error) {
 }
 
 func (k *KeyStore) Remove(pubkey string) error {
-	kp := k.GetKeyPath(pubkey)
+	kp := GetKeyPath(pubkey)
 	_, err := os.Stat(kp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -347,10 +351,14 @@ func AddGitIgnore(dir string) error {
 }
 
 func (k *KeyStore) Store(kp nkeys.KeyPair) (string, error) {
+	return StoreKey(kp)
+}
+
+func StoreKey(kp nkeys.KeyPair) (string, error) {
 	if err := makeKeyStore(GetKeysDir()); err != nil {
 		return "", err
 	}
-	fp, err := k.keypath(kp)
+	fp, err := keypath(kp)
 	if err != nil {
 		return "", err
 	}

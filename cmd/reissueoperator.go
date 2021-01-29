@@ -88,8 +88,10 @@ func (p *reIssueOperator) Validate(ctx ActionCtx) error {
 	if store.IsManaged() {
 		return fmt.Errorf("resign is only supported in non managed stores")
 	}
-	if _, err := store.ReadOperatorClaim(); err != nil {
+	if op, err := store.ReadOperatorClaim(); err != nil {
 		return err
+	} else if op.StrictSigningKeyUsage && !p.turnIntoSigningKey && len(op.SigningKeys) == 0 {
+		return fmt.Errorf("resign of strict operator is only supported with signing keys present")
 	}
 	return nil
 }
@@ -113,6 +115,16 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		r.AddError("failed to generate new operator identity: %v", err)
 		return r, err
+	}
+	accountSigningKey := opKp
+	if op.StrictSigningKeyUsage && !p.turnIntoSigningKey {
+		sp := SignerParams{kind: []nkeys.PrefixByte{nkeys.PrefixByteOperator}}
+		err = sp.Resolve(ctx)
+		if err != nil || sp.signerKP == nil {
+			r.AddError("failed to obtain signing key: %v", err)
+			return r, err
+		}
+		accountSigningKey = sp.signerKP
 	}
 	if _, err := ctx.StoreCtx().KeyStore.Store(opKp); err != nil {
 		r.AddError("failed to store new operator identity: %v", err)
@@ -153,7 +165,7 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 			r.AddOK("account %q already signed properly", acName)
 			continue
 		}
-		if accJWT, err := claim.Encode(opKp); err != nil {
+		if accJWT, err := claim.Encode(accountSigningKey); err != nil {
 			r.AddError("account %q error during encoding: %v", acName, err)
 		} else if err := s.StoreRaw([]byte(accJWT)); err != nil {
 			r.AddError("failed to store new account jwt for account %q: %v", acName, err)
