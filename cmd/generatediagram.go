@@ -288,7 +288,8 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 			bldrPrntf("note right of %s\n%s %s\nend note", ref, cli.WrapString(20, i.Description), link)
 		}
 	}
-	addValue := func(name string, value interface{}) {
+	addValue := func(name string, format string, args ...interface{}) {
+		value := fmt.Sprintf(format, args...)
 		if value != "" || detail {
 			bldrPrntf(`%s = %s`, name, value)
 		}
@@ -467,8 +468,9 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 	bldrPrntf(`title Object Diagram`)
 	bldrPrntf(`object "%s" as %s << operator >> {`, op.Name, op.Subject)
 	addClaims(op.ClaimsData, op.Tags)
-	addValue("JWT Version", fmt.Sprintf("%d", op.Version))
+	addValue("JWT Version", "%d", op.Version)
 	addValue("account server", op.AccountServerURL)
+	addValue("Strict signing key usage", "%t", op.StrictSigningKeyUsage)
 	addValidationResults(op)
 	bldrPrntf("}")
 
