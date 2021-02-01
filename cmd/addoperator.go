@@ -397,6 +397,7 @@ func (p *AddOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 			verb = "imported"
 		}
 		r.AddOK("%s operator %q", verb, p.name)
+		r.AddOK("When running your own nats-server, make sure they run at least version 2.2.0")
 		if sAcc != nil && sUsr != nil {
 			if skPub != "" {
 				r.AddOK("created operator signing key: %s", skPub)
