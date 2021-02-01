@@ -58,7 +58,7 @@ func Test_GetOperatorName(t *testing.T) {
 	require.NotNil(t, wko)
 	require.True(t, len(wko) >= 1)
 
-	n := GetOperatorName("test", "https://api.synadia.io/jwt/v1/synadia")
+	n := GetOperatorName("test", "https://api.synadia.io/jwt/v2/synadia")
 	require.Equal(t, "synadia", n)
 
 	n = GetOperatorName("X", "http://something.io/jwt/v1/foobar")
