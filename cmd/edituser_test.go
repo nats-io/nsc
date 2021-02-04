@@ -183,7 +183,7 @@ func Test_EditUser_Times(t *testing.T) {
 
 	ts.AddUser(t, "A", "a")
 
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09", "--time", "18:04:05-19:04:09")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09", "--time", "18:04:05-19:04:09", "--locale", "America/New_York")
 	require.NoError(t, err)
 
 	cc, err := ts.Store.ReadUserClaim("A", "a")
@@ -193,8 +193,9 @@ func Test_EditUser_Times(t *testing.T) {
 	require.ElementsMatch(t, cc.Times, []jwt.TimeRange{
 		{Start: "16:04:05", End: "17:04:09"},
 		{Start: "18:04:05", End: "19:04:09"}})
+	require.Equal(t, "America/New_York", cc.Locale)
 
-	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-time", "16:04:05")
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-time", "16:04:05", "--locale", "")
 	require.NoError(t, err)
 
 	cc, err = ts.Store.ReadUserClaim("A", "a")
@@ -202,6 +203,7 @@ func Test_EditUser_Times(t *testing.T) {
 	require.NotNil(t, cc)
 	require.ElementsMatch(t, cc.Times, []jwt.TimeRange{
 		{Start: "18:04:05", End: "19:04:09"}})
+	require.Equal(t, "UTC", cc.Locale)
 }
 
 func Test_EditUserSK(t *testing.T) {
