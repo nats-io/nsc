@@ -74,6 +74,7 @@ nsc edit user --name <n> --rm-response-perms
 
 	cmd.Flags().VarP(&params.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
 	cmd.Flags().StringSliceVarP(&params.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
+	cmd.Flags().VarP(&params.locale, "locale", "", "set the locale with which time values are interpreted")
 
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
@@ -117,6 +118,7 @@ type EditUserParams struct {
 	src         []string
 	times       timeSlice
 	rmTimes     []string
+	locale      timeLocale
 	payload     DataParams
 	bearer      bool
 	connTypes   []string
@@ -296,6 +298,9 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	sort.Strings(srcList)
 	p.claim.Src = srcList
 
+	if flags.Changed("locale") {
+		p.claim.Locale = p.locale.String()
+	}
 	for _, v := range p.times {
 		r.AddOK("added time range %s-%s", v.Start, v.End)
 		p.claim.Times = append(p.claim.Times, v)
@@ -409,4 +414,22 @@ func (t *timeSlice) String() string {
 
 func (t *timeSlice) Type() string {
 	return "time-ranges"
+}
+
+type timeLocale string
+
+func (l *timeLocale) Set(val string) error {
+	v, err := time.LoadLocation(val)
+	if err == nil {
+		*l = timeLocale(v.String())
+	}
+	return err
+}
+
+func (l *timeLocale) String() string {
+	return string(*l)
+}
+
+func (t *timeLocale) Type() string {
+	return "time-locale"
 }
