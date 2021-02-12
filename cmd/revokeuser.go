@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,7 +40,8 @@ func createRevokeUserCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&params.user, "name", "n", "", "user name")
-	cmd.Flags().IntVarP(&params.at, "at", "", 0, "revokes all user credentials created before a Unix timestamp ('0' is treated as now)")
+	cmd.Flags().VarP(&params.at, "at", "", "revokes all user credentials created"+
+		" or edited before a Unix timestamp ('0' is treated as now, accepted formats are RFC3339 or #seconds since epoch)")
 	params.userKey.BindFlags("user-public-key", "u", nkeys.PrefixByteUser, cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -55,7 +55,7 @@ func init() {
 // RevokeUserParams hold the info necessary to add a user to the revocation list in an account
 type RevokeUserParams struct {
 	AccountContextParams
-	at      int
+	at      dateTime
 	user    string
 	userKey PubKeyParams
 	claim   *jwt.AccountClaims
@@ -69,14 +69,6 @@ func (p *RevokeUserParams) SetDefaults(ctx ActionCtx) error {
 	p.userKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
-	return nil
-}
-
-func (p *RevokeUserParams) canParse(s string) error {
-	_, err := strconv.Atoi(s)
-	if err != nil {
-		return fmt.Errorf("%s is invalid: %v", s, err)
-	}
 	return nil
 }
 
@@ -159,13 +151,8 @@ func (p *RevokeUserParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if p.at == 0 {
-		at := fmt.Sprintf("%d", p.at)
-		at, err := cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
-		if err != nil {
-			return err
-		}
-		p.at, err = strconv.Atoi(at)
-		if err != nil {
+		if _, err := cli.Prompt("revoke all credentials created before (0 is now, formats are RFC3339 or #seconds since epoch)",
+			fmt.Sprintf("%d", p.at), cli.Val(p.at.Set)); err != nil {
 			return err
 		}
 	}
