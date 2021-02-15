@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -40,7 +39,8 @@ func createRevokeActivationCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&params.at, "at", "", 0, "revokes all user credentials created before a Unix timestamp ('0' is treated as now)")
+	cmd.Flags().VarP(&params.at, "at", "", "revokes all activations for an account created"+
+		" or edited before a Unix timestamp ('0' is treated as now, accepted formats are RFC3339 or #seconds since epoch)")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "export subject")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	params.accountKey.BindFlags("target-account", "t", nkeys.PrefixByteAccount, cmd)
@@ -61,7 +61,7 @@ type RevokeActivationParams struct {
 	claim           *jwt.AccountClaims
 	export          *jwt.Export
 	possibleExports jwt.Exports
-	at              int
+	at              dateTime
 	subject         string
 	service         bool
 	accountKey      PubKeyParams
@@ -71,14 +71,6 @@ func (p *RevokeActivationParams) SetDefaults(ctx ActionCtx) error {
 	p.accountKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
-	return nil
-}
-
-func (p *RevokeActivationParams) canParse(s string) error {
-	_, err := strconv.Atoi(s)
-	if err != nil {
-		return fmt.Errorf("%s is invalid: %v", s, err)
-	}
 	return nil
 }
 
@@ -159,13 +151,8 @@ func (p *RevokeActivationParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	if p.at == 0 {
-		at := fmt.Sprintf("%d", p.at)
-		at, err = cli.Prompt("revoke all credentials created before (0 is now)", at, cli.Val(p.canParse))
-		if err != nil {
-			return err
-		}
-		p.at, err = strconv.Atoi(at)
-		if err != nil {
+		if _, err := cli.Prompt("revoke all credentials created before (0 is now, formats are RFC3339 or #seconds since epoch)",
+			fmt.Sprintf("%d", p.at), cli.Val(p.at.Set)); err != nil {
 			return err
 		}
 	}

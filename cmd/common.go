@@ -582,3 +582,31 @@ func promptDuration(label string, defaultValue time.Duration) (time.Duration, er
 	}
 	return time.ParseDuration(value)
 }
+
+type dateTime int64
+
+func (t *dateTime) Set(val string) error {
+	if strings.TrimSpace(val) == "0" {
+		*t = 0
+		return nil
+	}
+	if v, err := time.Parse(time.RFC3339, val); err == nil {
+		*t = dateTime(v.Unix())
+		return nil
+	}
+	num, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return fmt.Errorf("provided value %q is not a number nor parsable as RFC3339", val)
+	}
+	*t = dateTime(num)
+	return nil
+}
+
+func (t *dateTime) String() string {
+	v := time.Unix(int64(*t), 0)
+	return v.Format(time.RFC3339)
+}
+
+func (t *dateTime) Type() string {
+	return "date-time"
+}

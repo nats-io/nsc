@@ -271,6 +271,20 @@ func TestRevokeBadUnixTime(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid argument")
 }
 
+func TestRevokeRFC3339Time(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	at := time.Now()
+	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*", "--at", at.Format(time.RFC3339))
+	require.NoError(t, err)
+
+	c, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, c.Revocations.IsRevoked("foo", at))
+	require.False(t, c.Revocations.IsRevoked("foo", at.Add(time.Second)))
+}
+
 func TestRevokeBadUnixTimeInteractive(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -278,5 +292,5 @@ func TestRevokeBadUnixTimeInteractive(t *testing.T) {
 	input := []interface{}{"*", "hello"}
 	_, _, err := ExecuteInteractiveCmd(createRevokeUserCmd(), input)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "hello is invalid:")
+	require.Contains(t, err.Error(), `provided value "hello" is not`)
 }

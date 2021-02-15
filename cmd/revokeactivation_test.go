@@ -241,5 +241,5 @@ func TestRevokeActivationBadInteractiveAt(t *testing.T) {
 	input := []interface{}{true, 0, "*", "hello"}
 	_, _, err := ExecuteInteractiveCmd(createRevokeActivationCmd(), input)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "hello is invalid:")
+	require.Contains(t, err.Error(), `provided value "hello" is not`)
 }

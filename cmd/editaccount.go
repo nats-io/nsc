@@ -293,7 +293,9 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
-		return fmt.Errorf("jetstream not available for system account")
+		if p.memStorage.Number != 0 || p.diskStorage.Number != 0 || p.consumer.NumberValue != 0 || p.streams.NumberValue != 0 {
+			return fmt.Errorf("jetstream not available for system account")
+		}
 	}
 	if err := p.PermissionsParams.Validate(); err != nil {
 		return err

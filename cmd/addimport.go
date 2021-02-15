@@ -42,7 +42,7 @@ func createAddImportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.tokenSrc, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "import name")
-	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject or prefix")
+	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject")
 	params.srcAccount.BindFlags("src-account", "", nkeys.PrefixByteAccount, cmd)
 	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
@@ -410,14 +410,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		p.local = p.remote
 	}
 
-	// services have to have a local subject - streams can be blank and import on source subject
-	m := "stream prefix subject"
-	prefix := ""
-	if p.service {
-		m = "local subject"
-		prefix = p.local
-	}
-	p.local, err = cli.Prompt(m, prefix, cli.Val(func(s string) error {
+	p.local, err = cli.Prompt("local subject", prefix, cli.Val(func(s string) error {
 		if !p.service && s == "" {
 			return nil
 		}
