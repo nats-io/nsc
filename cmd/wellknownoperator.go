@@ -36,7 +36,7 @@ var wellKnownOperators KnownOperators
 
 func defaultWellKnownOperators() KnownOperators {
 	return KnownOperators{
-		{Name: "synadia", URL: "https://www.synadia.com", AccountServerURL: "https://api.synadia.io/jwt/v2/synadia"},
+		{Name: "synadia", URL: "https://www.synadia.com", AccountServerURL: "https://api.synadia.io/jwt/v1/synadia"},
 	}
 }
 
