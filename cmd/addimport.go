@@ -404,7 +404,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	}
 
 	p.local, err = cli.Prompt("local subject", "", cli.Val(func(s string) error {
-		if !p.service && s == "" {
+		if s == "" {
 			return nil
 		}
 		if err := p.checkServiceSubject(s); err != nil {
