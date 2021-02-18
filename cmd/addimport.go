@@ -106,10 +106,6 @@ func (p *AddImportParams) SetDefaults(ctx ActionCtx) error {
 		p.name = p.remote
 	}
 
-	if p.service && p.local == "" {
-		p.local = p.remote
-	}
-
 	return nil
 }
 
@@ -406,12 +402,9 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if p.local == "" {
-		p.local = p.remote
-	}
 
-	p.local, err = cli.Prompt("local subject", prefix, cli.Val(func(s string) error {
-		if !p.service && s == "" {
+	p.local, err = cli.Prompt("local subject", "", cli.Val(func(s string) error {
+		if s == "" {
 			return nil
 		}
 		if err := p.checkServiceSubject(s); err != nil {

@@ -220,7 +220,7 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Name", "Type", "Remote", "Local/Prefix", "Expires", "From Account", "Public")
+	table.AddHeaders("Name", "Type", "Remote", "Local", "Expires", "From Account", "Public")
 
 	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
