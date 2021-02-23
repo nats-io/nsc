@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -345,6 +345,20 @@ func AddLimits(table *tablewriter.Table, lim jwt.Limits) {
 		table.AddRow("Max Msg Payload", v)
 	} else {
 		table.AddRow("Max Msg Payload", "Unlimited")
+	}
+
+	if lim.Data > 0 {
+		v := fmt.Sprintf("%d bytes (≈%s)", lim.Data, humanize.Bytes(uint64(lim.Data)))
+		table.AddRow("Max Data", v)
+	} else {
+		table.AddRow("Max Data", "Unlimited")
+	}
+
+	if lim.Subs > 0 {
+		v := fmt.Sprintf("%d", lim.Subs)
+		table.AddRow("Max Subs", v)
+	} else {
+		table.AddRow("Max Subs", "Unlimited")
 	}
 
 	if len(lim.Src) != 0 {

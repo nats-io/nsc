@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -92,7 +92,7 @@ func Test_EditUserAccountRequired(t *testing.T) {
 
 	ts.AddUser(t, "A", "a")
 	ts.AddUser(t, "B", "b")
-	GetConfig().SetAccount("")
+	require.NoError(t, GetConfig().SetAccount(""))
 	_, _, err := ExecuteCmd(createEditUserCmd(), "--tag", "A")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
@@ -390,7 +390,7 @@ func Test_EditUserWithSigningKeyOnly(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotNil(t, ac)
-	ts.KeyStore.Remove(ac.Subject)
+	require.NoError(t, ts.KeyStore.Remove(ac.Subject))
 	require.False(t, ts.KeyStore.HasPrivateKey(ac.Subject))
 
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "AAA")
@@ -470,4 +470,38 @@ func Test_EditUserSk(t *testing.T) {
 	uc, err = ts.Store.ReadUserClaim("A", "u")
 	require.NoError(t, err)
 	require.Equal(t, uc.Issuer, pSk)
+}
+
+func Test_EditUserSubs(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, int64(-1), uc.Subs)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--subs", "100")
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, int64(100), uc.Subs)
+	require.NoError(t, err)
+}
+
+func Test_EditUserData(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, int64(-1), uc.Limits.Data)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--data", "1K")
+	require.NoError(t, err)
+	uc, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, int64(1024), uc.Limits.Data)
+	require.NoError(t, err)
 }
