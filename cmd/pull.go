@@ -41,6 +41,8 @@ func createPullCmd() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&params.All, "all", "A", false, "operator and all accounts under the operator")
 	cmd.Flags().BoolVarP(&params.Overwrite, "overwrite-newer", "F", false, "overwrite local JWTs that are newer than remote")
+	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server. (Default is system account specified by operator)")
+	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -51,9 +53,11 @@ func init() {
 
 type PullParams struct {
 	AccountContextParams
-	All       bool
-	Jobs      PullJobs
-	Overwrite bool
+	All        bool
+	Jobs       PullJobs
+	Overwrite  bool
+	sysAccUser string // when present use
+	sysAcc     string
 }
 
 type PullJob struct {
@@ -241,7 +245,8 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 	} else if url := op.AccountServerURL; IsNatsUrl(url) {
 		subR := store.NewReport(store.OK, `pull from cluster using system account`)
 		r.Add(subR)
-		_, _, opt, err := getSystemAccountUser(ctx, "", "")
+		ib := nats.NewInbox()
+		_, opt, err := getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser, ib, "$SYS.REQ.CLAIMS.PACK")
 		if err != nil {
 			subR.AddError("failed to obtain system user: %v", err)
 			return r, nil
@@ -252,7 +257,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 			return r, nil
 		}
 		defer nc.Close()
-		ib := nats.NewInbox()
+
 		sub, err := nc.SubscribeSync(ib)
 		if err != nil {
 			subR.AddError("failed to subscribe to response subject: %v", err)

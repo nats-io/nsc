@@ -177,7 +177,7 @@ func Test_SyncNatsResolverDelete(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, true)
 	defer os.Remove(dir)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
+	_, _, err := ExecuteCmd(createPushCmd(), "--prune", "--system-account", "SYS", "--system-user", "sys")
 	require.NoError(t, err)
 	// test to assure AC1/SYS where pushed/pruned
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
@@ -261,7 +261,8 @@ func Test_SyncBadUrl(t *testing.T) {
 	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
 	require.NoError(t, err)
 	// Try again, thus also testing if the server is still around
-	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	// Provide explicit system account user to connect
+	_, _, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
 	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")

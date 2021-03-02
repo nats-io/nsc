@@ -183,6 +183,9 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createPullCmd(), "--all")
 	require.NoError(t, err)
+	// again, this time with system account and user specified
+	_, _, err = ExecuteCmd(createPullCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	require.NoError(t, err)
 	// claim now exists in nsc store
 	claim2, err := ts.Store.ReadAccountClaim("acc-name")
 	require.NoError(t, err)

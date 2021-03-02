@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nkeys"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
@@ -50,9 +52,8 @@ push -P -A (all accounts)`,
 	cmd.Flags().StringVarP(&params.ASU, "account-jwt-server-url", "u", "", "set account jwt server url for nsc sync (only http/https/nats urls supported if updating with nsc) If a nats url is provided ")
 
 	cmd.Flags().BoolVarP(&params.prune, "prune", "P", false, "prune all accounts not under the current operator (exclusive of -a). Only works with nats-resolver enabled nats-server.")
-	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server.")
-	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server.")
-
+	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server. (Default is system account specified by operator)")
+	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -63,14 +64,13 @@ func init() {
 
 type PushCmdParams struct {
 	AccountContextParams
-	ASU              string
-	sysAccUser       string // when present use
-	sysAcc           string
-	sysAccUserJwtOpt nats.Option
-	allAccounts      bool
-	force            bool
-	prune            bool
-	targeted         []string
+	ASU         string
+	sysAccUser  string // when present use
+	sysAcc      string
+	allAccounts bool
+	force       bool
+	prune       bool
+	targeted    []string
 
 	accountList []string
 }
@@ -109,43 +109,87 @@ func processResponse(report *store.Report, resp *nats.Msg) (bool, string, interf
 }
 
 // when sysAccName or sysAccUserName are "" we will try to find a suitable user
-func getSystemAccountUser(ctx ActionCtx, sysAccName string, sysAccUserName string) (string, string, nats.Option, error) {
-	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
-		return "", "", nil, err
+func getSystemAccountUser(ctx ActionCtx, sysAccName, sysAccUserName, allowSub string, allowPubs ...string) (string, nats.Option, error) {
+	op, err := ctx.StoreCtx().Store.ReadOperatorClaim()
+	if err != nil {
+		return "", nil, err
 	} else if accNames, err := friendlyNames(ctx.StoreCtx().Operator.Name); err != nil {
-		return "", "", nil, err
+		return "", nil, err
 	} else if sysAccName == "" {
 		if sysAccName = accNames[op.SystemAccount]; sysAccName == "" {
-			return "", "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
+			return "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
 		}
+	}
+	getOpt := func(theJWT string, kp nkeys.KeyPair) nats.Option {
+		return nats.UserJWT(
+			func() (string, error) {
+				return theJWT, nil
+			}, func(nonce []byte) ([]byte, error) {
+				return kp.Sign(nonce)
+			})
+	}
+	// Attempt to generate temporary user credentials and
+	if sysAccUserName == "" {
+		if keys, err := ctx.StoreCtx().GetAccountKeys(sysAccName); err == nil && len(keys) > 0 {
+			key := ""
+			if op.StrictSigningKeyUsage {
+				if len(keys) > 1 {
+					key = keys[1]
+				} else {
+					key = ""
+				}
+			} else {
+				key = keys[0]
+			}
+			sysAccKp, err := ctx.StoreCtx().KeyStore.GetKeyPair(key)
+			if err == nil {
+				defer sysAccKp.Wipe()
+				tmpUsrKp, err := nkeys.CreateUser()
+				if err == nil {
+					tmpUsrPub, err := tmpUsrKp.PublicKey()
+					if err == nil {
+						tmpUsrClaim := jwt.NewUserClaims(tmpUsrPub)
+						tmpUsrClaim.Expires = time.Now().Add(2 * time.Minute).Unix()
+						tmpUsrClaim.Name = "nsc temporary push user"
+						tmpUsrClaim.Pub.Allow.Add(allowPubs...)
+						tmpUsrClaim.Sub.Allow.Add(allowSub)
+						if theJWT, err := tmpUsrClaim.Encode(sysAccKp); err == nil {
+							return sysAccName, getOpt(theJWT, tmpUsrKp), nil
+						}
+					}
+				}
+			}
+		}
+		// in case of not finding a key, default to searching for an existing user and key
 	}
 	users := []string{sysAccUserName}
 	if sysAccUserName == "" {
 		var err error
 		if users, err = ctx.StoreCtx().Store.ListEntries(store.Accounts, sysAccName, store.Users); err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		} else if len(users) == 0 {
-			return "", "", nil, err
+			return "", nil, err
 		}
 	}
 	for _, sysUser := range users {
-		if claim, err := ctx.StoreCtx().Store.ReadUserClaim(sysAccName, sysUser); err != nil {
+		claim, err := ctx.StoreCtx().Store.ReadUserClaim(sysAccName, sysUser)
+		if err != nil {
 			continue
-		} else if kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(claim.Subject); err != nil {
-			continue
-		} else if theJWT, err := ctx.StoreCtx().Store.ReadRawUserClaim(sysAccName, sysUser); err != nil {
+		}
+		kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(claim.Subject)
+		if kp == nil {
+			kp, _ = ctx.StoreCtx().KeyStore.GetKeyPair(claim.IssuerAccount)
+			if kp == nil {
+				continue
+			}
+		}
+		if theJWT, err := ctx.StoreCtx().Store.ReadRawUserClaim(sysAccName, sysUser); err != nil {
 			continue
 		} else {
-			jwtCb := func() (string, error) {
-				return string(theJWT), nil
-			}
-			signCb := func(nonce []byte) ([]byte, error) {
-				return kp.Sign(nonce)
-			}
-			return sysAccName, sysUser, nats.UserJWT(jwtCb, signCb), nil
+			return sysAccName, getOpt(string(theJWT), kp), nil
 		}
 	}
-	return "", "", nil, fmt.Errorf(`no system account user found`)
+	return "", nil, fmt.Errorf(`no system account user with corresponding nkey found`)
 }
 
 func (p *PushCmdParams) SetDefaults(ctx ActionCtx) error {
@@ -160,12 +204,6 @@ func (p *PushCmdParams) SetDefaults(ctx ActionCtx) error {
 			return err
 		} else {
 			p.ASU = op.AccountServerURL
-		}
-	}
-	if IsNatsUrl(p.ASU) {
-		var err error
-		if p.sysAcc, p.sysAccUser, p.sysAccUserJwtOpt, err = getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser); err != nil {
-			return err
 		}
 	}
 	c := GetConfig()
@@ -257,7 +295,7 @@ func (p *PushCmdParams) Validate(ctx ActionCtx) error {
 	if p.ASU == "" {
 		return errors.New("no account server url or nats-server url was provided by the operator jwt")
 	}
-	if p.sysAccUser == "" && p.prune {
+	if !IsNatsUrl(p.ASU) && p.prune {
 		return errors.New("prune only works for nats based account resolver")
 	}
 
@@ -371,7 +409,9 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			}
 		}
 	} else {
-		sysAcc, sysAccUser, opt, err := getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser)
+		nats.NewInbox()
+		sysAcc, opt, err := getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser, nats.InboxPrefix+">",
+			"$SYS.REQ.CLAIMS.LIST", "$SYS.REQ.CLAIMS.UPDATE", "$SYS.REQ.CLAIMS.DELETE")
 		if err != nil {
 			r.AddError("error obtaining system account user: %v", err)
 			return r, nil
@@ -383,8 +423,8 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		defer nc.Close()
 		if len(p.targeted) != 0 {
-			sub := store.NewReport(store.OK, `push to nats-server "%s" using system account "%s" user "%s"`,
-				p.ASU, sysAcc, sysAccUser)
+			sub := store.NewReport(store.OK, `push to nats-server "%s" using system account "%s"`,
+				p.ASU, sysAcc)
 			r.Add(sub)
 			for _, v := range p.targeted {
 				subAcc := store.NewReport(store.OK, "push %s to nats-server with nats account resolver", v)
