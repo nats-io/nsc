@@ -109,7 +109,7 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 		p.sysAcc = oc.SystemAccount
 	}
 
-	if p.reqSk == false {
+	if !p.reqSk {
 		p.reqSk = oc.StrictSigningKeyUsage
 	}
 
@@ -264,11 +264,11 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.claim.StrictSigningKeyUsage != p.reqSk {
 		p.claim.StrictSigningKeyUsage = p.reqSk
 		r.AddOK("strict signing key usage set to: %t", p.reqSk)
-		flags := ctx.CurrentCmd().Flags()
-		p.claim.AccountServerURL = p.asu
-		if flags.Changed("account-jwt-server-url") {
-			r.AddOK("set account jwt server url to %q", p.asu)
-		}
+	}
+	flags := ctx.CurrentCmd().Flags()
+	p.claim.AccountServerURL = p.asu
+	if flags.Changed("account-jwt-server-url") {
+		r.AddOK("set account jwt server url to %q", p.asu)
 	}
 
 	if p.claim.SystemAccount != p.sysAcc {
