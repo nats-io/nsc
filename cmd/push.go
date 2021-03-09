@@ -149,6 +149,7 @@ func getSystemAccountUser(ctx ActionCtx, sysAccName, sysAccUserName, allowSub st
 					tmpUsrPub, err := tmpUsrKp.PublicKey()
 					if err == nil {
 						tmpUsrClaim := jwt.NewUserClaims(tmpUsrPub)
+						tmpUsrClaim.IssuerAccount = op.SystemAccount
 						tmpUsrClaim.Expires = time.Now().Add(2 * time.Minute).Unix()
 						tmpUsrClaim.Name = "nsc temporary push user"
 						tmpUsrClaim.Pub.Allow.Add(allowPubs...)
