@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -82,15 +82,17 @@ nsc edit user --name <n> --rm-response-perms
 	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "add source network for connection - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmSrc, "rm-source-network", "", nil, "remove source network for connection - comma separated list or option can be specified multiple times")
 
-	cmd.Flags().Int64VarP(&params.payload.Number, "payload", "", -1, "set maximum message payload in bytes for the account (-1 is unlimited)")
+	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
 
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
-	cmd.Flags().StringSliceVarP(&params.connTypes, "conn-type", "", nil,
-		fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
-			jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
+	cmd.Flags().StringSliceVarP(&params.connTypes, "conn-type", "", nil, fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
+		jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
 	cmd.Flags().StringSliceVarP(&params.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
 
 	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
+
+	cmd.Flags().Int64VarP(&params.maxSubs, "subs", "", -1, "set maximum number of subscriptions (-1 is unlimited)")
+	cmd.Flags().StringVarP(&params.maxData.Value, "data", "", "-1", "set maximum data in bytes for the user (-1 is unlimited)")
 
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
@@ -114,25 +116,30 @@ type EditUserParams struct {
 	token         string
 	credsFilePath string
 
-	rmSrc       []string
-	src         []string
-	times       timeSlice
-	rmTimes     []string
-	locale      timeLocale
-	payload     DataParams
 	bearer      bool
 	connTypes   []string
+	locale      timeLocale
+	maxData     DataParams
+	maxSubs     int64
+	payload     DataParams
 	rmConnTypes []string
+	rmSrc       []string
+	rmTimes     []string
+	src         []string
+	times       timeSlice
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 	p.name = NameFlagOrArgument(p.name, ctx)
-	p.AccountContextParams.SetDefaults(ctx)
+	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
+		return err
+	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
 
 	if !InteractiveFlag && ctx.NothingToDo("start", "expiry", "rm", "allow-pub", "allow-sub", "allow-pubsub",
 		"deny-pub", "deny-sub", "deny-pubsub", "tag", "rm-tag", "source-network", "rm-source-network", "payload",
-		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time", "conn-type", "rm-conn-type") {
+		"rm-response-perms", "max-responses", "response-ttl", "allow-pub-response", "bearer", "rm-time", "time", "conn-type",
+		"rm-conn-type", "subs", "data") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -189,13 +196,19 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 	}
 
 	if !ctx.CurrentCmd().Flag("payload").Changed {
-		p.payload.Number = p.claim.Limits.Payload
+		p.payload.Value = fmt.Sprintf("%d", p.claim.Limits.Payload)
+	}
+	if !ctx.CurrentCmd().Flag("data").Changed {
+		p.maxData.Value = fmt.Sprintf("%d", p.claim.Limits.Data)
+	}
+	if !ctx.CurrentCmd().Flag("subs").Changed {
+		p.maxSubs = p.claim.Limits.Subs
 	}
 
 	return err
 }
 
-func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
+func (p *EditUserParams) PostInteractive(_ ActionCtx) error {
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
 	//if err := p.PermissionsParams.Edit(p.claim.Resp != nil); err != nil {
 	//	return err
@@ -238,6 +251,9 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	if err != nil {
 		return fmt.Errorf("error parsing %s: %s", "payload", p.payload.Value)
 	}
+	if _, err := p.maxData.NumberValue(); err != nil {
+		return fmt.Errorf("error parsing %s: %s", "data", p.payload.Value)
+	}
 	if err = p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
@@ -247,7 +263,9 @@ func (p *EditUserParams) Validate(ctx ActionCtx) error {
 	if err = p.payload.Valid(); err != nil {
 		return err
 	}
-
+	if err = p.maxData.Valid(); err != nil {
+		return err
+	}
 	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
 	}
@@ -260,12 +278,22 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	r.ReportSum = false
 
 	var err error
-	p.GenericClaimsParams.Run(ctx, p.claim, r)
+	if err := p.GenericClaimsParams.Run(ctx, p.claim, r); err != nil {
+		return nil, err
+	}
 
 	flags := ctx.CurrentCmd().Flags()
-	p.claim.Limits.Payload = p.payload.Number
+	p.claim.Limits.Payload, _ = p.payload.NumberValue()
 	if flags.Changed("payload") {
 		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
+	}
+	p.claim.Limits.Data, _ = p.maxData.NumberValue()
+	if flags.Changed("data") {
+		r.AddOK("changed max data to %d", p.claim.Limits.Data)
+	}
+	p.claim.Limits.Subs = p.maxSubs
+	if flags.Changed("subs") {
+		r.AddOK("changed max number of subs to %d", p.claim.Limits.Subs)
 	}
 
 	if flags.Changed("bearer") {
