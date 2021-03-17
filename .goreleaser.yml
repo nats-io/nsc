@@ -39,7 +39,7 @@ snapshot:
 brews:
   - name: nsc
     folder: Formula
-    github:
+    tap:
       owner: nats-io
       name: homebrew-nats-tools
     url_template: "https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}.zip"
