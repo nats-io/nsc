@@ -128,8 +128,9 @@ var rootCmd = &cobra.Command{
 						}
 					}
 					if !allowCmdWithJWTV1Store {
-						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt"`,
-							store.GetName(), os.Args[0])
+						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt". `+
+							`Alternatively you can downgrade %s to a compatible version using: "%s update -version 0.5.0"\n`,
+							store.GetName(), os.Args[0], os.Args[0], os.Args[0])
 					}
 				}
 			}

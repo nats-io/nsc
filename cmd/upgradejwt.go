@@ -85,8 +85,7 @@ func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
 	}
 	if s.IsManaged() {
 		cmd.Print(cliprompts.WrapString(80, upgradeQuestion))
-		rep.AddError(`No change was made!
-Your store is in managed mode and was set up using:
+		rep.AddError(`No change was made! Your store is in managed mode and was set up using:
 "nsc add operator --force --url <file or url>""
 You need to contact "%s", obtain a V2 jwt and re issue the above command.
 `, opName)
@@ -130,13 +129,13 @@ This backup does `+cliprompts.Bold("not contain private nkeys")+`!
 	Delete the directory "%s"
 	Extract the backup 
 	Move the created directory in place of the deleted one
-	Downgrade nsc using: "nsc update -version <previous release>"
+	Downgrade nsc using: "nsc update -version 0.5.0"
 `, backupFile, s.Dir))
 	}
 	cmd.Print(cliprompts.WrapString(80,
 		`In order to use jwt V2, `+cliprompts.Bold("you must upgrade all nats-server")+` prior to usage!
 If you are `+cliprompts.Bold("not ready")+` to switch over to jwt V2, downgrade nsc using:
-"nsc update -version <previous release>"
+"nsc update -version 0.5.0"
 `))
 	if conv, _ := cliprompts.Confirm(cliprompts.WrapString(80, upgradeQuestion), false); !conv {
 		rep.AddOK("Declined to convert at this time. Rerun command when ready.")
