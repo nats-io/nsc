@@ -68,7 +68,8 @@ operator / account / user jwt to V2?
 Once converted you need to re-distribute the operator jwt wherever used.
 This includes, but is not limited to:
     ALL nats-server, which need to be restarted (one by one is ok)
-    ALL dependent nsc stores in managed mode`
+    ALL dependent nsc stores in managed mode
+`
 
 func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
 	op, err := s.ReadOperatorClaim()
@@ -87,7 +88,8 @@ func upgradeOperator(cmd *cobra.Command, s *store.Store, rep *store.Report) {
 		rep.AddError(`No change was made!
 Your store is in managed mode and was set up using:
 "nsc add operator --force --url <file or url>""
-You need to contact "%s", obtain a V2 jwt and re issue the above command.`, opName)
+You need to contact "%s", obtain a V2 jwt and re issue the above command.
+`, opName)
 		return
 	}
 	// obtain private identity key needed to recode the operator jwt
