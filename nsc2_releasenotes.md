@@ -1,6 +1,6 @@
 ## NSC 2.2
 
-**WARNING**: This release of NSC is only compatible with [nats-server 2.2 or better](https://github.com/nats-io/nats-server/releases/tag/v2.2.0). The dramatic version increase is to help mapping compatible versions between `nats-server` and `nsc`.
+**WARNING**: This release of NSC is only compatible with [nats-server 2.2 or better](https://github.com/nats-io/nats-server/releases/tag/v2.2.0). The dramatic version increase is to help map compatible versions of `nats-server` and `nsc`.
 
 **NGS Compatibility Notice**: Please continue to use [nsc 0.5.0](https://github.com/nats-io/nsc/releases/tag/0.5.0) to manage your NGS service configurations. An NGS release compatible with `nsc 2.2.0` will be available soon.
 
@@ -18,7 +18,7 @@ The upgrade procedure requires the following steps:
 
 - Upgrade your NSC configurations. Use the `nsc upgrade-jwt` command. You will need the Operator's main identity key to perform the upgrade.
 
-- Redistribute the updated Operator JWT, to all of your servers. You can easily export the operator JWT by issuing the command. If your server is configured to a JWT operator file, make sure the new file is referenced. If the JWT is embedded into the server configuration, make sure to copy the contents of an exported operator JWT. To example the operator to a file, you can execute the command: `nsc describe operator --raw > /tmp/operator.jwt`.
+- Redistribute the updated Operator JWT to all of your servers. You can easily export the operator JWT by issuing the command: `nsc describe operator --raw > /tmp/operator.jwt` If your server is configured to a JWT operator file, make sure the name matches. If the JWT is embedded into the server configuration, make sure to copy the contents of the exported operator JWT.
 
 - Restart the nats-server(s). You may want to enable [LDM](https://docs.nats.io/nats-server/nats_admin/lame_duck_mode) on the server(s) to shut down the server(s) in an orderly manner.
 
@@ -33,7 +33,7 @@ The upgrade procedure requires the following steps:
 - [feat] added `import account/user --file` argument to import from a file
 - [feat] added `add operator --force` argument to overwrite an existing operator
 - [feat] added `jwt describe  --json` to take an argument describing a JSON path in the JWT
-- [feat] added the ability to select the a signing key when signing a user
+- [feat] added the ability to select a signing key when signing a user
 - [feat] added ability to sign accounts on managed stores for which the user has the operator key
 - [feat] updated to jwt v2
 - [feat] added warnings and upgrade procedure when accessing a store that is JWT v1
@@ -48,8 +48,8 @@ The upgrade procedure requires the following steps:
 - [feat] added `add export --response-threshold` to control the duration a service is allowed to respond
 - [feat] added support for wildcard service imports
 - [feat] deprecated `to` in favor of `local subject`
-- [feat] added ability to specify permissions with a queue (subject + ' ' + queue name) note there's a space separating the subject permission and the queue name
+- [feat] added ability to specify permissions with a queue (subject + ' ' + queue name) note there's a space separating the subject and the queue name
 - [feat] `import account/operator --force` allows importing accounts signed by a different operator
 - [feat] added `reissue operator` command which will re-issue the identity of the operator and resign all affected accounts
 - [feat] `add operator --generate-signing-key --sys` will generate a signing key with the operator and also generate a system account
-- [feat] `edit operator --require-signing-keys` requires accounts to be issued with a signing key
+- [feat] `edit operator --require-signing-keys` requires accounts to be issued using a signing key
