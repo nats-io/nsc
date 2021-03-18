@@ -4,7 +4,7 @@ os:
 
 language: go
 go:
-- 1.14.x
+- 1.16.x
 
 git:
   depth: false
@@ -32,11 +32,11 @@ deploy:
   skip_cleanup: true
   script: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service travis-ci
   on:
-    condition: $TRAVIS_OS_NAME = linux && $TRAVIS_GO_VERSION =~ ^1.14.
+    condition: $TRAVIS_OS_NAME = linux
 
 - provider: script
   skip_cleanup: true
   script: curl -sL http://git.io/goreleaser | bash
   on:
     tags: true
-    condition: $TRAVIS_OS_NAME = linux
+    condition: $TRAVIS_OS_NAME = linux AND $TRAVIS_GO_VERSION =~ 1.16
