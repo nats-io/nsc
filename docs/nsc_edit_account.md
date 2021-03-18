@@ -13,22 +13,38 @@ nsc edit account [flags]
 ### Options
 
 ```
-      --conns int           set maximum active connections for the account (-1 is unlimited) (default -1)
-      --data string         set maximum data in bytes for the account (-1 is unlimited) (default "-1")
-      --expiry string       valid until ('0' is always, '2M' is two months) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears) (default "0")
-      --exports int         set maximum number of exports for the account (-1 is unlimited) (default -1)
-  -h, --help                help for account
-      --imports int         set maximum number of imports for the account (-1 is unlimited) (default -1)
-      --leaf-conns int      set maximum active leaf node connections for the account (-1 is unlimited)
-  -n, --name string         account to edit
-      --payload string      set maximum message payload in bytes for the account (-1 is unlimited) (default "-1")
-      --rm-sk strings       remove signing key - comma separated list or option can be specified multiple times
-      --rm-tag strings      remove tag - comma separated list or option can be specified multiple times
-      --sk strings          signing key or keypath - comma separated list or option can be specified multiple times
-      --start string        valid from ('0' is always, '3d' is three days) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears) (default "0")
-      --subscriptions int   set maximum subscription for the account (-1 is unlimited) (default -1)
-      --tag strings         add tags for user - comma separated list or option can be specified multiple times
-      --wildcard-exports    exports can contain wildcards (default true)
+      --allow-pub strings            add publish default permissions - comma separated list or option can be specified multiple times
+      --allow-pub-response int[=1]   default permissions to limit how often a client can publish to reply subjects [with an optional count, --allow-pub-response=n] (global)
+      --allow-pubsub strings         add publish and subscribe default permissions - comma separated list or option can be specified multiple times
+      --allow-sub strings            add subscribe default permissions - comma separated list or option can be specified multiple times
+      --conns int                    set maximum active connections for the account (-1 is unlimited) (default -1)
+      --consumer int                 set maximum consumer for the account (-1 is unlimited) (default -1)
+      --data string                  set maximum data in bytes for the account (-1 is unlimited) (default "-1")
+      --deny-pub strings             add deny publish default permissions - comma separated list or option can be specified multiple times
+      --deny-pubsub strings          add deny publish and subscribe default permissions - comma separated list or option can be specified multiple times
+      --deny-sub strings             add deny subscribe default permissions - comma separated list or option can be specified multiple times
+      --description string           Description for this account
+      --disk-storage string          set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled) (default "0")
+      --expiry string                valid until ('0' is always, '2M' is two months) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears) (default "0")
+      --exports int                  set maximum number of exports for the account (-1 is unlimited) (default -1)
+  -h, --help                         help for account
+      --imports int                  set maximum number of imports for the account (-1 is unlimited) (default -1)
+      --info-url string              Link for more info on this account
+      --leaf-conns int               set maximum active leaf node connections for the account (-1 is unlimited)
+      --mem-storage string           set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled) (default "0")
+  -n, --name string                  account to edit
+      --payload string               set maximum message payload in bytes for the account (-1 is unlimited) (default "-1")
+      --response-ttl string          the amount of time the default permissions is valid (global) - [#ms(millis) | #s(econds) | m(inutes) | h(ours)] - Default is no time limit.
+      --rm strings                   remove publish/subscribe and deny default permissions - comma separated list or option can be specified multiple times
+      --rm-response-perms            remove response settings from default permissions
+      --rm-sk strings                remove signing key - comma separated list or option can be specified multiple times
+      --rm-tag strings               remove tag - comma separated list or option can be specified multiple times
+      --sk strings                   signing key or keypath or the value "generate"" to generate a key pair on the fly - comma separated list or option can be specified multiple times
+      --start string                 valid from ('0' is always, '3d' is three days) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears) (default "0")
+      --streams int                  set maximum streams for the account (-1 is unlimited) (default -1)
+      --subscriptions int            set maximum subscription for the account (-1 is unlimited) (default -1)
+      --tag strings                  add tags for user - comma separated list or option can be specified multiple times
+      --wildcard-exports             exports can contain wildcards (default true)
 ```
 
 ### Options inherited from parent commands
@@ -42,4 +58,4 @@ nsc edit account [flags]
 
 * [nsc edit](nsc_edit.md)	 - Edit assets such as accounts, imports, and users
 
-###### Auto generated by spf13/cobra on 26-Nov-2019
+###### Auto generated by spf13/cobra on 18-Mar-2021
