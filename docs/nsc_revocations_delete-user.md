@@ -1,22 +1,22 @@
-## nsc revocations list_activations
+## nsc revocations delete-user
 
-List account revocations for an export
+Remove a user revocation
 
 ### Synopsis
 
-List account revocations for an export
+Remove a user revocation
 
 ```
-nsc revocations list_activations [flags]
+nsc revocations delete-user [flags]
 ```
 
 ### Options
 
 ```
-  -a, --account string   account name
-  -h, --help             help for list_activations
-      --service          service
-  -s, --subject string   export subject
+  -a, --account string           account name
+  -h, --help                     help for delete-user
+  -n, --name string              user name
+  -u, --user-public-key string   user-public-key
 ```
 
 ### Options inherited from parent commands
