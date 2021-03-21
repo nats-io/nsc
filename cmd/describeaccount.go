@@ -31,9 +31,12 @@ func createDescribeAccountCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: defaultCompletionArgument("name"),
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account name")
+	cmd.RegisterFlagCompletionFunc("name", completeAccount)
+
 
 	return cmd
 }

@@ -109,8 +109,9 @@ func QuietMode() bool {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "nsc",
-	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
+	Use:       "nsc",
+	Short:     "nsc creates NATS operators, accounts, users, and manage their permissions.",
+	ValidArgs: []string{"add", "delete", "describe", "edit", "export", "generate"},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if store, _ := GetStore(); store != nil {
 			if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
@@ -147,9 +148,9 @@ var rootCmd = &cobra.Command{
 			cmd.SilenceUsage = true
 			return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
 		}
-
 		return nil
 	},
+	ValidArgsFunction: completeSubCmds,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

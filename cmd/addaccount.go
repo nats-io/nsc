@@ -36,19 +36,19 @@ func CreateAddAccountCmd() *cobra.Command {
 		Short:        "Add an account",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
-
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
 			return GetConfig().SetAccount(params.name)
 		},
+		ValidArgsFunction: defaultCompletionArgument("name"),
 	}
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "account name")
 	cmd.Flags().StringVarP(&params.keyPath, "public-key", "k", "", "public key identifying the account")
 	params.TimeParams.BindFlags(cmd)
 	params.PermissionsParams.bindSetFlags(cmd, "default permissions")
-
+	registerNoCompletionsForFlags(cmd)
 	return cmd
 }
 

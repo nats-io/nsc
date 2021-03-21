@@ -38,6 +38,7 @@ func createDeleteExportCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	params.AccountContextParams.BindFlags(cmd)
+	cmd.RegisterFlagCompletionFunc("subject", completeExport)
 	return cmd
 }
 

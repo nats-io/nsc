@@ -21,8 +21,9 @@ import (
 
 // addCmd represents the add command
 var generateCmd = &cobra.Command{
-	Use:   "generate",
-	Short: "Generate activations, creds, configs or nkeys",
+	Use:       "generate",
+	Short:     "Generate activations, creds, configs or nkeys",
+	ValidArgs: []string{"activation", "config", "creds", "diagram", "nkey"},
 }
 
 func init() {

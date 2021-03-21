@@ -66,6 +66,7 @@ var describeCmd = &cobra.Command{
 		}
 		return nil
 	},
+	ValidArgsFunction: completeSubCmds,
 }
 
 func init() {

@@ -40,6 +40,7 @@ nsc delete account -i
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: completeAccount,
 	}
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "name of account to delete")

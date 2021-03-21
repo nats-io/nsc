@@ -23,8 +23,9 @@ var exportCmd = &cobra.Command{
 }
 
 var importCmd = &cobra.Command{
-	Use:   "import",
-	Short: "Import assets such as nkeys",
+	Use:       "import",
+	Short:     "Import assets such as nkeys",
+	ValidArgs: []string{"keys"},
 }
 
 func init() {

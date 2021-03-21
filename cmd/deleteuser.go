@@ -37,12 +37,14 @@ nsc delete user -i`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: completeUser,
 	}
 	cmd.Flags().StringSliceVarP(&params.names, "name", "n", nil, "name of user(s) to delete")
 	cmd.Flags().BoolVarP(&params.revoke, "revoke", "R", false, "revoke user before deleting")
 	cmd.Flags().BoolVarP(&params.rmNKey, "rm-nkey", "D", false, "delete the user key")
 	cmd.Flags().BoolVarP(&params.rmCreds, "rm-creds", "C", false, "delete the user creds")
 	params.AccountContextParams.BindFlags(cmd)
+	cmd.RegisterFlagCompletionFunc("name", completeUser)
 
 	return cmd
 }

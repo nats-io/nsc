@@ -19,8 +19,9 @@ import "github.com/spf13/cobra"
 
 // addCmd represents the add command
 var editCmd = &cobra.Command{
-	Use:   "edit",
-	Short: "Edit assets such as accounts, imports, and users",
+	Use:               "edit",
+	Short:             "Edit assets such as accounts, imports, and users",
+	ValidArgsFunction: completeSubCmds,
 }
 
 func init() {

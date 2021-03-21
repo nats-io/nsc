@@ -40,6 +40,7 @@ func createAddExportCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: completeAccount,
 	}
 	cmd.Flags().StringVarP(&params.export.Name, "name", "n", "", "export name")
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
@@ -51,6 +52,8 @@ func createAddExportCmd() *cobra.Command {
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
+
+	registerNoCompletionsForFlags(cmd, "account")
 
 	return cmd
 }

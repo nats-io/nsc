@@ -38,6 +38,7 @@ func createAddImportCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: defaultCompletionArgument("account"),
 	}
 	cmd.Flags().StringVarP(&params.tokenSrc, "token", "u", "", "path to token file can be a local path or an url (private imports only)")
 
@@ -48,6 +49,10 @@ func createAddImportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
 	cmd.Flags().BoolVarP(&params.share, "share", "", false, "share data when tracking latency (service only)")
 	params.AccountContextParams.BindFlags(cmd)
+
+	cmd.RegisterFlagCompletionFunc("src-account", completeOtherAccountsKeys)
+	cmd.RegisterFlagCompletionFunc("remote-subject", completeSubjects("src-account"))
+	registerNoCompletionsForFlags(cmd, "account", "src-account", "remote-subject")
 
 	return cmd
 }

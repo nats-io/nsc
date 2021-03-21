@@ -19,8 +19,9 @@ import "github.com/spf13/cobra"
 
 // addCmd represents the add command
 var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete imports and exports",
+	Use:               "delete",
+	Short:             "Delete imports and exports",
+	ValidArgsFunction: completeSubCmds,
 }
 
 func init() {

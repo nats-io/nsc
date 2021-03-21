@@ -19,11 +19,9 @@ import (
 	"fmt"
 
 	cli "github.com/nats-io/cliprompts/v2"
-
-	"github.com/nats-io/nsc/cmd/store"
-
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -55,6 +53,7 @@ func createEditAccount() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
+		ValidArgsFunction: completeAccount,
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")

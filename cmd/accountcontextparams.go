@@ -29,6 +29,7 @@ type AccountContextParams struct {
 
 func (p *AccountContextParams) BindFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&p.Name, "account", "a", "", "account name")
+	cmd.RegisterFlagCompletionFunc("account", completeAccount)
 }
 
 func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {

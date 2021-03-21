@@ -21,9 +21,10 @@ import (
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:     "add",
-	Short:   "Add assets such as accounts, imports, users",
-	Aliases: []string{"create"},
+	Use:               "add",
+	Short:             "Add assets such as accounts, imports, users",
+	Aliases:           []string{"create"},
+	ValidArgsFunction: completeSubCmds,
 }
 
 func init() {
