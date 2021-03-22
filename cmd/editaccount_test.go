@@ -114,8 +114,8 @@ func Test_EditAccountLimits(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10M", "--exports", "15",
-		"--imports", "20", "--payload", "1K", "--subscriptions", "30", "--leaf-conns", "31",
+	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10mib", "--exports", "15",
+		"--imports", "20", "--payload", "1Kib", "--subscriptions", "30", "--leaf-conns", "31",
 		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8")
 	require.NoError(t, err)
 

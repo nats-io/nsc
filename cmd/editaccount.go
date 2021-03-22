@@ -65,10 +65,20 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
 	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
 	cmd.Flags().Int64VarP(&params.subscriptions.NumberValue, "subscriptions", "", -1, "set maximum subscription for the account (-1 is unlimited)")
-	cmd.Flags().StringVarP(&params.memStorage.Value, "mem-storage", "", "0", "set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled)")
-	cmd.Flags().StringVarP(&params.diskStorage.Value, "disk-storage", "", "0", "set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled)")
-	cmd.Flags().Int64VarP(&params.streams.NumberValue, "streams", "", -1, "set maximum streams for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "consumer", "", -1, "set maximum consumer for the account (-1 is unlimited)")
+	// changed flag names by prefixing them with js-
+	// to replace them mark the old names as hidden (so using them does not break) and add new flags with correct name
+	cmd.Flags().StringVarP(&params.memStorage.Value, "mem-storage", "", "0", "")
+	cmd.Flags().StringVarP(&params.diskStorage.Value, "disk-storage", "", "0", "")
+	cmd.Flags().Int64VarP(&params.streams.NumberValue, "streams", "", -1, "")
+	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "consumer", "", -1, "")
+	cmd.Flags().MarkHidden("mem-storage")
+	cmd.Flags().MarkHidden("disk-storage")
+	cmd.Flags().MarkHidden("streams")
+	cmd.Flags().MarkHidden("consumer")
+	cmd.Flags().StringVarP(&params.memStorage.Value, "js-mem-storage", "", "0", "Jetstream: set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled)")
+	cmd.Flags().StringVarP(&params.diskStorage.Value, "js-disk-storage", "", "0", "Jetstream: set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled)")
+	cmd.Flags().Int64VarP(&params.streams.NumberValue, "js-streams", "", -1, "Jetstream: set maximum streams for the account (-1 is unlimited)")
+	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "js-consumer", "", -1, "Jetstream: set maximum consumer for the account (-1 is unlimited)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
@@ -122,7 +132,8 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions",
 		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
 		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
-		"rm-response-perms", "rm", "max-responses", "mem-storage", "disk-storage", "streams", "consumer") {
+		"rm-response-perms", "rm", "max-responses", "mem-storage", "disk-storage", "streams", "consumer",
+		"js-mem-storage", "js-disk-storage", "js-streams", "js-consumer") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -177,19 +188,19 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.subscriptions.NumberValue = p.claim.Limits.Subs
 	}
 
-	if !ctx.CurrentCmd().Flags().Changed("mem-storage") {
+	if !(ctx.CurrentCmd().Flags().Changed("js-mem-storage") || ctx.CurrentCmd().Flags().Changed("mem-storage")) {
 		p.memStorage.Value = fmt.Sprintf("%d", p.claim.Limits.MemoryStorage)
 	}
 
-	if !ctx.CurrentCmd().Flags().Changed("disk-storage") {
+	if !(ctx.CurrentCmd().Flags().Changed("js-disk-storage") || ctx.CurrentCmd().Flags().Changed("disk-storage")) {
 		p.diskStorage.Value = fmt.Sprintf("%d", p.claim.Limits.DiskStorage)
 	}
 
-	if !ctx.CurrentCmd().Flags().Changed("streams") {
+	if !(ctx.CurrentCmd().Flags().Changed("js-streams") || ctx.CurrentCmd().Flags().Changed("streams")) {
 		p.streams.NumberValue = p.claim.Limits.Streams
 	}
 
-	if !ctx.CurrentCmd().Flags().Changed("consumer") {
+	if !(ctx.CurrentCmd().Flags().Changed("js-consumer") || ctx.CurrentCmd().Flags().Changed("consumer")) {
 		p.consumer.NumberValue = p.claim.Limits.Consumer
 	}
 
