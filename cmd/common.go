@@ -26,7 +26,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -141,40 +140,18 @@ func ParseNumber(s string) (int64, error) {
 	if s == "" {
 		return 0, nil
 	}
-	s = strings.ToUpper(s)
-	re := regexp.MustCompile(`(-?\d+$)`)
-	m := re.FindStringSubmatch(s)
-	if m != nil {
-		v, err := strconv.ParseInt(m[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return v, nil
+	isNeg := strings.HasPrefix(s, "-")
+	if isNeg {
+		s = strings.TrimPrefix(s, "-")
 	}
-	re = regexp.MustCompile(`(-?\d+)([BKMG])`)
-	m = re.FindStringSubmatch(s)
-	if m != nil {
-		v, err := strconv.ParseInt(m[1], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		if v < 0 {
-			return -1, nil
-		}
-		if m[2] == "B" {
-			return v, nil
-		}
-		if m[2] == "K" {
-			return v * 1024, nil
-		}
-		if m[2] == "M" {
-			return v * 1024 * 1024, nil
-		}
-		if m[2] == "G" {
-			return v * 1024 * 1024 * 1024, nil
-		}
+	i, err := humanize.ParseBytes(s)
+	if err != nil {
+		return 0, err
 	}
-	return 0, fmt.Errorf("couldn't parse number: %v", s)
+	if isNeg {
+		return -(int64)(i), nil
+	}
+	return (int64)(i), nil
 }
 
 func UnixToDate(d int64) string {

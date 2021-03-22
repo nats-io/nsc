@@ -36,14 +36,29 @@ func TestDataParams(t *testing.T) {
 	dp.Value = "1K"
 	v, err = dp.NumberValue()
 	require.NoError(t, err)
+	require.Equal(t, int64(1000), v)
+
+	dp.Value = "1KiB"
+	v, err = dp.NumberValue()
+	require.NoError(t, err)
 	require.Equal(t, int64(1024), v)
 
 	dp.Value = "1M"
 	v, err = dp.NumberValue()
 	require.NoError(t, err)
+	require.Equal(t, int64(1000*1000), v)
+
+	dp.Value = "1MiB"
+	v, err = dp.NumberValue()
+	require.NoError(t, err)
 	require.Equal(t, int64(1024*1024), v)
 
 	dp.Value = "1G"
+	v, err = dp.NumberValue()
+	require.NoError(t, err)
+	require.Equal(t, int64(1000*1000*1000), v)
+
+	dp.Value = "1Gib"
 	v, err = dp.NumberValue()
 	require.NoError(t, err)
 	require.Equal(t, int64(1024*1024*1024), v)

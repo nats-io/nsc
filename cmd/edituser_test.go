@@ -498,7 +498,7 @@ func Test_EditUserData(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(-1), uc.Limits.Data)
 
-	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--data", "1K")
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--data", "1Kib")
 	require.NoError(t, err)
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
