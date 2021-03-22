@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -48,6 +48,8 @@ func createAddOperatorCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.sysAcc, "sys", "s", false, "generate system account with the operator (if specified will be signed with signing key)")
 	cmd.Flags().BoolVarP(&params.force, "force", "", false, "on import, overwrite existing when already present")
 	params.TimeParams.BindFlags(cmd)
+
+	registerExtensionFileCompletions(cmd, "url", "jwt")
 
 	return cmd
 }

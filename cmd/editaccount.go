@@ -76,8 +76,10 @@ func createEditAccount() *cobra.Command {
 	params.PermissionsParams.bindRemoveFlags(cmd, "default permissions")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
+	defaultCompletionArgument("name")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
+
 	return cmd
 }
 

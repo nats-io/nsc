@@ -96,7 +96,7 @@ func defaultCompletionArgument(flag string) func(cmd *cobra.Command, args []stri
 	}
 }
 
-func registerNoCompletionsForFlags(cmd *cobra.Command, exclude ...string) {
+func registerNoCompletions(cmd *cobra.Command, exclude ...string) {
 	flags := cmd.Flags()
 	flags.VisitAll(func(f *flag.Flag) {
 		excluded := false
@@ -112,15 +112,20 @@ func registerNoCompletionsForFlags(cmd *cobra.Command, exclude ...string) {
 	})
 }
 
+func registerExtensionFileCompletions(cmd *cobra.Command, flag string, ext ...string) {
+	cmd.RegisterFlagCompletionFunc(flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return ext, cobra.ShellCompDirectiveFilterFileExt
+	})
+}
+
 func registerNoCompletionsFor(cmd *cobra.Command, flag string) {
 	cmd.RegisterFlagCompletionFunc(flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	})
 }
 
-
 func completeSubjects(srcAccountKeyFlag string) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string)([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		key := cmd.Flag(srcAccountKeyFlag).Value.String()
 		if key == "" {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -149,13 +154,17 @@ func completeSubjects(srcAccountKeyFlag string) func(cmd *cobra.Command, args []
 	}
 }
 
-func completeSubCmds(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func completeSubCommands(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	children := cmd.Commands()
 	var buf []string
 	for _, c := range children {
 		buf = append(buf, c.Name())
 	}
 	return buf, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeOperator(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return GetConfig().ListOperators(), cobra.ShellCompDirectiveNoFileComp
 }
 
 func completeAccount(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -216,7 +225,7 @@ func completeUser(cmd *cobra.Command, args []string, toComplete string) ([]strin
 	return users, cobra.ShellCompDirectiveNoFileComp
 }
 
-func completeExport(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func completeExportSubject(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	s, err := GetStore()
 	// in the case of add operator, there might not be a store
 	if err == ErrNoOperator {
@@ -235,6 +244,29 @@ func completeExport(cmd *cobra.Command, args []string, toComplete string) ([]str
 	var buf []string
 	for _, v := range ac.Exports {
 		buf = append(buf, string(v.Subject))
+	}
+	return buf, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeExportName(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	s, err := GetStore()
+	// in the case of add operator, there might not be a store
+	if err == ErrNoOperator {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	if s.DefaultAccount == "" {
+		s.DefaultAccount = cmd.Flag("account").Value.String()
+		if s.DefaultAccount == "" {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+	}
+	ac, err := s.ReadAccountClaim(s.DefaultAccount)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	var buf []string
+	for _, v := range ac.Exports {
+		buf = append(buf, v.Name)
 	}
 	return buf, cobra.ShellCompDirectiveNoFileComp
 }

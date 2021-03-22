@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -38,7 +38,7 @@ func createDeleteExportCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.subject, "subject", "s", "", "subject")
 	params.AccountContextParams.BindFlags(cmd)
-	cmd.RegisterFlagCompletionFunc("subject", completeExport)
+	cmd.RegisterFlagCompletionFunc("subject", completeExportSubject)
 	return cmd
 }
 

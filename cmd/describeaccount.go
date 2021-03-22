@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -36,7 +36,6 @@ func createDescribeAccountCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account name")
 	cmd.RegisterFlagCompletionFunc("name", completeAccount)
-
 
 	return cmd
 }

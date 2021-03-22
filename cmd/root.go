@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,6 +35,7 @@ import (
 const TestEnv = "NSC_TEST"
 
 var KeyPathFlag string
+var KeyStorePath string
 var InteractiveFlag bool
 var NscCwdOnly bool
 var quietMode bool
@@ -113,44 +114,71 @@ var rootCmd = &cobra.Command{
 	Short:     "nsc creates NATS operators, accounts, users, and manage their permissions.",
 	ValidArgs: []string{"add", "delete", "describe", "edit", "export", "generate"},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if store, _ := GetStore(); store != nil {
-			if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
-				if c.Version > 2 {
-					return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
-						store.GetName(), c.Version, os.Args[0])
-				} else if c.Version == 1 {
-					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help" || cmd.Name() == "update"
-					if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
-						for _, v := range addCmd.Commands() {
-							if v == cmd {
-								allowCmdWithJWTV1Store = true
-								break
-							}
+		maybeLoadNscEnv(cmd)
+		if err := checkKeyPath(cmd, args); err != nil {
+			return err
+		}
+		if err := checkStore(cmd, args); err != nil {
+			return err
+		}
+		if err := checkMigration(cmd, args); err != nil {
+			return err
+		}
+
+		return nil
+	},
+	ValidArgsFunction: completeSubCommands,
+}
+
+func checkKeyPath(cmd *cobra.Command, args []string) error {
+	kf := cmd.Flag("keystore")
+	if kf.Changed {
+		return os.Setenv("NKEYS_PATH", kf.Value.String())
+	}
+	return nil
+}
+
+func checkMigration(cmd *cobra.Command, args []string) error {
+	if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
+		return nil
+	}
+	// check if we need to perform any kind of migration
+	needsUpdate, err := store.KeysNeedMigration()
+	if err != nil {
+		return err
+	}
+	if needsUpdate {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
+	}
+	return nil
+}
+
+func checkStore(cmd *cobra.Command, args []string) error {
+	if store, _ := GetStore(); store != nil {
+		if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
+			if c.Version > 2 {
+				return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
+					store.GetName(), c.Version, os.Args[0])
+			} else if c.Version == 1 {
+				allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help" || cmd.Name() == "update"
+				if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
+					for _, v := range addCmd.Commands() {
+						if v == cmd {
+							allowCmdWithJWTV1Store = true
+							break
 						}
 					}
-					if !allowCmdWithJWTV1Store {
-						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt". `+
-							`Alternatively you can downgrade %s to a compatible version using: "%s update -version 0.5.0"\n`,
-							store.GetName(), os.Args[0], os.Args[0], os.Args[0])
-					}
+				}
+				if !allowCmdWithJWTV1Store {
+					return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt". `+
+						`Alternatively you can downgrade %s to a compatible version using: "%s update -version 0.5.0"\n`,
+						store.GetName(), os.Args[0], os.Args[0], os.Args[0])
 				}
 			}
 		}
-		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
-			return nil
-		}
-		// check if we need to perform any kind of migration
-		needsUpdate, err := store.KeysNeedMigration()
-		if err != nil {
-			return err
-		}
-		if needsUpdate {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
-		}
-		return nil
-	},
-	ValidArgsFunction: completeSubCmds,
+	}
+	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -198,6 +226,7 @@ func init() {
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "keystore", "", "", "location of the NKEYS keystore")
 	return cmd
 }
 

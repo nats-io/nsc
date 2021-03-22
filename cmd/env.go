@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,7 +16,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/nats-io/nsc/cmd/store"
@@ -56,11 +58,20 @@ func createEnvCmd() *cobra.Command {
 			params.PrintEnv(cmd)
 			return nil
 		},
+		ValidArgs: []string{"--store", "--operator", "--account", "--save-dir-env", "--keystore"},
 	}
 
 	cmd.Flags().StringVarP(&params.StoreRoot, "store", "s", "", "set store directory")
+	cmd.Flags().StringVarP(&params.StoreRoot, "keystore", "", "", "keystore directory - requires `env` option")
 	cmd.Flags().StringVarP(&params.Operator, "operator", "o", "", "set operator name")
 	cmd.Flags().StringVarP(&params.Account, "account", "a", "", "set account name")
+	cmd.Flags().BoolVarP(&params.NscEnv, "save-dir-env", "D", true, "store an .nscenv file with the current setting")
+
+	cmd.RegisterFlagCompletionFunc("operator", completeOperator)
+	cmd.RegisterFlagCompletionFunc("account", completeAccount)
+	cmd.MarkFlagDirname("store")
+	cmd.MarkFlagDirname("keystore")
+	registerNoCompletionsFor(cmd, "save-dir-env")
 
 	return cmd
 }
@@ -70,9 +81,26 @@ func init() {
 }
 
 type SetContextParams struct {
-	StoreRoot string
-	Operator  string
-	Account   string
+	StoreRoot string `json:"store_root"`
+	Operator  string `json:"operator"`
+	Account   string `json:"account"`
+	KeyStore  string `json:"keystore"`
+	NscEnv    bool
+}
+
+func maybeLoadNscEnv(cmd *cobra.Command) {
+	d, err := ioutil.ReadFile(".nscenv")
+	if err == nil {
+		var params SetContextParams
+		if err := json.Unmarshal(d, &params); err != nil {
+			return
+		}
+		params.NscEnv = false
+		params.Run(cmd)
+		if params.KeyStore != "" {
+			os.Setenv("NKEYS_PATH", params.KeyStore)
+		}
+	}
 }
 
 func (p *SetContextParams) Run(cmd *cobra.Command) error {
@@ -83,6 +111,27 @@ func (p *SetContextParams) Run(cmd *cobra.Command) error {
 	current := GetConfig()
 	if err := current.ContextConfig.Update(p.StoreRoot, p.Operator, p.Account); err != nil {
 		return err
+	}
+	if p.NscEnv {
+		if p.StoreRoot == "" {
+			p.StoreRoot = current.StoreRoot
+		}
+		if p.Operator == "" {
+			p.Operator = current.Operator
+		}
+		if p.Account == "" {
+			p.Account = current.Account
+		}
+		if p.KeyStore == "" {
+			p.KeyStore = os.Getenv("NKEYS_PATH")
+		}
+		d, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		if err := ioutil.WriteFile(".nscenv", d, 0644); err != nil {
+			return err
+		}
 	}
 	return current.Save()
 }
