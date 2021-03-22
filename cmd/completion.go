@@ -137,6 +137,9 @@ func completeSubjects(srcAccountKeyFlag string) func(cmd *cobra.Command, args []
 		}
 
 		accounts, err := s.ListSubContainers(store.Accounts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
 		for _, a := range accounts {
 			ac, err := s.ReadAccountClaim(a)
 			if err != nil {
@@ -192,6 +195,9 @@ func completeOtherAccountsKeys(cmd *cobra.Command, args []string, toComplete str
 
 	target := cmd.Flag("account").Value.String()
 	accounts, err := s.ListSubContainers(store.Accounts)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
 	var buf []string
 	for _, a := range accounts {
 		if a == target {
