@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -57,8 +57,12 @@ func init() {
 }
 
 func JWTUpgradeBannerJWT(ver int) error {
-	return fmt.Errorf(`this version of nsc (%s) is incompatible with the provided jwt v%d`,
-		GetRootCmd().Version, ver)
+	extra := ""
+	if ver == 1 {
+		extra = " - please downgrade to 0.5.0 by executing `nsc update --version 0.5.0`."
+	}
+	return fmt.Errorf(`the operator jwt (v%d) is incompatible this version of nsc%s`,
+		ver, extra)
 }
 
 type AddOperatorParams struct {

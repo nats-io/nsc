@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,6 +30,7 @@ import (
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
+	jwt1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats-server/v2/server"
 	nats "github.com/nats-io/nats.go"
@@ -665,7 +666,7 @@ func Test_Util(t *testing.T) {
 	require.Equal(t, pk, ac2.Issuer)
 }
 
-func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httptest.Server, map[string][]byte) {
+func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, vers int) (*httptest.Server, map[string][]byte) {
 	storage := make(map[string][]byte)
 	opk, err := okp.PublicKey()
 	require.NoError(t, err)
@@ -770,16 +771,29 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 		}
 	}))
 
-	oc := jwt.NewOperatorClaims(opk)
-	oc.Name = "T"
-	oc.Subject = opk
-	u, err := url.Parse(tas.URL)
-	require.NoError(t, err)
-	u.Path = "jwt/v1"
-	oc.AccountServerURL = u.String()
-	token, err := oc.Encode(okp)
-	require.NoError(t, err)
-	storage["operator"] = []byte(token)
+	if vers == 1 {
+		oc := jwt1.NewOperatorClaims(opk)
+		oc.Name = "T"
+		oc.Subject = opk
+		u, err := url.Parse(tas.URL)
+		require.NoError(t, err)
+		u.Path = "jwt/v1"
+		oc.AccountServerURL = u.String()
+		token, err := oc.Encode(okp)
+		require.NoError(t, err)
+		storage["operator"] = []byte(token)
+	} else {
+		oc := jwt.NewOperatorClaims(opk)
+		oc.Name = "T"
+		oc.Subject = opk
+		u, err := url.Parse(tas.URL)
+		require.NoError(t, err)
+		u.Path = "jwt/v1"
+		oc.AccountServerURL = u.String()
+		token, err := oc.Encode(okp)
+		require.NoError(t, err)
+		storage["operator"] = []byte(token)
+	}
 
 	return tas, storage
 }
@@ -787,5 +801,5 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair) (*httpt
 // Runs a TestAccountServer returning the server and the underlying storage
 func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 	_, _, okp := CreateOperatorKey(t)
-	return RunTestAccountServerWithOperatorKP(t, okp)
+	return RunTestAccountServerWithOperatorKP(t, okp, 2)
 }
