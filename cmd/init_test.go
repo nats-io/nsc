@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -174,6 +174,37 @@ func Test_InitWellKnown2(t *testing.T) {
 	ts.VerifyOperator(t, "T", true)
 	ts.VerifyAccount(t, "T", "B", true)
 	ts.VerifyUser(t, "T", "B", "B", true)
+}
+
+func Test_InitWellKnownV1Operator(t *testing.T) {
+	ts := NewTestStore(t, "X")
+	defer ts.Done(t)
+
+	_, _, okp := CreateOperatorKey(t)
+	// run a jwt account server
+	as, _ := RunTestAccountServerWithOperatorKP(t, okp, 1)
+	defer as.Close()
+
+	// add an entry to well known
+	ourl, err := url.Parse(as.URL)
+	require.NoError(t, err)
+	ourl.Path = "/jwt/v1/operator"
+
+	var twko KnownOperator
+	twko.AccountServerURL = ourl.String()
+	twko.Name = "T"
+
+	// make it be the first
+	var wkops KnownOperators
+	wkops = append(wkops, twko)
+
+	ops, _ := GetWellKnownOperators()
+	wkops = append(wkops, ops...)
+	wellKnownOperators = wkops
+
+	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "the operator jwt (v1) is incompatible this version of nsc")
 }
 
 func Test_InitWellKnownInteractive(t *testing.T) {

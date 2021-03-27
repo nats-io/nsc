@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -265,6 +265,9 @@ func (p *InitCmdParams) createStore(cmd *cobra.Command) error {
 		op, err := jwt.DecodeOperatorClaims(token)
 		if err != nil {
 			return fmt.Errorf("error decoding operator jwt: %v", err)
+		}
+		if op.Version != 2 {
+			return JWTUpgradeBannerJWT(op.Version)
 		}
 		onk.Name = GetOperatorName(op.Name, p.OperatorJwtURL)
 		p.AccountServerURL = op.AccountServerURL
