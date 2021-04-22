@@ -341,6 +341,8 @@ func (p *AddUserParams) generateUserClaim(ctx ActionCtx, r *store.Report) (*jwt.
 		r.Add(s.Details...)
 	}
 
+	uc.Src.Add(p.src...)
+
 	uc.Tags.Add(p.tags...)
 	sort.Strings(uc.Tags)
 

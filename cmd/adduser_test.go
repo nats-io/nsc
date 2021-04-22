@@ -453,3 +453,19 @@ func Test_AddUser_QueuePermissions(t *testing.T) {
 	require.True(t, u.Sub.Allow.Contains("foo queue"))
 	require.True(t, u.Sub.Deny.Contains("bar queue"))
 }
+
+func Test_AddUser_SrcPermissions(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA",  "--source-network", "1.2.1.1/29", "--source-network", "1.2.2.2/29,1.2.0.3/32")
+	require.NoError(t, err)
+
+	u, err := ts.Store.ReadUserClaim("A", "UA")
+	require.NoError(t, err)
+	require.True(t, u.Limits.Src.Contains("1.2.1.1/29"))
+	require.True(t, u.Limits.Src.Contains("1.2.2.2/29"))
+	require.True(t, u.Limits.Src.Contains("1.2.0.3/32"))
+}
