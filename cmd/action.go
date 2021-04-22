@@ -151,10 +151,7 @@ func run(ctx ActionCtx, action interface{}) error {
 				return err
 			}
 			if m != "" {
-				if strings.HasSuffix(m, "\n") {
-					m = m[:len(m)-1]
-				}
-				ctx.CurrentCmd().Println(m)
+				ctx.CurrentCmd().Println(strings.TrimSuffix(m, "\n"))
 			}
 		}
 	}
