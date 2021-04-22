@@ -460,7 +460,7 @@ func Test_AddUser_SrcPermissions(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA",  "--source-network", "1.2.1.1/29", "--source-network", "1.2.2.2/29,1.2.0.3/32")
+	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA", "--source-network", "1.2.1.1/29", "--source-network", "1.2.2.2/29,1.2.0.3/32")
 	require.NoError(t, err)
 
 	u, err := ts.Store.ReadUserClaim("A", "UA")
