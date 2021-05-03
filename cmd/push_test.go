@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -151,6 +152,7 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
 	require.NoError(t, err)
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	data = bytes.ReplaceAll(data, []byte(`dir: '.\jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
 	data = bytes.ReplaceAll(data, []byte(`allow_delete: false`), []byte(fmt.Sprintf(`allow_delete: %t`, del)))
 	err = ioutil.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
@@ -162,7 +164,7 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	_, _, err = ExecuteCmd(createPushCmd(), "--all")
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
-	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, len(filesPre), 3)
 	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "--name", "AC2")
@@ -180,7 +182,7 @@ func Test_SyncNatsResolverDelete(t *testing.T) {
 	_, _, err := ExecuteCmd(createPushCmd(), "--prune", "--system-account", "SYS", "--system-user", "sys")
 	require.NoError(t, err)
 	// test to assure AC1/SYS where pushed/pruned
-	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, 2, len(filesPost))
 	// assert only AC1/SYS overlap in pre/post
@@ -194,9 +196,61 @@ func Test_SyncNatsResolverDelete(t *testing.T) {
 		}
 	}
 	require.Equal(t, 2, sameCnt)
-	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt.deleted")
+	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt.deleted")
 	require.NoError(t, err)
 	require.Equal(t, 1, len(filesDeleted))
+}
+
+func Test_SyncNatsResolverExplicitDelete(t *testing.T) {
+	dir, filesPre, ts := deleteSetup(t, true)
+	defer os.Remove(dir)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createPushCmd(), "--account-removal", "AC1")
+	require.NoError(t, err)
+	// test to assure AC1/SYS where pushed/pruned
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(filesPost))
+	// assert only AC1/SYS overlap in pre/post
+	sameCnt := 0
+	for _, f1 := range filesPost {
+		for _, f2 := range filesPre {
+			if f1 == f2 {
+				sameCnt++
+				break
+			}
+		}
+	}
+	require.Equal(t, 2, sameCnt)
+	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt.deleted")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(filesDeleted))
+}
+
+func Test_SyncNatsResolverDiff(t *testing.T) {
+	dir, _, ts := deleteSetup(t, true)
+	defer os.Remove(dir)
+	defer ts.Done(t)
+	_, stdErr, err := ExecuteCmd(createPushCmd(), "--diff")
+	require.NoError(t, err)
+	require.Contains(t, stdErr, "only exists in server")
+	require.Contains(t, stdErr, "named AC1 exists")
+	require.Contains(t, stdErr, "named SYS exists")
+
+	re := regexp.MustCompile("[A-Z0-9]* named AC1 exists")
+	line := re.FindString(stdErr)
+	accId := strings.TrimSuffix(line, " named AC1 exists")
+
+	_, _, err = ExecuteCmd(createPushCmd(), "--account-removal", accId)
+	require.NoError(t, err)
+	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + accId + ".jwt.deleted")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(filesDeleted))
+	_, stdErr, err = ExecuteCmd(createPushCmd(), "--diff")
+	require.NoError(t, err)
+	require.Contains(t, stdErr, "only exists in server")
+	require.NotContains(t, stdErr, "named AC1 exists")
+	require.Contains(t, stdErr, "named SYS exists")
 }
 
 func Test_SyncNatsResolverDeleteSYS(t *testing.T) {
@@ -210,7 +264,7 @@ func Test_SyncNatsResolverDeleteSYS(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createPushCmd(), "--prune") // will fail as system acc can't be deleted
 	require.Error(t, err)                              // this will actually not hit the server as the system account is already deleted
-	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, 3, len(filesPost))
 	require.Equal(t, filesPre, filesPost)
@@ -223,7 +277,7 @@ func Test_SyncNatsResolverNoDelete(t *testing.T) {
 	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
 	require.Error(t, err)
 	// test to assure that pruning did not happen
-	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, 3, len(filesPost))
 	require.Equal(t, filesPre, filesPost)
@@ -265,7 +319,7 @@ func Test_SyncBadUrl(t *testing.T) {
 	_, _, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
-	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "/*.jwt")
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, len(filesPre), 2)
 }
