@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jwt v1.2.2
-	github.com/nats-io/jwt/v2 v2.0.1
+	github.com/nats-io/jwt/v2 v2.0.2
 	github.com/nats-io/nats-server/v2 v2.1.8-0.20210107160521-ceb1fda2024b
 	github.com/nats-io/nats.go v1.10.1-0.20201021145452-94be476ad6e0
 	github.com/nats-io/nkeys v0.3.0
