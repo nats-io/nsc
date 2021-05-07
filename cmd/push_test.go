@@ -32,7 +32,7 @@ import (
 
 func Test_SyncOK(t *testing.T) {
 	_, _, okp := CreateOperatorKey(t)
-	as, m := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	defer as.Close()
 
 	ts := NewTestStoreWithOperator(t, "T", okp)
@@ -56,7 +56,7 @@ func Test_SyncOK(t *testing.T) {
 
 func Test_SyncNoURL(t *testing.T) {
 	_, _, okp := CreateOperatorKey(t)
-	as, m := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	ts.AddAccount(t, "A")
 	as.Close()
@@ -104,7 +104,7 @@ func Test_SyncManaged(t *testing.T) {
 
 func Test_SyncManualServer(t *testing.T) {
 	_, _, okp := CreateOperatorKey(t)
-	as, m := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	defer as.Close()
 
 	// remove the account server

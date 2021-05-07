@@ -182,7 +182,7 @@ func Test_InitWellKnownV1Operator(t *testing.T) {
 
 	_, _, okp := CreateOperatorKey(t)
 	// run a jwt account server
-	as, _ := RunTestAccountServerWithOperatorKP(t, okp, 1)
+	as, _ := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 1})
 	defer as.Close()
 
 	// add an entry to well known

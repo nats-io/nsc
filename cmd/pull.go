@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -102,6 +102,10 @@ func (j *PullJob) Token() (string, error) {
 }
 
 func (j *PullJob) Run() {
+	if j.PullStatus != nil {
+		// already ran
+		return
+	}
 	s, err := store.PullAccount(j.ASU)
 	if err != nil {
 		j.Err = err
@@ -172,9 +176,16 @@ func (p *PullParams) setupJobs(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
-		j := PullJob{ASU: u, Name: oc.Name, LocalClaim: oc}
-		p.Jobs = append(p.Jobs, &j)
-
+		// in ngs we are in v2 operator, so lets try /jwt/v2/operator first
+		uv2 := strings.Replace(u, "/jwt/v1/operator", "/jwt/v2/operator", 1)
+		j := PullJob{ASU: uv2, Name: oc.Name, LocalClaim: oc}
+		j.Run()
+		if j.Err == nil {
+			p.Jobs = append(p.Jobs, &j)
+		} else {
+			j = PullJob{ASU: u, Name: oc.Name, LocalClaim: oc}
+			p.Jobs = append(p.Jobs, &j)
+		}
 		tc := GetConfig()
 		accounts, err := tc.ListAccounts()
 		if err != nil {

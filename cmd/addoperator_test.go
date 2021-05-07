@@ -227,7 +227,7 @@ func Test_AddWellKnownOperator(t *testing.T) {
 
 	// create the managed operator store
 	_, opk, okp := CreateOperatorKey(t)
-	as, _ := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, _ := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	defer as.Close()
 
 	// add an entry to well known

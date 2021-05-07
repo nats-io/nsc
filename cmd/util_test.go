@@ -666,7 +666,12 @@ func Test_Util(t *testing.T) {
 	require.Equal(t, pk, ac2.Issuer)
 }
 
-func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, vers int) (*httptest.Server, map[string][]byte) {
+type TasOpts struct {
+	Vers             int
+	OperatorOnlyIfV2 bool
+}
+
+func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, opts TasOpts) (*httptest.Server, map[string][]byte) {
 	storage := make(map[string][]byte)
 	opk, err := okp.PublicKey()
 	require.NoError(t, err)
@@ -677,13 +682,29 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, vers in
 			w.Write([]byte(err.Error()))
 		}
 		getHandler := func(w http.ResponseWriter, r *http.Request) {
+			var data []byte
 			id := filepath.Base(r.RequestURI)
-			data := storage[id]
+			data = storage[id]
+
+			// if we don't have v2, and they ask for v2, ignore it
+			if r.RequestURI == "/jwt/v2/operator" && !opts.OperatorOnlyIfV2 {
+				data = nil
+			}
+			if r.RequestURI == "/jwt/v1/operator" && opts.OperatorOnlyIfV2 {
+				// option to only answer to v2 - they asked v1
+				data = nil
+			}
+
 			if data == nil {
 				w.WriteHeader(http.StatusNotFound)
 			}
 			w.Header().Add("Content-Type", "application/jwt")
 			w.Write(data)
+			if data == nil {
+				t.Log(r.RequestURI, "not found")
+			} else {
+				t.Log(r.RequestURI, "OK")
+			}
 		}
 
 		updateAccountHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -771,7 +792,7 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, vers in
 		}
 	}))
 
-	if vers == 1 {
+	if opts.Vers == 1 {
 		oc := jwt1.NewOperatorClaims(opk)
 		oc.Name = "T"
 		oc.Subject = opk
@@ -801,5 +822,5 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, vers in
 // Runs a TestAccountServer returning the server and the underlying storage
 func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 	_, _, okp := CreateOperatorKey(t)
-	return RunTestAccountServerWithOperatorKP(t, okp, 2)
+	return RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 }
