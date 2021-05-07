@@ -29,13 +29,13 @@ script:
 
 deploy:
 - provider: script
-  skip_cleanup: true
+  cleanup: false
   script: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service travis-ci
   on:
     condition: $TRAVIS_OS_NAME = linux
 
 - provider: script
-  skip_cleanup: true
+  cleanup: false
   script: curl -sL http://git.io/goreleaser | bash
   on:
     tags: true
