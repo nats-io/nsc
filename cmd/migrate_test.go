@@ -94,7 +94,7 @@ func Test_MigrateSingleInteractive(t *testing.T) {
 
 func Test_MigrateManaged(t *testing.T) {
 	_, opk, okp := CreateOperatorKey(t)
-	as, m := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	defer as.Close()
 
 	// create the managed operator store

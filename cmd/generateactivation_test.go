@@ -229,7 +229,7 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 
 func Test_InteractiveGenerateActivationPush(t *testing.T) {
 	_, _, okp := CreateOperatorKey(t)
-	as, m := RunTestAccountServerWithOperatorKP(t, okp, 2)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
 	defer as.Close()
 
 	ts := NewTestStoreWithOperator(t, "T", okp)

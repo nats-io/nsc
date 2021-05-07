@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -191,4 +191,44 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, claimOrig.ID)
 	require.Equal(t, claimOrig.ID, claim2.ID)
+}
+
+func Test_V2OperatorDoesntFail(t *testing.T) {
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2, OperatorOnlyIfV2: true})
+	defer as.Close()
+
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	defer ts.Done(t)
+	err := ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
+
+	// edit the jwt
+	_, _, err = ExecuteCmd(createPullCmd(), "-A")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, oc.Version, 2)
+}
+
+func Test_V1OperatorDoesntFail(t *testing.T) {
+	_, _, okp := CreateOperatorKey(t)
+	as, m := RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
+	defer as.Close()
+
+	ts := NewTestStoreWithOperator(t, "T", okp)
+	defer ts.Done(t)
+	err := ts.Store.StoreRaw(m["operator"])
+	require.NoError(t, err)
+
+	// edit the jwt
+	stdout, stderr, err := ExecuteCmd(createPullCmd(), "-A")
+	t.Log(stdout)
+	t.Log(stderr)
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, oc.Version, 2)
 }
