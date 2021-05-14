@@ -98,8 +98,10 @@ func expName(e *jwt.Export) string {
 
 func expId(subject string, e *jwt.Export) string {
 	s := strings.ReplaceAll(expName(e), " ", "_")
-	s = strings.ReplaceAll(s, "*", "_")
-	s = strings.ReplaceAll(s, ">", "_")
+	s = strings.ReplaceAll(s, "*", "_A_")
+	s = strings.ReplaceAll(s, ">", "_G_")
+	s = strings.ReplaceAll(s, "$", "_D_")
+	s = strings.ReplaceAll(s, "-", "_M_")
 	return fmt.Sprintf("%s_%s", subject, s)
 }
 
@@ -179,7 +181,7 @@ skinparam interface {
 		}
 		bldrPrntf("end note")
 	}
-	bldrPrntf(`title Component Diagram - Operator %s`, op.Name)
+	bldrPrntf(`title Component Diagram of Accounts - Operator %s`, op.Name)
 	accs, _ := s.ListSubContainers(store.Accounts)
 	accBySubj := make(map[string]*jwt.AccountClaims)
 	for _, accName := range accs {
