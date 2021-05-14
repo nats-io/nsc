@@ -195,11 +195,10 @@ func Test_AddPublicImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	pub := ts.GetAccountPublicKey(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", pub, "--remote-subject", "foobar.>")
+	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", "A", "--remote-subject", "foobar.>")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
