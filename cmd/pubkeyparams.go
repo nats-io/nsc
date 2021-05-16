@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-
 	"github.com/nats-io/jwt"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -38,10 +37,37 @@ type PubKeyParams struct {
 	AllowWildcard bool
 }
 
+type accountRef string
+
+func (l *accountRef) Set(val string) error {
+	if val == "*" || nkeys.IsValidPublicKey(val) {
+		*l = accountRef(val)
+	} else if s, err := GetConfig().LoadStore(GetConfig().Operator); err != nil {
+		return err
+	} else if claim, err := s.ReadAccountClaim(val); err != nil {
+		return err
+	} else {
+		*l = accountRef(claim.Subject)
+	}
+	return nil
+}
+
+func (l *accountRef) String() string {
+	return string(*l)
+}
+
+func (t *accountRef) Type() string {
+	return "account-ref"
+}
+
 func (e *PubKeyParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
 	e.flagName = flagName
 	e.kind = kind
-	cmd.Flags().StringVarP(&e.publicKey, flagName, shorthand, "", flagName)
+	if kind == nkeys.PrefixByteAccount {
+		cmd.Flags().VarP((*accountRef)(&e.publicKey), flagName, shorthand, "")
+	} else {
+		cmd.Flags().StringVarP(&e.publicKey, flagName, shorthand, "", flagName)
+	}
 }
 
 func (e *PubKeyParams) valid(s string) error {
