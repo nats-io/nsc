@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -128,9 +128,23 @@ var rootCmd = &cobra.Command{
 						}
 					}
 					if !allowCmdWithJWTV1Store {
-						return fmt.Errorf(`this version of nsc only supports jwtV2. To upgrade the v1 store %#q - type "%s upgrade-jwt". `+
-							`Alternatively you can downgrade %s to a compatible version using: "%s update -version 0.5.0"\n`,
-							store.GetName(), os.Args[0], os.Args[0], os.Args[0])
+						return fmt.Errorf(`this version of nsc only supports jwtV2. 
+If you are using a managed service, check your provider for 
+instructions on how to update your project. In most cases 
+all you need to do is:
+"%s add operator --force -u <url provided by your service>"
+
+If your service is well known, such as Synadia's NGS:
+"%s add operator --force -u synadia"
+
+If you are the operator, and you have your operator key, to 
+upgrade the v1 store %#q - type:
+"%s upgrade-jwt"
+
+Alternatively you can downgrade' %q to a compatible version using: 
+"%s update -version 0.5.0"
+`,
+							os.Args[0], os.Args[0], store.GetName(), os.Args[0], os.Args[0], os.Args[0])
 					}
 				}
 			}
@@ -161,7 +175,7 @@ func Execute() {
 	}
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+// ExecuteWithWriter adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 // But writer is decided by the caller function
 // returns error than os.Exit(1)
@@ -192,7 +206,7 @@ func init() {
 	HoistRootFlags(GetRootCmd())
 }
 
-// hostFlags adds persistent flags that would be added by the cobra framework
+// HoistRootFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
