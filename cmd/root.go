@@ -134,7 +134,7 @@ instructions on how to update your project. In most cases
 all you need to do is:
 "%s add operator --force -u <url provided by your service>"
 
-If your services is well known, such as Synadia's NGS:
+If your service is well known, such as Synadia's NGS:
 "%s add operator --force -u synadia"
 
 If you are the operator, and you have your operator key, to 
