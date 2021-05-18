@@ -73,7 +73,7 @@ func executeFailingCmd(t *testing.T, args ...string) {
 	t.Helper()
 	_, _, err := ExecuteCmd(rootCmd, args...) // could be any command
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "this version of nsc only supports jwtV2")
+	require.Contains(t, err.Error(), "This version of nsc only supports jwtV2")
 	require.Contains(t, err.Error(), "upgrade-jwt")
 }
 

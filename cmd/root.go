@@ -128,7 +128,8 @@ var rootCmd = &cobra.Command{
 						}
 					}
 					if !allowCmdWithJWTV1Store {
-						return fmt.Errorf(`this version of nsc only supports jwtV2. 
+						//lint:ignore ST1005 this message is shown to the user
+						return fmt.Errorf(`This version of nsc only supports jwtV2. 
 If you are using a managed service, check your provider for 
 instructions on how to update your project. In most cases 
 all you need to do is:
