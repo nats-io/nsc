@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Copyright 2020 The NATS Authors
+# Copyright 2020-2021 The NATS Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -38,14 +38,13 @@ set -eu
 # Inspecting headers, the documented guarantee redirects to the API-returned
 # URL, which redirects to the S3 bucket download URL.
 
-# Like the Python before us, we only support amd64 for now, and that's all that
-# nsc releases.  By calling this out up top, it should make it easier to find
-# the places which matter should that change in the future.
-readonly RELEASE_ARCH="amd64"
+# This is a list of the architectures we support, which should be listed in
+# the Go architecture naming format.
+readonly SUPPORTED_ARCHS="amd64 arm64"
 
 # Finding the releases to download
 readonly GITHUB_OWNER_REPO='nats-io/nsc'
-readonly HTTP_USER_AGENT='nsc_install/0.1 (@nats-io)'
+readonly HTTP_USER_AGENT='nsc_install/0.2 (@nats-io)'
 
 # Where to install to, relative to home-dir
 readonly NSC_RELATIVE_BIN_DIR='.nsccli/bin'
@@ -116,6 +115,7 @@ Usage: $progname [-t <tag>] [-d <dir>] [-s <dir>]
  -s dir     directory in which to place a symlink to the binary
             [default: ~/bin] [use '-' to forcibly not place a symlink]
  -t tag     retrieve a tagged release instead of the latest
+ -a arch    force choosing a specific processor architecture [allowed: $SUPPORTED_ARCHS]
 EOUSAGE
   exit "$ev"
 }
@@ -123,14 +123,22 @@ EOUSAGE
 opt_tag=''
 opt_install_dir=''
 opt_symlink_dir=''
+opt_arch=''
 parse_options() {
-  while getopts ':d:hs:t:' arg; do
+  while getopts ':a:d:hs:t:' arg; do
     case "$arg" in
       (h) usage 0 ;;
 
       (d) opt_install_dir="$OPTARG" ;;
       (s) opt_symlink_dir="$OPTARG" ;;
       (t) opt_tag="$OPTARG" ;;
+
+      (a)
+        if validate_arch "$OPTARG"; then
+          opt_arch="$OPTARG"
+        else
+          die "unsupported arch for -a, try one of: $SUPPORTED_ARCHS"
+        fi ;;
 
       (:) die "missing required option for -$OPTARG; see -h for help" ;;
       (\?) die "unknown option -$OPTARG; see -h for help" ;;
@@ -175,8 +183,43 @@ normalized_ostype() {
   printf '%s\n' "$ostype"
 }
 
+validate_arch() {
+  local check="$1"
+  local x
+  # Deliberately not quoted, setting $@ within this function
+  set $SUPPORTED_ARCHS
+  for x; do
+    if [ "$x" = "$check" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+normalized_arch() {
+  if [ -n "${opt_arch:-}" ]; then
+    printf '%s\n' "$opt_arch"
+    return 0
+  fi
+
+  local narch
+  narch="$(uname -p)"
+  case "$narch" in
+    (x86_64) narch="amd64" ;;
+    (amd64) true ;;
+    (aarch64) narch="arm64" ;;
+    (arm64) true ;;
+    (*) die "Unhandled architecture '$narch', use -a flag to select a supported arch" ;;
+  esac
+  if validate_arch "$narch"; then
+    printf '%s\n' "$narch"
+  else
+    die "Unhandled architecture '$narch', use -a flag to select a supported arch"
+  fi
+}
+
 zip_filename_per_os() {
-  printf '%s\n' "nsc-$(normalized_ostype)-${RELEASE_ARCH}.zip"
+  printf '%s\n' "nsc-$(normalized_ostype)-$(normalized_arch).zip"
 }
 
 exe_filename_per_os() {
