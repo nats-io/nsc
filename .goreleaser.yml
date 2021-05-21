@@ -20,8 +20,6 @@ builds:
   - amd64
   - arm64
   ignore:
-    - goos: linux
-      goarch: arm64
     - goos: windows
       goarch: arm64
 
