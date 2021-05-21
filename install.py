@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2018-2020 The NATS Authors
+# Copyright 2018-2021 The NATS Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -32,20 +32,32 @@ except ImportError:
 
 NSC_REPO_URL = "https://github.com/nats-io/nsc"
 FILENAME_LOOKUP = {
-    "darwin": "nsc-darwin-amd64.zip",
-    "linux": "nsc-linux-amd64.zip",
-    "win32": "nsc-windows-amd64.zip"
+    "darwin": {
+        "amd64": "nsc-darwin-amd64.zip",
+        "arm64": "nsc-darwin-arm64.zip",
+    },
+    "linux": {
+        "amd64": "nsc-linux-amd64.zip",
+        "arm64": "nsc-linux-arm64.zip",
+    },
+    "win32": {
+        "amd64": "nsc-windows-amd64.zip",
+    },
 }
 
 
-def release_url(platform, tag):
+def release_url(platform, arch, tag):
+    if "linux" in platform:
+        # convert any linux regardless of version reported to "linux"
+        platform = "linux"
+    if arch == "x86_64":
+        arch = "amd64"
+    elif arch == "aarch64":
+        arch = "arm64"
     try:
-        if "linux" in platform:
-            # convert any linux regardless of version reported to "linux"
-            platform = "linux"
-        filename = FILENAME_LOOKUP[platform]
+        filename = FILENAME_LOOKUP[platform][arch]
     except KeyError:
-        print("Unable to locate appropriate filename for", platform)
+        print("Unable to locate appropriate filename for", platform, "with archtecture", arch)
         sys.exit(1)
 
     release_base = NSC_REPO_URL + '/releases/'
@@ -79,7 +91,7 @@ def download_with_progress(url):
 
 
 def main():
-    url = release_url(sys.platform, sys.argv[1] if len(sys.argv) > 1 else None)
+    url = release_url(sys.platform, os.uname()[4], sys.argv[1] if len(sys.argv) > 1 else None)
     bin_dir = nsc_bin_dir()
     exe_fn = os.path.join(bin_dir, "nsc")
     windows = "windows" in url
