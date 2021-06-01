@@ -146,7 +146,7 @@ func getSystemAccountUser(ctx ActionCtx, sysAccName, sysAccUserName, allowSub st
 				key = keys[0]
 			}
 			sysAccKp, err := ctx.StoreCtx().KeyStore.GetKeyPair(key)
-			if err == nil {
+			if sysAccKp != nil && err == nil {
 				defer sysAccKp.Wipe()
 				tmpUsrKp, err := nkeys.CreateUser()
 				if err == nil {
@@ -292,7 +292,7 @@ func (p *PushCmdParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *PushCmdParams) PostInteractive(ctx ActionCtx) error {
+func (p *PushCmdParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
@@ -446,10 +446,12 @@ func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, deleteList []string, respLi
 		return
 	}
 	okp, opPk, err := obtainRequestKey(ctx, subPrune)
-	defer okp.Wipe()
 	if err != nil {
 		subPrune.AddError("Could not obtain Operator key to sign the delete request (err:%v)", err)
+		return
 	}
+	defer okp.Wipe()
+
 	claim := jwt.NewGenericClaims(opPk)
 	claim.Data["accounts"] = deleteList
 	pruneJwt, err := claim.Encode(okp)

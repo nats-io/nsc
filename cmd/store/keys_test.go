@@ -60,6 +60,24 @@ func TestMatchKeys(t *testing.T) {
 	require.False(t, Match(opk, akp))
 }
 
+func TestGetKeyNonExist(t *testing.T) {
+	dir := MakeTempDir(t)
+	old := os.Getenv(NKeysPathEnv)
+	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
+
+	ks := NewKeyStore("test_get_keys")
+	_, _, okp := CreateOperatorKey(t)
+	_, err := ks.Store(okp)
+	require.NoError(t, err)
+
+	_, apk, _ := CreateAccountKey(t)
+	kp, err := ks.GetKeyPair(apk)
+	require.NoError(t, err)
+	require.Nil(t, kp)
+
+	require.NoError(t, os.Setenv(NKeysPathEnv, old))
+}
+
 func TestGetKeys(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)
@@ -132,7 +150,7 @@ func TestGetMissingKey(t *testing.T) {
 	ckp, err := ks.GetKeyPair(opk)
 	require.Nil(t, err)
 	require.Nil(t, ckp)
-	os.Setenv(NKeysPathEnv, old)
+	_ = os.Setenv(NKeysPathEnv, old)
 }
 
 func CreateAccountKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
@@ -164,7 +182,9 @@ func TestAllKeys(t *testing.T) {
 	dir := MakeTempDir(t)
 	old := os.Getenv(NKeysPathEnv)
 	require.NoError(t, os.Setenv(NKeysPathEnv, dir))
-	defer os.Setenv(NKeysPathEnv, old)
+	defer func() {
+		_ = os.Setenv(NKeysPathEnv, old)
+	}()
 
 	ks := NewKeyStore(t.Name())
 	_, opk, okp := CreateOperatorKey(t)
