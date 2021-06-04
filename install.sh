@@ -204,6 +204,9 @@ normalized_arch() {
 
   local narch
   narch="$(uname -p)"
+  # We see inside Alpine Linux inside Docker that uname -p can fail with unknown
+  # but the arch command can work.
+  if [ "$narch" = "unknown" ]; then narch="$(arch)"; fi
   case "$narch" in
     (x86_64) narch="amd64" ;;
     (amd64) true ;;
@@ -219,7 +222,13 @@ normalized_arch() {
 }
 
 zip_filename_per_os() {
-  printf '%s\n' "nsc-$(normalized_ostype)-$(normalized_arch).zip"
+  # We break these out into a separate variable instead of passing directly
+  # to printf, so that if there's a failure in normalization then the printf
+  # won't swallow the exit status of the $(...) subshell and will instead
+  # abort correctly.
+  local zipname
+  zipname="nsc-$(normalized_ostype)-$(normalized_arch).zip" || exit $?
+  printf '%s\n' "${zipname}"
 }
 
 exe_filename_per_os() {
