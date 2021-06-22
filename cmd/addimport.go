@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,7 +45,7 @@ func createAddImportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.local, "local-subject", "s", "", "local subject")
 	params.srcAccount.BindFlags("src-account", "", nkeys.PrefixByteAccount, cmd)
 	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
-	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service (only public imports)")
+	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	cmd.Flags().BoolVarP(&params.share, "share", "", false, "share data when tracking latency (service only)")
 	params.AccountContextParams.BindFlags(cmd)
 
@@ -248,7 +248,7 @@ func (p *AddImportParams) generateToken(ctx ActionCtx, c *AccountExportChoice) e
 	return p.initFromActivation(ctx)
 }
 
-func (p *AddImportParams) addManualExport(ctx ActionCtx) error {
+func (p *AddImportParams) addManualExport(_ ActionCtx) error {
 	var err error
 	p.public, err = cli.Confirm("is the export public?", true)
 	if err != nil {
@@ -341,7 +341,7 @@ func (p *AddImportParams) Load(ctx ActionCtx) error {
 	return nil
 }
 
-func (p *AddImportParams) initFromActivation(ctx ActionCtx) error {
+func (p *AddImportParams) initFromActivation(_ ActionCtx) error {
 	var err error
 	if p.token == nil {
 		p.token, err = p.loadImport()

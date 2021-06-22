@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -52,6 +52,11 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
 
+	cmd.Flags().UintVarP(&params.accountTokenPosition, "account-token-position", "", 0, "subject token position where account is expected (public exports only)")
+	cmd.Flag("account-token-position").Hidden = true
+	cmd.Flags().BoolVarP(&params.advertise, "advertise", "", false, "advertise export")
+	cmd.Flag("advertise").Hidden = true
+
 	return cmd
 }
 
@@ -61,17 +66,18 @@ func init() {
 
 type AddExportParams struct {
 	AccountContextParams
-	claim  *jwt.AccountClaims
-	export jwt.Export
-
-	private bool
-	service bool
 	SignerParams
-	subject           string
-	latSubject        string
-	latSampling       string
-	responseType      string
-	responseThreshold time.Duration
+	claim                *jwt.AccountClaims
+	export               jwt.Export
+	private              bool
+	service              bool
+	subject              string
+	latSubject           string
+	latSampling          string
+	responseType         string
+	responseThreshold    time.Duration
+	accountTokenPosition uint
+	advertise            bool
 }
 
 func (p *AddExportParams) longHelp() string {
@@ -83,10 +89,14 @@ toolName add export --name myexport --subject a.b --service`
 }
 
 func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
-	p.AccountContextParams.SetDefaults(ctx)
+	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
+		return err
+	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	p.export.TokenReq = p.private
+	p.export.AccountTokenPosition = p.accountTokenPosition
+	p.export.Advertise = p.advertise
 	p.export.Subject = jwt.Subject(p.subject)
 	p.export.Type = jwt.Stream
 	if p.service {
@@ -258,7 +268,9 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("a subject is required")
 	}
-
+	if p.private && p.accountTokenPosition != 0 {
+		return errors.New("account token position is only valid for public exports")
+	}
 	// get the old validation results
 	var vr jwt.ValidationResults
 	if err = p.claim.Exports.Validate(&vr); err != nil {
