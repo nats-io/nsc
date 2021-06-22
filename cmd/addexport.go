@@ -53,9 +53,7 @@ func createAddExportCmd() *cobra.Command {
 	params.AccountContextParams.BindFlags(cmd)
 
 	cmd.Flags().UintVarP(&params.accountTokenPosition, "account-token-position", "", 0, "subject token position where account is expected (public exports only)")
-	cmd.Flag("account-token-position").Hidden = true
 	cmd.Flags().BoolVarP(&params.advertise, "advertise", "", false, "advertise export")
-	cmd.Flag("advertise").Hidden = true
 
 	return cmd
 }
