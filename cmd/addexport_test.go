@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2021 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,6 +44,21 @@ func Test_AddExport(t *testing.T) {
 		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`time: unknown unit`}, true},
 	}
 
+	tests.Run(t, "root", "add")
+}
+
+func Test_AddPublicExport(t *testing.T) {
+	ts := NewTestStore(t, "add_export")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	tests := CmdTests{
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "hello"}, nil, []string{"added public stream export \"hello\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "hello", "--account-token-position", "1"}, nil, []string{"Account Token Position can only be used with wildcard subjects"}, true},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "2"}, nil, []string{"Account Token Position 2 matches 'hello' but must match a *"}, true},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "3"}, nil, []string{"Account Token Position 3 exceeds length of subject"}, true},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "1"}, nil, []string{" added public stream export \"*.hello\""}, false},
+	}
 	tests.Run(t, "root", "add")
 }
 
