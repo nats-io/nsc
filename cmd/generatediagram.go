@@ -223,7 +223,7 @@ skinparam interface {
 			impAcc, foundExporter := accBySubj[i.Account]
 			if foundExporter {
 				for _, e := range impAcc.Exports {
-					if jwt.Subject(remote).IsContainedIn(e.Subject) {
+					if i.Type == e.Type && jwt.Subject(remote).IsContainedIn(e.Subject) {
 						matchingExport = e
 						foundExport = true
 						break
