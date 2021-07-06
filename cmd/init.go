@@ -323,6 +323,26 @@ func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, er
 	sysAccClaim := jwt.NewAccountClaims(acc.PubKey)
 	sysAccClaim.Name = "SYS"
 	sysAccClaim.SigningKeys.Add(sig.PubKey)
+	sysAccClaim.Exports = jwt.Exports{&jwt.Export{
+		Name:                 "account-monitoring-services",
+		Subject:              "$SYS.REQ.ACCOUNT.*.*",
+		Type:                 jwt.Service,
+		ResponseType:         jwt.ResponseTypeStream,
+		AccountTokenPosition: 4,
+		Info: jwt.Info{
+			Description: `Request account specific monitoring services for: SUBSZ, CONNZ, LEAFZ, JSZ and INFO`,
+			InfoURL:     "https://docs.nats.io/nats-server/configuration/sys_accounts",
+		},
+	},&jwt.Export{
+		Name:                 "account-monitoring-streams",
+		Subject:              "$SYS.ACCOUNT.*.>",
+		Type:                 jwt.Stream,
+		AccountTokenPosition: 3,
+		Info: jwt.Info{
+			Description: `Account specific monitoring stream`,
+			InfoURL:     "https://docs.nats.io/nats-server/configuration/sys_accounts",
+		},
+	}}
 	if sysAccJwt, err := sysAccClaim.Encode(opKp); err != nil {
 		return nil, nil, err
 	} else if _, err := s.Store.StoreClaim([]byte(sysAccJwt)); err != nil {
