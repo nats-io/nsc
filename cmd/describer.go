@@ -203,7 +203,25 @@ func (e *ExportsDescriber) Describe() string {
 		k := fmt.Sprintf("%s%s", st, rt)
 		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
 	}
-	return table.Render()
+
+	tableDesc := tablewriter.CreateTable()
+	tableDesc.AddTitle("Exports - Descriptions")
+	tableDesc.AddHeaders("Name", "Description", "Info Url")
+	hasContent := false
+	for _, v := range e.Exports {
+		if v.Description == "" && v.InfoURL == "" {
+			continue
+		}
+		hasContent = true
+		tableDesc.AddRow(v.Name, strings.ReplaceAll(v.Description, "\n", " "), v.InfoURL)
+	}
+
+	ret := table.Render()
+	if hasContent {
+		ret = fmt.Sprintf("%s\n%s", ret, tableDesc.Render())
+	}
+
+	return ret
 }
 
 type ImportsDescriber struct {
