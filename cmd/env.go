@@ -100,6 +100,10 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")
 	table.AddRow("", "", "If not set, will default to the system trust store")
+	table.AddRow("$"+NscTlsKeyNatsEnv, envSet(NscTlsKeyNatsEnv),
+		"If set, the tls key in the referenced file will be used for nats connections")
+	table.AddRow("$"+NscTlsCertNatsEnv, envSet(NscTlsCertNatsEnv),
+		"If set, the tls cert in the referenced file will be used for nats connections")
 	table.AddSeparator()
 	r := conf.StoreRoot
 	if r == "" {
