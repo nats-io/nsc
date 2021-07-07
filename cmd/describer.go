@@ -181,7 +181,7 @@ func toYesNo(tf bool) string {
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking", "Description", "Info URL")
+	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
 	for _, v := range e.Exports {
 		mon := "N/A"
 		rt := ""
@@ -201,10 +201,27 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := strings.Title(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon,
-			strings.ReplaceAll(v.Description, "\n", " "), v.InfoURL)
+		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
 	}
-	return table.Render()
+
+	tableDesc := tablewriter.CreateTable()
+	tableDesc.AddTitle("Exports - Descriptions")
+	tableDesc.AddHeaders("Name", "Description", "Info Url")
+	hasContent := false
+	for _, v := range e.Exports {
+		if v.Description == "" && v.InfoURL == "" {
+			continue
+		}
+		hasContent = true
+		tableDesc.AddRow(v.Name, strings.ReplaceAll(v.Description, "\n", " "), v.InfoURL)
+	}
+
+	ret := table.Render()
+	if hasContent {
+		ret = fmt.Sprintf("%s\n%s", ret, tableDesc.Render())
+	}
+
+	return ret
 }
 
 type ImportsDescriber struct {

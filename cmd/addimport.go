@@ -179,14 +179,30 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 			p.claim = ac
 			subject := string(c.Selection.Subject)
 
-			if c.Selection.IsService() && c.Selection.Subject.HasWildCards() {
-				a := strings.Split(subject, ".")
-				for i, e := range a {
-					if e == ">" || e == "*" {
-						a[i] = targetAccountPK
-					}
+			// rewrite account token subject to include importing account id
+			if c.Selection.AccountTokenPosition > 0 {
+				idx := int(c.Selection.AccountTokenPosition) - 1
+				tk := strings.Split(string(c.Selection.Subject), ".")
+				if idx > len(tk) {
+					return false, fmt.Errorf("AccountTokenPosition greater than subject is long")
 				}
-				subject = strings.Join(a, ".")
+				if tk[idx] != "*" {
+					return false, fmt.Errorf("AccountTokenPosition needs to point at wildcard *")
+				}
+				tk[idx] = targetAccountPK
+				subject = strings.Join(tk, ".")
+
+				// set local subject to not include the account id
+				if p.local == "" {
+					for i := idx; i < len(tk)-1; i++ {
+						tk[idx] = tk[idx+1]
+					}
+					tk2 := tk[0 : len(tk)-1]
+					p.local = strings.Join(tk2, ".")
+				}
+			}
+
+			if c.Selection.IsService() && c.Selection.Subject.HasWildCards() {
 				subject, err = cli.Prompt("export subject", subject, cli.Val(func(s string) error {
 					sub := jwt.Subject(s)
 					var vr jwt.ValidationResults
@@ -403,7 +419,7 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	p.local, err = cli.Prompt("local subject", "", cli.Val(func(s string) error {
+	p.local, err = cli.Prompt("local subject", p.local, cli.Val(func(s string) error {
 		if s == "" {
 			return nil
 		}
