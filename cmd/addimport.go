@@ -181,7 +181,7 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 
 			// rewrite account token subject to include importing account id
 			if c.Selection.AccountTokenPosition > 0 {
-				idx := int(c.Selection.AccountTokenPosition) -1
+				idx := int(c.Selection.AccountTokenPosition) - 1
 				tk := strings.Split(string(c.Selection.Subject), ".")
 				if idx > len(tk) {
 					return false, fmt.Errorf("AccountTokenPosition greater than subject is long")
@@ -194,10 +194,10 @@ func (p *AddImportParams) addLocalExport(ctx ActionCtx) (bool, error) {
 
 				// set local subject to not include the account id
 				if p.local == "" {
-					for i:=idx; i<len(tk)-1; i++ {
+					for i := idx; i < len(tk)-1; i++ {
 						tk[idx] = tk[idx+1]
 					}
-					tk2 := tk[0:len(tk)-1]
+					tk2 := tk[0 : len(tk)-1]
 					p.local = strings.Join(tk2, ".")
 				}
 			}

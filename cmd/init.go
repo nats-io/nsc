@@ -333,7 +333,7 @@ func createSystemAccount(s *store.Context, opKp nkeys.KeyPair) (*keys, *keys, er
 			Description: `Request account specific monitoring services for: SUBSZ, CONNZ, LEAFZ, JSZ and INFO`,
 			InfoURL:     "https://docs.nats.io/nats-server/configuration/sys_accounts",
 		},
-	},&jwt.Export{
+	}, &jwt.Export{
 		Name:                 "account-monitoring-streams",
 		Subject:              "$SYS.ACCOUNT.*.>",
 		Type:                 jwt.Stream,
