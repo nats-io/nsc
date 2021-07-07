@@ -51,7 +51,7 @@ var config ToolConfig
 var toolHome string
 var homeEnv string
 var rootCAsNats nats.Option // Will be skipped, when nil and passed to a connection
-var tlsKeyNats nats.Option // Will be skipped, when nil and passed to a connection
+var tlsKeyNats nats.Option  // Will be skipped, when nil and passed to a connection
 var tlsCertNats nats.Option // Will be skipped, when nil and passed to a connection
 
 var rootCAsFile string
