@@ -36,6 +36,8 @@ const NscHomeEnv = "NSC_HOME"
 const NscCwdOnlyEnv = "NSC_CWD_ONLY"
 const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
 const NscRootCasNatsEnv = "NATS_CA"
+const NscTlsKeyNatsEnv = "NATS_KEY"
+const NscTlsCertNatsEnv = "NATS_CERT"
 
 type ToolConfig struct {
 	ContextConfig
@@ -49,6 +51,9 @@ var config ToolConfig
 var toolHome string
 var homeEnv string
 var rootCAsNats nats.Option // Will be skipped, when nil and passed to a connection
+var tlsKeyNats nats.Option // Will be skipped, when nil and passed to a connection
+var tlsCertNats nats.Option // Will be skipped, when nil and passed to a connection
+
 var rootCAsFile string
 
 func SetToolName(name string) {

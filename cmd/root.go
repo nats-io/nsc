@@ -199,6 +199,11 @@ func SetEnvOptions() {
 		rootCAsFile = strings.TrimSpace(f)
 		rootCAsNats = nats.RootCAs(rootCAsFile)
 	}
+	key, okKey := os.LookupEnv(NscTlsKeyNatsEnv)
+	cert, okCert := os.LookupEnv(NscTlsCertNatsEnv)
+	if okKey || okCert {
+		tlsKeyNats = nats.ClientCert(cert, key)
+	}
 }
 
 func init() {

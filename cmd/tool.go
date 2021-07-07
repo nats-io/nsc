@@ -52,6 +52,8 @@ func createDefaultToolOptions(name string, ctx ActionCtx, o ...nats.Option) []na
 	opts := []nats.Option{nats.Name(name)}
 	opts = append(opts, nats.Timeout(connectTimeout))
 	opts = append(opts, rootCAsNats)
+	opts = append(opts, tlsKeyNats)
+	opts = append(opts, tlsCertNats)
 	opts = append(opts, nats.ReconnectWait(reconnectDelay))
 	opts = append(opts, nats.MaxReconnects(int(totalWait/reconnectDelay)))
 	opts = append(opts, nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
