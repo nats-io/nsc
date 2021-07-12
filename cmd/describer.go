@@ -157,6 +157,11 @@ func (a *AccountDescriber) Describe() string {
 		buf.WriteString(NewImportsDescriber(a.Imports).Describe())
 	}
 
+	if len(a.Mappings) > 0 {
+		buf.WriteString("\n")
+		buf.WriteString(NewMappingsDescriber(a.Mappings).Describe())
+	}
+
 	return buf.String()
 }
 
@@ -222,6 +227,32 @@ func (e *ExportsDescriber) Describe() string {
 	}
 
 	return ret
+}
+
+type MappingsDescriber jwt.Mapping
+
+func NewMappingsDescriber(m jwt.Mapping) *MappingsDescriber {
+	d := MappingsDescriber(m)
+	return &d
+}
+
+func (i *MappingsDescriber) Describe() string {
+	table := tablewriter.CreateTable()
+	table.AddTitle("Mappings")
+	table.AddHeaders("From", "To", "Weight (%)")
+	for k, v := range *i {
+		wSum := uint8(0)
+		for i, m := range v {
+			wSum += m.GetWeight()
+			if i == 0 {
+				table.AddRow(k, m.Subject, m.GetWeight())
+			} else {
+				table.AddRow("", m.Subject, m.Weight)
+			}
+		}
+		table.AddRow("", "", fmt.Sprintf("sum=%d", wSum))
+	}
+	return table.Render()
 }
 
 type ImportsDescriber struct {
