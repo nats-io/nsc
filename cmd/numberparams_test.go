@@ -39,7 +39,7 @@ func numberEditorCmd(params *NumberParams) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().Int64VarP(&params.NumberValue, "number", "n", 0, "some number")
+	cmd.Flags().VarP(params, "number", "n", "some number")
 
 	return cmd
 }
@@ -50,7 +50,7 @@ func TestNumberParams_BindFlags(t *testing.T) {
 	_, _, err := ExecuteCmd(cmd, "--number", "10")
 	require.NoError(t, err)
 
-	require.Equal(t, int64(10), p.NumberValue)
+	require.Equal(t, NumberParams(10), p)
 }
 
 func TestNumberParams_Edit(t *testing.T) {
@@ -59,5 +59,5 @@ func TestNumberParams_Edit(t *testing.T) {
 	_, _, err := ExecuteInteractiveCmd(cmd, []interface{}{"404"})
 	require.NoError(t, err)
 
-	require.Equal(t, int64(404), p.NumberValue)
+	require.Equal(t, NumberParams(404), p)
 }

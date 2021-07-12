@@ -58,19 +58,27 @@ func createEditAccount() *cobra.Command {
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
-	cmd.Flags().Int64VarP(&params.conns.NumberValue, "conns", "", -1, "set maximum active connections for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.leafConns.NumberValue, "leaf-conns", "", 0, "set maximum active leaf node connections for the account (-1 is unlimited)")
-	cmd.Flags().StringVarP(&params.data.Value, "data", "", "-1", "set maximum data in bytes for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.exports.NumberValue, "exports", "", -1, "set maximum number of exports for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.imports.NumberValue, "imports", "", -1, "set maximum number of imports for the account (-1 is unlimited)")
-	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.subscriptions.NumberValue, "subscriptions", "", -1, "set maximum subscription for the account (-1 is unlimited)")
+	params.conns = -1
+	cmd.Flags().VarP(&params.conns, "conns", "", "set maximum active connections for the account (-1 is unlimited)")
+	cmd.Flags().VarP(&params.leafConns, "leaf-conns", "", "set maximum active leaf node connections for the account (-1 is unlimited)")
+	params.data = -1
+	cmd.Flags().VarP(&params.data, "data", "", "set maximum data in bytes for the account (-1 is unlimited)")
+	params.exports = -1
+	cmd.Flags().VarP(&params.exports, "exports", "", "set maximum number of exports for the account (-1 is unlimited)")
+	params.imports = -1
+	cmd.Flags().VarP(&params.imports, "imports", "", "set maximum number of imports for the account (-1 is unlimited)")
+	params.payload = -1
+	cmd.Flags().VarP(&params.payload, "payload", "", "set maximum message payload in bytes for the account (-1 is unlimited)")
+	params.subscriptions = -1
+	cmd.Flags().VarP(&params.subscriptions, "subscriptions", "", "set maximum subscription for the account (-1 is unlimited)")
 	// changed flag names by prefixing them with js-
 	// to replace them mark the old names as hidden (so using them does not break) and add new flags with correct name
-	cmd.Flags().StringVarP(&params.memStorage.Value, "mem-storage", "", "0", "")
-	cmd.Flags().StringVarP(&params.diskStorage.Value, "disk-storage", "", "0", "")
-	cmd.Flags().Int64VarP(&params.streams.NumberValue, "streams", "", -1, "")
-	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "consumer", "", -1, "")
+	cmd.Flags().VarP(&params.memStorage, "mem-storage", "", "")
+	cmd.Flags().VarP(&params.diskStorage, "disk-storage", "", "")
+	params.streams = -1
+	cmd.Flags().VarP(&params.streams, "streams", "", "")
+	params.consumer = -1
+	cmd.Flags().VarP(&params.consumer, "consumer", "", "")
 	cmd.Flags().MarkHidden("mem-storage")
 	cmd.Flags().MarkHidden("disk-storage")
 	cmd.Flags().MarkHidden("streams")
@@ -79,10 +87,12 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().MarkDeprecated("disk-storage", "it got renamed to --js-disk-storage")
 	cmd.Flags().MarkDeprecated("streams", "it got renamed to --js-streams")
 	cmd.Flags().MarkDeprecated("consumer", "it got renamed to --js-consumer")
-	cmd.Flags().StringVarP(&params.memStorage.Value, "js-mem-storage", "", "0", "Jetstream: set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
-	cmd.Flags().StringVarP(&params.diskStorage.Value, "js-disk-storage", "", "0", "Jetstream: set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
-	cmd.Flags().Int64VarP(&params.streams.NumberValue, "js-streams", "", -1, "Jetstream: set maximum streams for the account (-1 is unlimited)")
-	cmd.Flags().Int64VarP(&params.consumer.NumberValue, "js-consumer", "", -1, "Jetstream: set maximum consumer for the account (-1 is unlimited)")
+	cmd.Flags().VarP(&params.memStorage, "js-mem-storage", "", "Jetstream: set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	cmd.Flags().VarP(&params.diskStorage, "js-disk-storage", "", "Jetstream: set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	params.streams = -1
+	cmd.Flags().VarP(&params.streams, "js-streams", "", "Jetstream: set maximum streams for the account (-1 is unlimited)")
+	params.consumer = -1
+	cmd.Flags().VarP(&params.consumer, "js-consumer", "", "Jetstream: set maximum consumer for the account (-1 is unlimited)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
@@ -112,15 +122,15 @@ type EditAccountParams struct {
 	conns         NumberParams
 	leafConns     NumberParams
 	exports       NumberParams
-	memStorage    DataParams
-	diskStorage   DataParams
+	memStorage    NumberParams
+	diskStorage   NumberParams
 	streams       NumberParams
 	consumer      NumberParams
 	exportsWc     bool
 	imports       NumberParams
 	subscriptions NumberParams
-	payload       DataParams
-	data          DataParams
+	payload       NumberParams
+	data          NumberParams
 	signingKeys   SigningKeysParams
 	rmSigningKeys []string
 }
@@ -165,47 +175,47 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("conns") {
-		p.conns.NumberValue = p.claim.Limits.Conn
+		p.conns = NumberParams(p.claim.Limits.Conn)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("leaf-conns") {
-		p.leafConns.NumberValue = p.claim.Limits.LeafNodeConn
+		p.leafConns = NumberParams(p.claim.Limits.LeafNodeConn)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("data") {
-		p.data.Value = fmt.Sprintf("%d", p.claim.Limits.Data)
+		p.data = NumberParams(p.claim.Limits.Data)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("exports") {
-		p.exports.NumberValue = p.claim.Limits.Exports
+		p.exports = NumberParams(p.claim.Limits.Exports)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("imports") {
-		p.imports.NumberValue = p.claim.Limits.Imports
+		p.imports = NumberParams(p.claim.Limits.Imports)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("payload") {
-		p.payload.Value = fmt.Sprintf("%d", p.claim.Limits.Payload)
+		p.payload = NumberParams(p.claim.Limits.Payload)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("subscriptions") {
-		p.subscriptions.NumberValue = p.claim.Limits.Subs
+		p.subscriptions = NumberParams(p.claim.Limits.Subs)
 	}
 
 	if !(ctx.CurrentCmd().Flags().Changed("js-mem-storage") || ctx.CurrentCmd().Flags().Changed("mem-storage")) {
-		p.memStorage.Value = fmt.Sprintf("%d", p.claim.Limits.MemoryStorage)
+		p.memStorage = NumberParams(p.claim.Limits.MemoryStorage)
 	}
 
 	if !(ctx.CurrentCmd().Flags().Changed("js-disk-storage") || ctx.CurrentCmd().Flags().Changed("disk-storage")) {
-		p.diskStorage.Value = fmt.Sprintf("%d", p.claim.Limits.DiskStorage)
+		p.diskStorage = NumberParams(p.claim.Limits.DiskStorage)
 	}
 
 	if !(ctx.CurrentCmd().Flags().Changed("js-streams") || ctx.CurrentCmd().Flags().Changed("streams")) {
-		p.streams.NumberValue = p.claim.Limits.Streams
+		p.streams = NumberParams(p.claim.Limits.Streams)
 	}
 
 	if !(ctx.CurrentCmd().Flags().Changed("js-consumer") || ctx.CurrentCmd().Flags().Changed("consumer")) {
-		p.consumer.NumberValue = p.claim.Limits.Consumer
+		p.consumer = NumberParams(p.claim.Limits.Consumer)
 	}
 
 	if !ctx.CurrentCmd().Flags().Changed("description") {
@@ -261,7 +271,7 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.memStorage.Number != 0 || p.diskStorage.Number != 0 {
+	if p.memStorage != 0 || p.diskStorage != 0 {
 		if err = p.streams.Edit("max streams (-1 unlimited)"); err != nil {
 			return err
 		}
@@ -308,7 +318,7 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
-		if p.memStorage.Number != 0 || p.diskStorage.Number != 0 || p.consumer.NumberValue != 0 || p.streams.NumberValue != 0 {
+		if p.memStorage != 0 || p.diskStorage != 0 || p.consumer != 0 || p.streams != 0 {
 			return fmt.Errorf("jetstream not available for system account")
 		}
 	}
@@ -340,25 +350,22 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	flags := ctx.CurrentCmd().Flags()
-	p.claim.Limits.Conn = p.conns.NumberValue
+	p.claim.Limits.Conn = p.conns.Int64()
 	if flags.Changed("conns") {
 		r.AddOK("changed max connections to %d", p.claim.Limits.Conn)
 	}
 
-	p.claim.Limits.LeafNodeConn = p.leafConns.NumberValue
+	p.claim.Limits.LeafNodeConn = p.leafConns.Int64()
 	if flags.Changed("leaf-conns") {
 		r.AddOK("changed leaf node connections to %d", p.claim.Limits.LeafNodeConn)
 	}
 
-	p.claim.Limits.Data, err = p.data.NumberValue()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %s", "data", p.data.Value)
-	}
+	p.claim.Limits.Data = p.data.Int64()
 	if flags.Changed("data") {
 		r.AddOK("changed max data to %d bytes", p.claim.Limits.Data)
 	}
 
-	p.claim.Limits.Exports = p.exports.NumberValue
+	p.claim.Limits.Exports = p.exports.Int64()
 	if flags.Changed("exports") {
 		r.AddOK("changed max exports to %d", p.claim.Limits.Exports)
 	}
@@ -368,46 +375,37 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed wild card exports to %t", p.claim.Limits.WildcardExports)
 	}
 
-	p.claim.Limits.Imports = p.imports.NumberValue
+	p.claim.Limits.Imports = p.imports.Int64()
 	if flags.Changed("imports") {
 		r.AddOK("changed max imports to %d", p.claim.Limits.Imports)
 	}
 
-	p.claim.Limits.Payload, err = p.payload.NumberValue()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %s", "payload", p.data.Value)
-	}
+	p.claim.Limits.Payload = p.payload.Int64()
 	if flags.Changed("payload") {
 		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
 	}
 
-	p.claim.Limits.Subs = p.subscriptions.NumberValue
+	p.claim.Limits.Subs = p.subscriptions.Int64()
 	if flags.Changed("subscriptions") {
 		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
 	}
 
-	p.claim.Limits.MemoryStorage, err = p.memStorage.NumberValue()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %s", "mem-storage", p.memStorage.Value)
-	}
+	p.claim.Limits.MemoryStorage = p.memStorage.Int64()
 	if flags.Changed("mem-storage") {
 		r.AddOK("changed max mem storage to %d", p.claim.Limits.MemoryStorage)
 	}
 
-	p.claim.Limits.DiskStorage, err = p.diskStorage.NumberValue()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %s", "disk-storage", p.diskStorage.Value)
-	}
+	p.claim.Limits.DiskStorage = p.diskStorage.Int64()
 	if flags.Changed("disk-storage") {
 		r.AddOK("changed max disk storage to %d", p.claim.Limits.DiskStorage)
 	}
 
-	p.claim.Limits.Streams = p.streams.NumberValue
+	p.claim.Limits.Streams = p.streams.Int64()
 	if flags.Changed("streams") {
 		r.AddOK("changed max streams to %d", p.claim.Limits.Streams)
 	}
 
-	p.claim.Limits.Consumer = p.consumer.NumberValue
+	p.claim.Limits.Consumer = p.consumer.Int64()
 	if flags.Changed("consumer") {
 		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
 	}
