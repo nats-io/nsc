@@ -26,23 +26,23 @@ func Test_DeleteMapping(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1",  "--to", "to1", "--weight", "50")
+	_, _, err := ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1", "--to", "to1", "--weight", "50")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1",  "--to", "to2", "--weight", "50")
+	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1", "--to", "to2", "--weight", "50")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2",  "--to", "to1", "--weight", "50")
+	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2", "--to", "to1", "--weight", "50")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2",  "--to", "to2", "--weight", "50")
+	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2", "--to", "to2", "--weight", "50")
 	require.NoError(t, err)
 
- 	ac, err := ts.Store.ReadAccountClaim("A")
+	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.NotNil(t, ac)
 	require.Len(t, ac.Mappings, 2)
 	require.Len(t, ac.Mappings["from1"], 2)
 	require.Len(t, ac.Mappings["from2"], 2)
 
- 	// remove all mappings for from1
+	// remove all mappings for from1
 	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--account", "A", "--from", "from1")
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -77,4 +77,3 @@ func Test_DeleteMapping(t *testing.T) {
 	require.NotNil(t, ac)
 	require.Len(t, ac.Mappings, 0)
 }
-

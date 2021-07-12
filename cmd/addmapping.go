@@ -112,7 +112,7 @@ func (p *AddMappingParams) Validate(ctx ActionCtx) error {
 		return errors.New("to subject is required")
 	}
 
-	if 	p.claim.Mappings == nil {
+	if p.claim.Mappings == nil {
 		p.claim.Mappings = jwt.Mapping{}
 	}
 

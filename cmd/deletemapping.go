@@ -48,9 +48,9 @@ func init() {
 type DeleteMappingParams struct {
 	AccountContextParams
 	SignerParams
-	claim   *jwt.AccountClaims
+	claim *jwt.AccountClaims
 	from  jwt.Subject
-	to 	  jwt.Subject
+	to    jwt.Subject
 }
 
 func (p *DeleteMappingParams) SetDefaults(ctx ActionCtx) error {
