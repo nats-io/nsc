@@ -162,6 +162,17 @@ func (a *AccountDescriber) Describe() string {
 		buf.WriteString(NewMappingsDescriber(a.Mappings).Describe())
 	}
 
+	if len(a.SigningKeys) > 0 {
+		for _, v := range a.SigningKeys {
+			if v == nil {
+				continue
+			}
+			buf.WriteString("\n")
+			buf.WriteString(NewScopedSkDescriber(v.(*jwt.UserScope)).Describe())
+		}
+		table.AddSeparator()
+	}
+
 	return buf.String()
 }
 
@@ -251,6 +262,29 @@ func (i *MappingsDescriber) Describe() string {
 			}
 		}
 		table.AddRow("", "", fmt.Sprintf("sum=%d", wSum))
+	}
+	return table.Render()
+}
+
+type ScopedSkDescriber jwt.UserScope
+
+func NewScopedSkDescriber(m *jwt.UserScope) *ScopedSkDescriber {
+	return (*ScopedSkDescriber)(m)
+}
+
+func (s *ScopedSkDescriber) Describe() string {
+	var buf bytes.Buffer
+	buf.WriteString("\n")
+	table := tablewriter.CreateTable()
+	table.AddTitle("Scoped Signing Key - Details")
+	table.AddRow("Key", s.Key)
+	table.AddRow("role", s.Role)
+	AddPermissions(table, s.Template.Permissions)
+	AddLimits(table, s.Template.Limits)
+	table.AddRow("Bearer Token", toYesNo(s.Template.BearerToken))
+	if len(s.Template.AllowedConnectionTypes) > 0 {
+		table.AddSeparator()
+		AddListValues(table, "Allowed Connection Types", s.Template.AllowedConnectionTypes)
 	}
 	return table.Render()
 }
@@ -481,7 +515,7 @@ func (u *UserDescriber) Describe() string {
 		AddListValues(table, "Tags", u.Tags)
 	}
 
-	if len(u.Tags) > 0 {
+	if len(u.AllowedConnectionTypes) > 0 {
 		table.AddSeparator()
 		AddListValues(table, "Allowed Connection Types", u.AllowedConnectionTypes)
 	}
