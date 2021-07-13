@@ -71,34 +71,12 @@ nsc edit user --name <n> --rm-response-perms
 			return RunAction(cmd, args, &params)
 		},
 	}
-
-	cmd.Flags().VarP(&params.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
-	cmd.Flags().StringSliceVarP(&params.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
-	cmd.Flags().VarP(&params.locale, "locale", "", "set the locale with which time values are interpreted")
-
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringSliceVarP(&params.src, "source-network", "", nil, "add source network for connection - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&params.rmSrc, "rm-source-network", "", nil, "remove source network for connection - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().StringVarP(&params.payload.Value, "payload", "", "-1", "set maximum message payload in bytes for the account (-1 is unlimited)")
-
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
-	cmd.Flags().StringSliceVarP(&params.connTypes, "conn-type", "", nil, fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
-		jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
-	cmd.Flags().StringSliceVarP(&params.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
-
-	cmd.Flags().BoolVarP(&params.bearer, "bearer", "", false, "no connect challenge required for user")
-
-	cmd.Flags().Int64VarP(&params.maxSubs, "subs", "", -1, "set maximum number of subscriptions (-1 is unlimited)")
-	cmd.Flags().StringVarP(&params.maxData.Value, "data", "", "-1", "set maximum data in bytes for the user (-1 is unlimited)")
-
 	params.AccountContextParams.BindFlags(cmd)
 	params.GenericClaimsParams.BindFlags(cmd)
-	params.PermissionsParams.bindSetFlags(cmd, "permissions")
-	params.PermissionsParams.bindRemoveFlags(cmd, "permissions")
-
+	params.UserPermissionLimits.BindFlags(cmd)
 	return cmd
 }
 
@@ -110,23 +88,11 @@ type EditUserParams struct {
 	AccountContextParams
 	SignerParams
 	GenericClaimsParams
-	PermissionsParams
 	claim         *jwt.UserClaims
 	name          string
 	token         string
 	credsFilePath string
-
-	bearer      bool
-	connTypes   []string
-	locale      timeLocale
-	maxData     DataParams
-	maxSubs     int64
-	payload     DataParams
-	rmConnTypes []string
-	rmSrc       []string
-	rmTimes     []string
-	src         []string
-	times       timeSlice
+	UserPermissionLimits
 }
 
 func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
@@ -195,25 +161,17 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if !ctx.CurrentCmd().Flag("payload").Changed {
-		p.payload.Value = fmt.Sprintf("%d", p.claim.Limits.Payload)
-	}
-	if !ctx.CurrentCmd().Flag("data").Changed {
-		p.maxData.Value = fmt.Sprintf("%d", p.claim.Limits.Data)
-	}
-	if !ctx.CurrentCmd().Flag("subs").Changed {
-		p.maxSubs = p.claim.Limits.Subs
-	}
+	p.UserPermissionLimits.Load(ctx, p.claim.UserPermissionLimits)
 
 	return err
 }
 
-func (p *EditUserParams) PostInteractive(_ ActionCtx) error {
+func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
 	//if err := p.PermissionsParams.Edit(p.claim.Resp != nil); err != nil {
 	//	return err
 	//}
-	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
+	if err := p.UserPermissionLimits.PostInteractive(ctx); err != nil {
 		return err
 	}
 	if p.claim.NotBefore > 0 {
@@ -229,44 +187,12 @@ func (p *EditUserParams) PostInteractive(_ ActionCtx) error {
 }
 
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
-	var err error
+	p.UserPermissionLimits.Validate(ctx)
 
-	connTypes := make([]string, len(p.connTypes))
-	for i, k := range p.connTypes {
-		u := strings.ToUpper(k)
-		switch u {
-		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket:
-		default:
-			return fmt.Errorf("unknown connection type %s", k)
-		}
-		connTypes[i] = u
-	}
-	rmConnTypes := make([]string, len(p.rmConnTypes))
-	for i, k := range p.rmConnTypes {
-		rmConnTypes[i] = strings.ToUpper(k)
-	}
-	p.rmConnTypes = rmConnTypes
-
-	_, err = p.payload.NumberValue()
-	if err != nil {
-		return fmt.Errorf("error parsing %s: %s", "payload", p.payload.Value)
-	}
-	if _, err := p.maxData.NumberValue(); err != nil {
-		return fmt.Errorf("error parsing %s: %s", "data", p.payload.Value)
-	}
-	if err = p.GenericClaimsParams.Valid(); err != nil {
+	if err := p.GenericClaimsParams.Valid(); err != nil {
 		return err
 	}
-	if err = p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
-		return err
-	}
-	if err = p.payload.Valid(); err != nil {
-		return err
-	}
-	if err = p.maxData.Valid(); err != nil {
-		return err
-	}
-	if err := p.PermissionsParams.Validate(); err != nil {
+	if err := p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
 		return err
 	}
 
@@ -282,72 +208,7 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	flags := ctx.CurrentCmd().Flags()
-	p.claim.Limits.Payload, _ = p.payload.NumberValue()
-	if flags.Changed("payload") {
-		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
-	}
-	p.claim.Limits.Data, _ = p.maxData.NumberValue()
-	if flags.Changed("data") {
-		r.AddOK("changed max data to %d", p.claim.Limits.Data)
-	}
-	p.claim.Limits.Subs = p.maxSubs
-	if flags.Changed("subs") {
-		r.AddOK("changed max number of subs to %d", p.claim.Limits.Subs)
-	}
-
-	if flags.Changed("bearer") {
-		p.claim.BearerToken = p.bearer
-		r.AddOK("changed bearer to %t", p.bearer)
-	}
-
-	var connTypes jwt.StringList
-	connTypes.Add(p.claim.AllowedConnectionTypes...)
-	connTypes.Add(p.connTypes...)
-	for _, v := range p.connTypes {
-		r.AddOK("added connection type %s", v)
-	}
-	connTypes.Remove(p.rmConnTypes...)
-	for _, v := range p.rmConnTypes {
-		r.AddOK("removed connection type %s", v)
-	}
-	p.claim.AllowedConnectionTypes = connTypes
-
-	var srcList jwt.CIDRList
-	srcList.Add(p.claim.Src...)
-	srcList.Add(p.src...)
-	for _, v := range p.src {
-		r.AddOK("added src network %s", v)
-	}
-	srcList.Remove(p.rmSrc...)
-	for _, v := range p.rmSrc {
-		r.AddOK("removed src network %s", v)
-	}
-	sort.Strings(srcList)
-	p.claim.Src = srcList
-
-	if flags.Changed("locale") {
-		p.claim.Locale = p.locale.String()
-	}
-	for _, v := range p.times {
-		r.AddOK("added time range %s-%s", v.Start, v.End)
-		p.claim.Times = append(p.claim.Times, v)
-	}
-	for _, vDel := range p.rmTimes {
-		for i, v := range p.claim.Times {
-			if v.Start == vDel {
-				r.AddOK("removed time range %s-%s", v.Start, v.End)
-				a := p.claim.Times
-				// Remove the element at index i from a.
-				copy(a[i:], a[i+1:])          // Shift a[i+1:] left one index.
-				a[len(a)-1] = jwt.TimeRange{} // Erase last element (write zero value).
-				p.claim.Times = a[:len(a)-1]  // Truncate slice.
-				break
-			}
-		}
-	}
-
-	s, err := p.PermissionsParams.Run(&p.claim.Permissions, ctx)
+	s, err := p.UserPermissionLimits.Run(ctx, &p.claim.UserPermissionLimits)
 	if err != nil {
 		return nil, err
 	}
@@ -460,4 +321,168 @@ func (l *timeLocale) String() string {
 
 func (t *timeLocale) Type() string {
 	return "time-locale"
+}
+
+type UserPermissionLimits struct {
+	PermissionsParams
+	bearer      bool
+	payload     NumberParams
+	maxData     NumberParams
+	maxSubs     int64
+	rmConnTypes []string
+	connTypes   []string
+	rmSrc       []string
+	src         []string
+	locale      timeLocale
+	rmTimes     []string
+	times       timeSlice
+}
+
+func (p *UserPermissionLimits) BindFlags(cmd *cobra.Command) {
+	cmd.Flags().VarP(&p.times, "time", "", fmt.Sprintf(`add start-end time range of the form "%s-%s" (option can be specified multiple times)`, timeFormat, timeFormat))
+	cmd.Flags().StringSliceVarP(&p.rmTimes, "rm-time", "", nil, fmt.Sprintf(`remove start-end time by start time "%s" (option can be specified multiple times)`, timeFormat))
+	cmd.Flags().VarP(&p.locale, "locale", "", "set the locale with which time values are interpreted")
+	cmd.Flags().StringSliceVarP(&p.src, "source-network", "", nil, "add source network for connection - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringSliceVarP(&p.rmSrc, "rm-source-network", "", nil, "remove source network for connection - comma separated list or option can be specified multiple times")
+	cmd.Flags().StringSliceVarP(&p.connTypes, "conn-type", "", nil, fmt.Sprintf("add connection types: %s %s %s %s - comma separated list or option can be specified multiple times",
+		jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket))
+	cmd.Flags().StringSliceVarP(&p.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
+	cmd.Flags().Int64VarP(&p.maxSubs, "subs", "", -1, "set maximum number of subscriptions (-1 is unlimited)")
+	p.maxData = -1
+	cmd.Flags().VarP(&p.maxData, "data", "", "set maximum data in bytes for the user (-1 is unlimited)")
+	p.payload = -1
+	cmd.Flags().VarP(&p.payload, "payload", "", "set maximum message payload in bytes for the account (-1 is unlimited)")
+	cmd.Flags().BoolVarP(&p.bearer, "bearer", "", false, "no connect challenge required for user")
+	p.PermissionsParams.bindSetFlags(cmd, "permissions")
+	p.PermissionsParams.bindRemoveFlags(cmd, "permissions")
+}
+
+func (p *UserPermissionLimits) Load(ctx ActionCtx, u jwt.UserPermissionLimits) error {
+	if !ctx.CurrentCmd().Flag("payload").Changed {
+		p.payload = NumberParams(u.Limits.Payload)
+	}
+	if !ctx.CurrentCmd().Flag("data").Changed {
+		p.maxData = NumberParams(u.Limits.Data)
+	}
+	if !ctx.CurrentCmd().Flag("subs").Changed {
+		p.maxSubs = u.Limits.Subs
+	}
+	return nil
+}
+
+func (p *UserPermissionLimits) PostInteractive(_ ActionCtx) error {
+	// FIXME: we won't do interactive on the response params until pub/sub/deny permissions are interactive
+	//if err := p.PermissionsParams.Edit(p.claim.Resp != nil); err != nil {
+	//	return err
+	//}
+	if err := p.payload.Edit("max payload (-1 unlimited)"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *UserPermissionLimits) Validate(ctx ActionCtx) error {
+	connTypes := make([]string, len(p.connTypes))
+	for i, k := range p.connTypes {
+		u := strings.ToUpper(k)
+		switch u {
+		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket:
+		default:
+			return fmt.Errorf("unknown connection type %s", k)
+		}
+		connTypes[i] = u
+	}
+	rmConnTypes := make([]string, len(p.rmConnTypes))
+	for i, k := range p.rmConnTypes {
+		rmConnTypes[i] = strings.ToUpper(k)
+	}
+	p.rmConnTypes = rmConnTypes
+
+	if err := p.PermissionsParams.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *UserPermissionLimits) Run(ctx ActionCtx, claim *jwt.UserPermissionLimits) (*store.Report, error) {
+	r := store.NewDetailedReport(true)
+	r.ReportSum = false
+
+	var err error
+
+	flags := ctx.CurrentCmd().Flags()
+	claim.Limits.Payload = p.payload.Int64()
+	if flags.Changed("payload") {
+		r.AddOK("changed max imports to %d", claim.Limits.Payload)
+	}
+	claim.Limits.Data = p.maxData.Int64()
+	if flags.Changed("data") {
+		r.AddOK("changed max data to %d", claim.Limits.Data)
+	}
+	claim.Limits.Subs = p.maxSubs
+	if flags.Changed("subs") {
+		r.AddOK("changed max number of subs to %d", claim.Limits.Subs)
+	}
+
+	if flags.Changed("bearer") {
+		claim.BearerToken = p.bearer
+		r.AddOK("changed bearer to %t", p.bearer)
+	}
+
+	var connTypes jwt.StringList
+	connTypes.Add(claim.AllowedConnectionTypes...)
+	connTypes.Add(p.connTypes...)
+	for _, v := range p.connTypes {
+		r.AddOK("added connection type %s", v)
+	}
+	connTypes.Remove(p.rmConnTypes...)
+	for _, v := range p.rmConnTypes {
+		r.AddOK("removed connection type %s", v)
+	}
+	claim.AllowedConnectionTypes = connTypes
+
+	var srcList jwt.CIDRList
+	srcList.Add(claim.Src...)
+	srcList.Add(p.src...)
+	for _, v := range p.src {
+		r.AddOK("added src network %s", v)
+	}
+	srcList.Remove(p.rmSrc...)
+	for _, v := range p.rmSrc {
+		r.AddOK("removed src network %s", v)
+	}
+	sort.Strings(srcList)
+	claim.Src = srcList
+
+	if flags.Changed("locale") {
+		claim.Locale = p.locale.String()
+	}
+	for _, v := range p.times {
+		r.AddOK("added time range %s-%s", v.Start, v.End)
+		claim.Times = append(claim.Times, v)
+	}
+	for _, vDel := range p.rmTimes {
+		for i, v := range claim.Times {
+			if v.Start == vDel {
+				r.AddOK("removed time range %s-%s", v.Start, v.End)
+				a := claim.Times
+				// Remove the element at index i from a.
+				copy(a[i:], a[i+1:])          // Shift a[i+1:] left one index.
+				a[len(a)-1] = jwt.TimeRange{} // Erase last element (write zero value).
+				claim.Times = a[:len(a)-1]    // Truncate slice.
+				break
+			}
+		}
+	}
+
+	s, err := p.PermissionsParams.Run(&claim.Permissions, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil {
+		r.Add(s.Details...)
+	}
+
+	return r, nil
 }
