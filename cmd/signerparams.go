@@ -20,6 +20,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nats-io/jwt/v2"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -190,6 +192,33 @@ func (p *SignerParams) ResolveWithPriority(ctx ActionCtx, preferKey string) erro
 	var err error
 	// if they specified -K resolve or fail
 	if KeyPathFlag != "" {
+		// try to find key by role. on error try other methods
+		if acc := ctx.StoreCtx().Account.Name; acc != "" {
+			if claim, err := ctx.StoreCtx().Store.ReadAccountClaim(acc); err == nil {
+				for key, v := range claim.SigningKeys {
+					if v, ok := v.(*jwt.UserScope); ok {
+						if v.Role == KeyPathFlag {
+							if kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(key); kp != nil {
+								p.signerKP = kp
+								return nil
+							}
+						}
+					}
+				}
+			}
+		}
+		// try to interpret as public key. on error try other methods
+		if nkeys.IsValidPublicKey(KeyPathFlag) {
+			for _, k := range p.kind {
+				if k, err := nkeys.Decode(k, []byte(KeyPathFlag)); err == nil && k != nil {
+					if kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(KeyPathFlag); kp != nil {
+						p.signerKP = kp
+						return nil
+					}
+				}
+			}
+		}
+		// try file or seed
 		p.signerKP, err = ctx.StoreCtx().ResolveKey(KeyPathFlag, p.kind...)
 		if err != nil {
 			return err

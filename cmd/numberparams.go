@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/dustin/go-humanize"
 
 	cli "github.com/nats-io/cliprompts/v2"

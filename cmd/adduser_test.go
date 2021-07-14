@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -468,4 +469,58 @@ func Test_AddUser_SrcPermissions(t *testing.T) {
 	require.True(t, u.Limits.Src.Contains("1.2.1.1/29"))
 	require.True(t, u.Limits.Src.Contains("1.2.2.2/29"))
 	require.True(t, u.Limits.Src.Contains("1.2.0.3/32"))
+}
+
+func Test_AddUser_Scoped(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	s, pk, kp := CreateAccountKey(t)
+
+	// store seed in temporary file
+	f, err := ioutil.TempFile("", "")
+	defer os.Remove(f.Name())
+	require.NoError(t, err)
+	f.Write(s)
+	f.Sync()
+
+	_, err = ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.SigningKeys, pk)
+
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", pk, "--subs", "5", "--role", "user-role")
+	require.NoError(t, err)
+
+	// fail using key outright
+	_, stderr, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA", "--tag", "foo", "--bearer", "-K", pk)
+	require.Error(t, err)
+	require.Contains(t, stderr, "[ERR ] scoped users require no permissions or limits set")
+
+	// fail using key via role name
+	_, stderr, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UB", "--tag", "foo", "--bearer", "-K", "user-role")
+	require.Error(t, err)
+	require.Contains(t, stderr, "[ERR ] scoped users require no permissions or limits set")
+
+	// pass as no permissions/limits are modified.
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UC", "--tag", "foo", "-K", "user-role")
+	require.NoError(t, err)
+
+	// pass as no permissions/limits are modified.
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UD", "--tag", "foo", "-K", pk)
+	require.NoError(t, err)
+
+	// pass as no permissions/limits are modified.
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UE", "--tag", "foo", "-K", string(s))
+	require.NoError(t, err)
+
+	// pass as no permissions/limits are modified.
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UF", "--tag", "foo", "-K", f.Name())
+	require.NoError(t, err)
 }
