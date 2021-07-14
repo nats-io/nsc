@@ -215,7 +215,7 @@ func init() {
 // HoistRootFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "private key")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "Key used to sign. Can be specified as role (where applicable), public key (private portion is retrieved) or file path to a private key or private key ")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
 	return cmd
 }

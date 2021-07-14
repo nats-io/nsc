@@ -232,6 +232,12 @@ func (p *EditUserParams) Run(ctx ActionCtx) (store.Status, error) {
 		p.claim.IssuerAccount = ac.Subject
 	}
 
+	if err := checkUserForScope(ctx, p.AccountContextParams.Name, p.signerKP, p.claim); err != nil {
+		r.AddFromError(err)
+		r.AddWarning("user was NOT edited as the edits conflict with signing key scope")
+		return r, err
+	}
+
 	// we sign
 	p.token, err = p.claim.Encode(p.signerKP)
 	if err != nil {

@@ -127,7 +127,7 @@ func (p *DescribeUserParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeUserParams) Run(_ ActionCtx) (store.Status, error) {
+func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if Raw || Json || JsonPath != "" {
 		if !IsStdOut(p.outputFile) {
 			var err error
@@ -143,6 +143,11 @@ func (p *DescribeUserParams) Run(_ ActionCtx) (store.Status, error) {
 		}
 	} else {
 		v := NewUserDescriber(p.UserClaims).Describe()
+		if aClaim, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name); err == nil {
+			if s, ok := aClaim.SigningKeys.GetScope(p.UserClaims.Issuer); ok && s != nil {
+				v = fmt.Sprintf("%s\n%s", v, NewScopedSkDescriber(s.(*jwt.UserScope)).Describe())
+			}
+		}
 		if err := Write(p.outputFile, []byte(v)); err != nil {
 			return nil, err
 		}

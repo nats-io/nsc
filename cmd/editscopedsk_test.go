@@ -16,9 +16,10 @@
 package cmd
 
 import (
+	"testing"
+
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_EditScopedSk_NotFound(t *testing.T) {

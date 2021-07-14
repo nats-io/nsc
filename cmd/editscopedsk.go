@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -27,7 +28,7 @@ func createEditSkopedSkCmd() *cobra.Command {
 	var params EditScopedSkParams
 	cmd := &cobra.Command{
 		Use:   "signing-key",
-		Short: "Edit a scoped signing key",
+		Short: "Edit a scoped signing key or promote a signing key to be scoped",
 		Long: `# Edit permissions associated with the account (n) signing key (sk):
 nsc edit signing-key --account <n> --sk <sk> --allow-pubsub <subject>,...
 nsc edit signing-key --account <n> --sk <sk> --allow-pub <subject>,...

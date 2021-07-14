@@ -140,11 +140,6 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Revocations", fmt.Sprintf("%d", len(a.Revocations)))
 	}
 
-	if len(a.Tags) > 0 {
-		table.AddSeparator()
-		AddListValues(table, "Tags", a.Tags)
-	}
-
 	buf.WriteString(table.Render())
 
 	if len(a.Exports) > 0 {
@@ -364,24 +359,29 @@ func (i *ImportDescriber) LoadActivation() (*jwt.ActivationClaims, error) {
 func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
 	label := "Account ID"
 	issuer := ""
+	var tags jwt.TagList
 	if ac, ok := claims.(*jwt.ActivationClaims); ok {
 		if ac.IssuerAccount != "" {
 			issuer = ac.IssuerAccount
 		}
+		tags = ac.Tags
 	}
 	if acc, ok := claims.(*jwt.ActivationClaims); ok {
 		if acc.IssuerAccount != "" {
 			issuer = acc.IssuerAccount
 		}
+		tags = acc.Tags
 	}
 	if uc, ok := claims.(*jwt.UserClaims); ok {
 		label = "User ID"
 		if uc.IssuerAccount != "" {
 			issuer = uc.IssuerAccount
 		}
+		tags = uc.Tags
 	}
-	if _, ok := claims.(*jwt.OperatorClaims); ok {
+	if oc, ok := claims.(*jwt.OperatorClaims); ok {
 		label = "Operator ID"
+		tags = oc.Tags
 	}
 
 	cd := claims.Claims()
@@ -395,6 +395,9 @@ func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
 	}
 	table.AddRow("Issued", RenderDate(cd.IssuedAt))
 	table.AddRow("Expires", RenderDate(cd.Expires))
+	if len(tags) > 0 {
+		AddListValues(table, "Tags", tags)
+	}
 }
 
 type ActivationDescriber struct {
@@ -503,23 +506,19 @@ func (u *UserDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("User")
 	AddStandardClaimInfo(table, &u.UserClaims)
-	table.AddRow("Bearer Token", toYesNo(u.BearerToken))
-
-	AddPermissions(table, u.Permissions)
-
-	table.AddSeparator()
-	AddLimits(table, u.Limits)
-
-	if len(u.Tags) > 0 {
+	if u.HasEmptyPermissions() {
+		table.AddRow("Issuer Scoped", "Yes")
+	} else {
+		table.AddRow("Bearer Token", toYesNo(u.BearerToken))
+		AddPermissions(table, u.Permissions)
 		table.AddSeparator()
-		AddListValues(table, "Tags", u.Tags)
-	}
+		AddLimits(table, u.Limits)
 
-	if len(u.AllowedConnectionTypes) > 0 {
-		table.AddSeparator()
-		AddListValues(table, "Allowed Connection Types", u.AllowedConnectionTypes)
+		if len(u.AllowedConnectionTypes) > 0 {
+			table.AddSeparator()
+			AddListValues(table, "Allowed Connection Types", u.AllowedConnectionTypes)
+		}
 	}
-
 	return table.Render()
 }
 
@@ -555,11 +554,6 @@ func (o *OperatorDescriber) Describe() string {
 	if len(o.SigningKeys) > 0 {
 		table.AddSeparator()
 		AddListValues(table, "Signing Keys", o.SigningKeys)
-	}
-
-	if len(o.Tags) > 0 {
-		table.AddSeparator()
-		AddListValues(table, "Tags", o.Tags)
 	}
 
 	return table.Render()

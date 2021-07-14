@@ -253,11 +253,60 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 	return nil
 }
 
+func signerKeyIsScoped(ctx ActionCtx, accountName string, signerKP nkeys.KeyPair) bool {
+	// get the account JWT - must have since we resolved the user based on it
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(accountName)
+	if err != nil {
+		return false
+	}
+	// extract the signer public key
+	pk, err := signerKP.PublicKey()
+	if err != nil {
+		return false
+	}
+	if s, ok := ac.SigningKeys.GetScope(pk); ok && s != nil {
+		return true
+	}
+	return false
+}
+
+func checkUserForScope(ctx ActionCtx, accountName string, signerKP nkeys.KeyPair, uc *jwt.UserClaims) error {
+	if ctx == nil || accountName == "" || signerKP == nil || uc == nil {
+		return errors.New("invalid arguments")
+	}
+	// get the account JWT - must have since we resolved the user based on it
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(accountName)
+	if err != nil {
+		return err
+	}
+	// extract the signer public key
+	pk, err := signerKP.PublicKey()
+	if err != nil {
+		return err
+	}
+	if s, ok := ac.SigningKeys.GetScope(pk); ok && s != nil {
+		if uc.Issuer == "" {
+			// set issuer as this is commonly set during encoding but is required next
+			uc.Issuer = pk
+		}
+		if err := s.ValidateScopedSigner(uc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
-	uc, err := p.generateUserClaim(ctx, r)
+	uc, err := p.generateUserClaim(ctx, r, signerKeyIsScoped(ctx, p.AccountContextParams.Name, p.signerKP))
 	if err != nil {
 		return nil, err
+	}
+
+	if err := checkUserForScope(ctx, p.AccountContextParams.Name, p.signerKP, uc); err != nil {
+		r.AddFromError(err)
+		r.AddWarning("user was NOT edited as the edits conflict with signing key scope")
+		return r, err
 	}
 
 	token, err := uc.Encode(p.signerKP)
@@ -311,13 +360,14 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	return r, nil
 }
 
-func (p *AddUserParams) generateUserClaim(ctx ActionCtx, r *store.Report) (*jwt.UserClaims, error) {
+func (p *AddUserParams) generateUserClaim(ctx ActionCtx, r *store.Report, scoped bool) (*jwt.UserClaims, error) {
 	pub, err := p.kp.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 	uc := jwt.NewUserClaims(pub)
 	uc.Name = p.userName
+	uc.SetScoped(scoped)
 
 	spk, err := p.signerKP.PublicKey()
 	if err != nil {
