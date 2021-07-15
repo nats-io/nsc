@@ -143,7 +143,7 @@ upgrade the v1 store %#q - type:
 "%s upgrade-jwt"
 
 Alternatively you can downgrade' %q to a compatible version using: 
-"%s update -version 0.5.0"
+"%s update --version 0.5.0"
 `,
 							os.Args[0], os.Args[0], store.GetName(), os.Args[0], os.Args[0], os.Args[0])
 					}
