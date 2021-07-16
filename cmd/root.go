@@ -170,7 +170,7 @@ Alternatively you can downgrade' %q to a compatible version using:
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := ExecuteWithWriter(rootCmd.OutOrStderr())
+	err := ExecuteWithWriter(os.Stdout)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -182,6 +182,7 @@ func Execute() {
 // returns error than os.Exit(1)
 func ExecuteWithWriter(out io.Writer) error {
 	cli.SetOutput(out)
+	GetRootCmd().SetOutput(out)
 	if err := GetRootCmd().Execute(); err != nil {
 		return err
 	}
