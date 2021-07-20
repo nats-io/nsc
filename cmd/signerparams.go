@@ -185,6 +185,19 @@ func (p *SignerParams) Resolve(ctx ActionCtx) error {
 	return p.ResolveWithPriority(ctx, "")
 }
 
+func keyByRoleName(keyStore store.KeyStore, claim *jwt.AccountClaims, role string) nkeys.KeyPair {
+	for key, v := range claim.SigningKeys {
+		if v, ok := v.(*jwt.UserScope); ok {
+			if v.Role == role {
+				if kp, _ := keyStore.GetKeyPair(key); kp != nil {
+					return kp
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (p *SignerParams) ResolveWithPriority(ctx ActionCtx, preferKey string) error {
 	if p.signerKP != nil {
 		return nil
@@ -195,15 +208,9 @@ func (p *SignerParams) ResolveWithPriority(ctx ActionCtx, preferKey string) erro
 		// try to find key by role. on error try other methods
 		if acc := ctx.StoreCtx().Account.Name; acc != "" {
 			if claim, err := ctx.StoreCtx().Store.ReadAccountClaim(acc); err == nil {
-				for key, v := range claim.SigningKeys {
-					if v, ok := v.(*jwt.UserScope); ok {
-						if v.Role == KeyPathFlag {
-							if kp, _ := ctx.StoreCtx().KeyStore.GetKeyPair(key); kp != nil {
-								p.signerKP = kp
-								return nil
-							}
-						}
-					}
+				p.signerKP = keyByRoleName(ctx.StoreCtx().KeyStore, claim, KeyPathFlag)
+				if p.signerKP != nil {
+					return nil
 				}
 			}
 		}
