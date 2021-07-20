@@ -40,7 +40,7 @@ nsc edit signing-key --account <n> --sk <sk> --allow-sub <subject>,...
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().StringVarP(&params.skName, "sk", "", "", "signing key to set scope for")
+	cmd.Flags().StringVarP(&params.skName, "sk", "", "", "signing key to set scope for or role name for already existing scoped signing key")
 	cmd.Flags().StringVarP(&params.role, "role", "", "", "role associated with the signing key scope")
 	params.AccountContextParams.BindFlags(cmd)
 	params.UserPermissionLimits.BindFlags(cmd)
@@ -92,7 +92,11 @@ func (p *EditScopedSkParams) Load(ctx ActionCtx) error {
 
 	s, found := p.claim.SigningKeys.GetScope(p.skName)
 	if !found {
-		return fmt.Errorf("signing-key not found")
+		if kp := keyByRoleName(ctx.StoreCtx().KeyStore, p.claim, p.skName); kp == nil {
+			return fmt.Errorf("signing-key not found")
+		} else if p.skName, err = kp.PublicKey(); err != nil {
+			return fmt.Errorf("signing-key public key error: %s", err)
+		}
 	}
 	if s == nil {
 		s = &jwt.UserScope{}
