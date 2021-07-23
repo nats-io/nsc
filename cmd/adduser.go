@@ -315,12 +315,12 @@ func (p *AddUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	st, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
-	if err != nil {
-		r.AddFromError(err)
-		return st, err
-	}
 	if st != nil {
 		r.Add(st)
+	}
+	if err != nil {
+		r.AddFromError(err)
+		return r, err
 	}
 
 	// store the key
