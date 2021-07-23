@@ -89,6 +89,8 @@ resolver {
     # it's state with one random nats based account resolver in the cluster and if needed, 
     # exchange jwt and converge on the same set of jwt.
     interval: "2m"
+    # Timeout for lookup requests in case an account does not exist locally.
+    timeout: "1.9s"
 }
 
 # Preload the nats based resolver with the system account jwt.
