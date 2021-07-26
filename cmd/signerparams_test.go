@@ -204,3 +204,21 @@ func Test_SignerParamsHomePath(t *testing.T) {
 	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", tfn)
 	require.NoError(t, err)
 }
+
+func Test_SignerParamsSeed(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	s, pk, _ := CreateAccountKey(t)
+
+	_, stdErr, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "a", "-K", string(s))
+	require.Error(t, err)
+	require.Contains(t, stdErr, "is not in the store")
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "a", "-K", string(s))
+	require.NoError(t, err)
+}
