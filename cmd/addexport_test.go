@@ -42,6 +42,7 @@ func Test_AddExport(t *testing.T) {
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, nil, []string{"added private service export \"pubservice\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "th.1", "--service", "--response-threshold", "1s"}, nil, []string{"added public service export \"th.1\""}, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`time: unknown unit`}, true},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "re", "--response-type", "stream"}, nil, []string{"response type can only be specified in conjunction with service"}, true},
 	}
 
 	tests.Run(t, "root", "add")
