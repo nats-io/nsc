@@ -317,6 +317,8 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 		}
 		p.export.ResponseType = rt
 		p.export.ResponseThreshold = p.responseThreshold
+	} else if ctx.AnySet("response-type") {
+		return errors.New("response type can only be specified in conjunction with service")
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {
