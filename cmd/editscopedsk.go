@@ -65,7 +65,7 @@ func (p *EditScopedSkParams) SetDefaults(ctx ActionCtx) error {
 	if err := p.AccountContextParams.SetDefaults(ctx); err != nil {
 		return err
 	}
-	p.SignerParams.SetDefaults(nkeys.PrefixByteAccount, true, ctx)
+	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
 

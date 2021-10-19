@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/nats-io/nkeys"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -52,11 +53,13 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, ac.SigningKeys, pk)
 	require.Contains(t, ac.SigningKeys, pk2)
+	require.True(t, nkeys.IsValidPublicOperatorKey(ac.Issuer))
 
 	checkAcc := func(subs int64) {
 		ac, err = ts.Store.ReadAccountClaim("A")
 		require.NoError(t, err)
 		require.Contains(t, ac.SigningKeys, pk)
+		require.True(t, nkeys.IsValidPublicOperatorKey(ac.Issuer))
 		s, ok := ac.SigningKeys.GetScope(pk)
 		require.True(t, ok)
 		require.Nil(t, s)
