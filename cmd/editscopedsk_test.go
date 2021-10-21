@@ -41,22 +41,27 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	ts := NewTestStore(t, "edit scope")
 	defer ts.Done(t)
 
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
 	ts.AddAccount(t, "A")
 	_, pk, _ := CreateAccountKey(t)
 	s, pk2, kp := CreateAccountKey(t)
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk, "--sk", pk2)
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk, "--sk", pk2)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Contains(t, ac.SigningKeys, pk)
 	require.Contains(t, ac.SigningKeys, pk2)
+	require.Equal(t, ac.Issuer, oc.Subject)
 
 	checkAcc := func(subs int64) {
 		ac, err = ts.Store.ReadAccountClaim("A")
 		require.NoError(t, err)
 		require.Contains(t, ac.SigningKeys, pk)
+		require.Equal(t, ac.Issuer, oc.Subject)
 		s, ok := ac.SigningKeys.GetScope(pk)
 		require.True(t, ok)
 		require.Nil(t, s)
