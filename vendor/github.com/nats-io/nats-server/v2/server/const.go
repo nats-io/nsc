@@ -1,4 +1,4 @@
-// Copyright 2012-2020 The NATS Authors
+// Copyright 2012-2021 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -29,6 +29,7 @@ const (
 
 	// private for now
 	commandLDMode = Command("ldm")
+	commandTerm   = Command("term")
 )
 
 var (
@@ -40,7 +41,7 @@ var (
 
 const (
 	// VERSION is the current version for the server.
-	VERSION = "2.2.0-beta.35"
+	VERSION = "2.6.4"
 
 	// PROTO is the currently supported protocol.
 	// 0 was the original
@@ -66,6 +67,11 @@ const (
 	// MAX_PAYLOAD_SIZE is the maximum allowed payload size. Should be using
 	// something different if > 1MB payloads are needed.
 	MAX_PAYLOAD_SIZE = (1024 * 1024)
+
+	// MAX_PAYLOAD_MAX_SIZE is the size at which the server will warn about
+	// max_payload being too high. In the future, the server may enforce/reject
+	// max_payload above this value.
+	MAX_PAYLOAD_MAX_SIZE = (8 * 1024 * 1024)
 
 	// MAX_PENDING_SIZE is the maximum outbound pending bytes per client.
 	MAX_PENDING_SIZE = (64 * 1024 * 1024)
@@ -123,6 +129,9 @@ const (
 
 	// PROTO_SNIPPET_SIZE is the default size of proto to print on parse errors.
 	PROTO_SNIPPET_SIZE = 32
+
+	// MAX_CONTROL_LINE_SNIPPET_SIZE is the default size of proto to print on max control line errors.
+	MAX_CONTROL_LINE_SNIPPET_SIZE = 128
 
 	// MAX_MSG_ARGS Maximum possible number of arguments from MSG proto.
 	MAX_MSG_ARGS = 4
@@ -196,4 +205,7 @@ const (
 
 	// DEFAULT GLOBAL_ACCOUNT
 	DEFAULT_GLOBAL_ACCOUNT = "$G"
+
+	// DEFAULT_FETCH_TIMEOUT is the default time that the system will wait for an account fetch to return.
+	DEFAULT_ACCOUNT_FETCH_TIMEOUT = 1900 * time.Millisecond
 )

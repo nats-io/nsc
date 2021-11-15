@@ -1,4 +1,4 @@
-// Copyright 2019-2020 The NATS Authors
+// Copyright 2019-2021 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -26,10 +26,12 @@ import (
 type StorageType int
 
 const (
+	// File specifies on disk, designated by the JetStream config StoreDir.
+	FileStorage = StorageType(22)
 	// MemoryStorage specifies in memory only.
-	MemoryStorage StorageType = iota
-	// FileStorage specifies on disk, designated by the JetStream config StoreDir.
-	FileStorage
+	MemoryStorage = StorageType(33)
+	// Any is for internals.
+	AnyStorage = StorageType(44)
 )
 
 var (
@@ -38,22 +40,26 @@ var (
 	// ErrStoreMsgNotFound when message was not found but was expected to be.
 	ErrStoreMsgNotFound = errors.New("no message found")
 	// ErrStoreEOF is returned when message seq is greater than the last sequence.
-	ErrStoreEOF = errors.New("stream EOF")
-	// ErrMaxMsgs is returned when we have discard new as a policy and we reached
-	// the message limit.
+	ErrStoreEOF = errors.New("stream store EOF")
+	// ErrMaxMsgs is returned when we have discard new as a policy and we reached the message limit.
 	ErrMaxMsgs = errors.New("maximum messages exceeded")
-	// ErrMaxBytes is returned when we have discard new as a policy and we reached
-	// the bytes limit.
+	// ErrMaxBytes is returned when we have discard new as a policy and we reached the bytes limit.
 	ErrMaxBytes = errors.New("maximum bytes exceeded")
+	// ErrMaxMsgsPerSubject is returned when we have discard new as a policy and we reached the message limit per subject.
+	ErrMaxMsgsPerSubject = errors.New("maximum messages per subject exceeded")
 	// ErrStoreSnapshotInProgress is returned when RemoveMsg or EraseMsg is called
 	// while a snapshot is in progress.
 	ErrStoreSnapshotInProgress = errors.New("snapshot in progress")
-	// ErrMsgTooBig is returned when a message is considered too large.
+	// ErrMsgTooLarge is returned when a message is considered too large.
 	ErrMsgTooLarge = errors.New("message to large")
 	// ErrStoreWrongType is for when you access the wrong storage type.
 	ErrStoreWrongType = errors.New("wrong storage type")
 	// ErrNoAckPolicy is returned when trying to update a consumer's acks with no ack policy.
 	ErrNoAckPolicy = errors.New("ack policy is none")
+	// ErrInvalidSequence is returned when the sequence is not present in the stream store.
+	ErrInvalidSequence = errors.New("invalid sequence")
+	// ErrSequenceMismatch is returned when storing a raw message and the expected sequence is wrong.
+	ErrSequenceMismatch = errors.New("expected sequence does not match store")
 )
 
 // Used to call back into the upper layers to report on changes in storage resources.
@@ -61,21 +67,30 @@ var (
 type StorageUpdateHandler func(msgs, bytes int64, seq uint64, subj string)
 
 type StreamStore interface {
-	StoreMsg(subj string, hdr, msg []byte) (uint64, int64, error)
+	StoreMsg(subject string, hdr, msg []byte) (uint64, int64, error)
+	StoreRawMsg(subject string, hdr, msg []byte, seq uint64, ts int64) error
 	SkipMsg() uint64
-	LoadMsg(seq uint64) (subj string, hdr, msg []byte, ts int64, err error)
+	LoadMsg(seq uint64) (subject string, hdr, msg []byte, ts int64, err error)
+	LoadLastMsg(subject string) (subj string, seq uint64, hdr, msg []byte, ts int64, err error)
 	RemoveMsg(seq uint64) (bool, error)
 	EraseMsg(seq uint64) (bool, error)
 	Purge() (uint64, error)
+	PurgeEx(subject string, seq, keep uint64) (uint64, error)
 	Compact(seq uint64) (uint64, error)
+	Truncate(seq uint64) error
 	GetSeqFromTime(t time.Time) uint64
+	FilteredState(seq uint64, subject string) SimpleState
+	SubjectsState(filterSubject string) map[string]SimpleState
 	State() StreamState
+	FastState(*StreamState)
+	Type() StorageType
 	RegisterStorageUpdates(StorageUpdateHandler)
 	UpdateConfig(cfg *StreamConfig) error
 	Delete() error
 	Stop() error
 	ConsumerStore(name string, cfg *ConsumerConfig) (ConsumerStore, error)
 	Snapshot(deadline time.Duration, includeConsumers, checkMsgs bool) (*SnapshotResult, error)
+	Utilization() (total, reported uint64, err error)
 }
 
 // RetentionPolicy determines how messages in a set are retained.
@@ -85,7 +100,7 @@ const (
 	// LimitsPolicy (default) means that messages are retained until any given limit is reached.
 	// This could be one of MaxMsgs, MaxBytes, or MaxAge.
 	LimitsPolicy RetentionPolicy = iota
-	// InterestPolicy specifies that when all known observables have acknowledged a message it can be removed.
+	// InterestPolicy specifies that when all known consumers have acknowledged a message it can be removed.
 	InterestPolicy
 	// WorkQueuePolicy specifies that when the first worker or subscriber acknowledges the message it can be removed.
 	WorkQueuePolicy
@@ -98,26 +113,41 @@ type DiscardPolicy int
 const (
 	// DiscardOld will remove older messages to return to the limits.
 	DiscardOld = iota
-	//DiscardNew will error on a StoreMsg call
+	// DiscardNew will error on a StoreMsg call
 	DiscardNew
 )
 
-// StreamStats is information about the given stream.
+// StreamState is information about the given stream.
 type StreamState struct {
-	Msgs      uint64    `json:"messages"`
-	Bytes     uint64    `json:"bytes"`
-	FirstSeq  uint64    `json:"first_seq"`
-	FirstTime time.Time `json:"first_ts"`
-	LastSeq   uint64    `json:"last_seq"`
-	LastTime  time.Time `json:"last_ts"`
-	Consumers int       `json:"consumer_count"`
+	Msgs       uint64          `json:"messages"`
+	Bytes      uint64          `json:"bytes"`
+	FirstSeq   uint64          `json:"first_seq"`
+	FirstTime  time.Time       `json:"first_ts"`
+	LastSeq    uint64          `json:"last_seq"`
+	LastTime   time.Time       `json:"last_ts"`
+	NumDeleted int             `json:"num_deleted,omitempty"`
+	Deleted    []uint64        `json:"deleted,omitempty"`
+	Lost       *LostStreamData `json:"lost,omitempty"`
+	Consumers  int             `json:"consumer_count"`
+}
+
+// SimpleState for filtered subject specific state.
+type SimpleState struct {
+	Msgs  uint64 `json:"messages"`
+	First uint64 `json:"first_seq"`
+	Last  uint64 `json:"last_seq"`
+}
+
+// LostStreamData indicates msgs that have been lost.
+type LostStreamData struct {
+	Msgs  []uint64 `json:"msgs"`
+	Bytes uint64   `json:"bytes"`
 }
 
 // SnapshotResult contains information about the snapshot.
 type SnapshotResult struct {
-	Reader  io.ReadCloser
-	BlkSize int
-	NumBlks int
+	Reader io.ReadCloser
+	State  StreamState
 }
 
 // ConsumerStore stores state on consumers for streams.
@@ -126,8 +156,10 @@ type ConsumerStore interface {
 	UpdateAcks(dseq, sseq uint64) error
 	Update(*ConsumerState) error
 	State() (*ConsumerState, error)
+	Type() StorageType
 	Stop() error
 	Delete() error
+	StreamDelete() error
 }
 
 // SequencePair has both the consumer and the stream sequence. They point to same message.
@@ -145,9 +177,9 @@ type ConsumerState struct {
 	// These are both in stream sequence context.
 	// Pending is for all messages pending and the timestamp for the delivered time.
 	// This will only be present when the AckPolicy is ExplicitAck.
-	Pending map[uint64]*Pending `json:"pending"`
+	Pending map[uint64]*Pending `json:"pending,omitempty"`
 	// This is for messages that have been redelivered, so count > 1.
-	Redelivered map[uint64]uint64 `json:"redelivered"`
+	Redelivered map[uint64]uint64 `json:"redelivered,omitempty"`
 }
 
 // Represents a pending message for explicit ack or ack all.
@@ -159,8 +191,8 @@ type Pending struct {
 
 // TemplateStore stores templates.
 type TemplateStore interface {
-	Store(*StreamTemplate) error
-	Delete(*StreamTemplate) error
+	Store(*streamTemplate) error
+	Delete(*streamTemplate) error
 }
 
 func jsonString(s string) string {
@@ -250,6 +282,7 @@ func (dp *DiscardPolicy) UnmarshalJSON(data []byte) error {
 const (
 	memoryStorageString = "memory"
 	fileStorageString   = "file"
+	anyStorageString    = "any"
 )
 
 func (st StorageType) String() string {
@@ -258,6 +291,8 @@ func (st StorageType) String() string {
 		return strings.Title(memoryStorageString)
 	case FileStorage:
 		return strings.Title(fileStorageString)
+	case AnyStorage:
+		return strings.Title(anyStorageString)
 	default:
 		return "Unknown Storage Type"
 	}
@@ -269,6 +304,8 @@ func (st StorageType) MarshalJSON() ([]byte, error) {
 		return json.Marshal(memoryStorageString)
 	case FileStorage:
 		return json.Marshal(fileStorageString)
+	case AnyStorage:
+		return json.Marshal(anyStorageString)
 	default:
 		return nil, fmt.Errorf("can not marshal %v", st)
 	}
@@ -280,6 +317,8 @@ func (st *StorageType) UnmarshalJSON(data []byte) error {
 		*st = MemoryStorage
 	case jsonString(fileStorageString):
 		*st = FileStorage
+	case jsonString(anyStorageString):
+		*st = AnyStorage
 	default:
 		return fmt.Errorf("can not unmarshal %q", data)
 	}
@@ -353,6 +392,7 @@ const (
 	deliverNewPolicyString       = "new"
 	deliverByStartSequenceString = "by_start_sequence"
 	deliverByStartTimeString     = "by_start_time"
+	deliverLastPerPolicyString   = "last_per_subject"
 	deliverUndefinedString       = "undefined"
 )
 
@@ -362,6 +402,8 @@ func (p *DeliverPolicy) UnmarshalJSON(data []byte) error {
 		*p = DeliverAll
 	case jsonString(deliverLastPolicyString):
 		*p = DeliverLast
+	case jsonString(deliverLastPerPolicyString):
+		*p = DeliverLastPerSubject
 	case jsonString(deliverNewPolicyString):
 		*p = DeliverNew
 	case jsonString(deliverByStartSequenceString):
@@ -381,6 +423,8 @@ func (p DeliverPolicy) MarshalJSON() ([]byte, error) {
 		return json.Marshal(deliverAllPolicyString)
 	case DeliverLast:
 		return json.Marshal(deliverLastPolicyString)
+	case DeliverLastPerSubject:
+		return json.Marshal(deliverLastPerPolicyString)
 	case DeliverNew:
 		return json.Marshal(deliverNewPolicyString)
 	case DeliverByStartSequence:
@@ -390,4 +434,15 @@ func (p DeliverPolicy) MarshalJSON() ([]byte, error) {
 	default:
 		return json.Marshal(deliverUndefinedString)
 	}
+}
+
+func isOutOfSpaceErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no space left")
+}
+
+// For when our upper layer catchup detects its missing messages from the beginning of the stream.
+var errFirstSequenceMismatch = errors.New("first sequence mismatch")
+
+func isClusterResetErr(err error) bool {
+	return err == errLastSeqMismatch || err == ErrStoreEOF || err == errFirstSequenceMismatch
 }

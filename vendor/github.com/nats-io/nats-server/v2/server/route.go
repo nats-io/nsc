@@ -75,12 +75,14 @@ type route struct {
 	url          *url.URL
 	authRequired bool
 	tlsRequired  bool
+	jetstream    bool
 	connectURLs  []string
 	wsConnURLs   []string
 	replySubs    map[*subscription]*time.Timer
 	gatewayURL   string
 	leafnodeURL  string
 	hash         string
+	idHash       string
 }
 
 type connectInfo struct {
@@ -105,10 +107,6 @@ const (
 )
 
 const (
-	// Used to decide if the sending of the route SUBs list should be
-	// done in place or in separate go routine.
-	sendRouteSubsInGoRoutineThreshold = 1024 * 1024 // 1MB
-
 	// Warning when user configures cluster TLS insecure
 	clusterTLSInsecureWarning = "TLS certificate chain and hostname of solicited routes will not be verified. DO NOT USE IN PRODUCTION!"
 )
@@ -581,8 +579,11 @@ func (c *client) processRouteInfo(info *Info) {
 
 	// Check if remote has same server name than this server.
 	if !c.route.didSolicit && info.Name == srvName {
-		// For now simply report as a warning.
-		c.Warnf("Remote server has a duplicate name: %q", info.Name)
+		c.mu.Unlock()
+		// This is now an error and we close the connection. We need unique names for JetStream clustering.
+		c.Errorf("Remote server has a duplicate name: %q", info.Name)
+		c.closeConnection(DuplicateRoute)
+		return
 	}
 
 	// Mark that the INFO protocol has been received, so we can detect updates.
@@ -601,13 +602,18 @@ func (c *client) processRouteInfo(info *Info) {
 	c.route.gatewayURL = info.GatewayURL
 	c.route.remoteName = info.Name
 	c.route.lnoc = info.LNOC
+	c.route.jetstream = info.JetStream
 
 	// When sent through route INFO, if the field is set, it should be of size 1.
 	if len(info.LeafNodeURLs) == 1 {
 		c.route.leafnodeURL = info.LeafNodeURLs[0]
 	}
-	// Compute the hash of this route based on remoteID
-	c.route.hash = string(getHash(info.ID))
+	// Compute the hash of this route based on remote server name
+	c.route.hash = string(getHash(info.Name))
+	// Same with remote server ID (used for GW mapped replies routing).
+	// Use getGWHash since we don't use the same hash len for that
+	// for backward compatibility.
+	c.route.idHash = string(getGWHash(info.ID))
 
 	// Copy over permissions as well.
 	c.opts.Import = info.Import
@@ -668,6 +674,14 @@ func (c *client) processRouteInfo(info *Info) {
 		if !s.getOpts().Cluster.NoAdvertise {
 			s.addConnectURLsAndSendINFOToClients(info.ClientConnectURLs, info.WSConnectURLs)
 		}
+		// Add the remote's leafnodeURL to our list of URLs and send the update
+		// to all LN connections. (Note that when coming from a route, LeafNodeURLs
+		// is an array of size 1 max).
+		s.mu.Lock()
+		if len(info.LeafNodeURLs) == 1 && s.addLeafNodeURL(info.LeafNodeURLs[0]) {
+			s.sendAsyncLeafNodeInfo()
+		}
+		s.mu.Unlock()
 	} else {
 		c.Debugf("Detected duplicate remote route %q", info.ID)
 		c.closeConnection(DuplicateRoute)
@@ -696,7 +710,7 @@ func (c *client) updateRemoteRoutePerms(sl *Sublist, info *Info) {
 		_localSubs [4096]*subscription
 		localSubs  = _localSubs[:0]
 	)
-	sl.localSubs(&localSubs)
+	sl.localSubs(&localSubs, false)
 
 	c.sendRouteSubProtos(localSubs, false, func(sub *subscription) bool {
 		subj := string(sub.subject)
@@ -818,7 +832,7 @@ func (s *Server) forwardNewRouteInfoToKnownServers(info *Info) {
 func (c *client) canImport(subject string) bool {
 	// Use pubAllowed() since this checks Publish permissions which
 	// is what Import maps to.
-	return c.pubAllowedFullCheck(subject, false)
+	return c.pubAllowedFullCheck(subject, false, true)
 }
 
 // canExport is whether or not we will accept a SUB from the remote for a given subject.
@@ -877,7 +891,8 @@ func (c *client) removeRemoteSubs() {
 		ase := as[accountName]
 		if ase == nil {
 			if v, ok := srv.accounts.Load(accountName); ok {
-				as[accountName] = &asubs{acc: v.(*Account), subs: []*subscription{sub}}
+				ase = &asubs{acc: v.(*Account), subs: []*subscription{sub}}
+				as[accountName] = ase
 			} else {
 				continue
 			}
@@ -887,6 +902,7 @@ func (c *client) removeRemoteSubs() {
 		if srv.gateway.enabled {
 			srv.gatewayUpdateSubInterest(accountName, sub, -1)
 		}
+		srv.updateLeafNodes(ase.acc, sub, -1)
 	}
 
 	// Now remove the subs by batch for each account sublist.
@@ -1063,14 +1079,15 @@ func (c *client) processRemoteSub(argo []byte, hasOrigin bool) (err error) {
 	// We store local subs by account and subject and optionally queue name.
 	// If we have a queue it will have a trailing weight which we do not want.
 	if sub.queue != nil {
-		sub.sid = arg[:len(arg)-len(args[3+off])-1]
+		sub.sid = arg[len(sub.origin)+off : len(arg)-len(args[3+off])-1]
 	} else {
-		sub.sid = arg
+		sub.sid = arg[len(sub.origin)+off:]
 	}
 	key := string(sub.sid)
 
 	osub := c.subs[key]
 	updateGWs := false
+	delta := int32(1)
 	if osub == nil {
 		c.subs[key] = sub
 		// Now place into the account sl.
@@ -1084,23 +1101,64 @@ func (c *client) processRemoteSub(argo []byte, hasOrigin bool) (err error) {
 		updateGWs = srv.gateway.enabled
 	} else if sub.queue != nil {
 		// For a queue we need to update the weight.
+		delta = sub.qw - atomic.LoadInt32(&osub.qw)
 		atomic.StoreInt32(&osub.qw, sub.qw)
 		acc.sl.UpdateRemoteQSub(osub)
 	}
 	c.mu.Unlock()
 
 	if updateGWs {
-		srv.gatewayUpdateSubInterest(acc.Name, sub, 1)
+		srv.gatewayUpdateSubInterest(acc.Name, sub, delta)
 	}
 
 	// Now check on leafnode updates.
-	srv.updateLeafNodes(acc, sub, 1)
+	srv.updateLeafNodes(acc, sub, delta)
 
 	if c.opts.Verbose {
 		c.sendOK()
 	}
 
 	return nil
+}
+
+func (c *client) addRouteSubOrUnsubProtoToBuf(buf []byte, accName string, sub *subscription, isSubProto bool) []byte {
+	// If we have an origin cluster and the other side supports leafnode origin clusters
+	// send an LS+/LS- version instead.
+	if len(sub.origin) > 0 && c.route.lnoc {
+		if isSubProto {
+			buf = append(buf, lSubBytes...)
+			buf = append(buf, sub.origin...)
+		} else {
+			buf = append(buf, lUnsubBytes...)
+		}
+		buf = append(buf, ' ')
+	} else {
+		if isSubProto {
+			buf = append(buf, rSubBytes...)
+		} else {
+			buf = append(buf, rUnsubBytes...)
+		}
+	}
+	buf = append(buf, accName...)
+	buf = append(buf, ' ')
+	buf = append(buf, sub.subject...)
+	if len(sub.queue) > 0 {
+		buf = append(buf, ' ')
+		buf = append(buf, sub.queue...)
+		// Send our weight if we are a sub proto
+		if isSubProto {
+			buf = append(buf, ' ')
+			var b [12]byte
+			var i = len(b)
+			for l := sub.qw; l > 0; l /= 10 {
+				i--
+				b[i] = digits[l%10]
+			}
+			buf = append(buf, b[i:]...)
+		}
+	}
+	buf = append(buf, CR_LF...)
+	return buf
 }
 
 // sendSubsToRoute will send over our subject interest to
@@ -1118,65 +1176,48 @@ func (s *Server) sendSubsToRoute(route *client) {
 		a := v.(*Account)
 		accs = append(accs, a)
 		a.mu.RLock()
-		// Proto looks like: "RS+ <account name> <subject>[ <queue weight>]\r\n"
-		// If we wanted to have better estimates (or even accurate), we would
-		// collect the subs here instead of capturing the accounts and then
-		// later going over each account.
-		eSize += len(a.rm) * (4 + len(a.Name) + 256)
+		if ns := len(a.rm); ns > 0 {
+			// Proto looks like: "RS+ <account name> <subject>[ <queue> <weight>]\r\n"
+			eSize += ns * (len(rSubBytes) + len(a.Name) + 1 + 2)
+			for key := range a.rm {
+				// Key contains "<subject>[ <queue>]"
+				eSize += len(key)
+				// In case this is a queue, just add some bytes for the queue weight.
+				// If we want to be accurate, would have to check if "key" has a space,
+				// if so, then figure out how many bytes we need to represent the weight.
+				eSize += 5
+			}
+		}
 		a.mu.RUnlock()
 		return true
 	})
 	s.mu.Unlock()
 
-	sendSubs := func(accs []*Account) {
-		var raw [32]*subscription
+	buf := make([]byte, 0, eSize)
 
-		route.mu.Lock()
-		for _, a := range accs {
-			subs := raw[:0]
-
-			a.mu.RLock()
-			c := a.randomClient()
-			if c == nil {
-				nsubs := len(a.rm)
-				accName := a.Name
-				a.mu.RUnlock()
-				if nsubs > 0 {
-					route.Warnf("Ignoring account %q with %d subs, no clients", accName, nsubs)
-				}
+	route.mu.Lock()
+	for _, a := range accs {
+		a.mu.RLock()
+		for key, n := range a.rm {
+			var subj, qn []byte
+			s := strings.Split(key, " ")
+			subj = []byte(s[0])
+			if len(s) > 1 {
+				qn = []byte(s[1])
+			}
+			// s[0] is the subject and already as a string, so use that
+			// instead of converting back `subj` to a string.
+			if !route.canImport(s[0]) {
 				continue
 			}
-			for key, n := range a.rm {
-				// FIXME(dlc) - Just pass rme around.
-				// Construct a sub on the fly. We need to place
-				// a client (or im) to properly set the account.
-				var subj, qn []byte
-				s := strings.Split(key, " ")
-				subj = []byte(s[0])
-				if len(s) > 1 {
-					qn = []byte(s[1])
-				}
-				// TODO(dlc) - This code needs to change, but even if left alone could be more
-				// efficient with these tmp subs.
-				sub := &subscription{client: c, subject: subj, queue: qn, qw: n}
-				subs = append(subs, sub)
-			}
-			a.mu.RUnlock()
-
-			route.sendRouteSubProtos(subs, false, route.importFilter)
+			sub := subscription{subject: subj, queue: qn, qw: n}
+			buf = route.addRouteSubOrUnsubProtoToBuf(buf, a.Name, &sub, true)
 		}
-		route.mu.Unlock()
-		route.Debugf("Sent local subscriptions to route")
+		a.mu.RUnlock()
 	}
-	// Decide if we call above function in go routine or in place.
-	if eSize > sendRouteSubsInGoRoutineThreshold {
-		s.startGoRoutine(func() {
-			sendSubs(accs)
-			s.grWG.Done()
-		})
-	} else {
-		sendSubs(accs)
-	}
+	route.enqueueProto(buf)
+	route.mu.Unlock()
+	route.Debugf("Sent local subscriptions to route")
 }
 
 // Sends SUBs protocols for the given subscriptions. If a filter is specified, it is
@@ -1230,46 +1271,10 @@ func (c *client) sendRouteSubOrUnSubProtos(subs []*subscription, isSubProto, tra
 		}
 
 		as := len(buf)
-
-		// If we have an origin cluster and the other side supports leafnode origin clusters
-		// send an LS+/LS- version instead.
-		if len(sub.origin) > 0 && c.route.lnoc {
-			if isSubProto {
-				buf = append(buf, lSubBytes...)
-				buf = append(buf, sub.origin...)
-			} else {
-				buf = append(buf, lUnsubBytes...)
-			}
-			buf = append(buf, ' ')
-		} else {
-			if isSubProto {
-				buf = append(buf, rSubBytes...)
-			} else {
-				buf = append(buf, rUnsubBytes...)
-			}
-		}
-		buf = append(buf, accName...)
-		buf = append(buf, ' ')
-		buf = append(buf, sub.subject...)
-		if len(sub.queue) > 0 {
-			buf = append(buf, ' ')
-			buf = append(buf, sub.queue...)
-			// Send our weight if we are a sub proto
-			if isSubProto {
-				buf = append(buf, ' ')
-				var b [12]byte
-				var i = len(b)
-				for l := sub.qw; l > 0; l /= 10 {
-					i--
-					b[i] = digits[l%10]
-				}
-				buf = append(buf, b[i:]...)
-			}
-		}
+		buf = c.addRouteSubOrUnsubProtoToBuf(buf, accName, sub, isSubProto)
 		if trace {
-			c.traceOutOp("", buf[as:])
+			c.traceOutOp("", buf[as:len(buf)-LEN_CR_LF])
 		}
-		buf = append(buf, CR_LF...)
 	}
 
 	c.enqueueProto(buf)
@@ -1287,7 +1292,7 @@ func (s *Server) createRoute(conn net.Conn, rURL *url.URL) *client {
 		}
 	}
 
-	c := &client{srv: s, nc: conn, opts: clientOpts{}, kind: ROUTER, msubs: -1, mpay: -1, route: r}
+	c := &client{srv: s, nc: conn, opts: ClientOpts{}, kind: ROUTER, msubs: -1, mpay: -1, route: r}
 
 	// Grab server variables
 	s.mu.Lock()
@@ -1321,46 +1326,13 @@ func (s *Server) createRoute(conn net.Conn, rURL *url.URL) *client {
 
 	// Check for TLS
 	if tlsRequired {
-		// Copy off the config to add in ServerName if we need to.
-		tlsConfig := opts.Cluster.TLSConfig.Clone()
-
-		// If we solicited, we will act like the client, otherwise the server.
+		tlsConfig := opts.Cluster.TLSConfig
 		if didSolicit {
-			c.Debugf("Starting TLS route client handshake")
-			// Specify the ServerName we are expecting.
-			host, _, _ := net.SplitHostPort(rURL.Host)
-			tlsConfig.ServerName = host
-			c.nc = tls.Client(c.nc, tlsConfig)
-		} else {
-			c.Debugf("Starting TLS route server handshake")
-			c.nc = tls.Server(c.nc, tlsConfig)
+			// Copy off the config to add in ServerName if we need to.
+			tlsConfig = tlsConfig.Clone()
 		}
-
-		conn := c.nc.(*tls.Conn)
-
-		// Setup the timeout
-		ttl := secondsToDuration(opts.Cluster.TLSTimeout)
-		time.AfterFunc(ttl, func() { tlsTimeout(c, conn) })
-		conn.SetReadDeadline(time.Now().Add(ttl))
-
-		c.mu.Unlock()
-		if err := conn.Handshake(); err != nil {
-			c.Errorf("TLS route handshake error: %v", err)
-			c.sendErr("Secure Connection - TLS Required")
-			c.closeConnection(TLSHandshakeError)
-			return nil
-		}
-		// Reset the read deadline
-		conn.SetReadDeadline(time.Time{})
-
-		// Re-Grab lock
-		c.mu.Lock()
-
-		// To be consistent with client, set this flag to indicate that handshake is done
-		c.flags.set(handshakeComplete)
-
-		// Verify that the connection did not go away while we released the lock.
-		if c.isClosed() {
+		// Perform (server or client side) TLS handshake.
+		if _, err := c.doTLSHandshake("route", didSolicit, rURL, tlsConfig, _EMPTY_, opts.Cluster.TLSTimeout, opts.Cluster.TLSPinnedCerts); err != nil {
 			c.mu.Unlock()
 			return nil
 		}
@@ -1448,15 +1420,20 @@ func (s *Server) addRoute(c *client, info *Info) (bool, bool) {
 	if !exists {
 		s.routes[c.cid] = c
 		s.remotes[id] = c
+		// check to be consistent and future proof. but will be same domain
+		if s.sameDomain(info.Domain) {
+			s.nodeToInfo.Store(c.route.hash, nodeInfo{c.route.remoteName, s.info.Cluster, info.Domain, id, false, info.JetStream})
+		}
 		c.mu.Lock()
 		c.route.connectURLs = info.ClientConnectURLs
 		c.route.wsConnURLs = info.WSConnectURLs
 		cid := c.cid
-		hash := string(c.route.hash)
+		hash := c.route.hash
+		idHash := c.route.idHash
 		c.mu.Unlock()
 
 		// Store this route using the hash as the key
-		s.routesByHash.Store(hash, c)
+		s.storeRouteByHash(hash, idHash, c)
 
 		// Now that we have registered the route, we can remove from the temp map.
 		s.removeFromTempClients(cid)
@@ -1467,13 +1444,6 @@ func (s *Server) addRoute(c *client, info *Info) (bool, bool) {
 		// If the INFO contains a Gateway URL, add it to the list for our cluster.
 		if info.GatewayURL != "" && s.addGatewayURL(info.GatewayURL) {
 			s.sendAsyncGatewayInfo()
-		}
-
-		// Add the remote's leafnodeURL to our list of URLs and send the update
-		// to all LN connections. (Note that when coming from a route, LeafNodeURLs
-		// is an array of size 1 max).
-		if len(info.LeafNodeURLs) == 1 && s.addLeafNodeURL(info.LeafNodeURLs[0]) {
-			s.sendAsyncLeafNodeInfo()
 		}
 	}
 	s.mu.Unlock()
@@ -1491,10 +1461,10 @@ func (s *Server) addRoute(c *client, info *Info) (bool, bool) {
 		// Since this duplicate route is going to be removed, make sure we clear
 		// c.route.leafnodeURL, otherwise, when processing the disconnect, this
 		// would cause the leafnode URL for that remote server to be removed
-		// from our list.
-		c.route.leafnodeURL = _EMPTY_
+		// from our list. Same for gateway...
+		c.route.leafnodeURL, c.route.gatewayURL = _EMPTY_, _EMPTY_
 		// Same for the route hash otherwise it would be removed from s.routesByHash.
-		c.route.hash = _EMPTY_
+		c.route.hash, c.route.idHash = _EMPTY_, _EMPTY_
 		c.mu.Unlock()
 
 		remote.mu.Lock()
@@ -1530,6 +1500,10 @@ func (s *Server) updateRouteSubscriptionMap(acc *Account, sub *subscription, del
 
 	// We only store state on local subs for transmission across all other routes.
 	if sub.client == nil || sub.client.kind == ROUTER || sub.client.kind == GATEWAY {
+		return
+	}
+
+	if sub.si {
 		return
 	}
 
@@ -1684,6 +1658,7 @@ func (s *Server) startRouteAcceptLoop() {
 
 	hp := net.JoinHostPort(opts.Cluster.Host, strconv.Itoa(port))
 	l, e := natsListen("tcp", hp)
+	s.routeListenerErr = e
 	if e != nil {
 		s.mu.Unlock()
 		s.Fatalf("Error listening on router port: %d - %v", opts.Cluster.Port, e)
@@ -1714,10 +1689,12 @@ func (s *Server) startRouteAcceptLoop() {
 		TLSRequired:  tlsReq,
 		TLSVerify:    tlsReq,
 		MaxPayload:   s.info.MaxPayload,
+		JetStream:    s.info.JetStream,
 		Proto:        proto,
 		GatewayURL:   s.getGatewayURL(),
 		Headers:      s.supportsHeaders(),
 		Cluster:      s.info.Cluster,
+		Domain:       s.info.Domain,
 		Dynamic:      s.isClusterNameDynamic(),
 		LNOC:         true,
 	}
@@ -1953,6 +1930,7 @@ func (c *client) processRouteConnect(srv *Server, arg []byte, lang string) error
 		return ErrWrongGateway
 	}
 	var perms *RoutePermissions
+	//TODO this check indicates srv may be nil. see srv usage below
 	if srv != nil {
 		perms = srv.getOpts().Cluster.Permissions
 	}
@@ -1975,7 +1953,7 @@ func (c *client) processRouteConnect(srv *Server, arg []byte, lang string) error
 			}
 		}
 		if shouldReject {
-			errTxt := fmt.Sprintf("Rejecting connection, cluster name %q does not match %q", proto.Cluster, srv.info.Cluster)
+			errTxt := fmt.Sprintf("Rejecting connection, cluster name %q does not match %q", proto.Cluster, clusterName)
 			c.Errorf(errTxt)
 			c.sendErr(errTxt)
 			c.closeConnection(ClusterNameConflict)
@@ -2016,6 +1994,7 @@ func (s *Server) removeRoute(c *client) {
 	var lnURL string
 	var gwURL string
 	var hash string
+	var idHash string
 	c.mu.Lock()
 	cid := c.cid
 	r := c.route
@@ -2023,6 +2002,7 @@ func (s *Server) removeRoute(c *client) {
 		rID = r.remoteID
 		lnURL = r.leafnodeURL
 		hash = r.hash
+		idHash = r.idHash
 		gwURL = r.gatewayURL
 	}
 	c.mu.Unlock()
@@ -2044,7 +2024,7 @@ func (s *Server) removeRoute(c *client) {
 		if lnURL != _EMPTY_ && s.removeLeafNodeURL(lnURL) {
 			s.sendAsyncLeafNodeInfo()
 		}
-		s.routesByHash.Delete(hash)
+		s.removeRouteByHash(hash, idHash)
 	}
 	s.removeFromTempClients(cid)
 	s.mu.Unlock()
