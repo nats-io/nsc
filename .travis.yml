@@ -14,7 +14,7 @@ env:
 
 install:
   - go get github.com/mattn/goveralls
-  - go get -u honnef.co/go/tools/cmd/staticcheck
+  - GO111MODULE=on go get honnef.co/go/tools/cmd/staticcheck@2021.1.2
   - go get github.com/wadey/gocovmerge
 
 before_script:
