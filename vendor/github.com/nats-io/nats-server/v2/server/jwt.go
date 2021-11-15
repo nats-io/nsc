@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"regexp"
 	"strings"
 	"time"
 
@@ -25,41 +24,36 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-var nscDecoratedRe = regexp.MustCompile(`\s*(?:(?:[-]{3,}[^\n]*[-]{3,}\n)(.+)(?:\n\s*[-]{3,}[^\n]*[-]{3,}[\n]*))`)
-
 // All JWTs once encoded start with this
 const jwtPrefix = "eyJ"
 
 // ReadOperatorJWT will read a jwt file for an operator claim. This can be a decorated file.
 func ReadOperatorJWT(jwtfile string) (*jwt.OperatorClaims, error) {
+	_, claim, err := readOperatorJWT(jwtfile)
+	return claim, err
+}
+
+func readOperatorJWT(jwtfile string) (string, *jwt.OperatorClaims, error) {
 	contents, err := ioutil.ReadFile(jwtfile)
 	if err != nil {
 		// Check to see if the JWT has been inlined.
 		if !strings.HasPrefix(jwtfile, jwtPrefix) {
-			return nil, err
+			return "", nil, err
 		}
 		// We may have an inline jwt here.
 		contents = []byte(jwtfile)
 	}
 	defer wipeSlice(contents)
 
-	var claim string
-	items := nscDecoratedRe.FindAllSubmatch(contents, -1)
-	if len(items) == 0 {
-		claim = string(contents)
-	} else {
-		// First result should be the JWT.
-		// We copy here so that if the file contained a seed file too we wipe appropriately.
-		raw := items[0][1]
-		tmp := make([]byte, len(raw))
-		copy(tmp, raw)
-		claim = string(tmp)
-	}
-	opc, err := jwt.DecodeOperatorClaims(claim)
+	theJWT, err := jwt.ParseDecoratedJWT(contents)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return opc, nil
+	opc, err := jwt.DecodeOperatorClaims(theJWT)
+	if err != nil {
+		return "", nil, err
+	}
+	return theJWT, opc, nil
 }
 
 // Just wipe slice with 'x', for clearing contents of nkey seed file.
@@ -91,11 +85,11 @@ func validateTrustedOperators(o *Options) error {
 	if len(o.TrustedOperators) > 0 && len(o.TrustedKeys) > 0 {
 		return fmt.Errorf("conflicting options for 'TrustedKeys' and 'TrustedOperators'")
 	}
-	if o.SystemAccount != "" {
+	if o.SystemAccount != _EMPTY_ {
 		foundSys := false
 		foundNonEmpty := false
 		for _, op := range o.TrustedOperators {
-			if op.SystemAccount != "" {
+			if op.SystemAccount != _EMPTY_ {
 				foundNonEmpty = true
 			}
 			if op.SystemAccount == o.SystemAccount {
@@ -106,8 +100,16 @@ func validateTrustedOperators(o *Options) error {
 		if foundNonEmpty && !foundSys {
 			return fmt.Errorf("system_account in config and operator JWT must be identical")
 		}
+	} else if o.TrustedOperators[0].SystemAccount == _EMPTY_ {
+		// In case the system account is neither defined in config nor in the first operator.
+		// If it would be needed due to the nats account resolver, raise an error.
+		switch o.AccountResolver.(type) {
+		case *DirAccResolver, *CacheDirAccResolver:
+			return fmt.Errorf("using nats based account resolver - the system account needs to be specified in configuration or the operator jwt")
+		}
 	}
-	srvMajor, srvMinor, srvUpdate, _ := jwt.ParseServerVersion(strings.Split(VERSION, "-")[0])
+	ver := strings.Split(strings.Split(strings.Split(VERSION, "-")[0], ".RC")[0], ".beta")[0]
+	srvMajor, srvMinor, srvUpdate, _ := jwt.ParseServerVersion(ver)
 	for _, opc := range o.TrustedOperators {
 		if major, minor, update, err := jwt.ParseServerVersion(opc.AssertServerVersion); err != nil {
 			return fmt.Errorf("operator %s expects version %s got error instead: %s",
@@ -132,12 +134,25 @@ func validateTrustedOperators(o *Options) error {
 		if o.TrustedKeys == nil {
 			o.TrustedKeys = make([]string, 0, 4)
 		}
-		o.TrustedKeys = append(o.TrustedKeys, opc.Issuer)
+		if !opc.StrictSigningKeyUsage {
+			o.TrustedKeys = append(o.TrustedKeys, opc.Subject)
+		}
 		o.TrustedKeys = append(o.TrustedKeys, opc.SigningKeys...)
 	}
 	for _, key := range o.TrustedKeys {
 		if !nkeys.IsValidPublicOperatorKey(key) {
 			return fmt.Errorf("trusted Keys %q are required to be a valid public operator nkey", key)
+		}
+	}
+	if len(o.resolverPinnedAccounts) > 0 {
+		for key := range o.resolverPinnedAccounts {
+			if !nkeys.IsValidPublicAccountKey(key) {
+				return fmt.Errorf("pinned account key %q is not a valid public account nkey", key)
+			}
+		}
+		// ensure the system account (belonging to the operator can always connect)
+		if o.SystemAccount != _EMPTY_ {
+			o.resolverPinnedAccounts[o.SystemAccount] = struct{}{}
 		}
 	}
 	return nil
