@@ -285,10 +285,8 @@ func checkUserForScope(ctx ActionCtx, accountName string, signerKP nkeys.KeyPair
 		return err
 	}
 	if s, ok := ac.SigningKeys.GetScope(pk); ok && s != nil {
-		if uc.Issuer == "" {
-			// set issuer as this is commonly set during encoding but is required next
-			uc.Issuer = pk
-		}
+		// set issuer as this is commonly set during encoding but is required next
+		uc.Issuer = pk
 		if err := s.ValidateScopedSigner(uc); err != nil {
 			return err
 		}

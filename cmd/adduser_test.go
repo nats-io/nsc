@@ -524,3 +524,35 @@ func Test_AddUser_Scoped(t *testing.T) {
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UF", "--tag", "foo", "-K", f.Name())
 	require.NoError(t, err)
 }
+
+func Test_AddUser_RotateScoped(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	// store seed in temporary file
+	newKey := func() string {
+		_, pk, kp := CreateAccountKey(t)
+		_, err := ts.KeyStore.Store(kp)
+		require.NoError(t, err)
+		return pk
+	}
+	pk1 := newKey()
+	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk1)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", pk1, "--subs", "5", "--role", "user-role1")
+	require.NoError(t, err)
+	// add and edit user
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "UA", "--tag", "foo1", "-K", "user-role1")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--name", "UA", "--tag", "foo2", "-K", "user-role1")
+	require.NoError(t, err)
+	// create a second key and resign this user with it
+	pk2 := newKey()
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk2)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", pk2, "--subs", "5", "--role", "user-role2")
+	require.NoError(t, err)
+	// With the re-signing issue in place, this edit command would fail.
+	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--name", "UA", "--tag", "foo3", "-K", "user-role2")
+	require.NoError(t, err)
+}
