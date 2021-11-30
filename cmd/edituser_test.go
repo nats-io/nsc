@@ -38,6 +38,8 @@ func Test_EditUser(t *testing.T) {
 		{createEditUserCmd(), []string{"edit", "user"}, nil, []string{"specify an edit option"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "A", "--account", "A"}, nil, []string{"edited user \"a\""}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "MQTT", "--rm-conn-type", "LEAFNODE", "--account", "A"}, nil, []string{"added connection type MQTT", "added connection type MQTT"}, false},
+		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "LEAFNODE_WS", "--account", "A"}, nil, []string{"added connection type LEAFNODE_WS"}, false},
+		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "MQTT_WS", "--account", "A"}, nil, []string{"added connection type MQTT_WS"}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B"}, nil, []string{"user name is required"}, true},
 		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B", "--name", "bb"}, nil, []string{"edited user \"bb\""}, false},
 	}
