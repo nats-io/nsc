@@ -28,10 +28,11 @@ type NatsResolverConfigBuilder struct {
 	sysAccountSubj string
 	sysAccount     string
 	sysAccountName string
+	cache          bool
 }
 
-func NewNatsResolverConfigBuilder() *NatsResolverConfigBuilder {
-	cb := NatsResolverConfigBuilder{}
+func NewNatsResolverConfigBuilder(cache bool) *NatsResolverConfigBuilder {
+	cb := NatsResolverConfigBuilder{cache: cache}
 	return &cb
 }
 
@@ -69,7 +70,25 @@ func (cb *NatsResolverConfigBuilder) SetSystemAccount(id string) error {
 	return nil
 }
 
-const tmpl = `# Operator named %s
+const tmplPreLoad = `
+# Preload the nats based resolver with the system account jwt.
+# This is not necessary but avoids a bootstrapping system account. 
+# This only applies to the system account. Therefore other account jwt are not included here.
+# To populate the resolver:
+# 1) make sure that your operator has the account server URL pointing at your nats servers.
+#    The url must start with: "nats://" 
+#    nsc edit operator --account-jwt-server-url nats://localhost:4222
+# 2) push your accounts using: nsc push --all
+#    The argument to push -u is optional if your account server url is set as described.
+# 3) to prune accounts use: nsc push --prune 
+#    In order to enable prune you must set above allow_delete to true
+# Later changes to the system account take precedence over the system account jwt listed here.
+resolver_preload: {
+	%s: %s,
+}
+`
+
+const tmplFull = `# Operator named %s
 operator: %s
 # System Account named %s
 system_account: %s
@@ -93,21 +112,26 @@ resolver {
     timeout: "1.9s"
 }
 
-# Preload the nats based resolver with the system account jwt.
-# This is not necessary but avoids a bootstrapping system account. 
-# This only applies to the system account. Therefore other account jwt are not included here.
-# To populate the resolver:
-# 1) make sure that your operator has the account server URL pointing at your nats servers.
-#    The url must start with: "nats://" 
-#    nsc edit operator --account-jwt-server-url nats://localhost:4222
-# 2) push your accounts using: nsc push --all
-#    The argument to push -u is optional if your account server url is set as described.
-# 3) to prune accounts use: nsc push --prune 
-#    In order to enable prune you must set above allow_delete to true
-# Later changes to the system account take precedence over the system account jwt listed here.
-resolver_preload: {
-	%s: %s,
+%s
+`
+
+const tmplCache = `# Operator named %s
+operator: %s
+# System Account named %s
+system_account: %s
+
+# configuration of the nats based cache resolver
+resolver {
+    type: cache
+    # Directory in which the account jwt will be stored
+    dir: './jwt'
+    # ttl after which the file will be removed from the cache. Set to a large value in order to disable.
+    ttl: "1h"
+    # Timeout for lookup requests in case an account does not exist locally.
+    timeout: "1.9s"
 }
+
+%s
 `
 
 func (cb *NatsResolverConfigBuilder) Generate() ([]byte, error) {
@@ -117,6 +141,10 @@ func (cb *NatsResolverConfigBuilder) Generate() ([]byte, error) {
 	if cb.sysAccountSubj == "" || cb.sysAccount == "" {
 		return nil, errors.New("system account is not set")
 	}
-	return []byte(fmt.Sprintf(tmpl, cb.operatorName, cb.operator, cb.sysAccountName,
-		cb.sysAccountSubj, cb.sysAccountSubj, cb.sysAccount)), nil
+	tmpl := tmplFull
+	if cb.cache {
+		tmpl = tmplCache
+	}
+	return []byte(fmt.Sprintf(tmpl, cb.operatorName, cb.operator, cb.sysAccountName, cb.sysAccountSubj,
+		fmt.Sprintf(tmplPreLoad, cb.sysAccountSubj, cb.sysAccount))), nil
 }

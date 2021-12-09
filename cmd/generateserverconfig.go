@@ -37,6 +37,7 @@ func createServerConfigCmd() *cobra.Command {
 nsc generate config --mem-resolver --config-file <outfile>
 nsc generate config --mem-resolver --config-file <outfile> --force
 nsc generate config --nats-resolver
+nsc generate config --nats-resolver-cache
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunAction(cmd, args, &params); err != nil {
@@ -54,6 +55,7 @@ nsc generate config --nats-resolver
 	cmd.Flags().BoolVarP(&params.nkeyConfig, "nkey", "", false, "generates an nkey account server configuration")
 	cmd.Flags().BoolVarP(&params.memResolverConfig, "mem-resolver", "", false, "generates a mem resolver server configuration")
 	cmd.Flags().BoolVarP(&params.natsResolverConfig, "nats-resolver", "", false, "generates a full nats resolver server configuration")
+	cmd.Flags().BoolVarP(&params.natsCacheResolverConfig, "nats-resolver-cache", "", false, "generates a cached nats resolver server configuration")
 	cmd.Flags().StringVarP(&params.outputFile, "config-file", "", "--", "output configuration file '--' is standard output (exclusive of --dir)")
 	cmd.Flags().StringVarP(&params.dirOut, "dir", "", "", "output configuration dir (only valid when --mem-resolver is specified)")
 	cmd.Flags().BoolVarP(&params.force, "force", "F", false, "overwrite output files if they exist")
@@ -68,18 +70,19 @@ func init() {
 }
 
 type GenerateServerConfigParams struct {
-	sysAccount         string
-	dirOut             string
-	outputFile         string
-	force              bool
-	nkeyConfig         bool
-	memResolverConfig  bool
-	natsResolverConfig bool
-	generator          ServerConfigGenerator
+	sysAccount              string
+	dirOut                  string
+	outputFile              string
+	force                   bool
+	nkeyConfig              bool
+	memResolverConfig       bool
+	natsResolverConfig      bool
+	natsCacheResolverConfig bool
+	generator               ServerConfigGenerator
 }
 
 func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
-	if ctx.NothingToDo("nkey", "mem-resolver", "dir", "nats-resolver") {
+	if ctx.NothingToDo("nkey", "mem-resolver", "dir", "nats-resolver", "nats-resolver-cache") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify a config type option")
 	}
@@ -88,7 +91,7 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is not valid with nkey configuration")
 	}
-	if p.natsResolverConfig && p.dirOut != "" {
+	if (p.natsResolverConfig || p.natsCacheResolverConfig) && p.dirOut != "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("--dir is not valid with nats-resolver configuration")
 	}
@@ -99,7 +102,7 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 	}
 
 	cfgCnt := 0
-	for _, c := range []bool{p.memResolverConfig, p.natsResolverConfig, p.nkeyConfig} {
+	for _, c := range []bool{p.memResolverConfig, p.natsResolverConfig, p.natsCacheResolverConfig, p.nkeyConfig} {
 		if c {
 			cfgCnt++
 		}
@@ -119,7 +122,9 @@ func (p *GenerateServerConfigParams) SetDefaults(ctx ActionCtx) error {
 	} else if p.memResolverConfig {
 		p.generator = NewMemResolverConfigBuilder()
 	} else if p.natsResolverConfig {
-		p.generator = NewNatsResolverConfigBuilder()
+		p.generator = NewNatsResolverConfigBuilder(false)
+	} else if p.natsCacheResolverConfig {
+		p.generator = NewNatsResolverConfigBuilder(true)
 	}
 	return nil
 }
