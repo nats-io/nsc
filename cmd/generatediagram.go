@@ -198,7 +198,7 @@ skinparam interface {
 		for _, e := range ac.Exports {
 			eId := expId(ac.Subject, e)
 			bldrPrntf(`interface "%s" << %s %s >> as %s`, expName(e), accessMod(e), expType(e), eId)
-			bldrPrntf(`%s -- %s : ""%s""`, expId(ac.Subject, e), ac.Subject, e.Subject)
+			bldrPrntf(`%s -- %s : "%s"`, expId(ac.Subject, e), ac.Subject, e.Subject)
 			addNote(eId, e.Info)
 
 			vr := jwt.ValidationResults{}
@@ -431,7 +431,7 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 			}
 			bldrPrntf("--- %s ---", name)
 			for _, sub := range list {
-				bldrPrntf(` ""%s""`, sub)
+				bldrPrntf(` "%s"`, sub)
 			}
 		}
 		permId := fmt.Sprintf("%s_permissions", subject)
