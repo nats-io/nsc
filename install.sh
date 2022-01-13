@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Copyright 2020-2021 The NATS Authors
+# Copyright 2020-2022 The NATS Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -197,16 +197,32 @@ validate_arch() {
 }
 
 normalized_arch() {
+  # We are normalising to the Golang nomenclature, which is how the binaries are released.
+  # The main ones are:  amd64 arm64
+  # There is no universal standard here.  Go's is as good as any.
+
+  # Command-line flag is the escape hatch.
   if [ -n "${opt_arch:-}" ]; then
     printf '%s\n' "$opt_arch"
     return 0
   fi
 
+  # Beware `uname -m` vs `uname -p`.
+  # Nominally, -m is machine, -p is processor.  But what does this mean in practice?
+  # In practice, -m tends to be closer to the absolute truth of what the CPU is,
+  # while -p is adaptive to personality, binary type, etc.
+  # On Alpine Linux inside Docker, -p can fail `unknown` while `-m` works.
+  #
+  #                 uname -m    uname -p
+  # Darwin/x86      x86_64      i386
+  # Darwin/M1       arm64       arm
+  # Alpine/docker   x86_64      unknown
+  # Ubuntu/x86/64b  x86_64      x86_64
+  # RPi 3B Linux    armv7l      unknown     (-m depends upon boot flags & kernel)
+  #
+  # SUSv4 requires that uname exist and that it have the -m flag, but does not document -p.
   local narch
-  narch="$(uname -p)"
-  # We see inside Alpine Linux inside Docker that uname -p can fail with unknown
-  # but the arch command can work.
-  if [ "$narch" = "unknown" ]; then narch="$(arch)"; fi
+  narch="$(uname -m)"
   case "$narch" in
     (x86_64) narch="amd64" ;;
     (amd64) true ;;
