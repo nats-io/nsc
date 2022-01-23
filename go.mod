@@ -1,7 +1,6 @@
 module github.com/nats-io/nsc
 
 require (
-	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/briandowns/spinner v0.0.0-20181029155426-195c31b675a7
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
@@ -18,10 +17,8 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/rhysd/go-github-selfupdate v1.2.2
-	github.com/spf13/cast v1.3.0 // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.2.1
 	github.com/stretchr/testify v1.6.1
 	github.com/ulikunitz/xz v0.5.8 // indirect
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5

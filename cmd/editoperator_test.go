@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2022 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -63,11 +61,11 @@ func readJWT(t *testing.T, elem ...string) string {
 
 func checkAcc(t *testing.T, ts *TestStore, acc string) {
 	t.Helper()
-	opJWT := readJWT(t, ts.Dir, "store", "O", "O.jwt")
+	opJWT := readJWT(t, ts.StoreDir, "O", "O.jwt")
 	op, err := jwt.DecodeOperatorClaims(opJWT)
 	require.NoError(t, err)
 	require.True(t, op.StrictSigningKeyUsage)
-	accJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
+	accJWT := readJWT(t, ts.StoreDir, "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
 	ac, err := jwt.DecodeAccountClaims(accJWT)
 	require.NoError(t, err)
 	require.NotEqual(t, ac.Issuer, op.Subject)
@@ -78,16 +76,16 @@ func checkAcc(t *testing.T, ts *TestStore, acc string) {
 
 func checkUsr(t *testing.T, ts *TestStore, acc string) {
 	t.Helper()
-	opJWT := readJWT(t, ts.Dir, "store", "O", "O.jwt")
+	opJWT := readJWT(t, ts.StoreDir, "O", "O.jwt")
 	op, err := jwt.DecodeOperatorClaims(opJWT)
 	require.NoError(t, err)
 	require.True(t, op.StrictSigningKeyUsage)
-	accJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
+	accJWT := readJWT(t, ts.StoreDir, "O", "accounts", acc, fmt.Sprintf("%s.jwt", acc))
 	ac, err := jwt.DecodeAccountClaims(accJWT)
 	require.NoError(t, err)
 	require.NotEqual(t, ac.Issuer, op.Subject)
 	require.Equal(t, ac.Issuer, op.SigningKeys[0])
-	usrJWT := readJWT(t, ts.Dir, "store", "O", "accounts", acc, "users", "U.jwt")
+	usrJWT := readJWT(t, ts.StoreDir, "O", "accounts", acc, "users", "U.jwt")
 	uc, err := jwt.DecodeUserClaims(usrJWT)
 	require.NoError(t, err)
 	require.NotEqual(t, uc.Issuer, ac.Subject)
@@ -130,9 +128,9 @@ func Test_EditOperatorRequireSigningKeys(t *testing.T) {
 	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--sk", "generate")
 	require.NoError(t, err)
 	checkAcc(t, ts, "A")
-	aAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.Dir, "store", "O", "accounts", "A", "A.jwt"))
+	aAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.StoreDir, "O", "accounts", "A", "A.jwt"))
 	require.NoError(t, err)
-	expAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.Dir, "store", "O", "accounts", "EXPORTER", "EXPORTER.jwt"))
+	expAc, err := jwt.DecodeAccountClaims(readJWT(t, ts.StoreDir, "O", "accounts", "EXPORTER", "EXPORTER.jwt"))
 	require.NoError(t, err)
 	outpath := filepath.Join(ts.Dir, "token.jwt")
 	_, _, err = ExecuteCmd(createGenerateActivationCmd(), "--account", "EXPORTER", "--subject", "sub.private",
@@ -177,7 +175,7 @@ func Test_EditOperatorRequireSigningKeys(t *testing.T) {
 func Test_EditOperatorRequireSigningKeysManaged(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, err := os.Lstat(filepath.Join(ts.Dir, "store"))
+	_, err := os.Lstat(ts.StoreDir)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}

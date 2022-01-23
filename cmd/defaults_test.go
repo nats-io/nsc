@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -27,21 +27,18 @@ import (
 func TestDefault_LoadOrInit(t *testing.T) {
 	d := MakeTempDir(t)
 	dir := filepath.Join(d, "a")
-	require.NoError(t, os.Setenv("TEST_NAME", dir))
 
 	ResetForTests()
-	tc, err := LoadOrInit("my/foo", "TEST_NAME")
+	tc, err := LoadOrInit(filepath.Join(dir, "config"), dir, "")
 	require.NoError(t, err)
 
-	require.Equal(t, filepath.Join(dir, "nats"), tc.StoreRoot)
+	require.Equal(t, dir, tc.StoreRoot)
 	require.Equal(t, "", tc.Operator)
 	require.Equal(t, "", tc.Account)
-	require.Equal(t, "my/foo", tc.GithubUpdates)
 }
 
 func TestDefault_LoadNewOnExisting(t *testing.T) {
 	ts := NewTestStore(t, "operator")
-	require.NoError(t, os.Setenv("TEST_NAME", ts.Dir))
 	ts.AddAccount(t, "A")
 
 	var cc ContextConfig
@@ -50,7 +47,7 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.NoError(t, WriteJson(fp, cc))
 
 	ResetForTests()
-	tc, err := LoadOrInit("my/foo", "TEST_NAME")
+	tc, err := LoadOrInit(filepath.Join(ts.Dir, "config"), filepath.Join(ts.Dir, "store"), "")
 	require.NoError(t, err)
 	require.NotNil(t, tc)
 
@@ -99,24 +96,20 @@ func Test_GetCwdStore(t *testing.T) {
 
 	// normalize the path representation
 	require.NoError(t, os.Chdir(ts.Dir))
-	testDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	require.Nil(t, GetCwdCtx())
 
-	storeRoot := filepath.Join(testDir, "store")
 	require.NoError(t, err)
-	require.NoError(t, os.Chdir(storeRoot))
+	require.NoError(t, os.Chdir(ts.StoreDir))
 
 	require.NotNil(t, GetCwdCtx())
-	require.Equal(t, storeRoot, GetCwdCtx().StoreRoot)
+	EqualPaths(t, ts.StoreDir, GetCwdCtx().StoreRoot)
 
-	odir := filepath.Join(storeRoot, "O")
+	odir := filepath.Join(ts.StoreDir, "O")
 	require.NoError(t, os.Chdir(odir))
 
 	ctx := GetCwdCtx()
 	require.NotNil(t, ctx)
-	require.Equal(t, storeRoot, ctx.StoreRoot)
+	EqualPaths(t, ts.StoreDir, ctx.StoreRoot)
 	require.Equal(t, "O", ctx.Operator)
 	require.Equal(t, "", ctx.Account)
 
@@ -125,7 +118,7 @@ func Test_GetCwdStore(t *testing.T) {
 
 	ctx = GetCwdCtx()
 	require.NotNil(t, ctx)
-	require.Equal(t, storeRoot, ctx.StoreRoot)
+	EqualPaths(t, ts.StoreDir, ctx.StoreRoot)
 	require.Equal(t, "O", ctx.Operator)
 	require.Equal(t, "", ctx.Account)
 
@@ -134,7 +127,7 @@ func Test_GetCwdStore(t *testing.T) {
 
 	ctx = GetCwdCtx()
 	require.NotNil(t, ctx)
-	require.Equal(t, storeRoot, ctx.StoreRoot)
+	EqualPaths(t, ts.StoreDir, ctx.StoreRoot)
 	require.Equal(t, "O", ctx.Operator)
 	require.Equal(t, "A", ctx.Account)
 
@@ -143,7 +136,7 @@ func Test_GetCwdStore(t *testing.T) {
 
 	ctx = GetCwdCtx()
 	require.NotNil(t, ctx)
-	require.Equal(t, storeRoot, ctx.StoreRoot)
+	EqualPaths(t, ts.StoreDir, ctx.StoreRoot)
 	require.Equal(t, "O", ctx.Operator)
 	require.Equal(t, "B", ctx.Account)
 }

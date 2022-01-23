@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -53,8 +53,7 @@ func createInitCmd() *cobra.Command {
 	}
 	sr := GetConfig().StoreRoot
 	if sr == "" {
-		conf, _ := LoadOrInit("nats-io/nsc", NscHomeEnv)
-		sr = conf.StoreRoot
+		sr, _ = NscDataHome("stores")
 	}
 	cmd.Flags().StringVarP(&params.Dir, "dir", "d", sr, "directory where the operator directory will be created")
 	cmd.Flags().StringVarP(&params.Name, "name", "n", "", "name used for the operator, account and user")

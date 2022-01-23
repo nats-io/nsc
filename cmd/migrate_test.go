@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -111,7 +111,7 @@ func Test_MigrateManaged(t *testing.T) {
 	ts.SwitchOperator(t, "T")
 
 	// migrate the local operator
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.Dir, "store", "O"))
+	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.StoreDir, "O"))
 	require.NoError(t, err)
 	require.NotNil(t, m[apk])
 

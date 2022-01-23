@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -184,9 +184,8 @@ func Test_ProfileStoreAndKeysDir(t *testing.T) {
 	require.Equal(t, "OO", ojwt.Name)
 
 	out := path.Join(ts.Dir, "out.json")
-	storeDir := path.Join(ts.Dir, "store")
-	keyDir := path.Join(ts.Dir, "keys")
-	u := fmt.Sprintf("nsc://O/A/U?operatorName&accountName&userName&operatorKey&accountKey&userKey&store=%s&keyStore=%s", storeDir, keyDir)
+
+	u := fmt.Sprintf("nsc://O/A/U?operatorName&accountName&userName&operatorKey&accountKey&userKey&store=%s&keyStore=%s", ts.StoreDir, ts.KeysDir)
 
 	_, _, err = ExecuteCmd(rootCmd, "generate", "profile", "-o", out, u)
 	require.NoError(t, err)

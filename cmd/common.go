@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -39,7 +39,43 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Resolve a directory/file from an environment variable
+func parentDir(envName string, defaultDir ...string) (string, error) {
+	xdg := os.Getenv(envName)
+	if xdg != "" {
+		return xdg, nil
+	}
+	home, err := homedir.Dir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine home directory: %v", err)
+	}
+	return filepath.Join(home, filepath.Join(defaultDir...)), nil
+}
+
+func XdgConfigHome() (string, error) {
+	return parentDir(XdgConfigHomeEnv, ".config")
+}
+
+func XdgDataHome() (string, error) {
+	return parentDir(XdgDataHomeEnv, ".local", "share")
+}
+
+func NscConfigHome() (string, error) {
+	parent, err := XdgConfigHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(parent, "nsc"), nil
+}
+
+func NscDataHome(dir string) (string, error) {
+	parent, err := XdgDataHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(parent, "nsc", dir), nil
+}
+
+// ResolvePath resolves a directory/file from an environment variable
 // if not set defaultPath is returned
 func ResolvePath(defaultPath string, varName string) string {
 	v := os.Getenv(varName)
@@ -85,6 +121,12 @@ func WriteJson(fp string, v interface{}) error {
 		return fmt.Errorf("error marshaling: %v", err)
 	}
 
+	parent := filepath.Dir(fp)
+	if parent != "" {
+		if err := os.MkdirAll(parent, 0700); err != nil {
+			return fmt.Errorf("error creating dirs %#q: %v", fp, err)
+		}
+	}
 	if err := ioutil.WriteFile(fp, data, 0600); err != nil {
 		return fmt.Errorf("error writing %#q: %v", fp, err)
 	}

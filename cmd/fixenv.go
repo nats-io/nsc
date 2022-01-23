@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -204,10 +204,7 @@ func (p *FixCmd) Regenerate(rr *store.Report) error {
 		rr.AddError("error creating destination directory %#q: %v", p.out, err)
 		return err
 	}
-	if err := os.Setenv(store.NKeysPathEnv, filepath.Join(p.out, "keys")); err != nil {
-		rr.AddError("error setting env $%s=%s: %v", store.NKeysPathEnv, p.out, err)
-		return err
-	}
+	store.KeyStorePath = filepath.Join(p.out, "keys")
 
 	gr := store.NewReport(store.OK, "Generate")
 	rr.Add(gr)

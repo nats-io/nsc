@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -31,34 +30,52 @@ import (
 
 var NscNotGitIgnore bool
 
-const DefaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
 const NKeyExtension = ".nk"
 const CredsExtension = ".creds"
 const CredsDir = "creds"
 const KeysDir = "keys"
 
+var KeyStorePath string
+
 type NamedKey struct {
 	Name string
 	KP   nkeys.KeyPair
 }
 
-// Resolve a directory/file from an environment variable
-// if not set defaultPath is returned
-func ResolvePath(defaultPath string, varName string) string {
-	v := os.Getenv(varName)
-	if v != "" {
-		return v
+func parentDir(envName string, defaultDir ...string) (string, error) {
+	xdg := os.Getenv(envName)
+	if xdg != "" {
+		return xdg, nil
 	}
-	return defaultPath
+	home, err := homedir.Dir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine home directory: %v", err)
+	}
+	return filepath.Join(home, filepath.Join(defaultDir...)), nil
+}
+
+func XdgDataHome() (string, error) {
+	return parentDir("XDG_DATA_HOME", ".local", "share")
+}
+
+func NscDataHome(dir string) (string, error) {
+	parent, err := XdgDataHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(parent, "nsc", dir), nil
 }
 
 func GetKeysDir() string {
-	u, err := user.Current()
-	if err != nil {
-		return ResolvePath("", NKeysPathEnv)
+	if KeyStorePath == "" {
+		// this shouldn't happen as the variable is initialized
+		// when the nsc tool starts, but old tests that
+		// depended on this being calculated by the environment
+		// might trigger
+		KeyStorePath, _ = NscDataHome("keys")
 	}
-	return ResolvePath(filepath.Join(u.HomeDir, DefaultNKeysPath), NKeysPathEnv)
+	return KeyStorePath
 }
 
 // Resolve a key value provided as a flag - value could be an actual nkey or a path to an nkey

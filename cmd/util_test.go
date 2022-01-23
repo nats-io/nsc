@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,10 @@ import (
 )
 
 type TestStore struct {
-	Dir string
+	Dir       string
+	KeysDir   string
+	ConfigDir string
+	StoreDir  string
 
 	Store    *store.Store
 	KeyStore store.KeyStore
@@ -73,11 +77,18 @@ func NewEmptyStore(t *testing.T) *TestStore {
 	SetEnvOptions()
 	var ts TestStore
 
-	homeEnv = t.Name()
-
 	ts.Dir = MakeTempDir(t)
-	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
-	_, err := initToolHome(t.Name())
+	err := MaybeMakeDir(ts.Dir)
+	require.NoError(t, err)
+
+	ts.ConfigDir, err = filepath.Abs(filepath.Join(ts.Dir, "config"))
+	require.NoError(t, err)
+	ts.StoreDir, err = filepath.Abs(filepath.Join(ts.Dir, "stores"))
+	require.NoError(t, err)
+	ts.KeysDir, err = filepath.Abs(filepath.Join(ts.Dir, "keys"))
+	require.NoError(t, err)
+
+	_, err = LoadOrInit(ts.ConfigDir, ts.StoreDir, ts.KeysDir)
 	require.NoError(t, err)
 
 	// debug the test that created the store
@@ -86,40 +97,21 @@ func NewEmptyStore(t *testing.T) *TestStore {
 	err = ForceStoreRoot(t, ts.GetStoresRoot())
 	require.NoError(t, err)
 
-	nkeysDir := filepath.Join(ts.Dir, "keys")
-	err = os.Mkdir(nkeysDir, 0700)
-	require.NoError(t, err, "error creating %#q", nkeysDir)
+	err = os.Setenv(NscHomeEnv, ts.ConfigDir)
 	require.NoError(t, err)
-	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
+
+	err = os.Setenv(store.NKeysPathEnv, ts.KeysDir)
 	require.NoError(t, err)
 
 	return &ts
 }
 
-func NewTestStoreWithOperator(t *testing.T, operatorName string, operator nkeys.KeyPair) *TestStore {
-	ResetForTests()
-	// init runs early
-	SetEnvOptions()
-	var ts TestStore
-
-	// ngsStore is a global - so first test to get it initializes it
-	homeEnv = t.Name()
-
-	ts.OperatorKey = operator
-	ts.Dir = MakeTempDir(t)
-	require.NoError(t, os.Setenv(t.Name(), filepath.Join(ts.Dir, "toolprefs")))
-	_, err := initToolHome(t.Name())
-	require.NoError(t, err)
-	// debug the test that created the store
-	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
-
-	err = ForceStoreRoot(t, ts.GetStoresRoot())
-	require.NoError(t, err)
-
+func NewTestStoreWithOperator(t *testing.T, operatorName string, key nkeys.KeyPair) *TestStore {
+	ts := NewEmptyStore(t)
+	ts.OperatorKey = key
 	ForceOperator(t, operatorName)
-	ts.AddOperatorWithKey(t, operatorName, operator)
-
-	return &ts
+	ts.AddOperatorWithKey(t, operatorName, key)
+	return ts
 }
 
 func NewTestStoreWithOperatorJWT(t *testing.T, operator string) *TestStore {
@@ -163,8 +155,7 @@ func (ts *TestStore) AddOperatorWithKey(t *testing.T, operatorName string, opera
 	}
 	require.NoError(t, err)
 
-	err = os.Setenv(store.NKeysPathEnv, nkeysDir)
-	require.NoError(t, err, "nkeys env")
+	store.KeyStorePath = nkeysDir
 
 	var nk = &store.NamedKey{}
 	nk.Name = operatorName
@@ -244,8 +235,15 @@ func (ts *TestStore) Done(t *testing.T) {
 	}
 }
 
+func (ts *TestStore) List(t *testing.T) {
+	filepath.Walk(ts.Dir, func(path string, info fs.FileInfo, err error) error {
+		t.Log(strings.TrimPrefix(path, ts.Dir))
+		return nil
+	})
+}
+
 func (ts *TestStore) GetStoresRoot() string {
-	return filepath.Join(ts.Dir, "store")
+	return ts.StoreDir
 }
 
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
@@ -823,4 +821,16 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, opts Ta
 func RunTestAccountServer(t *testing.T) (*httptest.Server, map[string][]byte) {
 	_, _, okp := CreateOperatorKey(t)
 	return RunTestAccountServerWithOperatorKP(t, okp, TasOpts{Vers: 2})
+}
+
+// EqualsPaths resolves any symlinks that may have been present
+// ie /private/var vs /var in the paths
+func EqualPaths(t *testing.T, a, b string) {
+	var err error
+	a, err = filepath.EvalSymlinks(a)
+	require.NoError(t, err)
+	b, err = filepath.EvalSymlinks(b)
+	require.NoError(t, err)
+
+	require.Equal(t, a, b)
 }

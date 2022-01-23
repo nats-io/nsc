@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -74,6 +74,8 @@ func Test_HasOldStructure(t *testing.T) {
 	defer ts.Done(t)
 
 	ks := filepath.Join(ts.Dir, "keys")
+	old := store.KeyStorePath
+	store.KeyStorePath = ks
 
 	oseed, _, _ := CreateOperatorKey(t)
 	require.NoError(t, storeOldKey(ts, "O", "", "", oseed))
@@ -93,6 +95,7 @@ func Test_HasOldStructure(t *testing.T) {
 	isOld, err := store.IsOldKeyRing(store.GetKeysDir())
 	require.NoError(t, err)
 	require.True(t, isOld)
+	store.KeyStorePath = old
 }
 
 func Test_MigrateKeys(t *testing.T) {
@@ -100,6 +103,8 @@ func Test_MigrateKeys(t *testing.T) {
 	defer ts.Done(t)
 
 	ks := filepath.Join(ts.Dir, "keys")
+	oldKs := store.KeyStorePath
+	store.KeyStorePath = ks
 
 	oseed, opk, _ := CreateOperatorKey(t)
 	require.NoError(t, storeOldKey(ts, "O", "", "", oseed))
@@ -139,4 +144,5 @@ func Test_MigrateKeys(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, kp)
 	}
+	store.KeyStorePath = oldKs
 }

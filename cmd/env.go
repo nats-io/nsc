@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
@@ -66,7 +69,10 @@ func createEnvCmd() *cobra.Command {
 }
 
 func init() {
-	GetRootCmd().AddCommand(createEnvCmd())
+	env := createEnvCmd()
+	GetRootCmd().AddCommand(env)
+	env.AddCommand(createEnvMigrateCmd())
+
 }
 
 type SetContextParams struct {
@@ -95,7 +101,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
-	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
+	table.AddRow("$"+XdgConfigHomeEnv+filepath.Join(string(filepath.Separator), ".config", "nsc"), envSet(XdgConfigHomeEnv), AbbrevHomePaths(ConfigDir))
 	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")
@@ -121,4 +127,39 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	}
 	table.AddRow("Root CAs to trust", "", caFile)
 	cmd.Println(table.Render())
+}
+
+type EnvMigrateParams struct {
+	Dir string
+}
+
+func createEnvMigrateCmd() *cobra.Command {
+	var params EnvMigrateParams
+	cmd := &cobra.Command{
+		Use:           "migrate",
+		Short:         "migrate nsc configuration directories",
+		Args:          MaxArgs(0),
+		SilenceErrors: false,
+		SilenceUsage:  false,
+		Example:       "migrate",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := os.Getenv("XDG_DATA_HOME")
+			if target == "" {
+				home, err := homedir.Dir()
+				if err != nil {
+					return err
+				}
+				target = path.Join(home, ".local", "share")
+			}
+			cmd.Println(target)
+			return nil
+		},
+	}
+	defaultHome := os.Getenv("NSC_HOME")
+	if defaultHome == "" {
+		defaultHome = "~/.nsc"
+	}
+	cmd.Flags().StringVarP(&params.Dir, "directory", "s", defaultHome, "nsc home directory")
+
+	return cmd
 }

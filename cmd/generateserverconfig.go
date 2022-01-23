@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -43,10 +43,10 @@ nsc generate config --nats-resolver-cache
 			if err := RunAction(cmd, args, &params); err != nil {
 				return err
 			}
-			if !QuietMode() && params.outputFile != "" && params.outputFile != "--" {
+			if params.outputFile != "" && params.outputFile != "--" {
 				cmd.Printf("Success!! - generated %#q\n", AbbrevHomePaths(params.outputFile))
 			}
-			if !QuietMode() && params.dirOut != "" {
+			if params.dirOut != "" {
 				cmd.Printf("Success!! - generated  %#q\n", AbbrevHomePaths(filepath.Join(params.dirOut, "resolver.conf")))
 			}
 			return nil

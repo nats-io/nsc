@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,24 +23,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mitchellh/go-homedir"
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-const TestEnv = "NSC_TEST"
+var configDir string
+var keysDir string
+var dataDir string
 
 var KeyPathFlag string
 var InteractiveFlag bool
 var NscCwdOnly bool
-var quietMode bool
-
-var cfgFile string
-
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
 
 type InterceptorFn func(ctx ActionCtx, params interface{}) error
@@ -96,40 +92,25 @@ func GetRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func EnterQuietMode() {
-	quietMode = true
-}
-
-func SetQuietMode(tf bool) {
-	quietMode = tf
-}
-
-func QuietMode() bool {
-	return quietMode
-}
-
-var rootCmd = &cobra.Command{
-	Use:   "nsc",
-	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if store, _ := GetStore(); store != nil {
-			if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
-				if c.Version > 2 {
-					return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
-						store.GetName(), c.Version, os.Args[0])
-				} else if c.Version == 1 {
-					allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help" || cmd.Name() == "update"
-					if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
-						for _, v := range addCmd.Commands() {
-							if v == cmd {
-								allowCmdWithJWTV1Store = true
-								break
-							}
+func precheckDataStore(cmd *cobra.Command) error {
+	if store, _ := GetStore(); store != nil {
+		if c, _ := store.ReadOperatorClaim(); c != nil && c.Version == 1 {
+			if c.Version > 2 {
+				return fmt.Errorf("the store %#q is at version %d. To upgrade nsc - type `%s update`",
+					store.GetName(), c.Version, os.Args[0])
+			} else if c.Version == 1 {
+				allowCmdWithJWTV1Store := cmd.Name() == "upgrade-jwt" || cmd.Name() == "env" || cmd.Name() == "help" || cmd.Name() == "update"
+				if !allowCmdWithJWTV1Store && cmd.Name() == "operator" {
+					for _, v := range addCmd.Commands() {
+						if v == cmd {
+							allowCmdWithJWTV1Store = true
+							break
 						}
 					}
-					if !allowCmdWithJWTV1Store {
-						//lint:ignore ST1005 this message is shown to the user
-						return fmt.Errorf(`This version of nsc only supports jwtV2. 
+				}
+				if !allowCmdWithJWTV1Store {
+					//lint:ignore ST1005 this message is shown to the user
+					return fmt.Errorf(`This version of nsc only supports jwtV2. 
 If you are using a managed service, check your provider for 
 instructions on how to update your project. In most cases 
 all you need to do is:
@@ -145,24 +126,73 @@ upgrade the v1 store %#q - type:
 Alternatively you can downgrade' %q to a compatible version using: 
 "%s update --version 0.5.0"
 `,
-							os.Args[0], os.Args[0], store.GetName(), os.Args[0], os.Args[0], os.Args[0])
-					}
+						os.Args[0], os.Args[0], store.GetName(), os.Args[0], os.Args[0], os.Args[0])
 				}
 			}
 		}
-		if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
-			return nil
-		}
-		// check if we need to perform any kind of migration
-		needsUpdate, err := store.KeysNeedMigration()
-		if err != nil {
-			return err
-		}
-		if needsUpdate {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
+	}
+	return nil
+}
+
+func precheckKeyStore(cmd *cobra.Command) error {
+	if cmd.Name() == "migrate" && cmd.Parent().Name() == "keys" {
+		return nil
+	}
+	// check if we need to perform any kind of migration
+	needsUpdate, err := store.KeysNeedMigration()
+	if err != nil {
+		return err
+	}
+	if needsUpdate {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("the keystore %#q needs migration - type `%s keys migrate` to update", AbbrevHomePaths(store.GetKeysDir()), os.Args[0])
+	}
+	return nil
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "nsc",
+	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+		// if the flag is set we use it, if not check the old env
+		if configDir != "" {
+			if configDir, err = Expand(configDir); err != nil {
+				return err
+			}
+		} else if os.Getenv(NscHomeEnv) != "" {
+			if configDir, err = Expand(os.Getenv(NscHomeEnv)); err != nil {
+				return err
+			}
 		}
 
+		if dataDir != "" {
+			if dataDir, err = Expand(dataDir); err != nil {
+				return err
+			}
+		}
+
+		if keysDir != "" {
+			if keysDir, err = Expand(keysDir); err != nil {
+				return err
+			}
+		} else if os.Getenv(store.NKeysPathEnv) != "" {
+			if keysDir, err = Expand(os.Getenv(store.NKeysPathEnv)); err != nil {
+				return err
+			}
+		}
+
+		if _, err = LoadOrInit(configDir, dataDir, keysDir); err != nil {
+			return err
+		}
+		// check that the store is compatible
+		if err := precheckDataStore(cmd); err != nil {
+			return err
+		}
+		// intercept migrate keys
+		if err := precheckKeyStore(cmd); err != nil {
+			return err
+		}
 		return nil
 	},
 }
@@ -208,7 +238,6 @@ func SetEnvOptions() {
 
 func init() {
 	SetEnvOptions()
-	cobra.OnInitialize(initConfig)
 	HoistRootFlags(GetRootCmd())
 }
 
@@ -217,31 +246,10 @@ func init() {
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "Key used to sign. Can be specified as role (where applicable), public key (private portion is retrieved) or file path to a private key or private key ")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
+
+	cmd.PersistentFlags().StringVarP(&configDir, "config-dir", "", "", "nsc config directory (~/.config/nsc)")
+	cmd.PersistentFlags().StringVarP(&dataDir, "data-dir", "", "", "nsc data store directory (~/.local/share/nsc)")
+	cmd.PersistentFlags().StringVarP(&keysDir, "keystore-dir", "", "", "nsc keystore directory (~/.nkeys)")
+
 	return cmd
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".nsc" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".nsc")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
 }
