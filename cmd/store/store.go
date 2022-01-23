@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -207,7 +207,7 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 func LoadStore(dir string) (*Store, error) {
 	sf := filepath.Join(dir, NSCFile)
 	if _, err := os.Stat(sf); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%#q is not a valid configuration directory", dir)
+		return nil, fmt.Errorf("%#q is not a valid data directory", dir)
 	}
 
 	s := &Store{Dir: dir}

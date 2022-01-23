@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
@@ -33,7 +34,7 @@ import (
 const XdgConfigHomeEnv = "XDG_CONFIG_HOME"
 const XdgDataHomeEnv = "XDG_DATA_HOME"
 
-//NscHomeEnv the folder for the config file
+// NscHomeEnv the folder for the config file
 const NscHomeEnv = "NSC_HOME"
 const NscCwdOnlyEnv = "NSC_CWD_ONLY"
 const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
@@ -48,7 +49,6 @@ type ToolConfig struct {
 }
 
 var config ToolConfig
-var ConfigDir string
 var rootCAsNats nats.Option // Will be skipped, when nil and passed to a connection
 var tlsKeyNats nats.Option  // Will be skipped, when nil and passed to a connection
 var tlsCertNats nats.Option // Will be skipped, when nil and passed to a connection
@@ -171,11 +171,37 @@ func isOperatorDir(dir string) (store.Info, bool, error) {
 }
 
 func GetConfigDir() string {
-	if configDir == "" {
+	if ConfigDirFlag == "" {
 		// this is running under a test...
 		return os.Getenv(NscHomeEnv)
 	}
-	return configDir
+	return ConfigDirFlag
+}
+
+func hasNewConfig(dir string) bool {
+	fp := filepath.Join(dir, "nsc.json")
+	if _, err := os.Stat(fp); err == nil {
+		return true
+	}
+	return false
+}
+
+func oldConfigDir() (string, error) {
+	home, err := homedir.Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".nsc"), nil
+}
+
+func hasOldConfig() bool {
+	ocd, err := oldConfigDir()
+	if err != nil {
+		return false
+	}
+	old := filepath.Join(ocd, "nsc.json")
+	_, err = os.Stat(old)
+	return err == nil
 }
 
 func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConfig, error) {
@@ -188,9 +214,15 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 		if err != nil {
 			return nil, fmt.Errorf("error calculating nsc config home: %v", err)
 		}
+		// don't fail for existing
+		if !hasNewConfig(configDir) && hasOldConfig() {
+			if configDir, err = oldConfigDir(); err != nil {
+				return nil, err
+			}
+		}
 	}
-	ConfigDir = configDir
-	if err := MaybeMakeDir(configDir); err != nil {
+	ConfigDirFlag = configDir
+	if err := MaybeMakeDir(ConfigDirFlag); err != nil {
 		return nil, err
 	}
 
@@ -201,6 +233,8 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 			return nil, fmt.Errorf("error calculating nsc data home: %v", err)
 		}
 	}
+	// dir created if files written
+	DataDirFlag = dataDir
 
 	if keystoreDir == "" {
 		keystoreDir, err = NscDataHome("keys")
@@ -208,7 +242,9 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 			return nil, fmt.Errorf("error calculating keystore directory: %v", err)
 		}
 	}
-	store.KeyStorePath = keystoreDir
+	// dir created if keys added
+	KeysDirFlag = keystoreDir
+	store.KeyStorePath = KeysDirFlag
 
 	if err := config.load(); err != nil {
 		return nil, err

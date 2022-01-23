@@ -101,7 +101,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
-	table.AddRow("$"+XdgConfigHomeEnv+filepath.Join(string(filepath.Separator), ".config", "nsc"), envSet(XdgConfigHomeEnv), AbbrevHomePaths(ConfigDir))
+	table.AddRow("$"+XdgConfigHomeEnv+filepath.Join(string(filepath.Separator), ".config", "nsc"), envSet(XdgConfigHomeEnv), AbbrevHomePaths(ConfigDirFlag))
 	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")

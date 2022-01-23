@@ -30,9 +30,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var configDir string
-var keysDir string
-var dataDir string
+var ConfigDirFlag string
+var KeysDirFlag string
+var DataDirFlag string
 
 var KeyPathFlag string
 var InteractiveFlag bool
@@ -156,33 +156,33 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		// if the flag is set we use it, if not check the old env
-		if configDir != "" {
-			if configDir, err = Expand(configDir); err != nil {
+		if ConfigDirFlag != "" {
+			if ConfigDirFlag, err = Expand(ConfigDirFlag); err != nil {
 				return err
 			}
 		} else if os.Getenv(NscHomeEnv) != "" {
-			if configDir, err = Expand(os.Getenv(NscHomeEnv)); err != nil {
+			if ConfigDirFlag, err = Expand(os.Getenv(NscHomeEnv)); err != nil {
 				return err
 			}
 		}
 
-		if dataDir != "" {
-			if dataDir, err = Expand(dataDir); err != nil {
+		if DataDirFlag != "" {
+			if DataDirFlag, err = Expand(DataDirFlag); err != nil {
 				return err
 			}
 		}
 
-		if keysDir != "" {
-			if keysDir, err = Expand(keysDir); err != nil {
+		if KeysDirFlag != "" {
+			if KeysDirFlag, err = Expand(KeysDirFlag); err != nil {
 				return err
 			}
 		} else if os.Getenv(store.NKeysPathEnv) != "" {
-			if keysDir, err = Expand(os.Getenv(store.NKeysPathEnv)); err != nil {
+			if KeysDirFlag, err = Expand(os.Getenv(store.NKeysPathEnv)); err != nil {
 				return err
 			}
 		}
 
-		if _, err = LoadOrInit(configDir, dataDir, keysDir); err != nil {
+		if _, err = LoadOrInit(ConfigDirFlag, DataDirFlag, KeysDirFlag); err != nil {
 			return err
 		}
 		// check that the store is compatible
@@ -247,9 +247,9 @@ func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "Key used to sign. Can be specified as role (where applicable), public key (private portion is retrieved) or file path to a private key or private key ")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
 
-	cmd.PersistentFlags().StringVarP(&configDir, "config-dir", "", "", "nsc config directory (~/.config/nsc)")
-	cmd.PersistentFlags().StringVarP(&dataDir, "data-dir", "", "", "nsc data store directory (~/.local/share/nsc)")
-	cmd.PersistentFlags().StringVarP(&keysDir, "keystore-dir", "", "", "nsc keystore directory (~/.nkeys)")
+	cmd.PersistentFlags().StringVarP(&ConfigDirFlag, "config-dir", "", "", "nsc config directory (~/.config/nsc)")
+	cmd.PersistentFlags().StringVarP(&DataDirFlag, "data-dir", "", "", "nsc data store directory (~/.local/share/nsc)")
+	cmd.PersistentFlags().StringVarP(&KeysDirFlag, "keystore-dir", "", "", "nsc keystore directory (~/.nkeys)")
 
 	return cmd
 }
