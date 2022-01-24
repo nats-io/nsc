@@ -42,6 +42,10 @@ const NscRootCasNatsEnv = "NATS_CA"
 const NscTlsKeyNatsEnv = "NATS_KEY"
 const NscTlsCertNatsEnv = "NATS_CERT"
 
+const StoresSubDirName = "stores"
+const KeysDirName = "keys"
+const NscConfigFileName = "nsc.json"
+
 type ToolConfig struct {
 	ContextConfig
 	GithubUpdates string `json:"github_updates"` // git hub repo
@@ -179,7 +183,7 @@ func GetConfigDir() string {
 }
 
 func hasNewConfig(dir string) bool {
-	fp := filepath.Join(dir, "nsc.json")
+	fp := filepath.Join(dir, NscConfigFileName)
 	if _, err := os.Stat(fp); err == nil {
 		return true
 	}
@@ -199,7 +203,7 @@ func hasOldConfig() bool {
 	if err != nil {
 		return false
 	}
-	old := filepath.Join(ocd, "nsc.json")
+	old := filepath.Join(ocd, NscConfigFileName)
 	_, err = os.Stat(old)
 	return err == nil
 }
@@ -228,7 +232,7 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 
 	// all data is in $XDG_DATA_HOME/.local/share/nsc
 	if dataDir == "" {
-		dataDir, err = NscDataHome("stores")
+		dataDir, err = NscDataHome(StoresSubDirName)
 		if err != nil {
 			return nil, fmt.Errorf("error calculating nsc data home: %v", err)
 		}
@@ -237,7 +241,7 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 	DataDirFlag = dataDir
 
 	if keystoreDir == "" {
-		keystoreDir, err = NscDataHome("keys")
+		keystoreDir, err = NscDataHome(KeysDirName)
 		if err != nil {
 			return nil, fmt.Errorf("error calculating keystore directory: %v", err)
 		}
