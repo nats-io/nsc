@@ -19,15 +19,27 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adrg/xdg"
+	"github.com/mitchellh/go-homedir"
 )
 
 const NscConfigFileName = "nsc.json"
 const StoresSubDirName = "stores"
 const KeysDirName = "keys"
 
+var home, _ = homedir.Dir()
+var config = envOrValue("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+var data = envOrValue("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+
+func envOrValue(name, value string) string {
+	ev := os.Getenv(name)
+	if ev != "" {
+		return ev
+	}
+	return value
+}
+
 func configHome() string {
-	return filepath.Join(xdg.ConfigHome, "nats", "nsc")
+	return filepath.Join(config, "nats", "nsc")
 }
 
 func hasNewConfig() bool {
@@ -40,7 +52,7 @@ func hasNewConfig() bool {
 }
 
 func oldConfigDir() (string, error) {
-	return filepath.Join(xdg.Home, ".nsc"), nil
+	return filepath.Join(home, ".nsc"), nil
 }
 
 func hasOldConfig() bool {
@@ -58,9 +70,9 @@ func NscConfigHome() string {
 		old, _ := oldConfigDir()
 		return old
 	}
-	return filepath.Join(xdg.ConfigHome, "nats", "nsc")
+	return filepath.Join(config, "nats", "nsc")
 }
 
 func NscDataHome(dir string) string {
-	return filepath.Join(xdg.DataHome, "nats", "nsc", dir)
+	return filepath.Join(data, "nats", "nsc", dir)
 }

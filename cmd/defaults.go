@@ -178,7 +178,6 @@ func GetConfigDir() string {
 func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConfig, error) {
 	const github = "nats-io/nsc"
 
-	// all configuration is in $XDG_CONFIG_HOME/.config/nsc
 	if configDir == "" {
 		configDir = home.NscConfigHome()
 	}
@@ -187,7 +186,6 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 		return nil, err
 	}
 
-	// all data is in $XDG_DATA_HOME/.local/share/nsc
 	if dataDir == "" {
 		dataDir = home.NscDataHome(home.StoresSubDirName)
 	}
