@@ -18,9 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
@@ -70,8 +68,6 @@ func createEnvCmd() *cobra.Command {
 func init() {
 	env := createEnvCmd()
 	GetRootCmd().AddCommand(env)
-	env.AddCommand(createEnvMigrateCmd())
-
 }
 
 type SetContextParams struct {
@@ -131,35 +127,4 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 
 type EnvMigrateParams struct {
 	Dir string
-}
-
-func createEnvMigrateCmd() *cobra.Command {
-	var params EnvMigrateParams
-	cmd := &cobra.Command{
-		Use:           "migrate",
-		Short:         "migrate nsc configuration directories",
-		Args:          MaxArgs(0),
-		SilenceErrors: false,
-		SilenceUsage:  false,
-		Example:       "migrate",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			target := os.Getenv("XDG_DATA_HOME")
-			if target == "" {
-				home, err := homedir.Dir()
-				if err != nil {
-					return err
-				}
-				target = path.Join(home, ".local", "share")
-			}
-			cmd.Println(target)
-			return nil
-		},
-	}
-	defaultHome := os.Getenv("NSC_HOME")
-	if defaultHome == "" {
-		defaultHome = "~/.nsc"
-	}
-	cmd.Flags().StringVarP(&params.Dir, "directory", "s", defaultHome, "nsc home directory")
-
-	return cmd
 }

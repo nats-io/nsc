@@ -50,7 +50,7 @@ func GetKeysDir() string {
 		// when the nsc tool starts, but old tests that
 		// depended on this being calculated by the environment
 		// might trigger
-		KeyStorePath = home.NscDataHome(home.KeysDirName)
+		KeyStorePath = home.NscDataHome(home.KeysSubDirName)
 	}
 	return KeyStorePath
 }

@@ -30,7 +30,7 @@ func TestResolveLocal(t *testing.T) {
 	old := KeyStorePath
 	KeyStorePath = ""
 	dir := GetKeysDir()
-	dp := home.NscDataHome(home.KeysDirName)
+	dp := home.NscDataHome(home.KeysSubDirName)
 	KeyStorePath = old
 	require.Equal(t, dir, dp)
 }

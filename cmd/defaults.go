@@ -193,7 +193,7 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 	DataDirFlag = dataDir
 
 	if keystoreDir == "" {
-		keystoreDir = home.NscDataHome(home.KeysDirName)
+		keystoreDir = home.NscDataHome(home.KeysSubDirName)
 	}
 	// dir created if keys added
 	KeysDirFlag = keystoreDir

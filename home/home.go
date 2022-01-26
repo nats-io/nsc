@@ -24,7 +24,7 @@ import (
 
 const NscConfigFileName = "nsc.json"
 const StoresSubDirName = "stores"
-const KeysDirName = "keys"
+const KeysSubDirName = "keys"
 
 var home, _ = homedir.Dir()
 var config = envOrValue("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
