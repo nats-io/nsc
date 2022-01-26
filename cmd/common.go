@@ -39,42 +39,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func parentDir(envName string, defaultDir ...string) (string, error) {
-	xdg := os.Getenv(envName)
-	if xdg != "" {
-		return xdg, nil
-	}
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", fmt.Errorf("unable to determine home directory: %v", err)
-	}
-	return filepath.Join(home, filepath.Join(defaultDir...)), nil
-}
-
-func XdgConfigHome() (string, error) {
-	return parentDir(XdgConfigHomeEnv, ".config")
-}
-
-func XdgDataHome() (string, error) {
-	return parentDir(XdgDataHomeEnv, ".local", "share")
-}
-
-func NscConfigHome() (string, error) {
-	parent, err := XdgConfigHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(parent, "nsc"), nil
-}
-
-func NscDataHome(dir string) (string, error) {
-	parent, err := XdgDataHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(parent, "nsc", dir), nil
-}
-
 // ResolvePath resolves a directory/file from an environment variable
 // if not set defaultPath is returned
 func ResolvePath(defaultPath string, varName string) string {

@@ -24,15 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nsc/home"
+
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
 )
-
-// XDG environment variables
-const XdgConfigHomeEnv = "XDG_CONFIG_HOME"
-const XdgDataHomeEnv = "XDG_DATA_HOME"
 
 // NscHomeEnv the folder for the config file
 const NscHomeEnv = "NSC_HOME"
@@ -41,10 +38,6 @@ const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
 const NscRootCasNatsEnv = "NATS_CA"
 const NscTlsKeyNatsEnv = "NATS_KEY"
 const NscTlsCertNatsEnv = "NATS_CERT"
-
-const StoresSubDirName = "stores"
-const KeysDirName = "keys"
-const NscConfigFileName = "nsc.json"
 
 type ToolConfig struct {
 	ContextConfig
@@ -182,48 +175,12 @@ func GetConfigDir() string {
 	return ConfigDirFlag
 }
 
-func hasNewConfig(dir string) bool {
-	fp := filepath.Join(dir, NscConfigFileName)
-	if _, err := os.Stat(fp); err == nil {
-		return true
-	}
-	return false
-}
-
-func oldConfigDir() (string, error) {
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".nsc"), nil
-}
-
-func hasOldConfig() bool {
-	ocd, err := oldConfigDir()
-	if err != nil {
-		return false
-	}
-	old := filepath.Join(ocd, NscConfigFileName)
-	_, err = os.Stat(old)
-	return err == nil
-}
-
 func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConfig, error) {
 	const github = "nats-io/nsc"
-	var err error
 
 	// all configuration is in $XDG_CONFIG_HOME/.config/nsc
 	if configDir == "" {
-		configDir, err = NscConfigHome()
-		if err != nil {
-			return nil, fmt.Errorf("error calculating nsc config home: %v", err)
-		}
-		// don't fail for existing
-		if !hasNewConfig(configDir) && hasOldConfig() {
-			if configDir, err = oldConfigDir(); err != nil {
-				return nil, err
-			}
-		}
+		configDir = home.NscConfigHome()
 	}
 	ConfigDirFlag = configDir
 	if err := MaybeMakeDir(ConfigDirFlag); err != nil {
@@ -232,19 +189,13 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 
 	// all data is in $XDG_DATA_HOME/.local/share/nsc
 	if dataDir == "" {
-		dataDir, err = NscDataHome(StoresSubDirName)
-		if err != nil {
-			return nil, fmt.Errorf("error calculating nsc data home: %v", err)
-		}
+		dataDir = home.NscDataHome(home.StoresSubDirName)
 	}
 	// dir created if files written
 	DataDirFlag = dataDir
 
 	if keystoreDir == "" {
-		keystoreDir, err = NscDataHome(KeysDirName)
-		if err != nil {
-			return nil, fmt.Errorf("error calculating keystore directory: %v", err)
-		}
+		keystoreDir = home.NscDataHome(home.KeysDirName)
 	}
 	// dir created if keys added
 	KeysDirFlag = keystoreDir

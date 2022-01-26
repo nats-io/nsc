@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nats-io/nsc/home"
+
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 )
@@ -28,10 +30,8 @@ func TestResolveLocal(t *testing.T) {
 	old := KeyStorePath
 	KeyStorePath = ""
 	dir := GetKeysDir()
-	dp, err := NscDataHome("keys")
-	require.NoError(t, err)
+	dp := home.NscDataHome(home.KeysDirName)
 	KeyStorePath = old
-
 	require.Equal(t, dir, dp)
 }
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/home"
 	"github.com/nats-io/nuid"
 )
 
@@ -43,37 +44,13 @@ type NamedKey struct {
 	KP   nkeys.KeyPair
 }
 
-func parentDir(envName string, defaultDir ...string) (string, error) {
-	xdg := os.Getenv(envName)
-	if xdg != "" {
-		return xdg, nil
-	}
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", fmt.Errorf("unable to determine home directory: %v", err)
-	}
-	return filepath.Join(home, filepath.Join(defaultDir...)), nil
-}
-
-func XdgDataHome() (string, error) {
-	return parentDir("XDG_DATA_HOME", ".local", "share")
-}
-
-func NscDataHome(dir string) (string, error) {
-	parent, err := XdgDataHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(parent, "nsc", dir), nil
-}
-
 func GetKeysDir() string {
 	if KeyStorePath == "" {
 		// this shouldn't happen as the variable is initialized
 		// when the nsc tool starts, but old tests that
 		// depended on this being calculated by the environment
 		// might trigger
-		KeyStorePath, _ = NscDataHome("keys")
+		KeyStorePath = home.NscDataHome(home.KeysDirName)
 	}
 	return KeyStorePath
 }

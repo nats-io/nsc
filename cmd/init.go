@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nsc/home"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
@@ -53,7 +55,7 @@ func createInitCmd() *cobra.Command {
 	}
 	sr := GetConfig().StoreRoot
 	if sr == "" {
-		sr, _ = NscDataHome("stores")
+		sr = home.NscDataHome(home.StoresSubDirName)
 	}
 	cmd.Flags().StringVarP(&params.Dir, "dir", "d", sr, "directory where the operator directory will be created")
 	cmd.Flags().StringVarP(&params.Name, "name", "n", "", "name used for the operator, account and user")

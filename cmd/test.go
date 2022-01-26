@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -60,6 +61,39 @@ func createFlagTable() *cobra.Command {
 				}
 			}
 			return Write("--", []byte(cmds.render()))
+		},
+	}
+	return cmd
+}
+
+func createWhatUsesFlag() *cobra.Command {
+	var cmds flagTable
+	cmd := &cobra.Command{
+		Use:           "whoflag",
+		Short:         "prints a table with commands using the specified flag",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Args:          cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var buf Stack
+			buf.Push(rootCmd)
+
+			for {
+				v := buf.Pop()
+				if v == nil {
+					break
+				}
+				if v.HasSubCommands() {
+					for _, vv := range v.Commands() {
+						buf.Push(vv)
+					}
+					continue
+				} else {
+					cmds.addCmd(v)
+				}
+			}
+			cmds.find(args[0])
+			return nil
 		},
 	}
 	return cmd
@@ -142,6 +176,17 @@ func (t *flagTable) addCmd(cmd *cobra.Command) {
 	t.commands = append(t.commands, c)
 }
 
+func (t *flagTable) find(flag string) {
+	for _, c := range t.commands {
+		m := c.flagMap
+		for n := range m {
+			if flag == m[n] || n == flag {
+				fmt.Println(c.name)
+			}
+		}
+	}
+}
+
 func (t *flagTable) render() string {
 	var buf bytes.Buffer
 
@@ -185,4 +230,5 @@ func init() {
 	testCmd.AddCommand(createGenerateNKeyCmd())
 	testCmd.AddCommand(createFlagTable())
 	testCmd.AddCommand(generateDoc())
+	testCmd.AddCommand(createWhatUsesFlag())
 }

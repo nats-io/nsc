@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nsc/cmd/store"
@@ -101,8 +100,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
-	table.AddRow("$"+XdgConfigHomeEnv+filepath.Join(string(filepath.Separator), ".config", "nsc"), envSet(XdgConfigHomeEnv), AbbrevHomePaths(ConfigDirFlag))
-	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
+	table.AddRow("$"+NscHomeEnv, envSet(NscHomeEnv), AbbrevHomePaths(ConfigDirFlag))
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")
 	table.AddRow("", "", "If not set, will default to the system trust store")
@@ -111,14 +109,16 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscTlsCertNatsEnv, envSet(NscTlsCertNatsEnv),
 		"If set, the tls cert in the referenced file will be used for nats connections")
 	table.AddSeparator()
+
+	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
+	table.AddRow("Default Stores Dir", "", AbbrevHomePaths(DataDirFlag))
 	r := conf.StoreRoot
 	if r == "" {
 		r = "Not Set"
 	}
-	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
-	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
-	table.AddRow("Default Operator", "", conf.Operator)
-	table.AddRow("Default Account", "", conf.Account)
+	table.AddRow("Current Store Dir", "", AbbrevHomePaths(r))
+	table.AddRow("Current Operator", "", conf.Operator)
+	table.AddRow("Current Account", "", conf.Account)
 	caFile := rootCAsFile
 	if caFile == "" {
 		caFile = "Default: System Trust Store"

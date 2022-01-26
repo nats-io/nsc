@@ -244,12 +244,12 @@ func init() {
 // HoistRootFlags adds persistent flags that would be added by the cobra framework
 // but are not because the unit tests are testing the command directly
 func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
-	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "Key used to sign. Can be specified as role (where applicable), public key (private portion is retrieved) or file path to a private key or private key ")
+	cmd.PersistentFlags().StringVarP(&KeyPathFlag, "private-key", "K", "", "Key used to sign. Can be specified as role (where applicable),\npublic key (private portion is retrieved)\nor file path to a private key or private key ")
 	cmd.PersistentFlags().BoolVarP(&InteractiveFlag, "interactive", "i", false, "ask questions for various settings")
 
-	cmd.PersistentFlags().StringVarP(&ConfigDirFlag, "config-dir", "", "", "nsc config directory (~/.config/nsc)")
-	cmd.PersistentFlags().StringVarP(&DataDirFlag, "data-dir", "", "", "nsc data store directory (~/.local/share/nsc)")
-	cmd.PersistentFlags().StringVarP(&KeysDirFlag, "keystore-dir", "", "", "nsc keystore directory (~/.nkeys)")
+	cmd.PersistentFlags().StringVarP(&ConfigDirFlag, "config-dir", "", "", "nsc config directory")
+	cmd.PersistentFlags().StringVarP(&DataDirFlag, "data-dir", "", "", "nsc data store directory")
+	cmd.PersistentFlags().StringVarP(&KeysDirFlag, "keystore-dir", "", "", "nsc keystore directory")
 
 	return cmd
 }
