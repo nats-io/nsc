@@ -181,6 +181,13 @@ skinparam interface {
 		}
 		bldrPrntf("end note")
 	}
+	escapeSubjectLabel := func(sub string) string {
+		// * is special notation in plantuml. (escape by adding a space)
+		if strings.HasPrefix(sub, "*") {
+			return fmt.Sprintf(" %s", sub)
+		}
+		return sub
+	}
 	bldrPrntf(`title Component Diagram of Accounts - Operator %s`, op.Name)
 	accs, _ := s.ListSubContainers(store.Accounts)
 	accBySubj := make(map[string]*jwt.AccountClaims)
@@ -198,7 +205,7 @@ skinparam interface {
 		for _, e := range ac.Exports {
 			eId := expId(ac.Subject, e)
 			bldrPrntf(`interface "%s" << %s %s >> as %s`, expName(e), accessMod(e), expType(e), eId)
-			bldrPrntf(`%s -- %s : ""%s""`, expId(ac.Subject, e), ac.Subject, e.Subject)
+			bldrPrntf(`%s -- %s : ""%s"""`, expId(ac.Subject, e), ac.Subject, escapeSubjectLabel(string(e.Subject)))
 			addNote(eId, e.Info)
 
 			vr := jwt.ValidationResults{}
@@ -235,9 +242,9 @@ skinparam interface {
 				bldrPrntf(`interface " " << not-found %s %s >> as %s`, accessMod(matchingExport), expType(matchingExport), id)
 			}
 			if local != remote {
-				bldrPrntf(`%s "%s%s" ..> %s : "%s"`, ac.Subject, rename, local, id, remote)
+				bldrPrntf(`%s "%s%s" ..> %s : "%s"`, ac.Subject, rename, local, id, escapeSubjectLabel(remote))
 			} else {
-				bldrPrntf(`%s ..> %s : "%s"`, ac.Subject, id, remote)
+				bldrPrntf(`%s ..> %s : "%s"`, ac.Subject, id, escapeSubjectLabel(remote))
 			}
 			vr := jwt.ValidationResults{}
 			i.Validate(ac.Subject, &vr)
