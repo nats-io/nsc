@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/nats-io/nsc/home"
+
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
@@ -107,7 +109,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddSeparator()
 
 	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
-	table.AddRow("Default Stores Dir", "", AbbrevHomePaths(DataDirFlag))
+	table.AddRow("Default Stores Dir", "", AbbrevHomePaths(home.NscDataHome(home.StoresSubDirName)))
 	r := conf.StoreRoot
 	if r == "" {
 		r = "Not Set"

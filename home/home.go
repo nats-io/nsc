@@ -22,7 +22,6 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-const NscConfigFileName = "nsc.json"
 const StoresSubDirName = "stores"
 const KeysSubDirName = "keys"
 
@@ -38,41 +37,58 @@ func envOrValue(name, value string) string {
 	return value
 }
 
-func configHome() string {
-	return filepath.Join(config, "nats", "nsc")
-}
-
-func hasNewConfig() bool {
-	dir := configHome()
-	fp := filepath.Join(dir, NscConfigFileName)
+func exists(fp string) bool {
 	if _, err := os.Stat(fp); err == nil {
 		return true
 	}
 	return false
 }
 
-func oldConfigDir() (string, error) {
-	return filepath.Join(home, ".nsc"), nil
+func configHome() string {
+	return filepath.Join(config, "nats", "nsc")
 }
 
-func hasOldConfig() bool {
-	ocd, err := oldConfigDir()
-	if err != nil {
-		return false
+func dataHome(dir string) string {
+	return filepath.Join(data, "nats", "nsc", dir)
+}
+
+func hasNewConfigFile() bool {
+	return exists(filepath.Join(configHome(), "nsc.json"))
+}
+
+func oldConfigDir() string {
+	return filepath.Join(home, ".nsc")
+}
+
+func hasOldConfigFile() bool {
+	return exists(filepath.Join(oldConfigDir(), "nsc.json"))
+}
+
+func hasNewDataDir(dir string) bool {
+	return exists(dataHome(dir))
+}
+
+func oldDataDir(dir string) string {
+	if dir == KeysSubDirName {
+		return filepath.Join(home, ".nkeys")
 	}
-	old := filepath.Join(ocd, NscConfigFileName)
-	_, err = os.Stat(old)
-	return err == nil
+	return filepath.Join(home, ".nsc", "nats")
+}
+
+func hasOldDataDir(dir string) bool {
+	return exists(oldDataDir(dir))
 }
 
 func NscConfigHome() string {
-	if !hasNewConfig() && hasOldConfig() {
-		old, _ := oldConfigDir()
-		return old
+	if !hasNewConfigFile() && hasOldConfigFile() {
+		return oldConfigDir()
 	}
 	return filepath.Join(config, "nats", "nsc")
 }
 
 func NscDataHome(dir string) string {
-	return filepath.Join(data, "nats", "nsc", dir)
+	if !hasNewDataDir(dir) && hasOldDataDir(dir) {
+		return oldDataDir(dir)
+	}
+	return dataHome(dir)
 }

@@ -34,7 +34,7 @@ func TestEnv_DefaultOutput(t *testing.T) {
 	stderr = StripTableDecorations(stderr)
 	require.NoError(t, err)
 	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
-	require.Contains(t, stderr, fmt.Sprintf("Stores Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
+	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
 	require.Contains(t, stderr, "Current Operator test")
 }
 
@@ -49,7 +49,7 @@ func TestEnv_SetAccountOutput(t *testing.T) {
 	require.NoError(t, err)
 	stderr = StripTableDecorations(stderr)
 	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
-	require.Contains(t, stderr, fmt.Sprintf("Stores Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
+	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
 	require.Contains(t, stderr, "Current Operator test")
 	require.Contains(t, stderr, "Current Account B")
 }
