@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -43,11 +43,11 @@ func Test_AddOperator(t *testing.T) {
 	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--name", "O", "--sys", "--generate-signing-key")
 	require.NoError(t, err)
 
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", ".nsc"))
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "O.jwt"))
+	require.FileExists(t, filepath.Join(ts.StoreDir, "O", ".nsc"))
+	require.FileExists(t, filepath.Join(ts.StoreDir, "O", "O.jwt"))
 
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt"))
-	require.FileExists(t, filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt"))
+	require.FileExists(t, filepath.Join(ts.StoreDir, "O", "accounts", "SYS", "SYS.jwt"))
+	require.FileExists(t, filepath.Join(ts.StoreDir, "O", "accounts", "SYS", "users", "sys.jwt"))
 }
 
 func TestImportOperator(t *testing.T) {
@@ -65,7 +65,7 @@ func TestImportOperator(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
 	require.NoError(t, err)
-	storeFile := filepath.Join(ts.Dir, "store", "O", ".nsc")
+	storeFile := filepath.Join(ts.StoreDir, "O", ".nsc")
 	require.FileExists(t, storeFile)
 
 	check := func() {
@@ -76,7 +76,7 @@ func TestImportOperator(t *testing.T) {
 		require.True(t, info.Managed)
 		require.Equal(t, "O", info.Name)
 
-		target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
+		target := filepath.Join(ts.StoreDir, "O", "O.jwt")
 		require.FileExists(t, target)
 		d, err = Read(target)
 		require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 
 	_, _, err := ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{false, "O", "2019-12-01", "2029-12-01", true, true, true})
 	require.NoError(t, err)
-	d, err := Read(filepath.Join(ts.Dir, "store", "O", "O.jwt"))
+	d, err := Read(filepath.Join(ts.StoreDir, "O", "O.jwt"))
 	require.NoError(t, err)
 	oc, err := jwt.DecodeOperatorClaims(string(d))
 	require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 	require.Equal(t, 1, expiry.Day())
 	require.NotEmpty(t, oc.SystemAccount)
 
-	sys := filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "SYS.jwt")
+	sys := filepath.Join(ts.StoreDir, "O", "accounts", "SYS", "SYS.jwt")
 	require.FileExists(t, sys)
 	sysJWT, err := Read(sys)
 	require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestAddOperatorInteractive(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, sysClaim.Issuer, oc.SigningKeys[0])
 
-	usr := filepath.Join(ts.Dir, "store", "O", "accounts", "SYS", "users", "sys.jwt")
+	usr := filepath.Join(ts.StoreDir, "O", "accounts", "SYS", "users", "sys.jwt")
 	require.FileExists(t, usr)
 	usrJWT, err := Read(usr)
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestImportOperatorInteractive(t *testing.T) {
 	_, _, err = ExecuteInteractiveCmd(createAddOperatorCmd(), []interface{}{true, tf})
 	require.NoError(t, err)
 
-	target := filepath.Join(ts.Dir, "store", "O", "O.jwt")
+	target := filepath.Join(ts.StoreDir, "O", "O.jwt")
 	require.FileExists(t, target)
 }
 

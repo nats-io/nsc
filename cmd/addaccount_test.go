@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -67,6 +67,7 @@ func Test_AddAccountValidateOutput(t *testing.T) {
 	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
+	ts.List(t)
 }
 
 func Test_AddAccountInteractive(t *testing.T) {
@@ -146,7 +147,7 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	inputs := []interface{}{"A", true, "0", "0", 0, string(s1)}
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
-	accJWT, err := ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "accounts", "A", "A.jwt"))
+	accJWT, err := ioutil.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "A", "A.jwt"))
 	require.NoError(t, err)
 	ac, err := jwt.DecodeAccountClaims(string(accJWT))
 	require.NoError(t, err)
@@ -157,7 +158,7 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	inputs = []interface{}{"B", true, "0", "0", 1, string(s1)}
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
-	accJWT, err = ioutil.ReadFile(filepath.Join(ts.Dir, "store", "O", "accounts", "B", "B.jwt"))
+	accJWT, err = ioutil.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "B", "B.jwt"))
 	require.NoError(t, err)
 	ac, err = jwt.DecodeAccountClaims(string(accJWT))
 	require.NoError(t, err)

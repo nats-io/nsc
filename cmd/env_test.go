@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -34,8 +34,8 @@ func TestEnv_DefaultOutput(t *testing.T) {
 	stderr = StripTableDecorations(stderr)
 	require.NoError(t, err)
 	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
-	require.Contains(t, stderr, fmt.Sprintf("Stores Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
-	require.Contains(t, stderr, "Default Operator test")
+	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
+	require.Contains(t, stderr, "Current Operator test")
 }
 
 func TestEnv_SetAccountOutput(t *testing.T) {
@@ -49,9 +49,9 @@ func TestEnv_SetAccountOutput(t *testing.T) {
 	require.NoError(t, err)
 	stderr = StripTableDecorations(stderr)
 	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
-	require.Contains(t, stderr, fmt.Sprintf("Stores Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
-	require.Contains(t, stderr, "Default Operator test")
-	require.Contains(t, stderr, "Default Account B")
+	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
+	require.Contains(t, stderr, "Current Operator test")
+	require.Contains(t, stderr, "Current Account B")
 }
 
 func TestEnv_FailsBadOperator(t *testing.T) {

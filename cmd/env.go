@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+
+	"github.com/nats-io/nsc/home"
 
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
@@ -66,7 +68,8 @@ func createEnvCmd() *cobra.Command {
 }
 
 func init() {
-	GetRootCmd().AddCommand(createEnvCmd())
+	env := createEnvCmd()
+	GetRootCmd().AddCommand(env)
 }
 
 type SetContextParams struct {
@@ -95,8 +98,7 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
 	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
-	table.AddRow("$"+homeEnv, envSet(homeEnv), AbbrevHomePaths(toolHome))
-	table.AddRow("Config", "", AbbrevHomePaths(conf.configFile()))
+	table.AddRow("$"+NscHomeEnv, envSet(NscHomeEnv), AbbrevHomePaths(ConfigDirFlag))
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")
 	table.AddRow("", "", "If not set, will default to the system trust store")
@@ -105,14 +107,16 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table.AddRow("$"+NscTlsCertNatsEnv, envSet(NscTlsCertNatsEnv),
 		"If set, the tls cert in the referenced file will be used for nats connections")
 	table.AddSeparator()
+
+	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
+	table.AddRow("Default Stores Dir", "", AbbrevHomePaths(home.NscDataHome(home.StoresSubDirName)))
 	r := conf.StoreRoot
 	if r == "" {
 		r = "Not Set"
 	}
-	table.AddRow("From CWD", "", yn(GetCwdCtx() != nil))
-	table.AddRow("Stores Dir", "", AbbrevHomePaths(r))
-	table.AddRow("Default Operator", "", conf.Operator)
-	table.AddRow("Default Account", "", conf.Account)
+	table.AddRow("Current Store Dir", "", AbbrevHomePaths(r))
+	table.AddRow("Current Operator", "", conf.Operator)
+	table.AddRow("Current Account", "", conf.Account)
 	caFile := rootCAsFile
 	if caFile == "" {
 		caFile = "Default: System Trust Store"
@@ -121,4 +125,8 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	}
 	table.AddRow("Root CAs to trust", "", caFile)
 	cmd.Println(table.Render())
+}
+
+type EnvMigrateParams struct {
+	Dir string
 }

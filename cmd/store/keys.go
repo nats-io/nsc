@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,45 +20,39 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/home"
 	"github.com/nats-io/nuid"
 )
 
 var NscNotGitIgnore bool
 
-const DefaultNKeysPath = ".nkeys"
 const NKeysPathEnv = "NKEYS_PATH"
 const NKeyExtension = ".nk"
 const CredsExtension = ".creds"
 const CredsDir = "creds"
 const KeysDir = "keys"
 
+var KeyStorePath string
+
 type NamedKey struct {
 	Name string
 	KP   nkeys.KeyPair
 }
 
-// Resolve a directory/file from an environment variable
-// if not set defaultPath is returned
-func ResolvePath(defaultPath string, varName string) string {
-	v := os.Getenv(varName)
-	if v != "" {
-		return v
-	}
-	return defaultPath
-}
-
 func GetKeysDir() string {
-	u, err := user.Current()
-	if err != nil {
-		return ResolvePath("", NKeysPathEnv)
+	if KeyStorePath == "" {
+		// this shouldn't happen as the variable is initialized
+		// when the nsc tool starts, but old tests that
+		// depended on this being calculated by the environment
+		// might trigger
+		KeyStorePath = home.NscDataHome(home.KeysSubDirName)
 	}
-	return ResolvePath(filepath.Join(u.HomeDir, DefaultNKeysPath), NKeysPathEnv)
+	return KeyStorePath
 }
 
 // Resolve a key value provided as a flag - value could be an actual nkey or a path to an nkey

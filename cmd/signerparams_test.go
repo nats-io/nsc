@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -162,7 +162,7 @@ func Test_SignerParamsRelativePath(t *testing.T) {
 
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
-	require.NoError(t, os.Chdir(filepath.Join(ts.Dir, "store")))
+	require.NoError(t, os.Chdir(ts.StoreDir))
 	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", filepath.Join("../", filepath.Base(dest)))
 	require.NoError(t, os.Chdir(cwd))
 	require.NoError(t, err)

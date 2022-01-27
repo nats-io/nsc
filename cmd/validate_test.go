@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -135,7 +135,7 @@ func Test_ValidateBadUserIssuer(t *testing.T) {
 	_, _, kp := CreateAccountKey(t)
 	token, err := uc.Encode(kp)
 	require.NoError(t, err)
-	fp := filepath.Join(ts.Dir, "store", "O", store.Accounts, "A", store.Users, store.JwtName("U"))
+	fp := filepath.Join(ts.StoreDir, "O", store.Accounts, "A", store.Users, store.JwtName("U"))
 	require.NoError(t, os.Remove(fp))
 	require.NoError(t, Write(fp, []byte(token)))
 

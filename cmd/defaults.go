@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -25,13 +24,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/nsc/home"
+
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/cmd/store"
 )
 
-//NscHomeEnv the folder for the config file
+// NscHomeEnv the folder for the config file
 const NscHomeEnv = "NSC_HOME"
 const NscCwdOnlyEnv = "NSC_CWD_ONLY"
 const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
@@ -45,23 +45,14 @@ type ToolConfig struct {
 	LastUpdate    int64  `json:"last_update"`
 }
 
-var toolName = strings.ReplaceAll(filepath.Base(os.Args[0]), ".exe", "")
-
 var config ToolConfig
-var toolHome string
-var homeEnv string
 var rootCAsNats nats.Option // Will be skipped, when nil and passed to a connection
 var tlsKeyNats nats.Option  // Will be skipped, when nil and passed to a connection
 var tlsCertNats nats.Option // Will be skipped, when nil and passed to a connection
-
 var rootCAsFile string
 
-func SetToolName(name string) {
-	toolName = name
-}
-
 func GetToolName() string {
-	return toolName
+	return "nsc"
 }
 
 // GetConfig returns the global config
@@ -176,17 +167,37 @@ func isOperatorDir(dir string) (store.Info, bool, error) {
 	return v, false, nil
 }
 
-func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
-	var err error
-	if toolHomeEnvName == "" {
-		return nil, errors.New("toolHomeEnv is required")
+func GetConfigDir() string {
+	if ConfigDirFlag == "" {
+		// this is running under a test...
+		return os.Getenv(NscHomeEnv)
 	}
-	homeEnv = toolHomeEnvName
+	return ConfigDirFlag
+}
 
-	toolHome, err = initToolHome(toolHomeEnvName)
-	if err != nil {
+func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConfig, error) {
+	const github = "nats-io/nsc"
+
+	if configDir == "" {
+		configDir = home.NscConfigHome()
+	}
+	ConfigDirFlag = configDir
+	if err := MaybeMakeDir(ConfigDirFlag); err != nil {
 		return nil, err
 	}
+
+	if dataDir == "" {
+		dataDir = home.NscDataHome(home.StoresSubDirName)
+	}
+	// dir created if files written
+	DataDirFlag = dataDir
+
+	if keystoreDir == "" {
+		keystoreDir = home.NscDataHome(home.KeysSubDirName)
+	}
+	// dir created if keys added
+	KeysDirFlag = keystoreDir
+	store.KeyStorePath = KeysDirFlag
 
 	if err := config.load(); err != nil {
 		return nil, err
@@ -197,8 +208,7 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 		config.GithubUpdates = github
 
 		config.LastUpdate = time.Now().UTC().Unix() // this is not "true" but avoids the initial check
-		// ~/.ngs_cli/nats
-		config.StoreRoot = filepath.Join(toolHome, "nats")
+		config.StoreRoot = dataDir
 		if err := MaybeMakeDir(config.StoreRoot); err != nil {
 			return nil, fmt.Errorf("error creating store root: %v", err)
 		}
@@ -229,12 +239,16 @@ func LoadOrInit(github string, toolHomeEnvName string) (*ToolConfig, error) {
 	return &config, nil
 }
 
-func (d *ToolConfig) SetVersion(version string) {
+func SetVersion(version string) {
 	// sem version gets very angry if there's a v in the release
 	if strings.HasPrefix(version, "v") || strings.HasPrefix(version, "V") {
 		version = version[1:]
 	}
 	GetRootCmd().Version = version
+}
+
+func (d *ToolConfig) SetVersion(version string) {
+	SetVersion(version)
 }
 
 func (d *ToolConfig) load() error {
@@ -257,27 +271,6 @@ func (d *ToolConfig) Save() error {
 	return nil
 }
 
-// GetToolHome returns the . folder used fro this CLIs config and optionally the projects
-func initToolHome(envVarName string) (string, error) {
-	toolHome = os.Getenv(envVarName)
-
-	if toolHome == "" {
-		dir, err := homedir.Dir()
-		if err != nil {
-			return "", fmt.Errorf("error getting homedir: %v", err.Error())
-		}
-		toolHome = filepath.Join(dir, fmt.Sprintf(".%s", GetToolName()))
-	}
-
-	if err := MaybeMakeDir(toolHome); err != nil {
-		return "", fmt.Errorf("error creating tool home %#q: %v", toolHome, err)
-	}
-
-	return toolHome, nil
-
-}
-
 func (d *ToolConfig) configFile() string {
-	configFileName := fmt.Sprintf("%s.json", GetToolName())
-	return filepath.Join(toolHome, configFileName)
+	return filepath.Join(GetConfigDir(), "nsc.json")
 }

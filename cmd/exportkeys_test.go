@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
@@ -173,18 +175,17 @@ func Test_ExportRemove(t *testing.T) {
 	requireExportedKey(t, exportDir, apk)
 	requireExportedKey(t, exportDir, upk)
 
-	kr := filepath.Join(ts.Dir, "keys", "keys")
-	requireEmptyDir(t, filepath.Join(kr, "O"))
-	requireEmptyDir(t, filepath.Join(kr, "A"))
-	requireEmptyDir(t, filepath.Join(kr, "U"))
+	requireEmptyDir(t, filepath.Join(ts.KeysDir, "keys", "O"))
+	requireEmptyDir(t, filepath.Join(ts.KeysDir, "keys", "A"))
+	requireEmptyDir(t, filepath.Join(ts.KeysDir, "keys", "U"))
 }
 
 func Test_ExportNoKeyStore(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 
-	require.NoError(t, os.Remove(filepath.Join(ts.Dir, "keys")))
+	store.KeyStorePath = ts.KeysDir
 	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", ts.Dir)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "does not exist")
+	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
 }

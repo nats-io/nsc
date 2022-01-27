@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,9 +17,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/stretchr/testify/require"
 )
@@ -130,9 +130,11 @@ func Test_ListKeysFilter(t *testing.T) {
 func Test_ListKeysNoKeyStore(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-
-	require.NoError(t, os.Remove(filepath.Join(ts.Dir, "keys")))
+	old := store.KeyStorePath
+	store.KeyStorePath = ts.KeysDir
 	_, _, err := ExecuteCmd(createListKeysCmd())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "does not exist")
+	t.Log(err.Error())
+	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
+	store.KeyStorePath = old
 }

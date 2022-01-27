@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -40,7 +40,7 @@ func storeOperatorKey(t *testing.T, ts *TestStore, kp nkeys.KeyPair) {
 
 func makeNonManaged(t *testing.T, ts *TestStore, opName string, kp nkeys.KeyPair) {
 	t.Helper()
-	storeFile := filepath.Join(ts.Dir, "store", opName, ".nsc")
+	storeFile := filepath.Join(ts.StoreDir, opName, ".nsc")
 	require.FileExists(t, storeFile)
 	d, err := Read(storeFile)
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func makeNonManaged(t *testing.T, ts *TestStore, opName string, kp nkeys.KeyPair
 
 func checkJwtVersion(t *testing.T, ts *TestStore, opName string, version int, token string) {
 	t.Helper()
-	target := filepath.Join(ts.Dir, "store", opName, fmt.Sprintf("%s.jwt", opName))
+	target := filepath.Join(ts.StoreDir, opName, fmt.Sprintf("%s.jwt", opName))
 	require.FileExists(t, target)
 	d, err := Read(target)
 	require.NoError(t, err)
@@ -115,13 +115,16 @@ func TestUpgradeNonManaged(t *testing.T) {
 	_, token, _, _, kp, _ := createOperator(t, tempDir, "O")
 	ts := NewTestStoreWithOperatorJWT(t, token)
 	defer ts.Done(t)
+	ts.KeyStore.Store(kp)
+
 	makeNonManaged(t, ts, "O", kp)
 	checkJwtVersion(t, ts, "O", 1, token)
-	executeFailingCmd(t, "list", "keys")                     // could be any command
 	executeFailingCmd(t, "edit", "operator", "--tag", "foo") // try writing operator
 	executePassingCmd(t, "env")                              // only few exceptions
 
-	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, false}, "upgrade-jwt") // only works in interactive mode
+	stdout, stderr, err := ExecuteInteractiveCmd(rootCmd, []interface{}{false, false}, "upgrade-jwt") // only works in interactive mode
+	t.Log(stdout)
+	t.Log(stderr)
 	require.NoError(t, err)
 	checkJwtVersion(t, ts, "O", 1, token)
 	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, true}, "upgrade-jwt")
