@@ -40,7 +40,7 @@ if ( !(Test-Path $BinDir) ) {
 }
 
 
-# Download te file
+# Download the archive with the exe from github
 ## GitHub requires TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
