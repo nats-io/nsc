@@ -30,7 +30,7 @@ $NscExe = "$BinDir\nsc.exe"
 $Target = 'windows-amd64'
 
 if (Test-Path "$BinDir\nsc.exe") {
-	Write-Host "NSC binary ($BinDir\nsc.exe) already exists, exiting script.`r`n"
+	Write-Host "NSC binary ($NscExe) already exists, exiting script.`r`n"
 	Exit -1
 }
 
