@@ -15,14 +15,14 @@ $ErrorActionPreference = 'Stop'
 
 $Version = ""
 if ($args.Length -eq 1) {
-  $Version = $args.Get(0)
+    $Version = $args.Get(0)
 }
 
 $NscInstall = $env:NSC_INSTALL
 $BinDir = if ($NscInstall) {
-  "$NscInstall\bin"
+    "$NscInstall\bin"
 } else {
-  "$Home\.nats\bin"
+    "$Home\.nats\bin"
 }
 
 $NscZip = "$BinDir\nsc.zip"
@@ -46,11 +46,11 @@ if ( !(Test-Path $BinDir) ) {
 
 ## Uri is different when a version is requested
 if (!$Version) {
-  Write-Host "Downloading latest nsc...`r`n"
-  $NscUri = "https://github.com/nats-io/nsc/releases/latest/download/nsc-${Target}.zip"
+    Write-Host "Downloading latest nsc...`r`n"
+    $NscUri = "https://github.com/nats-io/nsc/releases/latest/download/nsc-${Target}.zip"
 } else {
-  Write-Host "Downloading nsc version ${Version}...`r`n"
-  $NscUri = "https://github.com/nats-io/nsc/releases/download/${Version}/nsc-${Target}.zip"
+    Write-Host "Downloading nsc version ${Version}...`r`n"
+    $NscUri = "https://github.com/nats-io/nsc/releases/download/${Version}/nsc-${Target}.zip"
 }
 
 ## Actual download
@@ -69,13 +69,11 @@ Write-Host "Updating $BinDir for the User's path...`r`n"
 $User = [EnvironmentVariableTarget]::User
 $Path = [Environment]::GetEnvironmentVariable('Path', $User)
 if (!(";$Path;".ToLower() -like "*;$BinDir;*".ToLower())) {
-  [Environment]::SetEnvironmentVariable('Path', "$Path;$BinDir", $User)
-  $Env:Path += ";$BinDir"
+    [Environment]::SetEnvironmentVariable('Path', "$Path;$BinDir", $User)
+    $Env:Path += ";$BinDir"
 }
 
 Write-Host "NSC was installed successfully to $NscExe. Running 'nsc --version' to verify...`r`n"
 nsc --version
 
 Write-Host "`r`nRun 'nsc --help' to get started.`r`n"
-
-
