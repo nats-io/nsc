@@ -39,7 +39,6 @@ if ( !(Test-Path $BinDir) ) {
 	Write-Host "NSC directory ($BinDir) created...`r`n"
 }
 
-
 # Download the archive with the exe from github
 ## GitHub requires TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
