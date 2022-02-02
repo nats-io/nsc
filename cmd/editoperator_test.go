@@ -184,7 +184,8 @@ func Test_EditOperatorRequireSigningKeysManaged(t *testing.T) {
 	oc.Name = "O"
 	oc.StrictSigningKeyUsage = true
 	_, psk, sk := CreateOperatorKey(t)
-	ts.KeyStore.Store(sk)
+	_, err = ts.KeyStore.Store(sk)
+	require.NoError(t, err)
 	oc.SigningKeys.Add(psk)
 	token, err := oc.Encode(kp)
 	require.NoError(t, err)
@@ -312,4 +313,23 @@ func Test_EditOperatorServiceURLsInteractive(t *testing.T) {
 	require.NotContains(t, oc.Tags, "xxx")
 	require.Equal(t, oc.AccountServerURL, "")
 	require.Equal(t, oc.SystemAccount, pub)
+}
+
+func Test_RmAccountServiceURL(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+	as := "https://foo.com/v1/jwt/accounts"
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", as)
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, as, oc.AccountServerURL)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-account-jwt-server-url")
+	require.NoError(t, err)
+
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, "", oc.AccountServerURL)
 }

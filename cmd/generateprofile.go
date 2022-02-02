@@ -71,7 +71,7 @@ user, account, operator, If no prefix (user/account/operator is provided,
 it targets the last object in the configuration path)
 		`,
 
-		Args: MaxArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			us := args[0]
 			u, err := ParseNscURL(us)
