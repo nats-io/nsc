@@ -8,19 +8,18 @@
 
 A tool for creating NATS account and user access configurations
 
-
 ## Install
 
 With Python:
 
 ```bash
-curl -L https://raw.githubusercontent.com/nats-io/nsc/master/install.py | python
+curl -L https://raw.githubusercontent.com/nats-io/nsc/main/install.py | python
 ```
 
 Without Python and with a more cautious mindset:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/nats-io/nsc/master/install.sh
+curl -LO https://raw.githubusercontent.com/nats-io/nsc/main/install.sh
 less install.sh
 sh ./install.sh
 ```
@@ -38,11 +37,13 @@ brew untap nats-io/nats-tools
 
 Direct Download:
 
-Download your platform binary from [here.](https://github.com/nats-io/nsc/releases/latest)
+Download your platform binary from
+[here.](https://github.com/nats-io/nsc/releases/latest)
 
 ## Updates are easy
 
-`nsc update` will download and install the latest version. If you installed using Homebrew, `brew update` will update.
+`nsc update` will download and install the latest version. If you installed
+using Homebrew, `brew update` will update.
 
 ## Documentation
 
@@ -50,11 +51,15 @@ Download your platform binary from [here.](https://github.com/nats-io/nsc/releas
 
 ## Building
 
-NSC uses go modules. If your project source is in `$GOPATH`, you must define set the environment variable `GO111MODULE` to `on`.
+NSC uses go modules. If your project source is in `$GOPATH`, you must define set
+the environment variable `GO111MODULE` to `on`.
 
 ## Running with Docker
 
-The NATS team maintains a lightweight Docker image with many of the NATS utilities called [nats-box](https://github.com/nats-io/nats-box) where `nsc` is included. You can mount a local volume to get `nsc` accounts, nkeys, and other config back on the host using Docker as follows:
+The NATS team maintains a lightweight Docker image with many of the NATS
+utilities called [nats-box](https://github.com/nats-io/nats-box) where `nsc` is
+included. You can mount a local volume to get `nsc` accounts, nkeys, and other
+config back on the host using Docker as follows:
 
 ```sh
 docker run --rm -it -v $(pwd)/nsc:/nsc synadia/nats-box:latest
@@ -64,10 +69,10 @@ nats-box:~# nsc init
 nats-box:~# chmod -R 1000:1000 /nsc
 $ tree -L 2 nsc/
 nsc/
-├── accounts
-│   ├── nats
-│   └── nsc.json
-└── nkeys
+ ├── accounts
+ │   ├── nats
+ │   └── nsc.json
+ └── nkeys
     ├── creds
     └── keys
 
