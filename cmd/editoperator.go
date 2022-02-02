@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,6 +46,7 @@ func createEditOperatorCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.serviceURLs, "service-url", "n", nil, "add an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().StringSliceVarP(&params.rmServiceURLs, "rm-service-url", "", nil, "remove an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().BoolVarP(&params.reqSk, "require-signing-keys", "", false, "require accounts/user to be signed with a signing key")
+	cmd.Flags().BoolVarP(&params.rmAsu, "rm-account-jwt-server-url", "", false, "clear account server url")
 	params.TimeParams.BindFlags(cmd)
 
 	return cmd
@@ -61,6 +62,7 @@ type EditOperatorParams struct {
 	claim         *jwt.OperatorClaims
 	token         string
 	asu           string
+	rmAsu         bool
 	sysAcc        string
 	serviceURLs   []string
 	rmServiceURLs []string
@@ -72,7 +74,7 @@ type EditOperatorParams struct {
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, false, ctx)
 
-	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url", "system-account", "require-signing-keys") {
+	if !InteractiveFlag && ctx.NothingToDo("sk", "rm-sk", "start", "expiry", "tag", "rm-tag", "account-jwt-server-url", "service-url", "rm-service-url", "system-account", "require-signing-keys", "rm-account-jwt-server-url") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -269,6 +271,13 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.AccountServerURL = p.asu
 	if flags.Changed("account-jwt-server-url") {
 		r.AddOK("set account jwt server url to %q", p.asu)
+	}
+
+	if p.rmAsu {
+		p.claim.AccountServerURL = ""
+	}
+	if flags.Changed("rm-account-jwt-server-url") {
+		r.AddOK("removed account server url")
 	}
 
 	if p.claim.SystemAccount != p.sysAcc {
