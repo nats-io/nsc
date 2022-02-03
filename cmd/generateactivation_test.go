@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -114,7 +114,24 @@ func Test_GenerateActivationOutputsFile(t *testing.T) {
 	testExternalToken(t, outpath)
 }
 
-func testExternalToken(t *testing.T, tokenpath string) {
+func Test_GenerateActivationTargetAccountByName(t *testing.T) {
+	ts := NewTestStore(t, "gen activation")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "foo", false)
+
+	ts.AddAccount(t, "B")
+
+	outpath := filepath.Join(ts.Dir, "token.jwt")
+	_, _, err := ExecuteCmd(createGenerateActivationCmd(), "-a", "A", "--target-account", "B", "--output-file", outpath)
+	require.NoError(t, err)
+
+	ac := testExternalToken(t, outpath)
+	require.Equal(t, ts.GetAccountPublicKey(t, "B"), ac.Subject)
+}
+
+func testExternalToken(t *testing.T, tokenpath string) *jwt.ActivationClaims {
 	_, err := os.Stat(tokenpath)
 	require.NoError(t, err)
 
@@ -132,6 +149,8 @@ func testExternalToken(t *testing.T, tokenpath string) {
 	}
 	require.NoError(t, err)
 	require.Equal(t, "foo", string(ac.ImportSubject))
+
+	return ac
 }
 
 func Test_InteractiveGenerate(t *testing.T) {

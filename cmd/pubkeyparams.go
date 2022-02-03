@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -37,37 +37,32 @@ type PubKeyParams struct {
 	AllowWildcard bool
 }
 
-type accountRef string
-
-func (l *accountRef) Set(val string) error {
-	if val == "*" || nkeys.IsValidPublicKey(val) {
-		*l = accountRef(val)
-	} else if s, err := GetConfig().LoadStore(GetConfig().Operator); err != nil {
-		return err
-	} else if claim, err := s.ReadAccountClaim(val); err != nil {
-		return err
-	} else {
-		*l = accountRef(claim.Subject)
+func (e *PubKeyParams) SetDefaults(ctx ActionCtx) error {
+	if e.publicKey == "" || e.publicKey == "*" || store.IsPublicKey(e.kind, e.publicKey) {
+		return nil
+	}
+	switch e.kind {
+	case nkeys.PrefixByteAccount:
+		if c, err := ctx.StoreCtx().Store.ReadAccountClaim(e.publicKey); err != nil {
+			return err
+		} else {
+			e.publicKey = c.Subject
+		}
+	case nkeys.PrefixByteUser:
+		an := ctx.StoreCtx().Account.Name
+		if c, err := ctx.StoreCtx().Store.ReadUserClaim(an, e.publicKey); err != nil {
+			return err
+		} else {
+			e.publicKey = c.Subject
+		}
 	}
 	return nil
-}
-
-func (l *accountRef) String() string {
-	return string(*l)
-}
-
-func (t *accountRef) Type() string {
-	return "account-ref"
 }
 
 func (e *PubKeyParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
 	e.flagName = flagName
 	e.kind = kind
-	if kind == nkeys.PrefixByteAccount {
-		cmd.Flags().VarP((*accountRef)(&e.publicKey), flagName, shorthand, "")
-	} else {
-		cmd.Flags().StringVarP(&e.publicKey, flagName, shorthand, "", flagName)
-	}
+	cmd.Flags().StringVarP(&e.publicKey, flagName, shorthand, "", flagName)
 }
 
 func (e *PubKeyParams) valid(s string) error {
