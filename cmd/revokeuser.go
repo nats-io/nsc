@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -68,6 +68,9 @@ func (p *RevokeUserParams) SetDefaults(ctx ActionCtx) error {
 	}
 	p.userKey.AllowWildcard = true
 	p.AccountContextParams.SetDefaults(ctx)
+	if err := p.userKey.SetDefaults(ctx); err != nil {
+		return err
+	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 	return nil
 }
