@@ -150,15 +150,24 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 	}
 	if p.jwtPath != "" {
 		var err error
+		var urlLoadingErr error
 		var data []byte
 		loadedFromURL := false
+
+		// If we think the path is a url, try loading it as such.
+		// If that doesn't work, still try it as a path.
+		// If THAT doesn't work, and we have an error from the url reading step,
+		// that's the one we probably care about.
 		if IsURL(p.jwtPath) {
 			loadedFromURL = true
-			data, _ = LoadFromURL(p.jwtPath)
+			data, urlLoadingErr = LoadFromURL(p.jwtPath)
 		}
 		if data == nil {
 			data, err = Read(p.jwtPath)
 			if err != nil {
+				if urlLoadingErr != nil {
+					err = urlLoadingErr
+				}
 				return fmt.Errorf("error reading %#q: %v", p.jwtPath, err)
 			}
 		}
