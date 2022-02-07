@@ -2,9 +2,9 @@
 
 [![License Apache 2](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![ReportCard](https://goreportcard.com/badge/nats-io/nsc)](https://goreportcard.com/report/nats-io/nsc)
-[![Build Status](https://travis-ci.org/nats-io/nsc.svg?branch=master)](http://travis-ci.org/nats-io/nsc)
+[![Build Status](https://travis-ci.org/nats-io/nsc.svg?branch=main)](http://travis-ci.org/nats-io/nsc)
 [![GoDoc](http://godoc.org/github.com/nats-io/nsc?status.svg)](http://godoc.org/github.com/nats-io/nsc)
-[![Coverage Status](https://coveralls.io/repos/github/nats-io/nsc/badge.svg?branch=master&service=github)](https://coveralls.io/github/nats-io/nsc?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/nats-io/nsc/badge.svg?branch=main&service=github)](https://coveralls.io/github/nats-io/nsc?branch=main)
 
 A tool for creating NATS account and user access configurations
 
