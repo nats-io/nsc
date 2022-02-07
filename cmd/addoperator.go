@@ -152,15 +152,15 @@ func (p *AddOperatorParams) Load(ctx ActionCtx) error {
 		var err error
 		var data []byte
 		loadedFromURL := false
+
 		if IsURL(p.jwtPath) {
 			loadedFromURL = true
-			data, _ = LoadFromURL(p.jwtPath)
-		}
-		if data == nil {
+			data, err = LoadFromURL(p.jwtPath)
+		} else {
 			data, err = Read(p.jwtPath)
-			if err != nil {
-				return fmt.Errorf("error reading %#q: %v", p.jwtPath, err)
-			}
+		}
+		if err != nil {
+			return fmt.Errorf("error reading %#q: %v", p.jwtPath, err)
 		}
 
 		token, err := jwt.ParseDecoratedJWT(data)
