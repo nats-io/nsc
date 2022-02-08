@@ -145,7 +145,7 @@ $json = (Invoke-WebRequest https://get-nats.io/synadia-nats-platforms.json -Cont
 $nscZipUrl = $json.$channel.platforms.$OSInfo.tools.$NscTool.zip_url
 
 if ($channel -eq $Nightly) {
-	$verNsc = $verNats = Read-NightlyVersion
+	$verNsc = Read-NightlyVersion
 	Write-Host "$NscTool $Nightly version $verNsc"
 	$nscZipUrl = $nscZipUrl.Replace("%NIGHTLY%", $verNsc)
 }
