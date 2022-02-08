@@ -101,20 +101,11 @@ if ( !(Test-Path $binDirNoSlash) ) {
 $nscExePath = $binDir + $NscExe
 $nscZipLocal =  $binDir + $NscZip
 
-# $channel Have the user pick which type of channel they want, i.e. stable or nightly. Get the channel from the conf
-$dataDir = (Format-EndWithBackslash $Env:LOCALAPPDATA) + $NATSDir
-$dataFile = "$dataDir\install-channel.txt"
-$dflt = 0
-if ( Test-Path $dataFile ) {
-	$chn = (Get-Content -Path $dataFile).Split("`r?`n")[0]
-	if ($chn -eq $Nightly) {
-		$dflt = 1
-	}
-}
+# $channel Have the user pick which type of channel they want, i.e. stable or nightly.
 $opt0 = New-Object System.Management.Automation.Host.ChoiceDescription "&$Stable","Latest Stable Build."
 $opt1 = New-Object System.Management.Automation.Host.ChoiceDescription "&$Nightly","Current Nightly Build."
 $options = [System.Management.Automation.Host.ChoiceDescription[]]($opt0, $opt1)
-$result = $host.ui.PromptForChoice("$Channel Selection", "Which channel do you want to install?", $options, $dflt)
+$result = $host.ui.PromptForChoice("$Channel Selection", "Which channel do you want to install?", $options, 0)
 switch ($result) {
 	0{$channel = $Stable}
 	1{$channel = $Nightly}
