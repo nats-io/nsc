@@ -207,12 +207,12 @@ func (s *Store) createOperatorToken(operator *NamedKey) (string, error) {
 func LoadStore(dir string) (*Store, error) {
 	sf := filepath.Join(dir, NSCFile)
 	if _, err := os.Stat(sf); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%#q is not a valid data directory", dir)
+		return nil, fmt.Errorf("%#q is not a valid data directory: %w", dir, err)
 	}
 
 	s := &Store{Dir: dir}
 	if err := s.loadJson(&s.Info, ".nsc"); err != nil {
-		return nil, fmt.Errorf("error loading '.nsc' file: %v", err)
+		return nil, fmt.Errorf("error loading '.nsc' file: %w", err)
 	}
 
 	return s, nil
@@ -254,7 +254,7 @@ func (s *Store) Read(name ...string) ([]byte, error) {
 	fp := s.resolve(name...)
 	d, err := ioutil.ReadFile(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %#q: %v", fp, err)
+		return nil, fmt.Errorf("error reading %#q: %w", fp, err)
 	}
 	return d, nil
 }
@@ -329,7 +329,7 @@ func (s *Store) ClaimType(data []byte) (jwt.ClaimType, error) {
 	// Decode the jwt to figure out where it goes
 	gc, err := jwt.DecodeGeneric(string(data))
 	if err != nil {
-		return "", fmt.Errorf("invalid jwt: %v", err)
+		return "", fmt.Errorf("invalid jwt: %w", err)
 	}
 	if gc.Name == "" {
 		return "", errors.New("jwt claim doesn't have a name")
@@ -341,7 +341,7 @@ func PullAccount(u string) (Status, error) {
 	c := &http.Client{Timeout: time.Second * 5}
 	r, err := c.Get(u)
 	if err != nil {
-		return nil, fmt.Errorf("error pulling %q: %v", u, err)
+		return nil, fmt.Errorf("error pulling %q: %w", u, err)
 	}
 	if r.StatusCode > 299 {
 		return nil, fmt.Errorf("error pulling %q: %d", u, r.StatusCode)
@@ -350,7 +350,7 @@ func PullAccount(u string) (Status, error) {
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response from %q: %v", u, err)
+		return nil, fmt.Errorf("error reading response from %q: %w", u, err)
 	}
 	return PullReport(r.StatusCode, buf.Bytes()), nil
 }
@@ -378,7 +378,7 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 
 	oc, err := s.ReadOperatorClaim()
 	if err != nil {
-		return nil, fmt.Errorf("unable to push to the operator - failed to read operator claim: %v", err)
+		return nil, fmt.Errorf("unable to push to the operator - failed to read operator claim: %w", err)
 	}
 	r := NewDetailedReport(false)
 	if oc.AccountServerURL == "" || IsNatsUrl(oc.AccountServerURL) {
@@ -389,7 +389,7 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 
 	u, err := url.Parse(oc.AccountServerURL)
 	if err != nil {
-		return nil, fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %v", oc.Name, oc.AccountServerURL, err)
+		return nil, fmt.Errorf("unable to push to the %q - failed to parse account server url (%q): %w", oc.Name, oc.AccountServerURL, err)
 	}
 
 	r.Label = "synchronized account jwt with account server"
@@ -634,12 +634,12 @@ func (s *Store) LoadRootClaim() (*jwt.GenericClaims, error) {
 func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 	dirs, err := s.ListSubContainers(kind)
 	if err != nil {
-		return nil, fmt.Errorf("error listing %s: %v", kind, err)
+		return nil, fmt.Errorf("error listing %s: %w", kind, err)
 	}
 	if len(dirs) == 1 {
 		ac, err := s.LoadClaim(kind, dirs[0], JwtName(dirs[0]))
 		if err != nil {
-			return nil, fmt.Errorf("error reading %s %#q: %v", kind, dirs[0], err)
+			return nil, fmt.Errorf("error reading %s %#q: %w", kind, dirs[0], err)
 		}
 		return ac, nil
 	}
@@ -655,7 +655,7 @@ func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 			if s.Has(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd))) {
 				ac, err := s.LoadClaim(kind, filepath.Base(pwd), JwtName(filepath.Base(pwd)))
 				if err != nil {
-					return nil, fmt.Errorf("error reading %s %#q: %v", kind, dirs[0], err)
+					return nil, fmt.Errorf("error reading %s %#q: %w", kind, dirs[0], err)
 				}
 				return ac, nil
 			} else {
@@ -692,7 +692,7 @@ type Context struct {
 func (ctx *Context) SetContext(name string, pub string) error {
 	kp, err := nkeys.FromPublicKey(pub)
 	if err != nil {
-		return fmt.Errorf("error parsing public key: %v", err)
+		return fmt.Errorf("error parsing public key: %w", err)
 	}
 	pre, err := KeyType(kp)
 	if err != nil {
@@ -724,7 +724,7 @@ func (s *Store) GetContext() (*Context, error) {
 
 	root, err := s.LoadRootClaim()
 	if err != nil {
-		return nil, fmt.Errorf("error reading root: %v", err)
+		return nil, fmt.Errorf("error reading root: %w", err)
 	}
 
 	if root != nil {
