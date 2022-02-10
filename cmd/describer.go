@@ -123,6 +123,7 @@ func (a *AccountDescriber) Describe() string {
 		}
 		addLimitRow(table, "Max Streams", lim.Streams, false)
 		addLimitRow(table, "Max Consumer", lim.Consumer, false)
+		addLimitRow(table, "Max High Availability Resources", lim.HaResources, false)
 	}
 
 	table.AddSeparator()

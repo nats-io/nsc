@@ -93,6 +93,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.streams, "js-streams", "", "Jetstream: set maximum streams for the account (-1 is unlimited)")
 	params.consumer = -1
 	cmd.Flags().VarP(&params.consumer, "js-consumer", "", "Jetstream: set maximum consumer for the account (-1 is unlimited)")
+	cmd.Flags().VarP(&params.haResources, "js-ha-resources", "", "Jetstream: set maximum high availability resources, such as replicated streams and durable consumer, for the account (-1 unlimited / 0 ha resources disabled)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
@@ -126,6 +127,7 @@ type EditAccountParams struct {
 	diskStorage   NumberParams
 	streams       NumberParams
 	consumer      NumberParams
+	haResources   NumberParams
 	exportsWc     bool
 	imports       NumberParams
 	subscriptions NumberParams
@@ -218,6 +220,10 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.consumer = NumberParams(p.claim.Limits.Consumer)
 	}
 
+	if !ctx.CurrentCmd().Flags().Changed("js-ha-resources") {
+		p.haResources = NumberParams(p.claim.Limits.HaResources)
+	}
+
 	if !ctx.CurrentCmd().Flags().Changed("description") {
 		p.description = p.claim.Description
 	}
@@ -277,6 +283,10 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		}
 
 		if err = p.consumer.Edit("max consumer (-1 unlimited)"); err != nil {
+			return err
+		}
+
+		if err = p.haResources.Edit("max high availability resources (replicated streams/durable consumer) (-1 unlimited / 0 ha resources disabled)"); err != nil {
 			return err
 		}
 	}
@@ -391,23 +401,28 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	p.claim.Limits.MemoryStorage = p.memStorage.Int64()
-	if flags.Changed("mem-storage") {
+	if flags.Changed("mem-storage") || flags.Changed("js-mem-storage") {
 		r.AddOK("changed max mem storage to %d", p.claim.Limits.MemoryStorage)
 	}
 
 	p.claim.Limits.DiskStorage = p.diskStorage.Int64()
-	if flags.Changed("disk-storage") {
+	if flags.Changed("disk-storage") || flags.Changed("js-disk-storage") {
 		r.AddOK("changed max disk storage to %d", p.claim.Limits.DiskStorage)
 	}
 
 	p.claim.Limits.Streams = p.streams.Int64()
-	if flags.Changed("streams") {
+	if flags.Changed("streams") || flags.Changed("js-streams") {
 		r.AddOK("changed max streams to %d", p.claim.Limits.Streams)
 	}
 
 	p.claim.Limits.Consumer = p.consumer.Int64()
-	if flags.Changed("consumer") {
+	if flags.Changed("consumer") || flags.Changed("js-consumer") {
 		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
+	}
+
+	p.claim.Limits.HaResources = p.haResources.Int64()
+	if flags.Changed("js-ha-resources") {
+		r.AddOK("changed high availability resources to %d", p.claim.Limits.HaResources)
 	}
 
 	p.claim.Description = p.description
