@@ -149,7 +149,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
 		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
 		"rm-response-perms", "rm", "max-responses", "mem-storage", "disk-storage", "streams", "consumer",
-		"js-mem-storage", "js-disk-storage", "js-streams", "js-consumer") {
+		"js-mem-storage", "js-disk-storage", "js-streams", "js-consumer", "js-ha-resources") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -398,6 +398,13 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Subs = p.subscriptions.Int64()
 	if flags.Changed("subscriptions") {
 		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
+	}
+
+	// once edit account changes JS from disabled to enabled and haResources was not explicitly set,
+	// change ha-resources to unlimited. This avoids breaking scripts due to updating nsc.
+	if !p.claim.Limits.IsJSEnabled() && (p.memStorage != 0 || p.diskStorage != 0) &&
+		!InteractiveFlag && !flags.Changed("js-ha-resources") {
+		p.haResources = jwt.NoLimit
 	}
 
 	p.claim.Limits.MemoryStorage = p.memStorage.Int64()
