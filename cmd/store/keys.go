@@ -202,12 +202,12 @@ func (k *KeyStore) GetUserCredsPath(account string, user string) string {
 func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte) (string, error) {
 	kp, err := ExtractSeed(string(data))
 	if err != nil {
-		return "", fmt.Errorf("unable to store user creds file - error reading creds data: %v", err)
+		return "", fmt.Errorf("unable to store user creds file - error reading creds data: %w", err)
 	}
 
 	pk, err := kp.PublicKey()
 	if err != nil {
-		return "", fmt.Errorf("unable to get the public key from the seed in the creds: %v", err)
+		return "", fmt.Errorf("unable to get the public key from the seed in the creds: %w", err)
 	}
 
 	_, err = k.GetKeyPair(pk)
@@ -215,7 +215,7 @@ func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte)
 		return "", errors.New("unable to store creds file - user's seed file is not in the keystore")
 	}
 	if err != nil {
-		return "", fmt.Errorf("unable to store creds file - error examining user's seed file: %v", err)
+		return "", fmt.Errorf("unable to store creds file - error examining user's seed file: %w", err)
 	}
 
 	fp := k.CalcUserCredsPath(account, user)
@@ -371,7 +371,7 @@ func StoreKey(kp nkeys.KeyPair) (string, error) {
 		if os.IsNotExist(err) {
 			err := ioutil.WriteFile(fp, seed, 0600)
 			if err != nil {
-				return "", fmt.Errorf("error writing %#q: %v", fp, err)
+				return "", fmt.Errorf("error writing %#q: %w", fp, err)
 			}
 			return fp, nil
 		}
@@ -379,7 +379,7 @@ func StoreKey(kp nkeys.KeyPair) (string, error) {
 
 	d, err := ioutil.ReadFile(fp)
 	if err != nil {
-		return "", fmt.Errorf("error reading %#q: %v", fp, err)
+		return "", fmt.Errorf("error reading %#q: %w", fp, err)
 	}
 	if string(d) != string(seed) {
 		return "", fmt.Errorf("key %#q already exists and is different", fp)
@@ -570,11 +570,11 @@ func migrateKey(src string, to string) (string, error) {
 	if filepath.Ext(src) == NKeyExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
-			return "", fmt.Errorf("error processing %#q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %w", src, err)
 		}
 		kp, err := nkeys.FromSeed(d)
 		if err != nil {
-			return "", fmt.Errorf("error processing %#q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %w", src, err)
 		}
 
 		pk, err := kp.PublicKey()
@@ -618,7 +618,7 @@ func migrateCreds(ksroot string, src string, to string) (string, error) {
 	if filepath.Ext(src) == CredsExtension {
 		d, err := dataFromFile(src)
 		if err != nil {
-			return "", fmt.Errorf("error processing %#q: %v", src, err)
+			return "", fmt.Errorf("error processing %#q: %w", src, err)
 		}
 
 		rel, err := relCredsPath(ksroot, src)
@@ -640,10 +640,10 @@ func MaybeMakeDir(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil && os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("error creating %#q: %v", dir, err)
+			return fmt.Errorf("error creating %#q: %w", dir, err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("error stat'ing %#q: %v", dir, err)
+		return fmt.Errorf("error stat'ing %#q: %w", dir, err)
 	} else if !fi.IsDir() {
 		return fmt.Errorf("%#q already exists and it is not a dir", dir)
 	}
