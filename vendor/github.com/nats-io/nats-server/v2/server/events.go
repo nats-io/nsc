@@ -1,4 +1,4 @@
-// Copyright 2018-2021 The NATS Authors
+// Copyright 2018-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -91,7 +91,7 @@ type internal struct {
 	sweeper  *time.Timer
 	stmr     *time.Timer
 	replies  map[string]msgHandler
-	sendq    chan *pubMsg
+	sendq    *ipQueue // of *pubMsg
 	resetCh  chan struct{}
 	wg       sync.WaitGroup
 	sq       *sendq
@@ -181,6 +181,7 @@ type ClientInfo struct {
 	RTT        time.Duration `json:"rtt,omitempty"`
 	Server     string        `json:"server,omitempty"`
 	Cluster    string        `json:"cluster,omitempty"`
+	Alternates []string      `json:"alts,omitempty"`
 	Stop       *time.Time    `json:"stop,omitempty"`
 	Jwt        string        `json:"jwt,omitempty"`
 	IssuerKey  string        `json:"issuer_key,omitempty"`
@@ -247,6 +248,33 @@ type pubMsg struct {
 	last bool
 }
 
+var pubMsgPool sync.Pool
+
+func newPubMsg(c *client, sub, rply string, si *ServerInfo, hdr map[string]string,
+	msg interface{}, oct compressionType, echo, last bool) *pubMsg {
+
+	var m *pubMsg
+	pm := pubMsgPool.Get()
+	if pm != nil {
+		m = pm.(*pubMsg)
+	} else {
+		m = &pubMsg{}
+	}
+	// When getting something from a pool it is criticical that all fields are
+	// initialized. Doing this way guarantees that if someone adds a field to
+	// the structure, the compiler will fail the build if this line is not updated.
+	(*m) = pubMsg{c, sub, rply, si, hdr, msg, oct, echo, last}
+	return m
+}
+
+func (pm *pubMsg) returnToPool() {
+	if pm == nil {
+		return
+	}
+	pm.c, pm.sub, pm.rply, pm.si, pm.hdr, pm.msg = nil, _EMPTY_, _EMPTY_, nil, nil, nil
+	pubMsgPool.Put(pm)
+}
+
 // Used to track server updates.
 type serverUpdate struct {
 	seq   uint64
@@ -287,130 +315,124 @@ RESET:
 	}
 	s.mu.Unlock()
 
-	// Warn when internal send queue is backed up past 75%
-	warnThresh := 3 * internalSendQLen / 4
-	warnFreq := time.Second
-	last := time.Now().Add(-warnFreq)
-
 	for s.eventsRunning() {
-		// Setup information for next message
-		if len(sendq) > warnThresh && time.Since(last) >= warnFreq {
-			s.Warnf("Internal system send queue > 75%%")
-			last = time.Now()
-		}
-
 		select {
-		case pm := <-sendq:
-			if pm.si != nil {
-				pm.si.Name = servername
-				pm.si.Domain = domain
-				pm.si.Host = host
-				pm.si.Cluster = cluster
-				pm.si.ID = id
-				pm.si.Seq = atomic.AddUint64(seqp, 1)
-				pm.si.Version = VERSION
-				pm.si.Time = time.Now().UTC()
-				pm.si.JetStream = js
-			}
-			var b []byte
-			if pm.msg != nil {
-				switch v := pm.msg.(type) {
-				case string:
-					b = []byte(v)
-				case []byte:
-					b = v
-				default:
-					b, _ = json.Marshal(pm.msg)
+		case <-sendq.ch:
+			msgs := sendq.pop()
+			for _, pmi := range msgs {
+				pm := pmi.(*pubMsg)
+				if pm.si != nil {
+					pm.si.Name = servername
+					pm.si.Domain = domain
+					pm.si.Host = host
+					pm.si.Cluster = cluster
+					pm.si.ID = id
+					pm.si.Seq = atomic.AddUint64(seqp, 1)
+					pm.si.Version = VERSION
+					pm.si.Time = time.Now().UTC()
+					pm.si.JetStream = js
 				}
-			}
-
-			// Setup our client. If the user wants to use a non-system account use our internal
-			// account scoped here so that we are not changing out accounts for the system client.
-			var c *client
-			if pm.c != nil {
-				c = pm.c
-			} else {
-				c = sysc
-			}
-
-			// Grab client lock.
-			c.mu.Lock()
-
-			// Prep internal structures needed to send message.
-			c.pa.subject, c.pa.reply = []byte(pm.sub), []byte(pm.rply)
-			c.pa.size, c.pa.szb = len(b), []byte(strconv.FormatInt(int64(len(b)), 10))
-			c.pa.hdr, c.pa.hdb = -1, nil
-			trace := c.trace
-
-			// Now check for optional compression.
-			var contentHeader string
-			var bb bytes.Buffer
-
-			if len(b) > 0 {
-				switch pm.oct {
-				case gzipCompression:
-					zw := gzip.NewWriter(&bb)
-					zw.Write(b)
-					zw.Close()
-					b = bb.Bytes()
-					contentHeader = "gzip"
-				case snappyCompression:
-					sw := s2.NewWriter(&bb, s2.WriterSnappyCompat())
-					sw.Write(b)
-					sw.Close()
-					b = bb.Bytes()
-					contentHeader = "snappy"
-				case unsupportedCompression:
-					contentHeader = "identity"
+				var b []byte
+				if pm.msg != nil {
+					switch v := pm.msg.(type) {
+					case string:
+						b = []byte(v)
+					case []byte:
+						b = v
+					default:
+						b, _ = json.Marshal(pm.msg)
+					}
 				}
-			}
-			// Optional Echo
-			replaceEcho := c.echo != pm.echo
-			if replaceEcho {
-				c.echo = !c.echo
-			}
-			c.mu.Unlock()
-
-			// Add in NL
-			b = append(b, _CRLF_...)
-
-			// Check if we should set content-encoding
-			if contentHeader != _EMPTY_ {
-				b = c.setHeader(contentEncodingHeader, contentHeader, b)
-			}
-
-			// Optional header processing.
-			if pm.hdr != nil {
-				for k, v := range pm.hdr {
-					b = c.setHeader(k, v, b)
+				// Setup our client. If the user wants to use a non-system account use our internal
+				// account scoped here so that we are not changing out accounts for the system client.
+				var c *client
+				if pm.c != nil {
+					c = pm.c
+				} else {
+					c = sysc
 				}
-			}
-			// Tracing
-			if trace {
-				c.traceInOp(fmt.Sprintf("PUB %s %s %d", c.pa.subject, c.pa.reply, c.pa.size), nil)
-				c.traceMsg(b)
-			}
 
-			// Process like a normal inbound msg.
-			c.processInboundClientMsg(b)
-
-			// Put echo back if needed.
-			if replaceEcho {
+				// Grab client lock.
 				c.mu.Lock()
-				c.echo = !c.echo
-				c.mu.Unlock()
-			}
 
-			// See if we are doing graceful shutdown.
-			if !pm.last {
-				c.flushClients(0) // Never spend time in place.
-			} else {
-				// For the Shutdown event, we need to send in place otherwise
-				// there is a chance that the process will exit before the
-				// writeLoop has a chance to send it.
-				c.flushClients(time.Second)
-				return
+				// Prep internal structures needed to send message.
+				c.pa.subject, c.pa.reply = []byte(pm.sub), []byte(pm.rply)
+				c.pa.size, c.pa.szb = len(b), []byte(strconv.FormatInt(int64(len(b)), 10))
+				c.pa.hdr, c.pa.hdb = -1, nil
+				trace := c.trace
+
+				// Now check for optional compression.
+				var contentHeader string
+				var bb bytes.Buffer
+
+				if len(b) > 0 {
+					switch pm.oct {
+					case gzipCompression:
+						zw := gzip.NewWriter(&bb)
+						zw.Write(b)
+						zw.Close()
+						b = bb.Bytes()
+						contentHeader = "gzip"
+					case snappyCompression:
+						sw := s2.NewWriter(&bb, s2.WriterSnappyCompat())
+						sw.Write(b)
+						sw.Close()
+						b = bb.Bytes()
+						contentHeader = "snappy"
+					case unsupportedCompression:
+						contentHeader = "identity"
+					}
+				}
+				// Optional Echo
+				replaceEcho := c.echo != pm.echo
+				if replaceEcho {
+					c.echo = !c.echo
+				}
+				c.mu.Unlock()
+
+				// Add in NL
+				b = append(b, _CRLF_...)
+
+				// Check if we should set content-encoding
+				if contentHeader != _EMPTY_ {
+					b = c.setHeader(contentEncodingHeader, contentHeader, b)
+				}
+
+				// Optional header processing.
+				if pm.hdr != nil {
+					for k, v := range pm.hdr {
+						b = c.setHeader(k, v, b)
+					}
+				}
+				// Tracing
+				if trace {
+					c.traceInOp(fmt.Sprintf("PUB %s %s %d", c.pa.subject, c.pa.reply, c.pa.size), nil)
+					c.traceMsg(b)
+				}
+
+				// Process like a normal inbound msg.
+				c.processInboundClientMsg(b)
+
+				// Put echo back if needed.
+				if replaceEcho {
+					c.mu.Lock()
+					c.echo = !c.echo
+					c.mu.Unlock()
+				}
+
+				// See if we are doing graceful shutdown.
+				if !pm.last {
+					c.flushClients(0) // Never spend time in place.
+				} else {
+					// For the Shutdown event, we need to send in place otherwise
+					// there is a chance that the process will exit before the
+					// writeLoop has a chance to send it.
+					c.flushClients(time.Second)
+					return
+				}
+				pm.returnToPool()
 			}
+			sendq.recycle(&msgs)
 		case <-resetCh:
 			goto RESET
 		case <-s.quitCh:
@@ -432,10 +454,10 @@ func (s *Server) sendShutdownEvent() {
 	s.sys.sendq = nil
 	// Unhook all msgHandlers. Normal client cleanup will deal with subs, etc.
 	s.sys.replies = nil
-	s.mu.Unlock()
 	// Send to the internal queue and mark as last.
 	si := &ServerInfo{}
-	sendq <- &pubMsg{nil, subj, _EMPTY_, si, nil, si, noCompression, false, true}
+	sendq.push(newPubMsg(nil, subj, _EMPTY_, si, nil, si, noCompression, false, true))
+	s.mu.Unlock()
 }
 
 // Used to send an internal message to an arbitrary account.
@@ -450,19 +472,15 @@ func (s *Server) sendInternalAccountMsgWithReply(a *Account, subject, reply stri
 		s.mu.Unlock()
 		return ErrNoSysAccount
 	}
-	sendq := s.sys.sendq
-	// Don't hold lock while placing on the channel.
 	c := s.sys.client
-	s.mu.Unlock()
-
 	// Replace our client with the account's internal client.
 	if a != nil {
 		a.mu.Lock()
 		c = a.internalClient()
 		a.mu.Unlock()
 	}
-
-	sendq <- &pubMsg{c, subject, reply, nil, hdr, msg, noCompression, echo, false}
+	s.sys.sendq.push(newPubMsg(c, subject, reply, nil, hdr, msg, noCompression, echo, false))
+	s.mu.Unlock()
 	return nil
 }
 
@@ -480,11 +498,7 @@ func (s *Server) sendInternalMsg(subj, rply string, si *ServerInfo, msg interfac
 	if s.sys == nil || s.sys.sendq == nil {
 		return
 	}
-	sendq := s.sys.sendq
-	// Don't hold lock while placing on the channel.
-	s.mu.Unlock()
-	sendq <- &pubMsg{nil, subj, rply, si, nil, msg, noCompression, false, false}
-	s.mu.Lock()
+	s.sys.sendq.push(newPubMsg(nil, subj, rply, si, nil, msg, noCompression, false, false))
 }
 
 // Will send an api response.
@@ -494,10 +508,8 @@ func (s *Server) sendInternalResponse(subj string, response *ServerAPIResponse) 
 		s.mu.Unlock()
 		return
 	}
-	sendq := s.sys.sendq
-	// Don't hold lock while placing on the channel.
+	s.sys.sendq.push(newPubMsg(nil, subj, _EMPTY_, response.Server, nil, response, response.compress, false, false))
 	s.mu.Unlock()
-	sendq <- &pubMsg{nil, subj, _EMPTY_, response.Server, nil, response, response.compress, false, false}
 }
 
 // Used to send internal messages from other system clients to avoid no echo issues.
@@ -511,13 +523,11 @@ func (c *client) sendInternalMsg(subj, rply string, si *ServerInfo, msg interfac
 	}
 	s.mu.Lock()
 	if s.sys == nil || s.sys.sendq == nil {
+		s.mu.Unlock()
 		return
 	}
-	sendq := s.sys.sendq
-	// Don't hold lock while placing on the channel.
+	s.sys.sendq.push(newPubMsg(c, subj, rply, si, nil, msg, noCompression, false, false))
 	s.mu.Unlock()
-
-	sendq <- &pubMsg{c, subj, rply, si, nil, msg, noCompression, false, false}
 }
 
 // Locked version of checking if events system running. Also checks server.
@@ -669,6 +679,15 @@ func (s *Server) sendStatsz(subj string) {
 		jStat.Config = &c
 		js.mu.RUnlock()
 		jStat.Stats = js.usageStats()
+		// Update our own usage since we do not echo so we will not hear ourselves.
+		ourNode := string(getHash(s.serverName()))
+		if v, ok := s.nodeToInfo.Load(ourNode); ok && v != nil {
+			ni := v.(nodeInfo)
+			ni.stats = jStat.Stats
+			ni.cfg = jStat.Config
+			s.nodeToInfo.Store(ourNode, ni)
+		}
+		// Metagroup info.
 		if mg := js.getMetaGroup(); mg != nil {
 			if mg.Leader() {
 				if ci := s.raftNodeToClusterInfo(mg); ci != nil {
@@ -695,9 +714,11 @@ func (s *Server) sendStatsz(subj string) {
 func (s *Server) heartbeatStatsz() {
 	if s.sys.stmr != nil {
 		// Increase after startup to our max.
-		s.sys.cstatsz *= 4
-		if s.sys.cstatsz > s.sys.statsz {
-			s.sys.cstatsz = s.sys.statsz
+		if s.sys.cstatsz < s.sys.statsz {
+			s.sys.cstatsz *= 2
+			if s.sys.cstatsz > s.sys.statsz {
+				s.sys.cstatsz = s.sys.statsz
+			}
 		}
 		s.sys.stmr.Reset(s.sys.cstatsz)
 	}
@@ -714,7 +735,7 @@ func (s *Server) sendStatszUpdate() {
 func (s *Server) startStatszTimer() {
 	// We will start by sending out more of these and trail off to the statsz being the max.
 	s.sys.cstatsz = 250 * time.Millisecond
-	// Send out the first one after 250ms.
+	// Send out the first one quickly, we will slowly back off.
 	s.sys.stmr = time.AfterFunc(s.sys.cstatsz, s.wrapChk(s.heartbeatStatsz))
 }
 
@@ -1031,10 +1052,10 @@ func (s *Server) processRemoteServerShutdown(sid string) {
 	})
 	// Update any state in nodeInfo.
 	s.nodeToInfo.Range(func(k, v interface{}) bool {
-		si := v.(nodeInfo)
-		if si.id == sid {
-			si.offline = true
-			s.nodeToInfo.Store(k, si)
+		ni := v.(nodeInfo)
+		if ni.id == sid {
+			ni.offline = true
+			s.nodeToInfo.Store(k, ni)
 			return false
 		}
 		return true
@@ -1071,12 +1092,14 @@ func (s *Server) remoteServerShutdown(sub *subscription, c *client, _ *Account, 
 		s.Debugf("Received bad server info for remote server shutdown")
 		return
 	}
-	// Additional processing here.
-	if !s.sameDomain(si.Domain) {
-		return
-	}
+
+	// JetStream node updates if applicable.
 	node := string(getHash(si.Name))
-	s.nodeToInfo.Store(node, nodeInfo{si.Name, si.Cluster, si.Domain, si.ID, true, true})
+	if v, ok := s.nodeToInfo.Load(node); ok && v != nil {
+		ni := v.(nodeInfo)
+		ni.offline = true
+		s.nodeToInfo.Store(node, ni)
+	}
 
 	sid := toks[serverSubjectIndex]
 	if su := s.sys.servers[sid]; su != nil {
@@ -1095,44 +1118,67 @@ func (s *Server) remoteServerUpdate(sub *subscription, c *client, _ *Account, su
 		return
 	}
 	si := ssm.Server
+
+	// JetStream node updates.
 	if !s.sameDomain(si.Domain) {
 		return
 	}
 
+	var cfg *JetStreamConfig
+	var stats *JetStreamStats
+
+	if ssm.Stats.JetStream != nil {
+		cfg = ssm.Stats.JetStream.Config
+		stats = ssm.Stats.JetStream.Stats
+	}
+
 	node := string(getHash(si.Name))
-	s.nodeToInfo.Store(node, nodeInfo{si.Name, si.Cluster, si.Domain, si.ID, false, si.JetStream})
+	s.nodeToInfo.Store(node, nodeInfo{
+		si.Name,
+		si.Version,
+		si.Cluster,
+		si.Domain,
+		si.ID,
+		cfg,
+		stats,
+		false, si.JetStream,
+	})
 }
 
 // updateRemoteServer is called when we have an update from a remote server.
 // This allows us to track remote servers, respond to shutdown messages properly,
 // make sure that messages are ordered, and allow us to prune dead servers.
 // Lock should be held upon entry.
-func (s *Server) updateRemoteServer(ms *ServerInfo) {
-	su := s.sys.servers[ms.ID]
+func (s *Server) updateRemoteServer(si *ServerInfo) {
+	su := s.sys.servers[si.ID]
 	if su == nil {
-		s.sys.servers[ms.ID] = &serverUpdate{ms.Seq, time.Now()}
-		s.processNewServer(ms)
+		s.sys.servers[si.ID] = &serverUpdate{si.Seq, time.Now()}
+		s.processNewServer(si)
 	} else {
 		// Should always be going up.
-		if ms.Seq <= su.seq {
-			s.Errorf("Received out of order remote server update from: %q", ms.ID)
+		if si.Seq <= su.seq {
+			s.Errorf("Received out of order remote server update from: %q", si.ID)
 			return
 		}
-		su.seq = ms.Seq
+		su.seq = si.Seq
 		su.ltime = time.Now()
 	}
 }
 
 // processNewServer will hold any logic we want to use when we discover a new server.
 // Lock should be held upon entry.
-func (s *Server) processNewServer(ms *ServerInfo) {
+func (s *Server) processNewServer(si *ServerInfo) {
 	// Right now we only check if we have leafnode servers and if so send another
 	// connect update to make sure they switch this account to interest only mode.
 	s.ensureGWsInterestOnlyForLeafNodes()
+
 	// Add to our nodeToName
-	if s.sameDomain(ms.Domain) {
-		node := string(getHash(ms.Name))
-		s.nodeToInfo.Store(node, nodeInfo{ms.Name, ms.Cluster, ms.Domain, ms.ID, false, ms.JetStream})
+	if s.sameDomain(si.Domain) {
+		node := string(getHash(si.Name))
+		// Only update if non-existent
+		if _, ok := s.nodeToInfo.Load(node); !ok {
+			s.nodeToInfo.Store(node, nodeInfo{si.Name, si.Version, si.Cluster, si.Domain, si.ID, nil, nil, false, si.JetStream})
+		}
 	}
 	// Announce ourselves..
 	s.sendStatsz(fmt.Sprintf(serverStatsSubj, s.info.ID))
@@ -1378,9 +1424,15 @@ type ServerAPIConnzResponse struct {
 
 // statszReq is a request for us to respond with current statsz.
 func (s *Server) statszReq(sub *subscription, c *client, _ *Account, subject, reply string, rmsg []byte) {
-	if !s.EventsEnabled() || reply == _EMPTY_ {
+	if !s.EventsEnabled() {
 		return
 	}
+
+	// No reply is a signal that we should use our normal broadcast subject.
+	if reply == _EMPTY_ {
+		reply = fmt.Sprintf(serverStatsSubj, s.info.ID)
+	}
+
 	opts := StatszEventOptions{}
 	if _, msg := c.msgParts(rmsg); len(msg) != 0 {
 		if err := json.Unmarshal(msg, &opts); err != nil {
@@ -1564,7 +1616,7 @@ func (s *Server) sendLeafNodeConnect(a *Account) {
 func (s *Server) sendLeafNodeConnectMsg(accName string) {
 	subj := fmt.Sprintf(leafNodeConnectEventSubj, accName)
 	m := accNumConnsReq{Account: accName}
-	s.sendInternalMsg(subj, "", &m.Server, &m)
+	s.sendInternalMsg(subj, _EMPTY_, &m.Server, &m)
 }
 
 // sendAccConnsUpdate is called to send out our information on the
@@ -1581,7 +1633,6 @@ func (s *Server) sendAccConnsUpdate(a *Account, subj ...string) {
 	// Build event with account name and number of local clients and leafnodes.
 	eid := s.nextEventID()
 	a.mu.Lock()
-	s.mu.Unlock()
 	localConns := a.numLocalConnections()
 	m := &AccountNumConns{
 		TypedEvent: TypedEvent{
@@ -1606,17 +1657,10 @@ func (s *Server) sendAccConnsUpdate(a *Account, subj ...string) {
 		}
 	}
 	for _, sub := range subj {
-		msg := &pubMsg{nil, sub, _EMPTY_, &m.Server, nil, &m, noCompression, false, false}
-		select {
-		case sendQ <- msg:
-		default:
-			a.mu.Unlock()
-			sendQ <- msg
-			a.mu.Lock()
-		}
+		msg := newPubMsg(nil, sub, _EMPTY_, &m.Server, nil, &m, noCompression, false, false)
+		sendQ.push(msg)
 	}
 	a.mu.Unlock()
-	s.mu.Lock()
 }
 
 // accConnsUpdate is called whenever there is a change to the account's

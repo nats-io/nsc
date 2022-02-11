@@ -1,4 +1,4 @@
-// Copyright 2013-2019 The NATS Authors
+// Copyright 2013-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -1260,8 +1260,9 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
 	<a href=.%s>subsz</a><br/>
 	<a href=.%s>accountz</a><br/>
 	<a href=.%s>jsz</a><br/>
+	<a href=.%s>healthz</a><br/>
     <br/>
-    <a href=https://docs.nats.io/nats-server/configuration/monitoring.html>help</a>
+    <a href=https://docs.nats.io/nats-server/configuration/monitoring>help</a>
   </body>
 </html>`,
 		s.basePath(VarzPath),
@@ -1272,6 +1273,7 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
 		s.basePath(SubszPath),
 		s.basePath(AccountzPath),
 		s.basePath(JszPath),
+		s.basePath(HealthzPath),
 	)
 }
 
@@ -2131,7 +2133,8 @@ type ExtImport struct {
 
 type ExtExport struct {
 	jwt.Export
-	ApprovedAccounts []string `json:"approved_accounts,omitempty"`
+	ApprovedAccounts []string             `json:"approved_accounts,omitempty"`
+	RevokedAct       map[string]time.Time `json:"revoked_activations,omitempty"`
 }
 
 type ExtVrIssues struct {
@@ -2162,7 +2165,6 @@ type AccountInfo struct {
 	Claim       *jwt.AccountClaims   `json:"decoded_jwt,omitempty"`
 	Vr          []ExtVrIssues        `json:"validation_result_jwt,omitempty"`
 	RevokedUser map[string]time.Time `json:"revoked_user,omitempty"`
-	RevokedAct  map[string]time.Time `json:"revoked_activations,omitempty"`
 	Sublist     *SublistStats        `json:"sublist_stats,omitempty"`
 	Responses   map[string]ExtImport `json:"responses,omitempty"`
 }
@@ -2260,6 +2262,17 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 			vrIssues[i] = ExtVrIssues{v.Description, v.Blocking, v.TimeCheck}
 		}
 	}
+	collectRevocations := func(revocations map[string]int64) map[string]time.Time {
+		l := len(revocations)
+		if l == 0 {
+			return nil
+		}
+		rev := make(map[string]time.Time, l)
+		for k, v := range revocations {
+			rev[k] = time.Unix(v, 0)
+		}
+		return rev
+	}
 	exports := []ExtExport{}
 	for k, v := range a.exports.services {
 		e := ExtExport{
@@ -2276,6 +2289,7 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 			for name := range v.approved {
 				e.ApprovedAccounts = append(e.ApprovedAccounts, name)
 			}
+			e.RevokedAct = collectRevocations(v.actsRevoked)
 		}
 		exports = append(exports, e)
 	}
@@ -2292,6 +2306,7 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 			for name := range v.approved {
 				e.ApprovedAccounts = append(e.ApprovedAccounts, name)
 			}
+			e.RevokedAct = collectRevocations(v.actsRevoked)
 		}
 		exports = append(exports, e)
 	}
@@ -2342,13 +2357,6 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 		}
 		mappings[src] = dests
 	}
-	collectRevocations := func(revocations map[string]int64) map[string]time.Time {
-		rev := map[string]time.Time{}
-		for k, v := range a.usersRevoked {
-			rev[k] = time.Unix(v, 0)
-		}
-		return rev
-	}
 	return &AccountInfo{
 		accName,
 		a.updated,
@@ -2369,7 +2377,6 @@ func (s *Server) accountInfo(accName string) (*AccountInfo, error) {
 		claim,
 		vrIssues,
 		collectRevocations(a.usersRevoked),
-		collectRevocations(a.actsRevoked),
 		a.sl.Stats(),
 		responses,
 	}, nil
@@ -2388,11 +2395,13 @@ type JSzOptions struct {
 }
 
 type StreamDetail struct {
-	Name     string          `json:"name"`
-	Cluster  *ClusterInfo    `json:"cluster,omitempty"`
-	Config   *StreamConfig   `json:"config,omitempty"`
-	State    StreamState     `json:"state,omitempty"`
-	Consumer []*ConsumerInfo `json:"consumer_detail,omitempty"`
+	Name     string              `json:"name"`
+	Cluster  *ClusterInfo        `json:"cluster,omitempty"`
+	Config   *StreamConfig       `json:"config,omitempty"`
+	State    StreamState         `json:"state,omitempty"`
+	Consumer []*ConsumerInfo     `json:"consumer_detail,omitempty"`
+	Mirror   *StreamSourceInfo   `json:"mirror,omitempty"`
+	Sources  []*StreamSourceInfo `json:"sources,omitempty"`
 }
 
 type AccountDetail struct {
@@ -2417,11 +2426,10 @@ type JSInfo struct {
 	Disabled bool            `json:"disabled,omitempty"`
 	Config   JetStreamConfig `json:"config,omitempty"`
 	JetStreamStats
-	APICalls  int64            `json:"current_api_calls"`
-	Streams   int              `json:"total_streams,omitempty"`
-	Consumers int              `json:"total_consumers,omitempty"`
-	Messages  uint64           `json:"total_messages,omitempty"`
-	Bytes     uint64           `json:"total_message_bytes,omitempty"`
+	Streams   int              `json:"streams"`
+	Consumers int              `json:"consumers"`
+	Messages  uint64           `json:"messages"`
+	Bytes     uint64           `json:"bytes"`
 	Meta      *MetaClusterInfo `json:"meta_cluster,omitempty"`
 
 	// aggregate raft info
@@ -2470,10 +2478,16 @@ func (s *Server) accountDetail(jsa *jsAccount, optStreams, optConsumers, optCfg 
 				State:   stream.state(),
 				Cluster: ci,
 				Config:  cfg,
+				Mirror:  stream.mirrorInfo(),
+				Sources: stream.sourcesInfo(),
 			}
 			if optConsumers {
 				for _, consumer := range stream.getPublicConsumers() {
 					cInfo := consumer.info()
+					if cInfo == nil {
+						continue
+					}
+
 					if !optCfg {
 						cInfo.Config = nil
 					}
@@ -2572,7 +2586,6 @@ func (s *Server) Jsz(opts *JSzOptions) (*JSInfo, error) {
 		accounts = append(accounts, info)
 	}
 	s.js.mu.RUnlock()
-	jsi.APICalls = atomic.LoadInt64(&s.js.apiCalls)
 
 	if mg := s.js.getMetaGroup(); mg != nil {
 		if ci := s.raftNodeToClusterInfo(mg); ci != nil {
@@ -2680,9 +2693,98 @@ func (s *Server) HandleJsz(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := json.MarshalIndent(l, "", "  ")
 	if err != nil {
-		s.Errorf("Error marshaling response to /leafz request: %v", err)
+		s.Errorf("Error marshaling response to /jsz request: %v", err)
 	}
 
 	// Handle response
+	ResponseHandler(w, r, b)
+}
+
+type HealthStatus struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// https://tools.ietf.org/id/draft-inadarei-api-health-check-05.html
+func (s *Server) HandleHealthz(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	s.httpReqStats[HealthzPath]++
+	s.mu.Unlock()
+
+	var health = &HealthStatus{Status: "ok"}
+
+	if err := s.readyForConnections(time.Millisecond); err != nil {
+		health.Status = "error"
+		health.Error = err.Error()
+		w.WriteHeader(http.StatusServiceUnavailable)
+	} else if js := s.getJetStream(); js != nil {
+		// Check JetStream status here.
+		js.mu.RLock()
+		clustered, cc := !js.standAlone, js.cluster
+		js.mu.RUnlock()
+		if clustered {
+			// We do more checking for clustered mode to allow for proper rolling updates.
+			// We will make sure that we have seen the meta leader and that we are current with all assets.
+			node := js.getMetaGroup()
+			if node.GroupLeader() == _EMPTY_ {
+				health.Status = "unavailable"
+				health.Error = "JetStream has not established contact with a meta leader"
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else if !node.Current() {
+				health.Status = "unavailable"
+				health.Error = "JetStream is not current with the meta leader"
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				// If we are here we are current and have seen our meta leader.
+				// Now check assets.
+				var _a [512]*jsAccount
+				accounts := _a[:0]
+				js.mu.RLock()
+				// Collect accounts.
+				for _, jsa := range js.accounts {
+					accounts = append(accounts, jsa)
+				}
+				js.mu.RUnlock()
+
+				var streams []*stream
+			Err:
+				// Walk our accounts and assets.
+				for _, jsa := range accounts {
+					if len(streams) > 0 {
+						streams = streams[:0]
+					}
+					jsa.mu.RLock()
+					accName := jsa.account.Name
+					for _, stream := range jsa.streams {
+						streams = append(streams, stream)
+					}
+					jsa.mu.RUnlock()
+					// Now walk the streams themselves.
+					js.mu.RLock()
+					for _, stream := range streams {
+						// Skip non-replicated.
+						if stream.cfg.Replicas <= 1 {
+							continue
+						}
+						sname := stream.name()
+						if !cc.isStreamCurrent(accName, sname) {
+							health.Status = "unavailable"
+							health.Error = fmt.Sprintf("JetStream stream %q for account %q is not current", sname, accName)
+							w.WriteHeader(http.StatusServiceUnavailable)
+							js.mu.RUnlock()
+							break Err
+						}
+					}
+					js.mu.RUnlock()
+				}
+			}
+		}
+	}
+
+	b, err := json.Marshal(health)
+	if err != nil {
+		s.Errorf("Error marshaling response to /healthz request: %v", err)
+	}
+
 	ResponseHandler(w, r, b)
 }

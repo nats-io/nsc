@@ -1,4 +1,4 @@
-// Copyright 2012-2021 The NATS Authors
+// Copyright 2012-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -181,77 +181,79 @@ type RemoteLeafOpts struct {
 // NOTE: This structure is no longer used for monitoring endpoints
 // and json tags are deprecated and may be removed in the future.
 type Options struct {
-	ConfigFile            string        `json:"-"`
-	ServerName            string        `json:"server_name"`
-	Host                  string        `json:"addr"`
-	Port                  int           `json:"port"`
-	ClientAdvertise       string        `json:"-"`
-	Trace                 bool          `json:"-"`
-	Debug                 bool          `json:"-"`
-	TraceVerbose          bool          `json:"-"`
-	NoLog                 bool          `json:"-"`
-	NoSigs                bool          `json:"-"`
-	NoSublistCache        bool          `json:"-"`
-	NoHeaderSupport       bool          `json:"-"`
-	DisableShortFirstPing bool          `json:"-"`
-	Logtime               bool          `json:"-"`
-	MaxConn               int           `json:"max_connections"`
-	MaxSubs               int           `json:"max_subscriptions,omitempty"`
-	MaxSubTokens          uint8         `json:"-"`
-	Nkeys                 []*NkeyUser   `json:"-"`
-	Users                 []*User       `json:"-"`
-	Accounts              []*Account    `json:"-"`
-	NoAuthUser            string        `json:"-"`
-	SystemAccount         string        `json:"-"`
-	NoSystemAccount       bool          `json:"-"`
-	AllowNewAccounts      bool          `json:"-"`
-	Username              string        `json:"-"`
-	Password              string        `json:"-"`
-	Authorization         string        `json:"-"`
-	PingInterval          time.Duration `json:"ping_interval"`
-	MaxPingsOut           int           `json:"ping_max"`
-	HTTPHost              string        `json:"http_host"`
-	HTTPPort              int           `json:"http_port"`
-	HTTPBasePath          string        `json:"http_base_path"`
-	HTTPSPort             int           `json:"https_port"`
-	AuthTimeout           float64       `json:"auth_timeout"`
-	MaxControlLine        int32         `json:"max_control_line"`
-	MaxPayload            int32         `json:"max_payload"`
-	MaxPending            int64         `json:"max_pending"`
-	Cluster               ClusterOpts   `json:"cluster,omitempty"`
-	Gateway               GatewayOpts   `json:"gateway,omitempty"`
-	LeafNode              LeafNodeOpts  `json:"leaf,omitempty"`
-	JetStream             bool          `json:"jetstream"`
-	JetStreamMaxMemory    int64         `json:"-"`
-	JetStreamMaxStore     int64         `json:"-"`
-	JetStreamDomain       string        `json:"-"`
-	JetStreamKey          string        `json:"-"`
-	StoreDir              string        `json:"-"`
-	Websocket             WebsocketOpts `json:"-"`
-	MQTT                  MQTTOpts      `json:"-"`
-	ProfPort              int           `json:"-"`
-	PidFile               string        `json:"-"`
-	PortsFileDir          string        `json:"-"`
-	LogFile               string        `json:"-"`
-	LogSizeLimit          int64         `json:"-"`
-	Syslog                bool          `json:"-"`
-	RemoteSyslog          string        `json:"-"`
-	Routes                []*url.URL    `json:"-"`
-	RoutesStr             string        `json:"-"`
-	TLSTimeout            float64       `json:"tls_timeout"`
-	TLS                   bool          `json:"-"`
-	TLSVerify             bool          `json:"-"`
-	TLSMap                bool          `json:"-"`
-	TLSCert               string        `json:"-"`
-	TLSKey                string        `json:"-"`
-	TLSCaCert             string        `json:"-"`
-	TLSConfig             *tls.Config   `json:"-"`
-	TLSPinnedCerts        PinnedCertSet `json:"-"`
-	AllowNonTLS           bool          `json:"-"`
-	WriteDeadline         time.Duration `json:"-"`
-	MaxClosedClients      int           `json:"-"`
-	LameDuckDuration      time.Duration `json:"-"`
-	LameDuckGracePeriod   time.Duration `json:"-"`
+	ConfigFile            string            `json:"-"`
+	ServerName            string            `json:"server_name"`
+	Host                  string            `json:"addr"`
+	Port                  int               `json:"port"`
+	ClientAdvertise       string            `json:"-"`
+	Trace                 bool              `json:"-"`
+	Debug                 bool              `json:"-"`
+	TraceVerbose          bool              `json:"-"`
+	NoLog                 bool              `json:"-"`
+	NoSigs                bool              `json:"-"`
+	NoSublistCache        bool              `json:"-"`
+	NoHeaderSupport       bool              `json:"-"`
+	DisableShortFirstPing bool              `json:"-"`
+	Logtime               bool              `json:"-"`
+	MaxConn               int               `json:"max_connections"`
+	MaxSubs               int               `json:"max_subscriptions,omitempty"`
+	MaxSubTokens          uint8             `json:"-"`
+	Nkeys                 []*NkeyUser       `json:"-"`
+	Users                 []*User           `json:"-"`
+	Accounts              []*Account        `json:"-"`
+	NoAuthUser            string            `json:"-"`
+	SystemAccount         string            `json:"-"`
+	NoSystemAccount       bool              `json:"-"`
+	Username              string            `json:"-"`
+	Password              string            `json:"-"`
+	Authorization         string            `json:"-"`
+	PingInterval          time.Duration     `json:"ping_interval"`
+	MaxPingsOut           int               `json:"ping_max"`
+	HTTPHost              string            `json:"http_host"`
+	HTTPPort              int               `json:"http_port"`
+	HTTPBasePath          string            `json:"http_base_path"`
+	HTTPSPort             int               `json:"https_port"`
+	AuthTimeout           float64           `json:"auth_timeout"`
+	MaxControlLine        int32             `json:"max_control_line"`
+	MaxPayload            int32             `json:"max_payload"`
+	MaxPending            int64             `json:"max_pending"`
+	Cluster               ClusterOpts       `json:"cluster,omitempty"`
+	Gateway               GatewayOpts       `json:"gateway,omitempty"`
+	LeafNode              LeafNodeOpts      `json:"leaf,omitempty"`
+	JetStream             bool              `json:"jetstream"`
+	JetStreamMaxMemory    int64             `json:"-"`
+	JetStreamMaxStore     int64             `json:"-"`
+	JetStreamDomain       string            `json:"-"`
+	JetStreamExtHint      string            `json:"-"`
+	JetStreamKey          string            `json:"-"`
+	StoreDir              string            `json:"-"`
+	JsAccDefaultDomain    map[string]string `json:"-"` // account to domain name mapping
+	Websocket             WebsocketOpts     `json:"-"`
+	MQTT                  MQTTOpts          `json:"-"`
+	ProfPort              int               `json:"-"`
+	PidFile               string            `json:"-"`
+	PortsFileDir          string            `json:"-"`
+	LogFile               string            `json:"-"`
+	LogSizeLimit          int64             `json:"-"`
+	Syslog                bool              `json:"-"`
+	RemoteSyslog          string            `json:"-"`
+	Routes                []*url.URL        `json:"-"`
+	RoutesStr             string            `json:"-"`
+	TLSTimeout            float64           `json:"tls_timeout"`
+	TLS                   bool              `json:"-"`
+	TLSVerify             bool              `json:"-"`
+	TLSMap                bool              `json:"-"`
+	TLSCert               string            `json:"-"`
+	TLSKey                string            `json:"-"`
+	TLSCaCert             string            `json:"-"`
+	TLSConfig             *tls.Config       `json:"-"`
+	TLSPinnedCerts        PinnedCertSet     `json:"-"`
+	TLSRateLimit          int64             `json:"-"`
+	AllowNonTLS           bool              `json:"-"`
+	WriteDeadline         time.Duration     `json:"-"`
+	MaxClosedClients      int               `json:"-"`
+	LameDuckDuration      time.Duration     `json:"-"`
+	LameDuckGracePeriod   time.Duration     `json:"-"`
 
 	// MaxTracedMsgLen is the maximum printable length for traced messages.
 	MaxTracedMsgLen int `json:"-"`
@@ -261,6 +263,11 @@ type Options struct {
 	TrustedOperators         []*jwt.OperatorClaims `json:"-"`
 	AccountResolver          AccountResolver       `json:"-"`
 	AccountResolverTLSConfig *tls.Config           `json:"-"`
+
+	// AlwaysEnableNonce will always present a nonce to new connections
+	// typically used by custom Authentication implementations who embeds
+	// the server and so not presented as a configuration option
+	AlwaysEnableNonce bool
 
 	CustomClientAuthentication Authentication `json:"-"`
 	CustomRouterAuthentication Authentication `json:"-"`
@@ -385,6 +392,9 @@ type MQTTOpts struct {
 	Password string
 	Token    string
 
+	// JetStream domain mqtt is supposed to pick up
+	JsDomain string
+
 	// Timeout for the authentication process.
 	AuthTimeout float64
 
@@ -503,6 +513,7 @@ type TLSConfigOpts struct {
 	Map               bool
 	TLSCheckKnownURLs bool
 	Timeout           float64
+	RateLimit         int64
 	Ciphers           []uint16
 	CurvePreferences  []tls.CurveID
 	PinnedCerts       PinnedCertSet
@@ -651,7 +662,7 @@ func configureSystemAccount(o *Options, m map[string]interface{}) (retErr error)
 // or was present but set to false.
 func (o *Options) ProcessConfigFile(configFile string) error {
 	o.ConfigFile = configFile
-	if configFile == "" {
+	if configFile == _EMPTY_ {
 		return nil
 	}
 	m, err := conf.ParseFileWithChecks(configFile)
@@ -892,6 +903,7 @@ func (o *Options) processConfigFileLine(k string, v interface{}, errors *[]error
 		o.TLSTimeout = tc.Timeout
 		o.TLSMap = tc.Map
 		o.TLSPinnedCerts = tc.PinnedCerts
+		o.TLSRateLimit = tc.RateLimit
 
 		// Need to keep track of path of the original TLS config
 		// and certs path for OCSP Stapling monitoring.
@@ -1005,7 +1017,7 @@ func (o *Options) processConfigFileLine(k string, v interface{}, errors *[]error
 				}
 			}
 			// In case "system_account" is defined as well, it takes precedence
-			if o.SystemAccount == "" {
+			if o.SystemAccount == _EMPTY_ {
 				o.SystemAccount = o.TrustedOperators[0].SystemAccount
 			}
 		}
@@ -1247,12 +1259,12 @@ func (o *Options) processConfigFileLine(k string, v interface{}, errors *[]error
 			o.Tags.Add(v...)
 		case []interface{}:
 			for _, t := range v {
-				if t, ok := t.(token); ok {
-					if t, ok := t.Value().(string); ok {
-						o.Tags.Add(t)
+				if token, ok := t.(token); ok {
+					if ts, ok := token.Value().(string); ok {
+						o.Tags.Add(ts)
 						continue
 					} else {
-						err = &configErr{tk, fmt.Sprintf("error parsing tags: unsupported type %T where string is expected", t)}
+						err = &configErr{tk, fmt.Sprintf("error parsing tags: unsupported type %T where string is expected", token)}
 					}
 				} else {
 					err = &configErr{tk, fmt.Sprintf("error parsing tags: unsupported type %T", t)}
@@ -1266,6 +1278,18 @@ func (o *Options) processConfigFileLine(k string, v interface{}, errors *[]error
 			*errors = append(*errors, err)
 			return
 		}
+	case "default_js_domain":
+		vv, ok := v.(map[string]interface{})
+		if !ok {
+			*errors = append(*errors, &configErr{tk, fmt.Sprintf("error default_js_domain config: unsupported type %T", v)})
+			return
+		}
+		m := make(map[string]string)
+		for kk, kv := range vv {
+			_, v = unwrapValue(kv, &tk)
+			m[kk] = v.(string)
+		}
+		o.JsAccDefaultDomain = m
 	default:
 		if au := atomic.LoadInt32(&allowUnknownTopLevelField); au == 0 && !tk.IsUsedVariable() {
 			err := &unknownConfigFieldErr{
@@ -1579,7 +1603,7 @@ func parseGateway(v interface{}, o *Options, errors *[]error, warnings *[]error)
 	return nil
 }
 
-var dynamicJSAccountLimits = &JetStreamAccountLimits{-1, -1, -1, -1}
+var dynamicJSAccountLimits = &JetStreamAccountLimits{-1, -1, -1, -1, false}
 
 // Parses jetstream account limits for an account. Simple setup with boolen is allowed, and we will
 // use dynamic account limits.
@@ -1604,7 +1628,7 @@ func parseJetStreamForAccount(v interface{}, acc *Account, errors *[]error, warn
 			return &configErr{tk, fmt.Sprintf("Expected 'enabled' or 'disabled' for string value, got '%s'", vv)}
 		}
 	case map[string]interface{}:
-		jsLimits := &JetStreamAccountLimits{-1, -1, -1, -1}
+		jsLimits := &JetStreamAccountLimits{-1, -1, -1, -1, false}
 		for mk, mv := range vv {
 			tk, mv = unwrapValue(mv, &lt)
 			switch strings.ToLower(mk) {
@@ -1632,6 +1656,12 @@ func parseJetStreamForAccount(v interface{}, acc *Account, errors *[]error, warn
 					return &configErr{tk, fmt.Sprintf("Expected a parseable size for %q, got %v", mk, mv)}
 				}
 				jsLimits.MaxConsumers = int(vv)
+			case "max_bytes_required", "max_stream_bytes", "max_bytes":
+				vv, ok := mv.(bool)
+				if !ok {
+					return &configErr{tk, fmt.Sprintf("Expected a parseable bool for %q, got %v", mk, mv)}
+				}
+				jsLimits.MaxBytesRequired = bool(vv)
 			default:
 				if !tk.IsUsedVariable() {
 					err := &unknownConfigFieldErr{
@@ -1650,6 +1680,40 @@ func parseJetStreamForAccount(v interface{}, acc *Account, errors *[]error, warn
 		return &configErr{tk, fmt.Sprintf("Expected map, bool or string to define JetStream, got %T", v)}
 	}
 	return nil
+}
+
+// takes in a storage size as either an int or a string and returns an int64 value based on the input.
+func getStorageSize(v interface{}) (int64, error) {
+	_, ok := v.(int64)
+	if ok {
+		return v.(int64), nil
+	}
+
+	s, ok := v.(string)
+	if !ok {
+		return 0, fmt.Errorf("must be int64 or string")
+	}
+
+	if s == "" {
+		return 0, nil
+	}
+
+	suffix := s[len(s)-1:]
+	prefix := s[:len(s)-1]
+	num, err := strconv.ParseInt(prefix, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	suffixMap := map[string]int64{"K": 10, "M": 20, "G": 30, "T": 40}
+
+	mult, ok := suffixMap[suffix]
+	if !ok {
+		return 0, fmt.Errorf("sizes defined as strings must end in K, M, G, T")
+	}
+	num *= 1 << mult
+
+	return num, nil
 }
 
 // Parse enablement of jetstream for a server.
@@ -1683,10 +1747,18 @@ func parseJetStream(v interface{}, opts *Options, errors *[]error, warnings *[]e
 				}
 				opts.StoreDir = mv.(string)
 			case "max_memory_store", "max_mem_store", "max_mem":
-				opts.JetStreamMaxMemory = mv.(int64)
+				s, err := getStorageSize(mv)
+				if err != nil {
+					return &configErr{tk, fmt.Sprintf("max_mem_store %s", err)}
+				}
+				opts.JetStreamMaxMemory = s
 				opts.maxMemSet = true
 			case "max_file_store", "max_file":
-				opts.JetStreamMaxStore = mv.(int64)
+				s, err := getStorageSize(mv)
+				if err != nil {
+					return &configErr{tk, fmt.Sprintf("max_file_store %s", err)}
+				}
+				opts.JetStreamMaxStore = s
 				opts.maxStoreSet = true
 			case "domain":
 				opts.JetStreamDomain = mv.(string)
@@ -1694,6 +1766,8 @@ func parseJetStream(v interface{}, opts *Options, errors *[]error, warnings *[]e
 				doEnable = mv.(bool)
 			case "key", "ek", "encryption_key":
 				opts.JetStreamKey = mv.(string)
+			case "extension_hint":
+				opts.JetStreamExtHint = mv.(string)
 			default:
 				if !tk.IsUsedVariable() {
 					err := &unknownConfigFieldErr{
@@ -2291,6 +2365,39 @@ func parseAccountMappings(v interface{}, acc *Account, errors *[]error, warnings
 	return nil
 }
 
+// parseAccountLimits is called to parse account limits in a server config.
+func parseAccountLimits(mv interface{}, acc *Account, errors *[]error, warnings *[]error) error {
+	var lt token
+	defer convertPanicToErrorList(&lt, errors)
+
+	tk, v := unwrapValue(mv, &lt)
+	am, ok := v.(map[string]interface{})
+	if !ok {
+		return &configErr{tk, fmt.Sprintf("Expected account limits to be a map/struct, got %+v", v)}
+	}
+
+	for k, v := range am {
+		tk, mv = unwrapValue(v, &lt)
+		switch strings.ToLower(k) {
+		case "max_connections", "max_conn":
+			acc.mconns = int32(mv.(int64))
+		case "max_subscriptions", "max_subs":
+			acc.msubs = int32(mv.(int64))
+		case "max_payload", "max_pay":
+			acc.mpay = int32(mv.(int64))
+		case "max_leafnodes", "max_leafs":
+			acc.mleafs = int32(mv.(int64))
+		default:
+			if !tk.IsUsedVariable() {
+				err := &configErr{tk, fmt.Sprintf("Unknown field %q parsing account limits", k)}
+				*errors = append(*errors, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // parseAccounts will parse the different accounts syntax.
 func parseAccounts(v interface{}, opts *Options, errors *[]error, warnings *[]error) error {
 	var (
@@ -2407,6 +2514,12 @@ func parseAccounts(v interface{}, opts *Options, errors *[]error, warnings *[]er
 					acc.defaultPerms = permissions
 				case "mappings", "maps":
 					err := parseAccountMappings(tk, acc, errors, warnings)
+					if err != nil {
+						*errors = append(*errors, err)
+						continue
+					}
+				case "limits":
+					err := parseAccountLimits(tk, acc, errors, warnings)
 					if err != nil {
 						*errors = append(*errors, err)
 						continue
@@ -2550,7 +2663,7 @@ func parseAccounts(v interface{}, opts *Options, errors *[]error, warnings *[]er
 			*errors = append(*errors, &configErr{tk, msg})
 			continue
 		}
-		if service.to == "" {
+		if service.to == _EMPTY_ {
 			service.to = service.sub
 		}
 		if err := service.acc.AddServiceImport(ta, service.to, service.sub); err != nil {
@@ -3626,6 +3739,15 @@ func parseTLS(v interface{}, isClientCtx bool) (t *TLSConfigOpts, retErr error) 
 				return nil, &configErr{tk, "error parsing tls config, 'timeout' wrong type"}
 			}
 			tc.Timeout = at
+		case "connection_rate_limit":
+			at := int64(0)
+			switch mv := mv.(type) {
+			case int64:
+				at = mv
+			default:
+				return nil, &configErr{tk, "error parsing tls config, 'connection_rate_limit' wrong type"}
+			}
+			tc.RateLimit = at
 		case "pinned_certs":
 			ra, ok := mv.([]interface{})
 			if !ok {
@@ -3882,6 +4004,8 @@ func parseMQTT(v interface{}, o *Options, errors *[]error, warnings *[]error) er
 			} else {
 				o.MQTT.MaxAckPending = uint16(tmp)
 			}
+		case "js_domain":
+			o.MQTT.JsDomain = mv.(string)
 		default:
 			if !tk.IsUsedVariable() {
 				err := &unknownConfigFieldErr{
