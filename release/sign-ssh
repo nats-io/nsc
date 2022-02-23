@@ -1,0 +1,10 @@
+#!/bin/sh -eu
+#
+# This file exists to fix the impedance mismatch between cosign running one
+# command and ssh-keygen using either a fixed conflicting filename or stdout.
+
+keyfile="${1:?need an SSH private key}"
+artifact="${2:?need a file to sign}"
+signature="${3:?need a file to create}"
+
+exec ssh-keygen -Y sign -n file -f "$keyfile" < "$artifact" > "$signature"

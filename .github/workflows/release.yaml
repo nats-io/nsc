@@ -1,0 +1,76 @@
+name: NSC client tool release
+on:
+  # We use goreleaser in release mode, so if we do a workflow_dispatch rule here then we should prompt for a tag to check out.
+  push:
+    tags:
+      # At present (2022-02) the nsc auto-updater logic requires that we name the tags without the v prefix.
+      # Obviously if we change that, we'll still have an installed base with the old logic so won't be able to start using the new naming for some time.
+      # We match on v* for consistency and with an eye to the future.
+      # To avoid random experimental tags creating releases, we use ${major}.* and ${nextmajor}.* for the rules which will actually match.
+      - 'v*'
+      - '2.*'
+      - '3.*'
+
+permissions:
+  # Control the GITHUB_TOKEN permissions; GitHub's docs on which permission scopes control what are a little lacking.
+  # By having this block, all permissions not listed here are set to none.
+  # <https://goreleaser.com/ci/actions/> documents which scopes are needed for it.
+  #
+  # Uploading archives as release artifacts is bundled into the contents: permission key.
+  # The packages: permission is for pushing docker images to github (ghcr.io) instead.
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # If we do docker image builds, multi-arch, then because goreleaser can't do image builds
+      # in the style of 'crane' or 'ko', and needs a local docker daemon, then at this point
+      # we'd set up QEMU and Buildx; in other projects, we have success using:
+      #  docker/setup-qemu-action@v1
+      #  docker/setup-buildx-action@v1
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+          check-latest: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@main
+        # This is used inside goreleaser, not as a separate step in this file
+
+      - name: Basic Go integrity checks
+        # TODO: If we switch from vendor to modules, consider a Retracted check here
+        run: |
+          go vet ./...
+
+      - name: Expose signing keys to goreleaser
+        # Ideally we'd do this after the compilation, to reduce lifetime of
+        # visibility, but that's not goreleaser's model: it's all-or-nothing.
+        # We rely upon /tmp in the builders being private.
+        run: |
+          touch /tmp/cosign.key /tmp/ssh-release-sign
+          chmod 0600 /tmp/cosign.key /tmp/ssh-release-sign
+          printf '%s\n' "${{ secrets.RELEASE_SIGNING_KEY_COSIGN }}" >> /tmp/cosign.key
+          printf '%s\n' "${{ secrets.RELEASE_SIGNING_KEY_SSH }}" >> /tmp/ssh-release-sign
+          ls -ld /tmp/cosign.key /tmp/ssh-release-sign
+
+      - name: Run GoReleaser
+        id: goreleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          distribution: goreleaser-pro
+          version: latest
+          args: release --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          COSIGN_PASSWORD: ""
+
