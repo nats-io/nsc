@@ -1,45 +1,62 @@
+# Goreleaser configuration for the nats-io/nsc tool.
+#
+# Note that while we use Goreleaser-Pro for official builds, this file should
+# avoid using Pro features if possible, to make it as easy as possible for
+# others to reproduce the builds and verify they match.
+#
+# It is an explicit goal to have reproducible builds.
+
 project_name: nsc
+
 release:
   github:
     owner: nats-io
     name: nsc
   name_template: '{{.Tag}}'
   draft: true
+
 builds:
-- id: nsc
-  main: ./main.go
-  ldflags: "-X main.version={{.Tag}}"
-  env:
-    - CGO_ENABLED=0
-  binary: nsc
-  goos:
-  - darwin
-  - linux
-  - windows
-  - freebsd
-  goarch:
-  - amd64
-  - arm64
-  - arm
-  - 386
-  goarm:
-  - 6
-  - 7
-  ignore:
-    - goos: windows
-      goarch: arm64
-    - goos: windows
-      goarch: arm
-    - goos: windows
-      goarch: 386
-    - goos: darwin
-      goarch: 386
-    - goos: freebsd
-      goarch: arm
-    - goos: freebsd
-      goarch: arm64
-    - goos: freebsd
-      goarch: 386
+  - id: nsc
+    goos:
+      - darwin
+      - linux
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - 386
+    goarm:
+      - 6
+      - 7
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: 386
+      - goos: darwin
+        goarch: 386
+      - goos: freebsd
+        goarch: arm
+      - goos: freebsd
+        goarch: arm64
+      - goos: freebsd
+        goarch: 386
+    binary: nsc
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    # reproducible builds:
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - "-trimpath"
+    # ldflags: Default is `-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser`.
+    # We switch the .Date to .CommitDate per advice at bottom of <https://goreleaser.com/customization/build/> re reproducibility.
+    ldflags:
+      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.CommitDate}} -X main.builtBy=goreleaser"
 
 dist: build
 
@@ -52,10 +69,24 @@ archives:
       - none*
 
 checksum:
-  name_template: '{{ .ProjectName }}-checksums.txt'
+  name_template: 'SHA256SUMS-{{ .ProjectName }}.txt'
 
 snapshot:
   name_template: 'dev'
+
+signs:
+  - id: cosign
+    cmd: cosign
+    args: ["sign-blob", "--key=/tmp/cosign.key", "--output-signature=${signature}", "${artifact}"]
+    signature: "${artifact}.cosign.sig"
+    artifacts: checksum
+    # We pass COSIGN_PASSWORD from GH secret through env, and cosign(1) picks up
+    # that automatically, so we don't need to pass the password on stdin.
+  - id: ssh
+    cmd: "./release/sign-ssh"
+    args: ["/tmp/ssh-release-sign", "${artifact}", "${signature}"]
+    signature: "${artifact}.ssh.sig"
+    artifacts: checksum
 
 
 brews:
@@ -72,6 +103,4 @@ brews:
       system "#{bin}/nsc --version"
     install: |
       bin.install "nsc"
-
-
 

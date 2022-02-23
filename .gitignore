@@ -8,9 +8,10 @@
 
 # Test binary, build with `go test -c`
 *.test
-build/
+/build/
 cov/
 .idea/
 .vscode/
 coverage.out
 
+/nsc

@@ -19,10 +19,22 @@ import (
 	"github.com/nats-io/nsc/cmd"
 )
 
-// the cli injects the version
-var version = "0.0.0-dev"
+// The build system should inject this data.
+// We only currently use the version, because of cobra's model, but we stamp
+// the rest into the binary so that debuggers can see it.
+var (
+	version = "0.0.0-dev"
+	commit  = ""
+	date    = ""
+	builtBy = ""
+)
 
 func main() {
 	cmd.SetVersion(version)
 	cmd.Execute()
+
+	// Silence linters
+	_ = commit
+	_ = date
+	_ = builtBy
 }
