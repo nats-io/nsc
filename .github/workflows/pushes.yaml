@@ -1,0 +1,208 @@
+name: GHA Build
+# The `name:` here is also used in badge.svg rendering as the left-hand-side
+
+# This repository is currently using vendored code and setting GO111MODULE=off
+# When ready to change, look in this file for:  MODULE-TRANSITION-FIX  oldgo_workdir
+
+permissions:
+  # Control the GITHUB_TOKEN permissions.
+  # By having this block, all permissions not listed here are set to none.
+  # Available permissions listed at:
+  #   <https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token>
+  # Which API calls need which permissions at what level, listed at:
+  #   <https://docs.github.com/en/rest/reference/permissions-required-for-github-apps>
+  #
+  contents: read
+  checks: write
+  statuses: write
+
+on:
+  push:
+    branches-ignore:
+      - 'exp'
+      - 'exp/*'
+      - 'exp-*'
+      - 'exp_*'
+      - 'wip'
+      - 'wip/*'
+      - 'wip-*'
+      - 'wip_*'
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental || false }}
+    strategy:
+      # Debugging multi-platform builds, let them all complete (for now)
+      fail-fast: false
+      matrix:
+        # It's called a matrix but in practice I'm just listing out the precise combinations we want, via include.
+        # The canonical entry is the only one where we run vet/lint/style checks.
+        # `experimental: true` entries do not cause the tests to fail.
+        include:
+          - go: '1.17.x'
+            os: ubuntu-latest
+            canonical: true
+          - go: '1.16.x'
+            os: ubuntu-latest
+            canonical: false
+          - go: '1.16.x'
+            os: windows-latest
+            canonical: false
+          - go: '1.17.x'
+            os: macos-latest
+            canonical: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          # grep-bait: MODULE-TRANSITION-FIX
+          # We're still using GO111MODULE=off so we need a checkout path; relative to $GITHUB_WORKSPACE
+          path: go/src/github.com/${{ github.repository }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+          # We're not doing releases, just checks, so we can live without check-latest here
+
+      - name: Adjust paths for old non-module Go
+        # grep-bait: MODULE-TRANSITION-FIX this entire step can go with pure modules
+        # nb: we could use working-directory: on run: steps, but we'd probably have to calculate each time?
+        run: |
+          printf >> "$GITHUB_ENV" 'GOPATH=%s/go\n' "$GITHUB_WORKSPACE"
+          printf >> "$GITHUB_ENV" 'oldgo_workdir=%s/go/src/github.com/%s\n' "$GITHUB_WORKSPACE" "$GITHUB_REPOSITORY"
+          printf >> "$GITHUB_ENV" 'GO111MODULE=off\n'
+          printf >> "$GITHUB_PATH" '%s/go/bin\n' "$GITHUB_WORKSPACE"
+        if: runner.os != 'Windows'
+
+      - name: Adjust paths for old non-module Go (Windows)
+        # grep-bait: MODULE-TRANSITION-FIX this entire step can go with pure modules
+        # nb: we could use working-directory: on run: steps, but we'd probably have to calculate each time?
+        run: |
+          printf >> "${env:GITHUB_ENV}" 'GOPATH=%s\\go\n' "${env:GITHUB_WORKSPACE}"
+          printf >> "${env:GITHUB_ENV}" 'oldgo_workdir=%s\\go\\src\\github.com\\%s\n' "${env:GITHUB_WORKSPACE}" "${env:GITHUB_REPOSITORY}"
+          printf >> "${env:GITHUB_ENV}" 'GO111MODULE=off\n'
+          printf >> "${env:GITHUB_PATH}" '%s\\go\\bin\n' "${env:GITHUB_WORKSPACE}"
+        if: runner.os == 'Windows'
+
+      - name: Export Go environment to Actions outputs
+        id: go-settings
+        run: |
+          echo "::set-output name=arch::$(go env GOARCH)"
+          echo "::set-output name=hostarch::$(go env GOHOSTARCH)"
+          echo "::set-output name=os::$(go env GOOS)"
+          echo "::set-output name=hostos::$(go env GOHOSTOS)"
+          echo "::set-output name=go-version::$(go env GOVERSION)"
+        # Use with:
+        #   ${{ steps.go-settings.outputs.go-version }}
+        # which will look like `go1.17.1` if matrix `1.17.x` matches `1.17.1`.
+        # These are independent of how the matrix is setup, or if a matrix is even used.
+        #
+        # You can see the individual values in the "Set up Go" output, collapsed inside a "go env" group at the end.
+
+      - name: Go caches
+        id: caching
+        uses: actions/cache@v2
+        with:
+          # (This bit copied from the actions/setup-go@v2 version)
+          # In order:
+          # * Module download cache
+          # * pkg area for non-module work [added by us]   grep-bait: MODULE-TRANSITION-FIX
+          # * Build cache (Linux)
+          # * Build cache (Mac)
+          # * Build cache (Windows)
+          path: |
+            ~/go/pkg/mod
+            ${{ github.workspace }}/go/pkg
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            %LocalAppData%\go-build
+          # (These bits locally modified:)
+          key: ${{ runner.os }}-${{ steps.go-settings.outputs.go-version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.go-settings.outputs.go-version }}-
+          # In theory, the caches are nowadays multi-version safe.
+          # In practice, some releases break that; users end up needing to run: go clean --modcache
+          # But we can't do that, so we just play it safe and accept that the cache is cleaned when the version of Go changes.
+
+      - name: Download all Go dependencies
+        id: dependencies-fetch
+        # nb: `go mod download` is heavyweight and extends beyond the actual dependencies
+        # nb2: we still have vendored code, so we use `-mod=readonly` to deal with that
+        # grep-bait: MODULE-TRANSITION-FIX (want -m all)
+        run: |
+          go list all
+        working-directory: ${{ env.oldgo_workdir }}
+
+      - name: Install additional check/lint tools
+        id: tools-install
+        # grep-bait: MODULE-TRANSITION-FIX (see unset
+        run: |
+          unset GO111MODULE GOPATH
+          go install github.com/mattn/goveralls@latest
+          go install github.com/wadey/gocovmerge@latest
+          go install honnef.co/go/tools/cmd/staticcheck@2021.1.2
+        if: matrix.canonical
+
+      - name: Basic Go integrity checks
+        id: integrity
+        # grep-bait: MODULE-TRANSITION-FIX
+        run: |
+          t="$(gofmt -s -l . | grep -v '^vendor/')" || true
+          if [ ".$t" != "." ]; then printf 'gofmt would modify files:\n%s\n' "$t"; exit 1; fi
+          go vet ./...
+        ## This list is spectacularly slow with a vendor tree as opposed to just "very slow"
+        # t="$(go list -m -retracted -f '{{if .Retracted}}::error file=go.mod::{{.Path}} is retracted{{end}}' all)"
+        # if [ ".$t" != "." ]; then printf '%s\n' "$t"; exit 1; fi
+        working-directory: ${{ env.oldgo_workdir }}
+        if: matrix.canonical
+
+      - name: Run Tests (with coverage enabled)
+        id: coverage
+        # nb: without go modules, the go test will fail unless we're in $GOPATH
+        # grep-bait: MODULE-TRANSITION-FIX
+        run: |
+          mkdir cov
+          echo "::group::Coverage of ./cmd"
+          go test -v -failfast -covermode=atomic -coverprofile=./cov/cmd.out ./cmd
+          echo "::endgroup::"
+          echo "::group::Coverage of ./cmd/store"
+          go test -v -failfast -covermode=atomic -coverprofile=./cov/store.out ./cmd/store
+          echo "::endgroup::"
+        working-directory: ${{ env.oldgo_workdir }}
+        if: runner.os != 'Windows'
+
+      - name: Run Tests (Windows)
+        id: wintest
+        # nb: without go modules, the go test will fail unless we're in $GOPATH
+        # grep-bait: MODULE-TRANSITION-FIX
+        # nb2: if we use the coverage approach on Windows, the -coverprofile flag appears to be looked for as a package, and I've no idea why (am not a Windows dev)
+        #   cannot find package "github.com/nats-io/nsc/cov/cmd.out" in any of:
+        #	C:\hostedtoolcache\windows\go\1.16.13\x64\src\github.com\nats-io\nsc\cov\cmd.out (from $GOROOT)
+        #	D:\a\nsc\nsc\go\src\github.com\nats-io\nsc\cov\cmd.out (from $GOPATH)
+        run: |
+          echo "::group::Testing of ./cmd"
+          go test -v -failfast ./cmd
+          echo "::endgroup::"
+          echo "::group::Testing of ./cmd/store"
+          go test -v -failfast ./cmd/store
+          echo "::endgroup::"
+        working-directory: ${{ env.oldgo_workdir }}
+        if: runner.os == 'Windows'
+
+      - name: Upload coverage results
+        id: coverage-upload
+        # grep-bait: MODULE-TRANSITION-FIX
+        run: |
+          gocovmerge ./cov/*.out > coverage.out
+          goveralls -coverprofile=coverage.out -service=github
+        working-directory: ${{ env.oldgo_workdir }}
+        env:
+          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: matrix.canonical
+
+#EOF
