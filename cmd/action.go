@@ -61,7 +61,7 @@ func NewActx(cmd *cobra.Command, args []string) (ActionCtx, error) {
 	s, err := GetStore()
 	// in the case of add operator, there might not be a store
 	if err == ErrNoOperator {
-		if cmd.Name() == "operator" && cmd.Parent().Name() == "add" {
+		if cmd.Name() == "load" || (cmd.Name() == "operator" && cmd.Parent().Name() == "add") {
 			return nil, nil
 		}
 	}

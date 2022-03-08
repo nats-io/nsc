@@ -1,24 +1,22 @@
-/*
- * Copyright 2018-2022 The NATS Authors
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright 2022 The NATS Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"reflect"
+	"net/url"
+	"os/exec"
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
@@ -49,7 +47,7 @@ func createLoadCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&params.Profile, "profile", "p", "", "profile url")
+	cmd.Flags().StringVarP(&params.resourceURL, "url", "u", "", "URL used to initialize NSC and NATS CLI env")
 	return cmd
 }
 
@@ -57,178 +55,265 @@ func init() {
 	rootCmd.AddCommand(createLoadCmd())
 }
 
+// LoadParams prepares an NSC environment and NATS Cli context based
+// on the URL of and Account seed.  Requires NATS CLI to be in PATH
+// to complete the setup of a user profile.
 type LoadParams struct {
-	Profile       string
-	nscURL        *NscURL
-	operatorName  string
-	operatorToken string
-	operatorClaim *jwt.OperatorClaims
-	accountToken  string
-	accountClaim  *jwt.AccountClaims
+	err              error
+	r                *store.Report
+	ctx              *store.Context
+	resourceURL      string
+	operatorName     string
+	operator         *jwt.OperatorClaims
+	accountName      string
+	accountSeed      string
+	accountPublicKey string
+	account          *jwt.AccountClaims
+	accountKeyPair   nkeys.KeyPair
+	username         string
+	contextName      string
 }
 
 func (p *LoadParams) SetDefaults(ctx ActionCtx) error {
-	var err error
-	p.nscURL, err = ParseNscURL(p.Profile)
+	u, err := url.Parse(p.resourceURL)
+	if err != nil {
+		return err
+	}
+	p.operatorName = u.Hostname()
+	qparams := u.Query()
+	p.accountSeed = qparams.Get("secret")
+	p.username = "default"
+	p.contextName = fmt.Sprintf("nsc-%s-%s-user", p.operatorName, p.username)
+	// TODO: Move the known operator url logic to be here.
+	// TODO: Context name to use for the credentials mapping.
 	return err
-
 }
 
-func (p *LoadParams) PreInteractive(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *LoadParams) loadOperator(r *store.Report) error {
-	var err error
-	p.operatorName, err = p.nscURL.getOperator()
+func (p *LoadParams) addOperator(ctx ActionCtx) {
+	if p.err != nil {
+		return
+	}
+	// The operator is part of the hostname
+	// nsc://synadia?secret="..."
+	//
+	ko, err := FindKnownOperator(p.operatorName)
 	if err != nil {
-		return err
+		p.err = err
+		return
 	}
-	s, err := GetConfig().LoadStore(p.operatorName)
+
+	// Fetch the Operator JWT from the URL to get its claims
+	// and setup the local store.
+	data, err := LoadFromURL(ko.AccountServerURL)
 	if err != nil {
-		// either doesn't exist or there was an error
-		ko, err := FindKnownOperator(p.operatorName)
-		if err != nil {
-			r.AddError("there was an error finding %q operator: %w", p.operatorName, err)
-			return err
-		}
-		if ko == nil {
-			r.AddError("%q is not a well known operator, import it first", p.operatorName)
-			return errors.New("operator not found")
-		}
-		data, err := LoadFromURL(ko.AccountServerURL)
-		if err != nil {
-			r.AddError("failed to load operator from %s: %w", ko.AccountServerURL, err)
-			return err
-		}
-		p.operatorToken, err = jwt.ParseDecoratedJWT(data)
-		if err != nil {
-			r.AddError("failed to parse JWT from %s: %w", ko.AccountServerURL, err)
-			return err
-		}
-		p.operatorClaim, err = jwt.DecodeOperatorClaims(p.operatorToken)
-		if err != nil {
-			r.AddError("failed to decode JWT from %s: %w", ko.AccountServerURL, err)
-			return err
-		}
-
-	} else {
-		r.AddOK("found operator %q locally", p.operatorName)
-		p.operatorClaim, err = s.ReadOperatorClaim()
-		if err != nil {
-			r.AddError("failed to read operator %w", err)
-			return fmt.Errorf("error reading operator %w", err)
-		}
+		p.err = err
+		return
 	}
-	if p.operatorClaim.Version < 2 {
-		r.AddError("unsupported operator JWT version (%d)", p.operatorClaim.Version)
-		return fmt.Errorf("bad operator version")
-	}
-	return nil
-}
-
-func (p *LoadParams) loadAccount(r *store.Report) error {
-	an, err := p.nscURL.getAccount()
+	opJWT, err := jwt.ParseDecoratedJWT(data)
 	if err != nil {
-		return err
+		p.err = err
+		return
+	}
+	operator, err := jwt.DecodeOperatorClaims(opJWT)
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.operator = operator
+	if operator.AccountServerURL == "" {
+		p.err = fmt.Errorf("error importing operator %q - it doesn't define an account server url", operator.Name)
+		return
 	}
 
-	if an == "" {
-		r.AddWarning("account was not specified")
-		return nil
-	}
-
-	var kp nkeys.KeyPair
-	// if we have an account name does it look like an nkey?
-	if strings.HasPrefix(an, "A") {
-		kp, err = nkeys.FromPublicKey(an)
-		if err != nil {
-			r.AddError("failed to parse account name as an nkey: %w", err)
-			return err
-		}
-	} else if strings.HasPrefix(an, "SA") {
-		kp, err = nkeys.FromSeed([]byte(an))
-		if err != nil {
-			r.AddError("failed to parse account name as an nkey: %w", err)
-			return err
-		}
-	}
-
-	var aidURL = ""
-	if kp != nil && !reflect.ValueOf(kp).IsNil() {
-		aid, err := kp.PublicKey()
-		if err != nil {
-			r.AddError("failed to get public key: %w", err)
-			return err
-		}
-		// https://host:port/jwt/v2/operator
-		// https://host:port/jwt/v1/accounts/<accountid>
-		aidURL = fmt.Sprintf("%s/accounts/%s", p.operatorClaim.AccountServerURL, aid)
-	}
-	if aidURL != "" {
-		data, err := LoadFromURL(aidURL)
-		if err != nil {
-			r.AddError("failed to load account from %s: %w", aidURL, err)
-			return err
-		}
-		p.accountToken, err = jwt.ParseDecoratedJWT(data)
-		if err != nil {
-			r.AddError("failed to parse JWT from %s: %w", aidURL, err)
-			return err
-		}
-		p.accountClaim, err = jwt.DecodeAccountClaims(p.accountToken)
-		if err != nil {
-			r.AddError("failed to decode JWT from %s: %w", aidURL, err)
-			return err
-		}
-
-		// check if the account exist
-		s, err := GetConfig().LoadStore(p.operatorName)
+	// Store the Operator locally.
+	var (
+		onk store.NamedKey
+		s   *store.Store
+	)
+	onk.Name = operator.Name
+	ts, err := GetConfig().LoadStore(onk.Name)
+	if err == nil {
+		tso, err := ts.ReadOperatorClaim()
 		if err == nil {
-			ac, _ := s.ReadAccountClaim(p.accountClaim.Name)
-			if ac != nil && !reflect.ValueOf(ac).IsNil() {
-				if ac.Subject == p.accountClaim.Subject {
-					r.AddError("account %q already installed as %s", ac.Subject, ac.Name)
-				}
-				if ac.Subject != p.accountClaim.Subject {
-					r.AddError("an different account %q is already installed as %s\nrename the existing account first:\nnsc rename %s <newname>", ac.Subject, ac.Name, ac.Name)
-				}
+			if tso.Subject == operator.Subject {
+				s = ts
+			} else {
+				p.err = fmt.Errorf("error a different operator named %q already exists -- specify --dir to create at a different location", onk.Name)
+				return
 			}
 		}
 	}
-	return nil
+	if s == nil {
+		s, err = store.CreateStore(onk.Name, GetConfig().StoreRoot, &onk)
+		if err != nil {
+			p.err = err
+			return
+		}
+	}
+	if err := s.StoreRaw([]byte(opJWT)); err != nil {
+		p.err = err
+	}
 }
 
-func (p *LoadParams) Load(ctx ActionCtx) error {
-	return nil
+func (p *LoadParams) addAccount(ctx ActionCtx) {
+	if p.err != nil {
+		return
+	}
+	r := p.r
+	// Take the seed and generate the public key for the Account then store it.
+	// The key is needed to be able to create local user creds as well to configure
+	// the context for the NATS CLI.
+	operator := p.operator
+	seed := p.accountSeed
+	if !strings.HasPrefix(seed, "SA") {
+		p.err = fmt.Errorf("expected account seed to initialize")
+		return
+	}
+	akp, err := nkeys.FromSeed([]byte(seed))
+	if err != nil {
+		p.err = fmt.Errorf("failed to parse account name as an nkey: %w", err)
+		return
+	}
+	p.accountKeyPair = akp
+	publicAccount, err := akp.PublicKey()
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.accountPublicKey = publicAccount
+
+	// Fetch Account JWT from URL.
+	accountURL := fmt.Sprintf("%s/accounts/%s", operator.AccountServerURL, publicAccount)
+	data, err := LoadFromURL(accountURL)
+	if err != nil {
+		p.err = err
+		return
+	}
+	accJWT, err := jwt.ParseDecoratedJWT(data)
+	if err != nil {
+		p.err = err
+		return
+	}
+	account, err := jwt.DecodeAccountClaims(accJWT)
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.account = account
+	p.accountName = account.Name
+
+	// Store the key and JWT.
+	_, err = store.StoreKey(akp)
+	if err != nil {
+		p.err = err
+		return
+	}
+	StoreAccountAndUpdateStatus(ctx, accJWT, r)
 }
 
-func (p *LoadParams) PostInteractive(ctx ActionCtx) error {
-	return nil
+func (p *LoadParams) addUser(ctx ActionCtx) {
+	if p.err != nil {
+		return
+	}
+	s := p.ctx.Store
+	r := p.r
+
+	// Check if username is already setup.
+	if s.Has(store.Accounts, p.ctx.Account.Name, store.Users, store.JwtName(p.username)) {
+		r.AddWarning("the user %q already exists", p.username)
+		return
+	}
+	kp, err := nkeys.CreatePair(nkeys.PrefixByteUser)
+	if err != nil {
+		p.err = err
+		return
+	}
+	pub, err := kp.PublicKey()
+	if err != nil {
+		p.err = err
+		return
+	}
+	uc := jwt.NewUserClaims(pub)
+	uc.Name = p.username
+	uc.SetScoped(signerKeyIsScoped(ctx, p.accountName, p.accountKeyPair))
+	userJWT, err := uc.Encode(p.accountKeyPair)
+	if err != nil {
+		p.err = err
+		return
+	}
+	st, err := ctx.StoreCtx().Store.StoreClaim([]byte(userJWT))
+	if st != nil {
+		r.Add(st)
+	}
+	if err != nil {
+		p.r.AddFromError(err)
+		p.err = err
+		return
+	}
+	_, err = ctx.StoreCtx().KeyStore.Store(kp)
+	if err != nil {
+		p.err = err
+		return
+	}
+	r.AddOK("generated and stored user key %q", uc.Subject)
+
+	// Store user credentials.
+	userSeed, err := kp.Seed()
+	if err != nil {
+		p.err = err
+	}
+	creds, err := jwt.FormatUserConfig(userJWT, userSeed)
+	if err != nil {
+		p.err = err
+		return
+	}
+	ks := ctx.StoreCtx().KeyStore
+	path, err := ks.MaybeStoreUserCreds(p.accountName, p.username, creds)
+	if err != nil {
+		p.err = err
+		return
+	}
+	r.AddOK("generated and stored user credentials at %q", path)
 }
 
-func (p *LoadParams) Validate(ctx ActionCtx) error {
-	return nil
+func (p *LoadParams) configureCLI(ctx ActionCtx) {
+	path, err := exec.LookPath("natscli")
+	if err != nil {
+		p.err = fmt.Errorf("cannot find 'natscli' in user path")
+		return
+	}
+
+	cmd := exec.Command(
+		path,
+		"context",
+		"save",
+		p.contextName,
+		"--nsc",
+		fmt.Sprintf("nsc://%s/%s/%s", p.operator.Name, p.account.Name, p.username),
+	)
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		p.err = fmt.Errorf("nsc invoke failed: %s", err)
+		return
+	}
 }
 
 func (p *LoadParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
-	if err := p.loadOperator(r); err != nil {
-		return r, err
+	p.r = r
+	p.ctx = ctx.StoreCtx()
+	p.addOperator(ctx)
+	p.addAccount(ctx)
+	p.addUser(ctx)
+	p.configureCLI(ctx)
+	if p.err != nil {
+		return nil, p.err
 	}
-	if err := p.loadAccount(r); err != nil {
-		return r, err
-	}
-	// add the operator
-	// add the account
-	// store the key
-	// add a user
-	// create a nats cli profile that references this profile
-	// print a message that shows:
-	// to test your configuration try:
-	// nsc publish -a <account name> hello world
-	// or
-	// nats profile select "account name"
-	// nats pub hello world
+	r.AddOK("created nats context %q", p.contextName)
 	return r, nil
 }
+
+func (p *LoadParams) PreInteractive(ctx ActionCtx) error  { return nil }
+func (p *LoadParams) Load(ctx ActionCtx) error            { return nil }
+func (p *LoadParams) PostInteractive(ctx ActionCtx) error { return nil }
+func (p *LoadParams) Validate(ctx ActionCtx) error        { return nil }

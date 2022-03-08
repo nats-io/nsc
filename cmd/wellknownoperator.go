@@ -35,9 +35,15 @@ type KnownOperators []KnownOperator
 var wellKnownOperators KnownOperators
 
 func defaultWellKnownOperators() KnownOperators {
-	return KnownOperators{
+	list := []KnownOperator{
 		{Name: "synadia", URL: "https://www.synadia.com", AccountServerURL: "https://api.synadia.io/jwt/v2/synadia"},
 	}
+	if os.Getenv("NSC_DEV") != "" {
+		dev := KnownOperator{Name: "localhost", URL: "http://localhost", AccountServerURL: "http://localhost:9090/jwt/v1/operator"}
+		list = append(list, dev)
+	}
+
+	return KnownOperators(list)
 }
 
 func GetWellKnownOperators() (KnownOperators, error) {
