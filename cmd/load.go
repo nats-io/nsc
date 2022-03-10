@@ -22,6 +22,7 @@ import (
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/home"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +32,11 @@ func createLoadCmd() *cobra.Command {
 		Use:   "load",
 		Short: "install entities for an operator, account and key",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Note: Need to initialize the operator and environment
+			// before the RunAction command since that is dependent
+			// on an operator being available.
+			params.setupHomeDir()
+			params.addOperator()
 			err := RunAction(cmd, args, &params)
 			if err != nil {
 				switch err.Error() {
@@ -78,11 +84,42 @@ type LoadParams struct {
 	contextName      string
 }
 
-func (p *LoadParams) SetDefaults(ctx ActionCtx) error {
+func (p *LoadParams) setupHomeDir() {
+	tc := GetConfig()
+	sr := tc.StoreRoot
+	if sr == "" {
+		sr = home.NscDataHome(home.StoresSubDirName)
+	}
+
+	sr, err := Expand(sr)
+	if err != nil {
+		p.err = err
+		return
+	}
+	if err := MaybeMakeDir(sr); err != nil {
+		p.err = err
+		return
+	}
+	if err := tc.ContextConfig.setStoreRoot(sr); err != nil {
+		p.err = err
+		return
+	}
+	if err := tc.Save(); err != nil {
+		p.err = err
+		return
+	}
+}
+
+func (p *LoadParams) addOperator() {
+	if p.err != nil {
+		return
+	}
+	fmt.Println(p.resourceURL)
 	if p.resourceURL != "" {
 		u, err := url.Parse(p.resourceURL)
 		if err != nil {
-			return err
+			p.err = err
+			return
 		}
 		p.operatorName = u.Hostname()
 		qparams := u.Query()
@@ -93,20 +130,16 @@ func (p *LoadParams) SetDefaults(ctx ActionCtx) error {
 		}
 		ko, err := FindKnownOperator(p.operatorName)
 		if err != nil {
-			return err
+			p.err = err
+			return
 		}
 		p.accountServerURL = ko.AccountServerURL
 	}
 	if p.accountServerURL == "" {
-		return fmt.Errorf("missing account server URL")
-	}
-	return nil
-}
-
-func (p *LoadParams) addOperator(ctx ActionCtx) {
-	if p.err != nil {
+		p.err = fmt.Errorf("missing account server URL")
 		return
 	}
+
 	// Fetch the Operator JWT from the URL to get its claims
 	// and setup the local store.
 	data, err := LoadFromURL(p.accountServerURL)
@@ -308,11 +341,14 @@ func (p *LoadParams) configureCLI(ctx ActionCtx) {
 	}
 }
 
+// Run executes the load profile command.
 func (p *LoadParams) Run(ctx ActionCtx) (store.Status, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
 	r := store.NewDetailedReport(false)
 	p.r = r
 	p.ctx = ctx.StoreCtx()
-	p.addOperator(ctx)
 	p.addAccount(ctx)
 	p.addUser(ctx)
 	p.configureCLI(ctx)
@@ -323,6 +359,7 @@ func (p *LoadParams) Run(ctx ActionCtx) (store.Status, error) {
 	return r, nil
 }
 
+func (p *LoadParams) SetDefaults(ctx ActionCtx) error     { return nil }
 func (p *LoadParams) PreInteractive(ctx ActionCtx) error  { return nil }
 func (p *LoadParams) Load(ctx ActionCtx) error            { return nil }
 func (p *LoadParams) PostInteractive(ctx ActionCtx) error { return nil }
