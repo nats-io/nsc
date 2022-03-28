@@ -34,14 +34,14 @@ func createProfileCmd() *cobra.Command {
 		Use:   "profile",
 		Short: "Generate a profile from nsc 'URL' that can be used by tooling",
 		Example: `profile nsc://operator
-resolve nsc://operator/account
-resolve nsc://operator/account/user
-resolve nsc://operator/account/user?operatorSeed&accountSeed&userSeed
-resolve nsc://operator/account/user?operatorKey&accountKey&userKey
-resolve nsc://operator?key&seed
-resolve nsc://operator/account?key&seed
-resolve nsc://operator/account/user?key&seed
-resolve nsc://operator/account/user?store=/a/.nsc/nats&keystore=/foo/.nkeys
+profile nsc://operator/account
+profile nsc://operator/account/user
+profile nsc://operator/account/user?operatorSeed&accountSeed&userSeed
+profile nsc://operator/account/user?operatorKey&accountKey&userKey
+profile nsc://operator?key&seed
+profile nsc://operator/account?key&seed
+profile nsc://operator/account/user?key&seed
+profile nsc://operator/account/user?store=/a/.nsc/nats&keystore=/foo/.nkeys
 
 Output of the program looks like:
 {
