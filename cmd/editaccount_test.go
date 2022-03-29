@@ -132,7 +132,6 @@ func Test_EditAccountLimits(t *testing.T) {
 	require.Equal(t, int64(6), ac.Limits.Consumer)
 	require.Equal(t, int64(7), ac.Limits.DiskStorage)
 	require.Equal(t, int64(8), ac.Limits.MemoryStorage)
-	require.Equal(t, int64(90), ac.Limits.HaResources)
 }
 
 func Test_EditAccountSigningKeys(t *testing.T) {

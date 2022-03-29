@@ -100,11 +100,7 @@ func (a *AccountDescriber) Describe() string {
 
 	AddPermissions(table, a.DefaultPermissions)
 
-	table.AddSeparator()
-	if a.Limits.DiskStorage == 0 && a.Limits.MemoryStorage == 0 {
-		table.AddRow("Jetstream", "Disabled")
-	} else {
-		table.AddRow("Jetstream", "Enabled")
+	printJsLimit := func(lim jwt.JetStreamLimits) {
 		switch {
 		case lim.DiskStorage > 0:
 			table.AddRow("Max Disk Storage", humanize.Bytes(uint64(lim.DiskStorage)))
@@ -123,7 +119,32 @@ func (a *AccountDescriber) Describe() string {
 		}
 		addLimitRow(table, "Max Streams", lim.Streams, false)
 		addLimitRow(table, "Max Consumer", lim.Consumer, false)
-		addLimitRow(table, "Max High Availability Resources", lim.HaResources, false)
+		maxBytes := "optional (Stream setting)"
+		if lim.MaxBytesRequired {
+			maxBytes = "required (Stream setting)"
+		}
+		table.AddRow("Max Bytes", maxBytes)
+
+		addLimitRow(table, "Max Memory Stream", lim.MemoryMaxStreamBytes, true)
+		addLimitRow(table, "Max Disk Stream", lim.DiskMaxStreamBytes, true)
+	}
+
+	table.AddSeparator()
+	if !a.Limits.IsJSEnabled() {
+		table.AddRow("Jetstream", "Disabled")
+	} else if len(a.Limits.JetStreamTieredLimits) == 0 {
+		table.AddRow("Jetstream", "Enabled")
+		printJsLimit(a.Limits.JetStreamLimits)
+	} else {
+		remaining := len(a.Limits.JetStreamTieredLimits)
+		for tier, lim := range a.Limits.JetStreamTieredLimits {
+			table.AddRow("Jetstream Tier", tier)
+			printJsLimit(lim)
+			remaining--
+			if remaining != 0 {
+				table.AddSeparator()
+			}
+		}
 	}
 
 	table.AddSeparator()

@@ -220,10 +220,6 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.consumer = NumberParams(p.claim.Limits.Consumer)
 	}
 
-	if !ctx.CurrentCmd().Flags().Changed("js-ha-resources") {
-		p.haResources = NumberParams(p.claim.Limits.HaResources)
-	}
-
 	if !ctx.CurrentCmd().Flags().Changed("description") {
 		p.description = p.claim.Description
 	}
@@ -425,11 +421,6 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Consumer = p.consumer.Int64()
 	if flags.Changed("consumer") || flags.Changed("js-consumer") {
 		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
-	}
-
-	p.claim.Limits.HaResources = p.haResources.Int64()
-	if flags.Changed("js-ha-resources") {
-		r.AddOK("changed high availability resources to %d", p.claim.Limits.HaResources)
 	}
 
 	p.claim.Description = p.description
