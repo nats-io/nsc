@@ -191,3 +191,29 @@ func TestDescribeAccount_JsonPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)
 }
+
+func TestDescribeAccount_JSTiers(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Service, "q", true)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	ac.Limits.JetStreamTieredLimits = jwt.JetStreamTieredLimits{}
+	ac.Limits.JetStreamTieredLimits["R1"] = jwt.JetStreamLimits{
+		DiskStorage: 1024, Streams: 10, MaxBytesRequired: true, DiskMaxStreamBytes: 512}
+	ac.Limits.JetStreamTieredLimits["R3"] = jwt.JetStreamLimits{
+		MemoryStorage: 1024, Streams: 10, MaxBytesRequired: false, MemoryMaxStreamBytes: 512}
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	_, err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+
+	out, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
+	require.NoError(t, err)
+	require.Contains(t, out, " | R1")
+	require.Contains(t, out, " | R3")
+	require.Contains(t, out, " | required")
+	require.Contains(t, out, " | optional")
+}
