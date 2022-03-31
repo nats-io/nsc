@@ -119,6 +119,7 @@ func (a *AccountDescriber) Describe() string {
 		}
 		addLimitRow(table, "Max Streams", lim.Streams, false)
 		addLimitRow(table, "Max Consumer", lim.Consumer, false)
+		addLimitRow(table, "Max Ack Pending", lim.MaxAckPending, false)
 		maxBytes := "optional (Stream setting)"
 		if lim.MaxBytesRequired {
 			maxBytes = "required (Stream setting)"

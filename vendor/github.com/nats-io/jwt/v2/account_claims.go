@@ -55,6 +55,7 @@ type JetStreamLimits struct {
 	DiskStorage          int64 `json:"disk_storage,omitempty"`          // Max number of bytes stored on disk across all streams. (0 means disabled)
 	Streams              int64 `json:"streams,omitempty"`               // Max number of streams
 	Consumer             int64 `json:"consumer,omitempty"`              // Max number of consumers
+	MaxAckPending        int64 `json:"max_ack_pending,omitempty"`       // Max ack pending of a Stream
 	MemoryMaxStreamBytes int64 `json:"mem_max_stream_bytes,omitempty"`  // Max bytes a memory backed stream can have. (0 means disabled/unlimited)
 	DiskMaxStreamBytes   int64 `json:"disk_max_stream_bytes,omitempty"` // Max bytes a disk backed stream can have. (0 means disabled/unlimited)
 	MaxBytesRequired     bool  `json:"max_bytes_required,omitempty"`    // Max bytes required by all Streams
@@ -70,7 +71,10 @@ func (j *JetStreamLimits) IsUnlimited() bool {
 	if lim.DiskMaxStreamBytes < 0 {
 		lim.DiskMaxStreamBytes = 0
 	}
-	return lim == JetStreamLimits{NoLimit, NoLimit, NoLimit, NoLimit, 0, 0, false}
+	if lim.MaxAckPending < 0 {
+		lim.MaxAckPending = 0
+	}
+	return lim == JetStreamLimits{NoLimit, NoLimit, NoLimit, NoLimit, 0, 0, 0, false}
 }
 
 type JetStreamTieredLimits map[string]JetStreamLimits
@@ -228,7 +232,7 @@ func NewAccountClaims(subject string) *AccountClaims {
 	c.Limits = OperatorLimits{
 		NatsLimits{NoLimit, NoLimit, NoLimit},
 		AccountLimits{NoLimit, NoLimit, true, NoLimit, NoLimit},
-		JetStreamLimits{0, 0, 0, 0, 0, 0, false},
+		JetStreamLimits{0, 0, 0, 0, 0, 0, 0, false},
 		JetStreamTieredLimits{},
 	}
 	c.Subject = subject
