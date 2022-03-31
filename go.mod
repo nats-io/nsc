@@ -11,8 +11,8 @@ require (
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jwt v1.2.2
 	github.com/nats-io/jwt/v2 v2.2.1-0.20220330180145-442af02fd36a
-	github.com/nats-io/nats-server/v2 v2.6.4
-	github.com/nats-io/nats.go v1.13.1-0.20211018182449-f2416a8b1483
+	github.com/nats-io/nats-server/v2 v2.7.4
+	github.com/nats-io/nats.go v1.13.1-0.20220308171302-2f2f6968e98d
 	github.com/nats-io/nkeys v0.3.0
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/gomega v1.4.3 // indirect
@@ -23,7 +23,6 @@ require (
 	github.com/ulikunitz/xz v0.5.8 // indirect
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
-	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 

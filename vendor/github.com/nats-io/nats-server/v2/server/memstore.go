@@ -27,7 +27,6 @@ type memStore struct {
 	cfg       StreamConfig
 	state     StreamState
 	msgs      map[uint64]*storedMsg
-	dmap      map[uint64]struct{}
 	fss       map[string]*SimpleState
 	maxp      int64
 	scb       StorageUpdateHandler
@@ -53,7 +52,6 @@ func newMemStore(cfg *StreamConfig) (*memStore, error) {
 	ms := &memStore{
 		msgs: make(map[uint64]*storedMsg),
 		fss:  make(map[string]*SimpleState),
-		dmap: make(map[uint64]struct{}),
 		maxp: cfg.MaxMsgsPer,
 		cfg:  *cfg,
 	}
@@ -97,17 +95,31 @@ func (ms *memStore) storeRawMsg(subj string, hdr, msg []byte, seq uint64, ts int
 		return ErrStoreClosed
 	}
 
+	// Tracking by subject.
+	var ss *SimpleState
+	var asl bool
+	if len(subj) > 0 {
+		if ss = ms.fss[subj]; ss != nil {
+			asl = ms.maxp > 0 && ss.Msgs >= uint64(ms.maxp)
+		}
+	}
+
 	// Check if we are discarding new messages when we reach the limit.
 	if ms.cfg.Discard == DiscardNew {
 		if ms.cfg.MaxMsgs > 0 && ms.state.Msgs >= uint64(ms.cfg.MaxMsgs) {
-			return ErrMaxMsgs
+			// If we are tracking max messages per subject and are at the limit we will replace, so this is ok.
+			if !asl {
+				return ErrMaxMsgs
+			}
 		}
 		if ms.cfg.MaxBytes > 0 && ms.state.Bytes+uint64(len(msg)+len(hdr)) >= uint64(ms.cfg.MaxBytes) {
-			return ErrMaxBytes
-		}
-		if ms.maxp > 0 && len(subj) > 0 {
-			if ss := ms.fss[subj]; ss != nil && ss.Msgs >= uint64(ms.maxp) {
-				return ErrMaxMsgsPerSubject
+			if !asl {
+				return ErrMaxBytes
+			}
+			// If we are here we are at a subject maximum, need to determine if dropping last message gives us enough room.
+			sm, ok := ms.msgs[ss.First]
+			if !ok || memStoreMsgSize(sm.subj, sm.hdr, sm.msg) < uint64(len(msg)+len(hdr)) {
+				return ErrMaxBytes
 			}
 		}
 	}
@@ -126,13 +138,13 @@ func (ms *memStore) storeRawMsg(subj string, hdr, msg []byte, seq uint64, ts int
 		ms.state.FirstTime = now
 	}
 
-	// Make copies - https://github.com/go101/go101/wiki
+	// Make copies
 	// TODO(dlc) - Maybe be smarter here.
 	if len(msg) > 0 {
-		msg = append(msg[:0:0], msg...)
+		msg = copyBytes(msg)
 	}
 	if len(hdr) > 0 {
-		hdr = append(hdr[:0:0], hdr...)
+		hdr = copyBytes(hdr)
 	}
 
 	ms.msgs[seq] = &storedMsg{subj, hdr, msg, seq, ts}
@@ -143,7 +155,7 @@ func (ms *memStore) storeRawMsg(subj string, hdr, msg []byte, seq uint64, ts int
 
 	// Track per subject.
 	if len(subj) > 0 {
-		if ss := ms.fss[subj]; ss != nil {
+		if ss != nil {
 			ss.Msgs++
 			ss.Last = seq
 			// Check per subject limits.
@@ -475,7 +487,6 @@ func (ms *memStore) Purge() (uint64, error) {
 	ms.state.Msgs = 0
 	ms.msgs = make(map[uint64]*storedMsg)
 	ms.fss = make(map[string]*SimpleState)
-	ms.dmap = make(map[uint64]struct{})
 	ms.mu.Unlock()
 
 	if cb != nil {
@@ -511,8 +522,6 @@ func (ms *memStore) Compact(seq uint64) (uint64, error) {
 				bytes += memStoreMsgSize(sm.subj, sm.hdr, sm.msg)
 				purged++
 				delete(ms.msgs, seq)
-			} else {
-				delete(ms.dmap, seq)
 			}
 		}
 		ms.state.Msgs -= purged
@@ -554,8 +563,6 @@ func (ms *memStore) Truncate(seq uint64) error {
 			purged++
 			bytes += memStoreMsgSize(sm.subj, sm.hdr, sm.msg)
 			delete(ms.msgs, seq)
-		} else {
-			delete(ms.dmap, i)
 		}
 	}
 	// Reset last.
@@ -621,6 +628,61 @@ func (ms *memStore) LoadLastMsg(subject string) (subj string, seq uint64, hdr, m
 	return sm.subj, sm.seq, sm.hdr, sm.msg, sm.ts, nil
 }
 
+// LoadNextMsg will find the next message matching the filter subject starting at the start sequence.
+// The filter subject can be a wildcard.
+func (ms *memStore) LoadNextMsg(filter string, wc bool, start uint64) (subj string, seq uint64, hdr, msg []byte, ts int64, err error) {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	if start < ms.state.FirstSeq {
+		start = ms.state.FirstSeq
+	}
+
+	// If past the end no results.
+	if start > ms.state.LastSeq {
+		return _EMPTY_, ms.state.LastSeq, nil, nil, 0, ErrStoreEOF
+	}
+
+	isAll := filter == _EMPTY_ || filter == fwcs
+	subs := []string{filter}
+	if wc || isAll {
+		subs = subs[:0]
+		for fsubj := range ms.fss {
+			if isAll || subjectIsSubsetMatch(fsubj, filter) {
+				subs = append(subs, fsubj)
+			}
+		}
+	}
+	fseq, lseq := ms.state.LastSeq, uint64(0)
+	for _, subj := range subs {
+		ss := ms.fss[subj]
+		if ss == nil {
+			continue
+		}
+		if ss.First < fseq {
+			fseq = ss.First
+		}
+		if ss.Last > lseq {
+			lseq = ss.Last
+		}
+	}
+	if fseq < start {
+		fseq = start
+	}
+
+	eq := subjectsEqual
+	if wc {
+		eq = subjectIsSubsetMatch
+	}
+
+	for nseq := fseq; nseq <= lseq; nseq++ {
+		if sm, ok := ms.msgs[nseq]; ok && (isAll || eq(sm.subj, filter)) {
+			return sm.subj, nseq, sm.hdr, sm.msg, sm.ts, nil
+		}
+	}
+	return _EMPTY_, ms.state.LastSeq, nil, nil, 0, ErrStoreEOF
+}
+
 // RemoveMsg will remove the message from this store.
 // Will return the number of bytes removed.
 func (ms *memStore) RemoveMsg(seq uint64) (bool, error) {
@@ -643,13 +705,11 @@ func (ms *memStore) EraseMsg(seq uint64) (bool, error) {
 func (ms *memStore) updateFirstSeq(seq uint64) {
 	if seq != ms.state.FirstSeq {
 		// Interior delete.
-		ms.dmap[seq] = struct{}{}
 		return
 	}
 	var nsm *storedMsg
 	var ok bool
 	for nseq := ms.state.FirstSeq + 1; nseq <= ms.state.LastSeq; nseq++ {
-		delete(ms.dmap, nseq)
 		if nsm, ok = ms.msgs[nseq]; ok {
 			break
 		}
@@ -661,7 +721,6 @@ func (ms *memStore) updateFirstSeq(seq uint64) {
 		// Like purge.
 		ms.state.FirstSeq = ms.state.LastSeq + 1
 		ms.state.FirstTime = time.Time{}
-		ms.dmap = make(map[uint64]struct{})
 	}
 }
 
@@ -681,10 +740,10 @@ func (ms *memStore) removeSeqPerSubject(subj string, seq uint64) {
 		return
 	}
 	// TODO(dlc) - Might want to optimize this.
-	for tseq := seq + 1; tseq < ss.Last; tseq++ {
+	for tseq := seq + 1; tseq <= ss.Last; tseq++ {
 		if sm := ms.msgs[tseq]; sm != nil && sm.subj == subj {
 			ss.First = tseq
-			return
+			break
 		}
 	}
 }
@@ -737,31 +796,46 @@ func (ms *memStore) Type() StorageType {
 }
 
 // FastState will fill in state with only the following.
-// Msgs, Bytes, FirstSeq, LastSeq
+// Msgs, Bytes, First and Last Sequence and Time and NumDeleted.
 func (ms *memStore) FastState(state *StreamState) {
 	ms.mu.RLock()
 	state.Msgs = ms.state.Msgs
 	state.Bytes = ms.state.Bytes
 	state.FirstSeq = ms.state.FirstSeq
+	state.FirstTime = ms.state.FirstTime
 	state.LastSeq = ms.state.LastSeq
+	state.LastTime = ms.state.LastTime
+	if state.LastSeq > state.FirstSeq {
+		state.NumDeleted = int((state.LastSeq - state.FirstSeq) - state.Msgs + 1)
+	}
+	state.Consumers = ms.consumers
+	state.NumSubjects = len(ms.fss)
 	ms.mu.RUnlock()
 }
 
 func (ms *memStore) State() StreamState {
 	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
 	state := ms.state
 	state.Consumers = ms.consumers
+	state.NumSubjects = len(ms.fss)
 	state.Deleted = nil
-	for seq := range ms.dmap {
-		state.Deleted = append(state.Deleted, seq)
+
+	// Calculate interior delete details.
+	if state.LastSeq > state.FirstSeq {
+		state.NumDeleted = int((state.LastSeq - state.FirstSeq) - state.Msgs + 1)
+		if state.NumDeleted > 0 {
+			state.Deleted = make([]uint64, 0, state.NumDeleted)
+			// TODO(dlc) - Too Simplistic, once state is updated to allow runs etc redo.
+			for seq := state.FirstSeq + 1; seq < ms.state.LastSeq; seq++ {
+				if _, ok := ms.msgs[seq]; !ok {
+					state.Deleted = append(state.Deleted, seq)
+				}
+			}
+		}
 	}
-	ms.mu.RUnlock()
-	if len(state.Deleted) > 0 {
-		sort.Slice(state.Deleted, func(i, j int) bool {
-			return state.Deleted[i] < state.Deleted[j]
-		})
-		state.NumDeleted = len(state.Deleted)
-	}
+
 	return state
 }
 
@@ -820,11 +894,10 @@ func (ms *memStore) Snapshot(_ time.Duration, _, _ bool) (*SnapshotResult, error
 }
 
 // No-ops.
-func (os *consumerMemStore) Update(_ *ConsumerState) error { return nil }
-
+func (os *consumerMemStore) Update(_ *ConsumerState) error                 { return nil }
 func (os *consumerMemStore) UpdateDelivered(_, _, _ uint64, _ int64) error { return nil }
-
-func (os *consumerMemStore) UpdateAcks(_, _ uint64) error { return nil }
+func (os *consumerMemStore) UpdateAcks(_, _ uint64) error                  { return nil }
+func (os *consumerMemStore) UpdateConfig(_ *ConsumerConfig) error          { return nil }
 
 func (os *consumerMemStore) Stop() error {
 	os.ms.decConsumers()
