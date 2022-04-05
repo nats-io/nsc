@@ -155,10 +155,10 @@ func (p *LoadParams) addOperator() error {
 		return err
 	}
 	p.operator = operator
-	p.contextName = fmt.Sprintf("nsc-%s-%s-user", p.operator.Name, p.username)
+	p.contextName = fmt.Sprintf("nsc-%s-%s-user", p.operatorName, p.username)
 
 	if operator.AccountServerURL == "" {
-		return fmt.Errorf("error importing operator %q - it doesn't define an account server url", operator.Name)
+		return fmt.Errorf("error importing operator %q - it doesn't define an account server url", p.operatorName)
 	}
 
 	// Store the Operator locally.
@@ -166,7 +166,7 @@ func (p *LoadParams) addOperator() error {
 		onk store.NamedKey
 		s   *store.Store
 	)
-	onk.Name = operator.Name
+	onk.Name = p.operatorName
 	ts, err := GetConfig().LoadStore(onk.Name)
 	if err == nil {
 		tso, err := ts.ReadOperatorClaim()
@@ -299,14 +299,14 @@ func (p *LoadParams) configureCLI(ctx ActionCtx) error {
 	if err != nil {
 		return fmt.Errorf("cannot find 'natscli' in user path")
 	}
-
+	resourceURI := fmt.Sprintf("nsc://%s/%s/%s", p.operatorName, p.account.Name, p.username)
 	cmd := exec.Command(
 		path,
 		"context",
 		"save",
 		p.contextName,
 		"--nsc",
-		fmt.Sprintf("nsc://%s/%s/%s", p.operator.Name, p.account.Name, p.username),
+		resourceURI,
 	)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
