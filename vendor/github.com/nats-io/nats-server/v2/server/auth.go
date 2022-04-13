@@ -42,14 +42,16 @@ type Authentication interface {
 
 // ClientAuthentication is an interface for client authentication
 type ClientAuthentication interface {
-	// Get options associated with a client
+	// GetOpts gets options associated with a client
 	GetOpts() *ClientOpts
-	// If TLS is enabled, TLS ConnectionState, nil otherwise
+	// GetTLSConnectionState if TLS is enabled, TLS ConnectionState, nil otherwise
 	GetTLSConnectionState() *tls.ConnectionState
-	// Optionally map a user after auth.
+	// RegisterUser optionally map a user after auth.
 	RegisterUser(*User)
 	// RemoteAddress expose the connection information of the client
 	RemoteAddress() net.Addr
+	// GetNonce is the nonce presented to the user in the INFO line
+	GetNonce() []byte
 	// Kind indicates what type of connection this is matching defined constants like CLIENT, ROUTER, GATEWAY, LEAF etc
 	Kind() int
 }
@@ -169,16 +171,19 @@ func (p *Permissions) clone() *Permissions {
 // Lock is assumed held.
 func (s *Server) checkAuthforWarnings() {
 	warn := false
-	if s.opts.Password != "" && !isBcrypt(s.opts.Password) {
+	if s.opts.Password != _EMPTY_ && !isBcrypt(s.opts.Password) {
 		warn = true
 	}
 	for _, u := range s.users {
 		// Skip warn if using TLS certs based auth
 		// unless a password has been left in the config.
-		if u.Password == "" && s.opts.TLSMap {
+		if u.Password == _EMPTY_ && s.opts.TLSMap {
 			continue
 		}
-
+		// Check if this is our internal sys client created on the fly.
+		if s.sysAccOnlyNoAuthUser != _EMPTY_ && u.Username == s.sysAccOnlyNoAuthUser {
+			continue
+		}
 		if !isBcrypt(u.Password) {
 			warn = true
 			break
@@ -483,10 +488,10 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 				if u != _EMPTY_ {
 					usr, ok := s.users[u]
 					if !ok || !c.connectionTypeAllowed(usr.AllowedConnectionTypes) {
-						return _EMPTY_, ok
+						return _EMPTY_, false
 					}
 					user = usr
-					return usr.Username, ok
+					return usr.Username, true
 				}
 
 				if certDN == nil {
@@ -536,7 +541,8 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 			// but we set it here to be able to identify it in the logs.
 			c.opts.Username = user.Username
 		} else {
-			if (c.kind == CLIENT || c.kind == LEAF) && c.opts.Username == _EMPTY_ && noAuthUser != _EMPTY_ {
+			if (c.kind == CLIENT || c.kind == LEAF) && noAuthUser != _EMPTY_ &&
+				c.opts.Username == _EMPTY_ && c.opts.Password == _EMPTY_ && c.opts.Token == _EMPTY_ {
 				if u, exists := s.users[noAuthUser]; exists {
 					c.mu.Lock()
 					c.opts.Username = u.Username
@@ -668,6 +674,28 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 		if err := c.RegisterNkeyUser(nkey); err != nil {
 			return false
 		}
+
+		// Warn about JetStream restrictions
+		if c.perms != nil {
+			deniedPub := []string{}
+			deniedSub := []string{}
+			for _, sub := range denyAllJs {
+				if c.perms.pub.deny != nil {
+					if r := c.perms.pub.deny.Match(sub); len(r.psubs)+len(r.qsubs) > 0 {
+						deniedPub = append(deniedPub, sub)
+					}
+				}
+				if c.perms.sub.deny != nil {
+					if r := c.perms.sub.deny.Match(sub); len(r.psubs)+len(r.qsubs) > 0 {
+						deniedSub = append(deniedSub, sub)
+					}
+				}
+			}
+			if len(deniedPub) > 0 || len(deniedSub) > 0 {
+				c.Noticef("Connected %s has JetStream denied on pub: %v sub: %v", c.kindString(), deniedPub, deniedSub)
+			}
+		}
+
 		// Hold onto the user's public key.
 		c.mu.Lock()
 		c.pubKey = juc.Subject
@@ -680,8 +708,8 @@ func (s *Server) processClientOrLeafAuthentication(c *client, opts *Options) boo
 
 		acc.mu.RLock()
 		c.Debugf("Authenticated JWT: %s %q (claim-name: %q, claim-tags: %q) "+
-			"signed with %q by Account %q (claim-name: %q, claim-tags: %q) signed with %q",
-			c.kindString(), juc.Subject, juc.Name, juc.Tags, juc.Issuer, issuer, acc.nameTag, acc.tags, acc.Issuer)
+			"signed with %q by Account %q (claim-name: %q, claim-tags: %q) signed with %q has mappings %t accused %p",
+			c.kindString(), juc.Subject, juc.Name, juc.Tags, juc.Issuer, issuer, acc.nameTag, acc.tags, acc.Issuer, acc.hasMappingsLocked(), acc)
 		acc.mu.RUnlock()
 		return true
 	}
@@ -1102,7 +1130,9 @@ func validateAllowedConnectionTypes(m map[string]struct{}) error {
 	for ct := range m {
 		ctuc := strings.ToUpper(ct)
 		switch ctuc {
-		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt:
+		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket,
+			jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeLeafnodeWS,
+			jwt.ConnectionTypeMqtt, jwt.ConnectionTypeMqttWS:
 		default:
 			return fmt.Errorf("unknown connection type %q", ct)
 		}
@@ -1115,7 +1145,7 @@ func validateAllowedConnectionTypes(m map[string]struct{}) error {
 }
 
 func validateNoAuthUser(o *Options, noAuthUser string) error {
-	if noAuthUser == "" {
+	if noAuthUser == _EMPTY_ {
 		return nil
 	}
 	if len(o.TrustedOperators) > 0 {

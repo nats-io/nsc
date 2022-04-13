@@ -84,12 +84,16 @@ const (
 
 	wsNoMaskingHeader       = "Nats-No-Masking"
 	wsNoMaskingValue        = "true"
+	wsXForwardedForHeader   = "X-Forwarded-For"
 	wsNoMaskingFullResponse = wsNoMaskingHeader + ": " + wsNoMaskingValue + CR_LF
 	wsPMCExtension          = "permessage-deflate" // per-message compression
 	wsPMCSrvNoCtx           = "server_no_context_takeover"
 	wsPMCCliNoCtx           = "client_no_context_takeover"
 	wsPMCReqHeaderValue     = wsPMCExtension + "; " + wsPMCSrvNoCtx + "; " + wsPMCCliNoCtx
 	wsPMCFullResponse       = "Sec-WebSocket-Extensions: " + wsPMCExtension + "; " + wsPMCSrvNoCtx + "; " + wsPMCCliNoCtx + _CRLF_
+	wsSecProto              = "Sec-Websocket-Protocol"
+	wsMQTTSecProtoVal       = "mqtt"
+	wsMQTTSecProto          = wsSecProto + ": " + wsMQTTSecProtoVal + CR_LF
 )
 
 var decompressorPool sync.Pool
@@ -113,6 +117,7 @@ type websocket struct {
 	maskwrite  bool
 	compressor *flate.Writer
 	cookieJwt  string
+	clientIP   string
 }
 
 type srvWebsocket struct {
@@ -684,6 +689,8 @@ func (s *Server) wsUpgrade(w http.ResponseWriter, r *http.Request) (*wsUpgradeRe
 		ep := r.URL.EscapedPath()
 		if strings.HasPrefix(ep, leafNodeWSPath) {
 			kind = LEAF
+		} else if strings.HasPrefix(ep, mqttWSPath) {
+			kind = MQTT
 		}
 	}
 
@@ -758,6 +765,9 @@ func (s *Server) wsUpgrade(w http.ResponseWriter, r *http.Request) (*wsUpgradeRe
 	if noMasking {
 		p = append(p, wsNoMaskingFullResponse...)
 	}
+	if kind == MQTT {
+		p = append(p, wsMQTTSecProto...)
+	}
 	p = append(p, _CRLF_...)
 
 	if _, err = conn.Write(p); err != nil {
@@ -771,7 +781,16 @@ func (s *Server) wsUpgrade(w http.ResponseWriter, r *http.Request) (*wsUpgradeRe
 	// Server always expect "clients" to send masked payload, unless the option
 	// "no-masking" has been enabled.
 	ws := &websocket{compress: compress, maskread: !noMasking}
-	if kind == CLIENT {
+
+	// Check for X-Forwarded-For header
+	if cips, ok := r.Header[wsXForwardedForHeader]; ok {
+		cip := cips[0]
+		if net.ParseIP(cip) != nil {
+			ws.clientIP = cip
+		}
+	}
+
+	if kind == CLIENT || kind == MQTT {
 		// Indicate if this is likely coming from a browser.
 		if ua := r.Header.Get("User-Agent"); ua != _EMPTY_ && strings.HasPrefix(ua, "Mozilla/") {
 			ws.browser = true
@@ -1096,6 +1115,8 @@ func (s *Server) startWebsocketServer() {
 		switch res.kind {
 		case CLIENT:
 			s.createWSClient(res.conn, res.ws)
+		case MQTT:
+			s.createMQTTClient(res.conn, res.ws)
 		case LEAF:
 			if !hasLeaf {
 				s.Errorf("Not configured to accept leaf node connections")
@@ -1112,7 +1133,7 @@ func (s *Server) startWebsocketServer() {
 		Addr:        hp,
 		Handler:     mux,
 		ReadTimeout: o.HandshakeTimeout,
-		ErrorLog:    log.New(&wsCaptureHTTPServerLog{s}, _EMPTY_, 0),
+		ErrorLog:    log.New(&captureHTTPServerLog{s, "websocket: "}, _EMPTY_, 0),
 	}
 	s.websocket.server = hs
 	s.websocket.listener = hl
@@ -1237,24 +1258,6 @@ func (s *Server) createWSClient(conn net.Conn, ws *websocket) *client {
 	c.mu.Unlock()
 
 	return c
-}
-
-type wsCaptureHTTPServerLog struct {
-	s *Server
-}
-
-func (cl *wsCaptureHTTPServerLog) Write(p []byte) (int, error) {
-	var buf [128]byte
-	var b = buf[:0]
-
-	copy(b, []byte("websocket :"))
-	offset := 0
-	if bytes.HasPrefix(p, []byte("http:")) {
-		offset = 6
-	}
-	b = append(b, p[offset:]...)
-	cl.s.Errorf(string(b))
-	return len(p), nil
 }
 
 func (c *client) wsCollapsePtoNB() (net.Buffers, int64) {

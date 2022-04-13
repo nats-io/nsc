@@ -284,7 +284,7 @@ func (p *LoadParams) addUser(ctx ActionCtx) error {
 		r.AddWarning("the user %q already exists", p.username)
 		creds := sctx.KeyStore.CalcUserCredsPath(p.accountName, p.username)
 		if _, err := os.Stat(creds); os.IsNotExist(err) {
-			r.AddFromError(fmt.Errorf("user %q credentials not found at %q", creds))
+			r.AddFromError(fmt.Errorf("user %q credentials not found at %q", p.username, creds))
 			return err
 		} else {
 			p.userCreds = creds
