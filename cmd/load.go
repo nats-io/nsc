@@ -157,7 +157,6 @@ func (p *LoadParams) addOperator() error {
 		return err
 	}
 	p.operator = operator
-	p.contextName = fmt.Sprintf("nsc-%s-%s-user", p.operatorName, p.username)
 
 	if operator.AccountServerURL == "" {
 		return fmt.Errorf("error importing operator %q - it doesn't define an account server url", p.operatorName)
@@ -354,6 +353,8 @@ func (p *LoadParams) configureNSCEnv() error {
 }
 
 func (p *LoadParams) configureNATSCLI() error {
+	p.contextName = fmt.Sprintf("%s_%s_%s", p.operatorName, p.accountName, p.username)
+
 	// Replace this to use instead use the natscontext library.
 	var servers string
 	if len(p.operator.OperatorServiceURLs) > 0 {
