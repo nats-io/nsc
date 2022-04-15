@@ -16,9 +16,10 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os/exec"
+	"os"
 	"strings"
 
+	"github.com/nats-io/jsm.go/natscontext"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
@@ -88,6 +89,7 @@ type LoadParams struct {
 	accountServerURL string
 	username         string
 	contextName      string
+	userCreds        string
 }
 
 func (p *LoadParams) setupHomeDir() error {
@@ -123,9 +125,9 @@ func (p *LoadParams) addOperator() error {
 		p.operatorName = u.Hostname()
 		qparams := u.Query()
 		p.accountSeed = qparams.Get("secret")
-		p.username = qparams.Get("user")
-		if p.username == "" {
-			p.username = "default"
+		username := qparams.Get("user")
+		if username != "" {
+			p.username = username
 		}
 		ko, err := FindKnownOperator(p.operatorName)
 		if err != nil {
@@ -155,7 +157,6 @@ func (p *LoadParams) addOperator() error {
 		return err
 	}
 	p.operator = operator
-	p.contextName = fmt.Sprintf("nsc-%s-%s-user", p.operatorName, p.username)
 
 	if operator.AccountServerURL == "" {
 		return fmt.Errorf("error importing operator %q - it doesn't define an account server url", p.operatorName)
@@ -228,25 +229,68 @@ func (p *LoadParams) addAccount(ctx ActionCtx) error {
 	p.account = account
 	p.accountName = account.Name
 
+	current := GetConfig()
+	err = current.ContextConfig.Update(current.StoreRoot, p.operatorName, "")
+
 	// Store the key and JWT.
 	_, err = store.StoreKey(akp)
 	if err != nil {
 		return err
 	}
-	StoreAccountAndUpdateStatus(ctx, accJWT, r)
-
+	sctx := ctx.StoreCtx()
+	err = sctx.SetContext(p.accountName, p.accountPublicKey)
+	if err != nil {
+		return err
+	}
+	ts, err := current.LoadStore(p.operatorName)
+	if err != nil {
+		return err
+	}
+	rs, err := ts.StoreClaim([]byte(accJWT))
+	if rs != nil {
+		r.Add(rs)
+	}
+	if err != nil {
+		r.AddFromError(err)
+	}
 	return nil
 }
 
 func (p *LoadParams) addUser(ctx ActionCtx) error {
-	s := p.ctx.Store
+	current := GetConfig()
+	err := current.ContextConfig.Update(current.StoreRoot, p.operatorName, p.accountName)
+	if err != nil {
+		return err
+	}
+
+	sctx := ctx.StoreCtx()
+	err = sctx.SetContext(p.accountName, p.accountPublicKey)
+	if err != nil {
+		return err
+	}
+	ts, err := current.LoadStore(p.operatorName)
+	if err != nil {
+		return err
+	}
 	r := p.r
 
-	// Check if username is already setup.
-	if s.Has(store.Accounts, p.ctx.Account.Name, store.Users, store.JwtName(p.username)) {
+	// NOTE: Stamp the KeyStore env to use the Operator that is being setup.
+	sctx.KeyStore.Env = p.operatorName
+
+	// Check if username is already setup, if so then just find the creds instead.
+	userFields := []string{store.Accounts, p.accountName, store.Users, store.JwtName(p.username)}
+	if ts.Has(userFields...) {
 		r.AddWarning("the user %q already exists", p.username)
+		creds := sctx.KeyStore.CalcUserCredsPath(p.accountName, p.username)
+		if _, err := os.Stat(creds); os.IsNotExist(err) {
+			r.AddFromError(fmt.Errorf("user %q credentials not found at %q", p.username, creds))
+			return err
+		} else {
+			p.userCreds = creds
+		}
 		return nil
 	}
+
 	kp, err := nkeys.CreatePair(nkeys.PrefixByteUser)
 	if err != nil {
 		return err
@@ -262,7 +306,7 @@ func (p *LoadParams) addUser(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	st, err := ctx.StoreCtx().Store.StoreClaim([]byte(userJWT))
+	st, err := ts.StoreClaim([]byte(userJWT))
 	if st != nil {
 		r.Add(st)
 	}
@@ -270,7 +314,7 @@ func (p *LoadParams) addUser(ctx ActionCtx) error {
 		p.r.AddFromError(err)
 		return err
 	}
-	_, err = ctx.StoreCtx().KeyStore.Store(kp)
+	_, err = sctx.KeyStore.Store(kp)
 	if err != nil {
 		return err
 	}
@@ -285,32 +329,49 @@ func (p *LoadParams) addUser(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	ks := ctx.StoreCtx().KeyStore
+	ks := sctx.KeyStore
 	path, err := ks.MaybeStoreUserCreds(p.accountName, p.username, creds)
 	if err != nil {
 		return err
 	}
+	p.userCreds = path
 	r.AddOK("generated and stored user credentials at %q", path)
 	return nil
 }
 
-func (p *LoadParams) configureCLI(ctx ActionCtx) error {
-	path, err := exec.LookPath("nats")
-	if err != nil {
-		return fmt.Errorf("cannot find 'natscli' in user path")
+func (p *LoadParams) configureNSCEnv() error {
+	// Change the current context to the one from load.
+	current := GetConfig()
+
+	if err := current.ContextConfig.Update(current.StoreRoot, p.operatorName, p.accountName); err != nil {
+		return err
 	}
-	resourceURI := fmt.Sprintf("nsc://%s/%s/%s", p.operatorName, p.account.Name, p.username)
-	cmd := exec.Command(
-		path,
-		"context",
-		"save",
-		p.contextName,
-		"--nsc",
-		resourceURI,
+	if err := current.Save(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *LoadParams) configureNATSCLI() error {
+	p.contextName = fmt.Sprintf("%s_%s_%s", p.operatorName, p.accountName, p.username)
+
+	// Replace this to use instead use the natscontext library.
+	var servers string
+	if len(p.operator.OperatorServiceURLs) > 0 {
+		servers = strings.Join(p.operator.OperatorServiceURLs, ",")
+	}
+	// Finally, store the NATS context used by the NATS CLI.
+	config, err := natscontext.New(p.contextName, false,
+		natscontext.WithServerURL(servers),
+		natscontext.WithCreds(p.userCreds),
+		natscontext.WithDescription(fmt.Sprintf("%s (%s)", p.operatorName, p.operator.Name)),
 	)
-	_, err = cmd.CombinedOutput()
+	config.Save(p.contextName)
+
+	// Switch to use that context as well.
+	err = natscontext.SelectContext(p.contextName)
 	if err != nil {
-		return fmt.Errorf("nsc invoke failed: %s", err)
+		return err
 	}
 	return nil
 }
@@ -319,14 +380,16 @@ func (p *LoadParams) configureCLI(ctx ActionCtx) error {
 func (p *LoadParams) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(false)
 	p.r = r
-	p.ctx = ctx.StoreCtx()
+	if err := p.configureNSCEnv(); err != nil {
+		return nil, err
+	}
 	if err := p.addAccount(ctx); err != nil {
 		return nil, err
 	}
 	if err := p.addUser(ctx); err != nil {
 		return nil, err
 	}
-	if err := p.configureCLI(ctx); err != nil {
+	if err := p.configureNATSCLI(); err != nil {
 		return nil, err
 	}
 	r.AddOK("created nats context %q", p.contextName)

@@ -1,4 +1,4 @@
-// Copyright 2012-2021 The NATS Authors
+// Copyright 2012-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -427,6 +427,14 @@ func (c *client) String() (id string) {
 	return _EMPTY_
 }
 
+// GetNonce returns the nonce that was presented to the user on connection
+func (c *client) GetNonce() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.nonce
+}
+
 // GetName returns the application supplied name for the connection.
 func (c *client) GetName() string {
 	c.mu.Lock()
@@ -603,6 +611,15 @@ func (c *client) initClient() {
 				host, port, _ := net.SplitHostPort(conn)
 				iPort, _ := strconv.Atoi(port)
 				c.host, c.port = host, uint16(iPort)
+				if c.isWebsocket() && c.ws.clientIP != _EMPTY_ {
+					cip := c.ws.clientIP
+					// Surround IPv6 addresses with square brackets, as
+					// net.JoinHostPort would do...
+					if strings.Contains(cip, ":") {
+						cip = "[" + cip + "]"
+					}
+					conn = fmt.Sprintf("%s/%s", cip, conn)
+				}
 				// Now that we have extracted host and port, escape
 				// the string because it is going to be used in Sprintf
 				conn = strings.ReplaceAll(conn, "%", "%%")
@@ -618,7 +635,11 @@ func (c *client) initClient() {
 		case WS:
 			c.ncs.Store(fmt.Sprintf("%s - wid:%d", conn, c.cid))
 		case MQTT:
-			c.ncs.Store(fmt.Sprintf("%s - mid:%d", conn, c.cid))
+			var ws string
+			if c.isWebsocket() {
+				ws = "_ws"
+			}
+			c.ncs.Store(fmt.Sprintf("%s - mid%s:%d", conn, ws, c.cid))
 		}
 	case ROUTER:
 		c.ncs.Store(fmt.Sprintf("%s - rid:%d", conn, c.cid))
@@ -924,22 +945,63 @@ func (c *client) setPermissions(perms *Permissions) {
 	}
 }
 
+type denyType int
+
+const (
+	pub = denyType(iota + 1)
+	sub
+	both
+)
+
 // Merge client.perms structure with additional pub deny permissions
 // Lock is held on entry.
-func (c *client) mergePubDenyPermissions(denyPubs []string) {
+func (c *client) mergeDenyPermissions(what denyType, denyPubs []string) {
 	if len(denyPubs) == 0 {
 		return
 	}
 	if c.perms == nil {
 		c.perms = &permissions{}
 	}
-	if c.perms.pub.deny == nil {
-		c.perms.pub.deny = NewSublistWithCache()
+	var perms []*perm
+	switch what {
+	case pub:
+		perms = []*perm{&c.perms.pub}
+	case sub:
+		perms = []*perm{&c.perms.sub}
+	case both:
+		perms = []*perm{&c.perms.pub, &c.perms.sub}
 	}
-	for _, pubSubject := range denyPubs {
-		sub := &subscription{subject: []byte(pubSubject)}
-		c.perms.pub.deny.Insert(sub)
+	for _, p := range perms {
+		if p.deny == nil {
+			p.deny = NewSublistWithCache()
+		}
+	FOR_DENY:
+		for _, subj := range denyPubs {
+			r := p.deny.Match(subj)
+			for _, v := range r.qsubs {
+				for _, s := range v {
+					if string(s.subject) == subj {
+						continue FOR_DENY
+					}
+				}
+			}
+			for _, s := range r.psubs {
+				if string(s.subject) == subj {
+					continue FOR_DENY
+				}
+			}
+			sub := &subscription{subject: []byte(subj)}
+			p.deny.Insert(sub)
+		}
 	}
+}
+
+// Merge client.perms structure with additional pub deny permissions
+// Client lock must not be held on entry
+func (c *client) mergeDenyPermissionsLocked(what denyType, denyPubs []string) {
+	c.mu.Lock()
+	c.mergeDenyPermissions(what, denyPubs)
+	c.mu.Unlock()
 }
 
 // Check to see if we have an expiration for the user JWT via base claims.
@@ -1026,17 +1088,6 @@ func (c *client) writeLoop() {
 // sent to during processing. We pass in a budget as a time.Duration
 // for how much time to spend in place flushing for this client.
 func (c *client) flushClients(budget time.Duration) time.Time {
-	return c.flushClientsWithCheck(budget, false)
-}
-
-// flushClientsWithCheck will make sure to flush any clients we may have
-// sent to during processing. We pass in a budget as a time.Duration
-// for how much time to spend in place flushing for this client.
-// The 'clientsKindOnly' boolean indicates whether to check kind of client
-// and pending client to run flushOutbound in flushClientsWithCheck.
-// flushOutbound() could block the caller up to the write deadline when
-// the receiving client cannot drain data from the socket fast enough.
-func (c *client) flushClientsWithCheck(budget time.Duration, clientsKindOnly bool) time.Time {
 	last := time.Now().UTC()
 
 	// Check pending clients for flush.
@@ -1057,7 +1108,7 @@ func (c *client) flushClientsWithCheck(budget time.Duration, clientsKindOnly boo
 			continue
 		}
 
-		if budget > 0 && (!clientsKindOnly || c.kind == CLIENT && cp.kind == CLIENT) && cp.out.lft < 2*budget && cp.flushOutbound() {
+		if budget > 0 && cp.out.lft < 2*budget && cp.flushOutbound() {
 			budget -= cp.out.lft
 		} else {
 			cp.flushSignal()
@@ -1199,17 +1250,8 @@ func (c *client) readLoop(pre []byte) {
 			atomic.AddInt64(&s.inBytes, int64(c.in.bytes))
 		}
 
-		// Budget to spend in place flushing outbound data.
-		// Client will be checked on several fronts to see
-		// if applicable. Routes and Gateways will never
-		// spend time flushing outbound in place.
-		var budget time.Duration
-		if c.kind == CLIENT {
-			budget = time.Millisecond
-		}
-
-		// Flush, or signal to writeLoop to flush to socket.
-		last := c.flushClientsWithCheck(budget, true)
+		// Signal to writeLoop to flush to socket.
+		last := c.flushClients(0)
 
 		// Update activity, check read buffer size.
 		c.mu.Lock()
@@ -1686,7 +1728,7 @@ func (c *client) processConnect(arg []byte) error {
 		c.rtt = computeRTT(c.start)
 		if c.srv != nil {
 			c.clearPingTimer()
-			c.srv.setFirstPingTimer(c)
+			c.setFirstPingTimer()
 		}
 	}
 	kind := c.kind
@@ -1780,35 +1822,15 @@ func (c *client) processConnect(arg []byte) error {
 			return ErrAuthentication
 		}
 
-		// Check for Account designation, this section should be only used when there is not a jwt.
-		if account != _EMPTY_ {
-			var acc *Account
-			var wasNew bool
-			var err error
-			if !srv.NewAccountsAllowed() {
-				acc, err = srv.LookupAccount(account)
-				if err != nil {
-					c.Errorf(err.Error())
-					c.sendErr(ErrMissingAccount.Error())
-					return err
-				} else if accountNew && acc != nil {
-					c.sendErrAndErr(ErrAccountExists.Error())
-					return ErrAccountExists
-				}
-			} else {
-				// We can create this one on the fly.
-				acc, wasNew = srv.LookupOrRegisterAccount(account)
-				if accountNew && !wasNew {
-					c.sendErrAndErr(ErrAccountExists.Error())
-					return ErrAccountExists
-				}
-			}
-			// If we are here we can register ourselves with the new account.
-			if err := c.registerWithAccount(acc); err != nil {
-				c.reportErrRegisterAccount(acc, err)
-				return ErrBadAccount
-			}
-		} else if c.acc == nil {
+		// Check for Account designation, we used to have this as an optional feature for dynamic
+		// sandbox environments. Now its considered an error.
+		if accountNew || account != _EMPTY_ {
+			c.authViolation()
+			return ErrAuthentication
+		}
+
+		// If no account designation.
+		if c.acc == nil {
 			// By default register with the global account.
 			c.registerWithAccount(srv.globalAccount())
 		}
@@ -3863,7 +3885,7 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 	// Send tracking info here if we are tracking this response.
 	// This is always a response.
 	var didSendTL bool
-	if si.tracking {
+	if si.tracking && !si.didDeliver {
 		// Stamp that we attempted delivery.
 		si.didDeliver = true
 		didSendTL = acc.sendTrackingLatency(si, c)
@@ -3906,11 +3928,19 @@ func (c *client) processServiceImport(si *serviceImport, acc *Account, msg []byt
 			if err := json.Unmarshal(getHeader(ClientInfoHdr, msg[:c.pa.hdr]), &cis); err == nil {
 				ci = &cis
 				ci.Service = acc.Name
+				// Check if we are moving into a share details account from a non-shared
+				// and add in server and cluster details.
+				if !share && si.share {
+					c.addServerAndClusterInfo(ci)
+				}
 			}
 		} else if c.kind != LEAF || c.pa.hdr < 0 || len(getHeader(ClientInfoHdr, msg[:c.pa.hdr])) == 0 {
 			ci = c.getClientInfo(share)
+		} else if c.kind == LEAF && si.share {
+			// We have a leaf header here for ci, augment as above.
+			ci = c.getClientInfo(si.share)
 		}
-
+		// Set clientInfo if present.
 		if ci != nil {
 			if b, _ := json.Marshal(ci); b != nil {
 				msg = c.setHeader(ClientInfoHdr, string(b), msg)
@@ -4992,31 +5022,52 @@ func (ci *ClientInfo) serviceAccount() string {
 	return ci.Account
 }
 
+// Add in our server and cluster information to this client info.
+func (c *client) addServerAndClusterInfo(ci *ClientInfo) {
+	if ci == nil {
+		return
+	}
+	// Server
+	if c.kind != LEAF {
+		ci.Server = c.srv.Name()
+	} else if c.kind == LEAF {
+		ci.Server = c.leaf.remoteServer
+	}
+	// Cluster
+	ci.Cluster = c.srv.cachedClusterName()
+	// If we have gateways fill in cluster alternates.
+	// These will be in RTT asc order.
+	if c.srv.gateway.enabled {
+		var gws []*client
+		c.srv.getOutboundGatewayConnections(&gws)
+		for _, c := range gws {
+			c.mu.Lock()
+			cn := c.gw.name
+			c.mu.Unlock()
+			ci.Alternates = append(ci.Alternates, cn)
+		}
+	}
+}
+
 // Grabs the information for this client.
 func (c *client) getClientInfo(detailed bool) *ClientInfo {
-	if c == nil || (c.kind != CLIENT && c.kind != LEAF && c.kind != JETSTREAM) {
+	if c == nil || (c.kind != CLIENT && c.kind != LEAF && c.kind != JETSTREAM && c.kind != ACCOUNT) {
 		return nil
 	}
 
-	// Server name. Defaults to server ID if not set explicitly.
-	var cn, sn string
+	// Result
+	var ci ClientInfo
+
 	if detailed {
-		if c.kind != LEAF {
-			sn = c.srv.Name()
-		}
-		cn = c.srv.cachedClusterName()
+		c.addServerAndClusterInfo(&ci)
 	}
 
 	c.mu.Lock()
-	var ci ClientInfo
 	// RTT and Account are always added.
 	ci.Account = accForClient(c)
 	ci.RTT = c.rtt
 	// Detailed signals additional opt in.
 	if detailed {
-		if c.kind == LEAF {
-			sn = c.leaf.remoteServer
-		}
 		ci.Start = &c.start
 		ci.Host = c.host
 		ci.ID = c.cid
@@ -5024,8 +5075,6 @@ func (c *client) getClientInfo(detailed bool) *ClientInfo {
 		ci.User = c.getRawAuthUser()
 		ci.Lang = c.opts.Lang
 		ci.Version = c.opts.Version
-		ci.Server = sn
-		ci.Cluster = cn
 		ci.Jwt = c.opts.JWT
 		ci.IssuerKey = issuerForClient(c)
 		ci.NameTag = c.nameTag
@@ -5184,7 +5233,9 @@ func convertAllowedConnectionTypes(cts []string) (map[string]struct{}, error) {
 	for _, i := range cts {
 		i = strings.ToUpper(i)
 		switch i {
-		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt:
+		case jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket,
+			jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeLeafnodeWS,
+			jwt.ConnectionTypeMqtt, jwt.ConnectionTypeMqttWS:
 			m[i] = struct{}{}
 		default:
 			unknown = append(unknown, i)
@@ -5215,10 +5266,18 @@ func (c *client) connectionTypeAllowed(acts map[string]struct{}) bool {
 		case WS:
 			want = jwt.ConnectionTypeWebsocket
 		case MQTT:
-			want = jwt.ConnectionTypeMqtt
+			if c.isWebsocket() {
+				want = jwt.ConnectionTypeMqttWS
+			} else {
+				want = jwt.ConnectionTypeMqtt
+			}
 		}
 	case LEAF:
-		want = jwt.ConnectionTypeLeafnode
+		if c.isWebsocket() {
+			want = jwt.ConnectionTypeLeafnodeWS
+		} else {
+			want = jwt.ConnectionTypeLeafnode
+		}
 	}
 	_, ok := acts[want]
 	return ok
@@ -5258,4 +5317,33 @@ func (c *client) Tracef(format string, v ...interface{}) {
 func (c *client) Warnf(format string, v ...interface{}) {
 	format = fmt.Sprintf("%s - %s", c, format)
 	c.srv.Warnf(format, v...)
+}
+
+// Set the very first PING to a lower interval to capture the initial RTT.
+// After that the PING interval will be set to the user defined value.
+// Client lock should be held.
+func (c *client) setFirstPingTimer() {
+	s := c.srv
+	if s == nil {
+		return
+	}
+	opts := s.getOpts()
+	d := opts.PingInterval
+
+	if !opts.DisableShortFirstPing {
+		if c.kind != CLIENT {
+			if d > firstPingInterval {
+				d = firstPingInterval
+			}
+			if c.kind == GATEWAY {
+				d = adjustPingIntervalForGateway(d)
+			}
+		} else if d > firstClientPingInterval {
+			d = firstClientPingInterval
+		}
+	}
+	// We randomize the first one by an offset up to 20%, e.g. 2m ~= max 24s.
+	addDelay := rand.Int63n(int64(d / 5))
+	d += time.Duration(addDelay)
+	c.ping.tmr = time.AfterFunc(d, c.processPingTimer)
 }
