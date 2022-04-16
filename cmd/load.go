@@ -65,6 +65,7 @@ func createLoadCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.accountServerURL, "url", "", "", "URL of the account server")
 	cmd.Flags().StringVarP(&params.accountSeed, "seed", "", "", "Seed of the account used to create users")
 	cmd.Flags().StringVarP(&params.username, "user", "", "default", "Default username")
+	cmd.Flags().StringVarP(&params.operatorName, "operator", "", "", "Name used for the operator context")
 	return cmd
 }
 
