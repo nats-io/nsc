@@ -7,7 +7,9 @@ on:
       # Obviously if we change that, we'll still have an installed base with the old logic so won't be able to start using the new naming for some time.
       # We match on v* for consistency and with an eye to the future.
       # To avoid random experimental tags creating releases, we use ${major}.* and ${nextmajor}.* for the rules which will actually match.
+      # We allow 0.0.X for debugging of release engineering processes, where it won't create a new release.
       - 'v*'
+      - '0.0.*'
       - '2.*'
       - '3.*'
 
@@ -46,21 +48,10 @@ jobs:
         uses: sigstore/cosign-installer@main
         # This is used inside goreleaser, not as a separate step in this file
 
-      - name: Basic Go integrity checks
+      - name: Basic integrity checks
         # TODO: If we switch from vendor to modules, consider a Retracted check here
         run: |
           go vet ./...
-
-      - name: Expose signing keys to goreleaser
-        # Ideally we'd do this after the compilation, to reduce lifetime of
-        # visibility, but that's not goreleaser's model: it's all-or-nothing.
-        # We rely upon /tmp in the builders being private.
-        run: |
-          touch /tmp/cosign.key /tmp/ssh-release-sign
-          chmod 0600 /tmp/cosign.key /tmp/ssh-release-sign
-          printf '%s\n' "${{ secrets.RELEASE_SIGNING_KEY_COSIGN }}" >> /tmp/cosign.key
-          printf '%s\n' "${{ secrets.RELEASE_SIGNING_KEY_SSH }}" >> /tmp/ssh-release-sign
-          ls -ld /tmp/cosign.key /tmp/ssh-release-sign
 
       - name: Run GoReleaser
         id: goreleaser
@@ -72,5 +63,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          SIGNING_KEY_COSIGN: ${{ secrets.RELEASE_SIGNING_KEY_COSIGN }}
+          SIGNING_KEY_SSH: ${{ secrets.RELEASE_SIGNING_KEY_SSH }}
           COSIGN_PASSWORD: ""
-

@@ -1,10 +1,33 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
+set -euo pipefail
 #
 # This file exists to fix the impedance mismatch between cosign running one
 # command and ssh-keygen using either a fixed conflicting filename or stdout.
+#
+# This is failing badly on Ubuntu 20.04 stock ssh-keygen (8.2), so I'm leaving
+# this release tool in, but removing the invocation.  22.04 should be out soon
+# so we will try again with that.  As long as signature _verification_ works
+# portably, we still want a "tool everyone has" signature verifier.
 
-keyfile="${1:?need an SSH private key}"
-artifact="${2:?need a file to sign}"
-signature="${3:?need a file to create}"
+progname="$(dirname "$0")"
+stderr() { printf >&2 '%s: %s\n' "$progname" "$*"; }
+die_n() { e="$1"; shift; stderr "$@"; exit "$e"; }
+EX_USAGE=64
 
-exec ssh-keygen -Y sign -n file -f "$keyfile" < "$artifact" > "$signature"
+[[ -n "${SIGNING_KEY_SSH:-}" ]] || die_n $EX_USAGE 'missing env var SIGNING_KEY_SSH'
+
+artifact="${1:?need a file to sign}"
+signature="${2:?need a file to create}"
+
+# ssh-keygen won't read the key from a pipe
+
+keyfile="$(mktemp)"
+printf >> "$keyfile" '%s\n' "$SIGNING_KEY_SSH"
+
+set +e
+ssh-keygen -Y sign -n file \
+	-f "$keyfile" \
+	< "$artifact" > "$signature"
+ev=$?
+rm -f "$keyfile"
+exit $ev

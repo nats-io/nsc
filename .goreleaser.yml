@@ -76,17 +76,18 @@ snapshot:
 
 signs:
   - id: cosign
-    cmd: cosign
-    args: ["sign-blob", "--key=/tmp/cosign.key", "--output-signature=${signature}", "${artifact}"]
+    cmd: "./release/sign-cosign"
+    args: ["${artifact}", "${signature}"]
     signature: "${artifact}.cosign.sig"
     artifacts: checksum
     # We pass COSIGN_PASSWORD from GH secret through env, and cosign(1) picks up
     # that automatically, so we don't need to pass the password on stdin.
-  - id: ssh
-    cmd: "./release/sign-ssh"
-    args: ["/tmp/ssh-release-sign", "${artifact}", "${signature}"]
-    signature: "${artifact}.ssh.sig"
-    artifacts: checksum
+# Disabled pending Ubuntu 22.04:
+# - id: ssh
+#   cmd: "./release/sign-ssh"
+#   args: ["${artifact}", "${signature}"]
+#   signature: "${artifact}.ssh.sig"
+#   artifacts: checksum
 
 
 brews:
