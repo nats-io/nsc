@@ -102,7 +102,9 @@ brews:
     homepage: "https://github.com/nats-io/nsc"
     description: "A tool for creating NATS account and user access configurations"
     license: "Apache-2.0"
-    skip_upload: false
+    # Cross-repo upload currently requires that $GITHUB_ACTION be a PAT which has some undesirable security characteristics.
+    # We are instead registering this as a build artifact, so that the file is available for a manual PR of nsc.rb in the tap.
+    skip_upload: true
     test: |
       system "#{bin}/nsc --version"
     install: |

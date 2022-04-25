@@ -69,3 +69,9 @@ jobs:
           SIGNING_KEY_COSIGN: ${{ secrets.RELEASE_SIGNING_KEY_COSIGN }}
           SIGNING_KEY_SSH: ${{ secrets.RELEASE_SIGNING_KEY_SSH }}
           COSIGN_PASSWORD: ""
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: homebrew-formula-nsc.rb
+          path: build/nsc.rb
