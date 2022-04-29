@@ -581,9 +581,19 @@ func (p *PermissionsParams) Run(perms *jwt.Permissions, ctx ActionCtx) (*store.R
 	}
 	sort.Strings(perms.Sub.Allow)
 
+	var ds []string
 	perms.Sub.Deny.Add(p.denySubs...)
+	ds = append(ds, p.denySubs...)
 	perms.Sub.Deny.Add(p.denyPubsub...)
+	ds = append(ds, p.denyPubsub...)
+	for _, v := range ds {
+		r.AddOK("added deny sub %q", v)
+	}
+
 	perms.Sub.Deny.Remove(p.rmPerms...)
+	for _, v := range p.rmPerms {
+		r.AddOK("removed sub %q", v)
+	}
 	sort.Strings(perms.Sub.Deny)
 	return r, nil
 }
