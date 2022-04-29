@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jsm.go v0.0.30
 	github.com/nats-io/jwt v1.2.2
-	github.com/nats-io/jwt/v2 v2.2.1-0.20220330180145-442af02fd36a
+	github.com/nats-io/jwt/v2 v2.2.1-0.20220429175140-9f4f1d5cc977
 	github.com/nats-io/nats-server/v2 v2.7.5-0.20220309212130-5c0d1999ff72
 	github.com/nats-io/nats.go v1.13.1-0.20220308171302-2f2f6968e98d
 	github.com/nats-io/nkeys v0.3.0

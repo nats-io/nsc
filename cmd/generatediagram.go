@@ -480,6 +480,7 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 	addValue("JWT Version", "%d", op.Version)
 	addValue("account server", op.AccountServerURL)
 	addValue("Strict signing key usage", "%t", op.StrictSigningKeyUsage)
+	addValue("Disallow bearer token", "%t", op.DisallowBearerToken)
 	addValidationResults(op)
 	bldrPrntf("}")
 

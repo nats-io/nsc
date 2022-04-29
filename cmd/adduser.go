@@ -230,6 +230,12 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
+	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
+		return err
+	} else if op.DisallowBearerToken && p.bearer {
+		return fmt.Errorf("operator disallows bearer token")
+	}
+
 	if p.pkOrPath != "" {
 		p.kp, err = store.ResolveKey(p.pkOrPath)
 		if err != nil {
