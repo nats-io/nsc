@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -545,7 +545,7 @@ func (p *PermissionsParams) Run(perms *jwt.Permissions, ctx ActionCtx) (*store.R
 	perms.Pub.Allow.Add(p.allowPubsub...)
 	ap = append(ap, p.allowPubsub...)
 	for _, v := range ap {
-		r.AddOK("added pub pub %q", v)
+		r.AddOK("added pub %q", v)
 	}
 	perms.Pub.Allow.Remove(p.rmPerms...)
 	for _, v := range p.rmPerms {
@@ -581,9 +581,19 @@ func (p *PermissionsParams) Run(perms *jwt.Permissions, ctx ActionCtx) (*store.R
 	}
 	sort.Strings(perms.Sub.Allow)
 
+	var ds []string
 	perms.Sub.Deny.Add(p.denySubs...)
+	ds = append(ds, p.denySubs...)
 	perms.Sub.Deny.Add(p.denyPubsub...)
+	ds = append(ds, p.denyPubsub...)
+	for _, v := range ds {
+		r.AddOK("added deny sub %q", v)
+	}
+
 	perms.Sub.Deny.Remove(p.rmPerms...)
+	for _, v := range p.rmPerms {
+		r.AddOK("removed sub %q", v)
+	}
 	sort.Strings(perms.Sub.Deny)
 	return r, nil
 }
