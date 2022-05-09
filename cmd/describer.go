@@ -92,11 +92,16 @@ func (a *AccountDescriber) Describe() string {
 	addLimitRow(table, "Max Msg Payload", lim.Payload, true)
 	addLimitRow(table, "Max Subscriptions", lim.Subs, false)
 
-	we := "False"
-	if lim.WildcardExports {
-		we = "True"
+	addBoolLimitRow := func(table *tablewriter.Table, msg string, value bool) {
+		we := "False"
+		if value {
+			we = "True"
+		}
+		table.AddRow(msg, we)
 	}
-	table.AddRow("Exports Allows Wildcards", we)
+
+	addBoolLimitRow(table, "Exports Allows Wildcards", lim.WildcardExports)
+	addBoolLimitRow(table, "Disallow Bearer Token", lim.DisallowBearer)
 
 	AddPermissions(table, a.DefaultPermissions)
 

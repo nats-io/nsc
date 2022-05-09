@@ -77,7 +77,6 @@ func init() {
 // to complete the setup of a user profile.
 type LoadParams struct {
 	r                *store.Report
-	ctx              *store.Context
 	resourceURL      string
 	operatorName     string
 	operator         *jwt.OperatorClaims
@@ -231,7 +230,9 @@ func (p *LoadParams) addAccount(ctx ActionCtx) error {
 
 	current := GetConfig()
 	err = current.ContextConfig.Update(current.StoreRoot, p.operatorName, "")
-
+	if err != nil {
+		return err
+	}
 	// Store the key and JWT.
 	_, err = store.StoreKey(akp)
 	if err != nil {
@@ -366,6 +367,9 @@ func (p *LoadParams) configureNATSCLI() error {
 		natscontext.WithCreds(p.userCreds),
 		natscontext.WithDescription(fmt.Sprintf("%s (%s)", p.operatorName, p.operator.Name)),
 	)
+	if err != nil {
+		return err
+	}
 	config.Save(p.contextName)
 
 	// Switch to use that context as well.

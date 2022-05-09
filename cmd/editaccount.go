@@ -93,8 +93,8 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.streams, "js-streams", "", "Jetstream: set maximum streams for the account (-1 is unlimited)")
 	params.consumer = -1
 	cmd.Flags().VarP(&params.consumer, "js-consumer", "", "Jetstream: set maximum consumer for the account (-1 is unlimited)")
-	cmd.Flags().VarP(&params.haResources, "js-ha-resources", "", "Jetstream: set maximum high availability resources, such as replicated streams and durable consumer, for the account (-1 unlimited / 0 ha resources disabled)")
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
+	cmd.Flags().BoolVarP(&params.disallowBearer, "disallow-bearer", "", false, "require user jwt to not be bearer token")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this account")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this account")
@@ -116,25 +116,25 @@ type EditAccountParams struct {
 	SignerParams
 	GenericClaimsParams
 	PermissionsParams
-	claim         *jwt.AccountClaims
-	token         string
-	infoUrl       string
-	description   string
-	conns         NumberParams
-	leafConns     NumberParams
-	exports       NumberParams
-	memStorage    NumberParams
-	diskStorage   NumberParams
-	streams       NumberParams
-	consumer      NumberParams
-	haResources   NumberParams
-	exportsWc     bool
-	imports       NumberParams
-	subscriptions NumberParams
-	payload       NumberParams
-	data          NumberParams
-	signingKeys   SigningKeysParams
-	rmSigningKeys []string
+	claim          *jwt.AccountClaims
+	token          string
+	infoUrl        string
+	description    string
+	conns          NumberParams
+	leafConns      NumberParams
+	exports        NumberParams
+	memStorage     NumberParams
+	diskStorage    NumberParams
+	streams        NumberParams
+	consumer       NumberParams
+	disallowBearer bool
+	exportsWc      bool
+	imports        NumberParams
+	subscriptions  NumberParams
+	payload        NumberParams
+	data           NumberParams
+	signingKeys    SigningKeysParams
+	rmSigningKeys  []string
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -149,7 +149,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
 		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
 		"rm-response-perms", "rm", "max-responses", "mem-storage", "disk-storage", "streams", "consumer",
-		"js-mem-storage", "js-disk-storage", "js-streams", "js-consumer", "js-ha-resources") {
+		"js-mem-storage", "js-disk-storage", "js-streams", "js-consumer", "disallow-bearer") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -281,10 +281,6 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		if err = p.consumer.Edit("max consumer (-1 unlimited)"); err != nil {
 			return err
 		}
-
-		if err = p.haResources.Edit("max high availability resources (replicated streams/durable consumer) (-1 unlimited / 0 ha resources disabled)"); err != nil {
-			return err
-		}
 	}
 
 	if p.claim.NotBefore > 0 {
@@ -330,6 +326,19 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	}
 	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
+	}
+	if p.disallowBearer {
+		usrs, _ := ctx.StoreCtx().Store.ListEntries(store.Accounts, p.AccountContextParams.Name, store.Users)
+		for _, usrName := range usrs {
+			uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, usrName)
+			if err != nil {
+				return err
+			}
+			if uc.BearerToken {
+				return fmt.Errorf("user %q in account %q uses bearer token (needs to be deleted/changed first)",
+					usrName, p.AccountContextParams.Name)
+			}
+		}
 	}
 	return nil
 }
@@ -381,6 +390,11 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed wild card exports to %t", p.claim.Limits.WildcardExports)
 	}
 
+	p.claim.Limits.DisallowBearer = p.disallowBearer
+	if flags.Changed("disallow-bearer") {
+		r.AddOK("changed disallow bearer to %t", p.claim.Limits.DisallowBearer)
+	}
+
 	p.claim.Limits.Imports = p.imports.Int64()
 	if flags.Changed("imports") {
 		r.AddOK("changed max imports to %d", p.claim.Limits.Imports)
@@ -394,13 +408,6 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Limits.Subs = p.subscriptions.Int64()
 	if flags.Changed("subscriptions") {
 		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
-	}
-
-	// once edit account changes JS from disabled to enabled and haResources was not explicitly set,
-	// change ha-resources to unlimited. This avoids breaking scripts due to updating nsc.
-	if !p.claim.Limits.IsJSEnabled() && (p.memStorage != 0 || p.diskStorage != 0) &&
-		!InteractiveFlag && !flags.Changed("js-ha-resources") {
-		p.haResources = jwt.NoLimit
 	}
 
 	p.claim.Limits.MemoryStorage = p.memStorage.Int64()

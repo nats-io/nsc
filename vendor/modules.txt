@@ -58,7 +58,7 @@ github.com/nats-io/jsm.go/natscontext
 # github.com/nats-io/jwt v1.2.2
 ## explicit
 github.com/nats-io/jwt
-# github.com/nats-io/jwt/v2 v2.2.1-0.20220330180145-442af02fd36a
+# github.com/nats-io/jwt/v2 v2.2.1-0.20220509180118-3bcd719cc7d0
 ## explicit
 github.com/nats-io/jwt/v2
 # github.com/nats-io/nats-server/v2 v2.7.5-0.20220309212130-5c0d1999ff72

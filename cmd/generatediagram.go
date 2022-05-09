@@ -362,6 +362,7 @@ func objectDiagram(users bool, showKeys bool, detail bool) error {
 		addLimit("Max Client Connections", l.Conn)
 		addLimit("Max Leaf Node Connections", l.LeafNodeConn)
 		addValue("Allow Wildcard Exports", fmt.Sprintf("%t", l.WildcardExports))
+		addValue("Disallow bearer token", fmt.Sprintf("%t", l.DisallowBearer))
 	}
 	addNatsLimits := func(l jwt.NatsLimits) {
 		if l.IsUnlimited() {
