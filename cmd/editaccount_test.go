@@ -116,7 +116,7 @@ func Test_EditAccountLimits(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10mib", "--exports", "15",
 		"--imports", "20", "--payload", "1Kib", "--subscriptions", "30", "--leaf-conns", "31",
-		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8", "--js-ha-resources", "90")
+		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -234,4 +234,34 @@ func Test_EditAccountSk(t *testing.T) {
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, ac.Issuer, pSk)
+}
+
+func Test_EditOperatorDisallowBearerToken(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--name", "U", "--bearer")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--disallow-bearer")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), `user "U" in account "A" uses bearer token (needs to be deleted/changed first)`)
+
+	// delete offending user
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--account", "A", "--name", "U")
+	require.NoError(t, err)
+	// set option
+	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--disallow-bearer")
+	require.NoError(t, err)
+	// test user creation
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U", "--bearer")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), `account "A" forbids the use of bearer token`)
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--bearer")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "account disallows bearer token")
 }

@@ -30,13 +30,14 @@ type AccountLimits struct {
 	Imports         int64 `json:"imports,omitempty"`   // Max number of imports
 	Exports         int64 `json:"exports,omitempty"`   // Max number of exports
 	WildcardExports bool  `json:"wildcards,omitempty"` // Are wildcards allowed in exports
-	Conn            int64 `json:"conn,omitempty"`      // Max number of active connections
-	LeafNodeConn    int64 `json:"leaf,omitempty"`      // Max number of active leaf node connections
+	DisallowBearer  bool  `json:"disallow_bearer,omitempty"` // User JWT can't be bearer token
+	Conn            int64 `json:"conn,omitempty"` // Max number of active connections
+	LeafNodeConn    int64 `json:"leaf,omitempty"` // Max number of active leaf node connections
 }
 
 // IsUnlimited returns true if all limits are unlimited
 func (a *AccountLimits) IsUnlimited() bool {
-	return *a == AccountLimits{NoLimit, NoLimit, true, NoLimit, NoLimit}
+	return *a == AccountLimits{NoLimit, NoLimit, true, false, NoLimit, NoLimit}
 }
 
 type NatsLimits struct {
@@ -231,7 +232,7 @@ func NewAccountClaims(subject string) *AccountClaims {
 	// errors if we add to the OperatorLimits.
 	c.Limits = OperatorLimits{
 		NatsLimits{NoLimit, NoLimit, NoLimit},
-		AccountLimits{NoLimit, NoLimit, true, NoLimit, NoLimit},
+		AccountLimits{NoLimit, NoLimit, true, false, NoLimit, NoLimit},
 		JetStreamLimits{0, 0, 0, 0, 0, 0, 0, false},
 		JetStreamTieredLimits{},
 	}

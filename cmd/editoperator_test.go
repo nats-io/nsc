@@ -209,39 +209,6 @@ func Test_EditOperatorRequireSigningKeysManaged(t *testing.T) {
 	checkUsr(t, ts, "A")
 }
 
-func Test_EditOperatorDisallowBearerToken(t *testing.T) {
-	ts := NewEmptyStore(t)
-	defer ts.Done(t)
-	_, err := os.Lstat(ts.StoreDir)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	_, pub, kp := CreateOperatorKey(t)
-	oc := jwt.NewOperatorClaims(pub)
-	oc.Name = "O"
-	oc.DisallowBearerToken = true
-	_, psk, sk := CreateOperatorKey(t)
-	_, err = ts.KeyStore.Store(sk)
-	require.NoError(t, err)
-	oc.SigningKeys.Add(psk)
-	token, err := oc.Encode(kp)
-	require.NoError(t, err)
-	tf := filepath.Join(ts.Dir, "O.jwt")
-	err = Write(tf, []byte(token))
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf) // causes a managed store
-	require.NoError(t, err)
-	// perform operations in a managed store and assure identity is not used
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U", "--bearer")
-	require.Error(t, err, "operator disallows bearer token")
-	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U")
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--bearer")
-	require.Error(t, err, "operator disallows bearer token")
-}
-
 func Test_EditOperatorSigningKeys(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)

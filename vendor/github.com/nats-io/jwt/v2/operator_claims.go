@@ -45,7 +45,6 @@ type Operator struct {
 	AssertServerVersion string `json:"assert_server_version,omitempty"`
 	// Signing of subordinate objects will require signing keys
 	StrictSigningKeyUsage bool `json:"strict_signing_key_usage,omitempty"`
-	DisallowBearerToken   bool `json:"disallow_bearer,omitempty"`
 	GenericFields
 }
 

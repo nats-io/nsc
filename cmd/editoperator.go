@@ -46,7 +46,6 @@ func createEditOperatorCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&params.serviceURLs, "service-url", "n", nil, "add an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().StringSliceVarP(&params.rmServiceURLs, "rm-service-url", "", nil, "remove an operator service url for nsc where clients can access the NATS service (only nats/tls urls supported)")
 	cmd.Flags().BoolVarP(&params.reqSk, "require-signing-keys", "", false, "require accounts/user to be signed with a signing key")
-	cmd.Flags().BoolVarP(&params.disallowBearer, "disallow-bearer-token", "", false, "require user jwt to not be bearer token")
 	cmd.Flags().BoolVarP(&params.rmAsu, "rm-account-jwt-server-url", "", false, "clear account server url")
 	params.TimeParams.BindFlags(cmd)
 
@@ -60,17 +59,16 @@ func init() {
 type EditOperatorParams struct {
 	SignerParams
 	GenericClaimsParams
-	claim          *jwt.OperatorClaims
-	token          string
-	asu            string
-	rmAsu          bool
-	sysAcc         string
-	serviceURLs    []string
-	rmServiceURLs  []string
-	signingKeys    SigningKeysParams
-	rmSigningKeys  []string
-	reqSk          bool
-	disallowBearer bool
+	claim         *jwt.OperatorClaims
+	token         string
+	asu           string
+	rmAsu         bool
+	sysAcc        string
+	serviceURLs   []string
+	rmServiceURLs []string
+	signingKeys   SigningKeysParams
+	rmSigningKeys []string
+	reqSk         bool
 }
 
 func (p *EditOperatorParams) SetDefaults(ctx ActionCtx) error {
@@ -115,10 +113,6 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 
 	if !p.reqSk {
 		p.reqSk = oc.StrictSigningKeyUsage
-	}
-
-	if !p.disallowBearer {
-		p.disallowBearer = oc.DisallowBearerToken
 	}
 
 	p.claim = oc
@@ -215,7 +209,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			}
 		}
 	}
-	if p.reqSk || p.disallowBearer {
+	if p.reqSk {
 		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
 		if err != nil {
 			return err
@@ -225,7 +219,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			if err != nil {
 				return err
 			}
-			if p.reqSk && ac.Issuer == p.claim.Subject {
+			if ac.Issuer == p.claim.Subject {
 				return fmt.Errorf("account %q needs to be issued with a signing key first", accName)
 			}
 			usrs, _ := ctx.StoreCtx().Store.ListEntries(store.Accounts, accName, store.Users)
@@ -234,11 +228,8 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 				if err != nil {
 					return err
 				}
-				if p.reqSk && uc.Issuer == ac.Subject {
+				if uc.Issuer == ac.Subject {
 					return fmt.Errorf("user %q in account %q needs to be issued with a signing key first", usrName, accName)
-				}
-				if p.disallowBearer && uc.BearerToken {
-					return fmt.Errorf("user %q in account %q needs to be issued without bearer first", usrName, accName)
 				}
 			}
 		}
@@ -275,10 +266,6 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.claim.StrictSigningKeyUsage != p.reqSk {
 		p.claim.StrictSigningKeyUsage = p.reqSk
 		r.AddOK("strict signing key usage set to: %t", p.reqSk)
-	}
-	if p.claim.DisallowBearerToken != p.disallowBearer {
-		p.claim.DisallowBearerToken = p.disallowBearer
-		r.AddOK("disallow bearer token set to: %t", p.disallowBearer)
 	}
 	flags := ctx.CurrentCmd().Flags()
 	p.claim.AccountServerURL = p.asu

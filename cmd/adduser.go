@@ -230,12 +230,6 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 
-	if op, err := ctx.StoreCtx().Store.ReadOperatorClaim(); err != nil {
-		return err
-	} else if op.DisallowBearerToken && p.bearer {
-		return fmt.Errorf("operator disallows bearer token")
-	}
-
 	if p.pkOrPath != "" {
 		p.kp, err = store.ResolveKey(p.pkOrPath)
 		if err != nil {
@@ -252,7 +246,11 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 	}
 
 	s := ctx.StoreCtx().Store
-	if s.Has(store.Accounts, ctx.StoreCtx().Account.Name, store.Users, store.JwtName(p.userName)) {
+	if claim, err := s.ReadAccountClaim(p.AccountContextParams.Name); err != nil {
+		return fmt.Errorf("reading account %q failed: %v", p.AccountContextParams.Name, err)
+	} else if claim.Limits.DisallowBearer && p.bearer {
+		return fmt.Errorf("account %q forbids the use of bearer token", p.AccountContextParams.Name)
+	} else if s.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.userName)) {
 		return fmt.Errorf("the user %q already exists", p.userName)
 	}
 
