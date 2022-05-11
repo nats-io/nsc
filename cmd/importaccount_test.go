@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -82,4 +82,41 @@ func Test_ImportAccountOtherOperator(t *testing.T) {
 	}
 	test(false)
 	test(true)
+}
+
+func Test_ImportDecoratedAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	// save a naked jwt
+	a, err := ts.Store.ReadRawAccountClaim("A")
+	require.NoError(t, err)
+	normal := filepath.Join(ts.Dir, "a.jwt")
+	err = Write(normal, a)
+
+	// save a decorated jwt
+	decorated := filepath.Join(ts.Dir, "decorated_a.jwt")
+	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "A", "--raw", "--output-file", decorated)
+
+	// delete the account
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--force")
+	require.NoError(t, err)
+	_, err = ts.Store.ReadAccountClaim("A")
+	require.Error(t, err)
+	require.Equal(t, "account A does not exist in the current operator", err.Error())
+
+	// import the naked jwt
+	_, _, err = ExecuteCmd(rootCmd, "import", "account", "--file", normal)
+	require.NoError(t, err)
+	_, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--force")
+	require.NoError(t, err)
+
+	// import the decorated jwt
+	_, _, err = ExecuteCmd(rootCmd, "import", "account", "--file", decorated)
+	require.NoError(t, err)
 }
