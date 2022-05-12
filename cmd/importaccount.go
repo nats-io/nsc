@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -71,8 +70,16 @@ func (p *fileImport) PostInteractive(ctx ActionCtx) (err error) {
 }
 
 func (p *fileImport) Load(ctx ActionCtx) (err error) {
-	p.content, err = ioutil.ReadFile(p.file)
-	return
+	p.content, err = Read(p.file)
+	if err != nil {
+		return err
+	}
+	s, err := jwt.ParseDecoratedJWT(p.content)
+	if err != nil {
+		return err
+	}
+	p.content = []byte(s)
+	return nil
 }
 
 func (p *fileImport) Validate(xtx ActionCtx, fileEndings ...string) error {
@@ -164,11 +171,11 @@ func (p *ImportAccount) Run(ctx ActionCtx) (store.Status, error) {
 			return r, nil
 		}
 	} else if claim.IsSelfSigned() || (!sameOperator && p.force) {
-		if jwt, err := claim.Encode(p.signerKP); err != nil {
+		if ajwt, err := claim.Encode(p.signerKP); err != nil {
 			r.AddError("error during encoding of self signed account jwt: %v", err)
 			return r, nil
 		} else {
-			theJWT = []byte(jwt)
+			theJWT = []byte(ajwt)
 			sameOperator = true
 		}
 	}
