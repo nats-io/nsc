@@ -74,6 +74,45 @@ func TestPub(t *testing.T) {
 	require.Equal(t, []byte(v), control.Data)
 }
 
+func TestPubPermissionViolation(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	// generate a random subject/payload
+	v := nuid.Next()
+
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-pub", v)
+	require.NoError(t, err)
+
+	// create the basic configuration
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+		"--config-file", serverconf)
+	require.NoError(t, err)
+
+	// start a server with the config at a random port
+	ports := ts.RunServerWithConfig(t, serverconf)
+
+	// with the captured ports, regenerate the operator jwt
+	// we only need the client to update
+	_, _, err = ExecuteCmd(createEditOperatorCmd(),
+		"--service-url", strings.Join(ports.Nats, ","))
+	require.NoError(t, err)
+
+	// create a conn to the server
+	nc, err := nats.Connect(strings.Join(ports.Nats, ","),
+		nats.UserCredentials(ts.KeyStore.CalcUserCredsPath("A", "U")))
+	require.NoError(t, err)
+	defer nc.Close()
+
+	// pub a message
+	_, _, err = ExecuteCmd(createPubCmd(), v, v)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Permissions Violation")
+}
+
 func TestSub(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -132,6 +171,39 @@ func TestSub(t *testing.T) {
 	case <-time.After(25 * time.Second):
 		t.Fatal("timed out")
 	}
+}
+
+func TestSubPermissionViolation(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	// generate a random subject/payload
+	v := nuid.Next()
+
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-sub", v)
+	require.NoError(t, err)
+
+	// create the basic configuration
+	conf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+		"--config-file", conf)
+	require.NoError(t, err)
+
+	// start a server with the config at a random port
+	ports := ts.RunServerWithConfig(t, conf)
+
+	// with the captured ports, regenerate the operator jwt - we only need the client to update
+	_, _, err = ExecuteCmd(createEditOperatorCmd(),
+		"--service-url", strings.Join(ports.Nats, ","))
+	require.NoError(t, err)
+
+	log.SetFlags(log.LstdFlags)
+
+	_, _, err = ExecuteCmd(createSubCmd(), "--max-messages", "1", v)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Permissions Violation")
 }
 
 func TestReq(t *testing.T) {
@@ -223,6 +295,37 @@ func TestReply(t *testing.T) {
 	m, err := nc.Request(v, []byte(v), 15*time.Second)
 	require.NoError(t, err)
 	require.Equal(t, v, string(m.Data))
+}
+
+func TestReplyPermissionViolation(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	// generate a random subject/payload
+	v := nuid.Next()
+
+	ts.AddUser(t, "A", "U")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-sub", v)
+	require.NoError(t, err)
+
+	// create the basic configuration
+	conf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+		"--config-file", conf)
+	require.NoError(t, err)
+
+	// start a server with the config at a random port
+	ports := ts.RunServerWithConfig(t, conf)
+
+	// with the captured ports, regenerate the operator jwt - we only need the client to update
+	_, _, err = ExecuteCmd(createEditOperatorCmd(),
+		"--service-url", strings.Join(ports.Nats, ","))
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createReplyCmd(), "--max-messages", "1", v)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Permissions Violation")
 }
 
 func Test_EncryptDecrypt(t *testing.T) {
