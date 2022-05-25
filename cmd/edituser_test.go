@@ -365,7 +365,7 @@ func Test_EditUserBearerToken(t *testing.T) {
 
 	_, stderr, err = ExecuteCmd(createEditUserCmd(), "--name", "U", "--bearer=false")
 	require.NoError(t, err)
-	require.Contains(t, stderr, "changed bearer to false")
+	require.Contains(t, stderr, "ignoring change to bearer - value is already false")
 
 	u, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
