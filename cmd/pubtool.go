@@ -128,6 +128,9 @@ func (p *PubParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err := nc.Flush(); err != nil {
 		return nil, err
 	}
+	if err := nc.LastError(); err != nil {
+		return nil, err
+	}
 
 	ctx.CurrentCmd().Printf("Published [%s] : %q\n", subj, payload)
 

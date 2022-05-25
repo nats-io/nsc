@@ -150,6 +150,9 @@ func (p *RepParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err := nc.Flush(); err != nil {
 		return nil, err
 	}
+	if err := nc.LastError(); err != nil {
+		return nil, err
+	}
 
 	i := 0
 	for {

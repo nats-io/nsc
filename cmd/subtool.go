@@ -149,6 +149,9 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err := nc.Flush(); err != nil {
 		return nil, err
 	}
+	if err := nc.LastError(); err != nil {
+		return nil, err
+	}
 
 	var seed string
 	if encryptFlag {
