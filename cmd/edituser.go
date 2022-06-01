@@ -53,7 +53,7 @@ nsc edit user --name <n> --rm <subject>,...
 # To dynamically allow publishing to reply subjects, this works well for service responders:
 nsc edit user --name <n> --allow-pub-response
 
-# A permission to publish a response can be removed after a duration from when 
+# A permission to publish a response can be removed after a duration from when
 # the message was received:
 nsc edit user --name <n> --allow-pub-response --response-ttl 5s
 
@@ -439,7 +439,11 @@ func (p *UserPermissionLimits) Run(ctx ActionCtx, claim *jwt.UserPermissionLimit
 
 	if flags.Changed("bearer") {
 		claim.BearerToken = p.bearer
-		r.AddOK("changed bearer to %t", p.bearer)
+		if flags.Lookup("bearer").DefValue != fmt.Sprint(p.bearer) {
+			r.AddOK("changed bearer to %t", p.bearer)
+		} else {
+			r.AddOK("ignoring change to bearer - value is already %t", p.bearer)
+		}
 	}
 
 	var connTypes jwt.StringList
