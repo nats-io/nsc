@@ -186,6 +186,7 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 		return nil, err
 	}
 
+	dataDirFlagSet := dataDir != ""
 	if dataDir == "" {
 		dataDir = home.NscDataHome(home.StoresSubDirName)
 	}
@@ -231,6 +232,9 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 			}
 			config.SetDefaults()
 		}
+	}
+	if dataDirFlagSet {
+		config.StoreRoot = dataDir
 	}
 
 	// trigger updating defaults

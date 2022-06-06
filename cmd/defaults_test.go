@@ -47,11 +47,31 @@ func TestDefault_LoadNewOnExisting(t *testing.T) {
 	require.NoError(t, WriteJson(fp, cc))
 
 	ResetForTests()
-	tc, err := LoadOrInit(filepath.Join(ts.Dir, "config"), filepath.Join(ts.Dir, "store"), "")
+	tc, err := LoadOrInit(filepath.Join(ts.Dir, "config"), "", "")
 	require.NoError(t, err)
 	require.NotNil(t, tc)
 
 	require.Equal(t, ts.GetStoresRoot(), tc.StoreRoot)
+	require.Equal(t, "operator", tc.Operator)
+	require.Equal(t, "A", tc.Account)
+}
+
+func TestDefault_LoadNewOnExistingOverride(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	ts.AddAccount(t, "A")
+
+	var cc ContextConfig
+	cc.StoreRoot = ts.GetStoresRoot()
+	fp := filepath.Join(ts.Dir, fmt.Sprintf("%s.json", GetToolName()))
+	require.NoError(t, WriteJson(fp, cc))
+
+	ResetForTests()
+	dataDir := filepath.Join(ts.Dir, "store")
+	tc, err := LoadOrInit(filepath.Join(ts.Dir, "config"), dataDir, "")
+	require.NoError(t, err)
+	require.NotNil(t, tc)
+
+	require.Equal(t, dataDir, tc.StoreRoot)
 	require.Equal(t, "operator", tc.Operator)
 	require.Equal(t, "A", tc.Account)
 }
