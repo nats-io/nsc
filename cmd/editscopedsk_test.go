@@ -101,3 +101,41 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	require.NoError(t, err)
 
 }
+
+func Test_EditScopedSk_ResolveAny(t *testing.T) {
+	ts := NewTestStore(t, "edit scope")
+	defer ts.Done(t)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+	s, pk, kp := CreateAccountKey(t)
+
+	fp, err := ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.SigningKeys, pk)
+	require.Equal(t, ac.Issuer, oc.Subject)
+
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
+		"--sk", string(s), "--subs", "10")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
+		"--sk", pk, "--subs", "10")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
+		"--sk", fp, "--subs", "10")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
+		"--sk", "foo", "--subs", "10")
+	require.Error(t, err)
+}
