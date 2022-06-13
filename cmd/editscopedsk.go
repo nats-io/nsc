@@ -92,9 +92,22 @@ func (p *EditScopedSkParams) Load(ctx ActionCtx) error {
 
 	s, found := p.claim.SigningKeys.GetScope(p.skName)
 	if !found {
-		if kp := keyByRoleName(ctx.StoreCtx().KeyStore, p.claim, p.skName); kp == nil {
+		kp := keyByRoleName(ctx.StoreCtx().KeyStore, p.claim, p.skName)
+		if kp == nil {
+			// Couldn't find key by role name.
+			// Try resolving seed, public key, or filepath.
+			kp, err = store.ResolveKey(p.skName)
+			if err != nil {
+				return err
+			}
+		}
+		if kp == nil {
+			// Still don't have a key pair, give up.
 			return fmt.Errorf("signing-key not found")
-		} else if p.skName, err = kp.PublicKey(); err != nil {
+		}
+
+		p.skName, err = kp.PublicKey()
+		if err != nil {
 			return fmt.Errorf("signing-key public key error: %s", err)
 		}
 	}
