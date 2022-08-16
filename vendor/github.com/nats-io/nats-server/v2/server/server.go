@@ -164,6 +164,7 @@ type Server struct {
 	}
 	leafRemoteCfgs     []*leafNodeCfg
 	leafRemoteAccounts sync.Map
+	leafNodeEnabled    bool
 
 	quitCh           chan struct{}
 	shutdownComplete chan struct{}
@@ -269,15 +270,24 @@ type Server struct {
 	// Keep track of what that user name is for config reload purposes.
 	sysAccOnlyNoAuthUser string
 
-	// This is a central logger for IPQueues when the number of pending
-	// messages reaches a certain thresold (per queue)
-	ipqLog *srvIPQueueLogger
-}
+	// IPQueues map
+	ipQueues sync.Map
 
-type srvIPQueueLogger struct {
-	ch   chan string
-	done chan struct{}
-	s    *Server
+	// To limit logging frequency
+	rateLimitLogging   sync.Map
+	rateLimitLoggingCh chan time.Duration
+
+	// Total outstanding catchup bytes in flight.
+	gcbMu  sync.RWMutex
+	gcbOut int64
+	// A global chanel to kick out stalled catchup sequences.
+	gcbKick chan struct{}
+
+	// Total outbound syncRequests
+	syncOutSem chan struct{}
+
+	// Queue to process JS API requests that come from routes (or gateways)
+	jsAPIRoutedReqs *ipQueue
 }
 
 // For tracking JS nodes.
@@ -364,19 +374,28 @@ func NewServer(opts *Options) (*Server, error) {
 	now := time.Now().UTC()
 
 	s := &Server{
-		kp:           kp,
-		configFile:   opts.ConfigFile,
-		info:         info,
-		prand:        rand.New(rand.NewSource(time.Now().UnixNano())),
-		opts:         opts,
-		done:         make(chan bool, 1),
-		start:        now,
-		configTime:   now,
-		gwLeafSubs:   NewSublistWithCache(),
-		httpBasePath: httpBasePath,
-		eventIds:     nuid.New(),
-		routesToSelf: make(map[string]struct{}),
-		httpReqStats: make(map[string]uint64), // Used to track HTTP requests
+		kp:                 kp,
+		configFile:         opts.ConfigFile,
+		info:               info,
+		prand:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		opts:               opts,
+		done:               make(chan bool, 1),
+		start:              now,
+		configTime:         now,
+		gwLeafSubs:         NewSublistWithCache(),
+		httpBasePath:       httpBasePath,
+		eventIds:           nuid.New(),
+		routesToSelf:       make(map[string]struct{}),
+		httpReqStats:       make(map[string]uint64), // Used to track HTTP requests
+		rateLimitLoggingCh: make(chan time.Duration, 1),
+		leafNodeEnabled:    opts.LeafNode.Port != 0 || len(opts.LeafNode.Remotes) > 0,
+		syncOutSem:         make(chan struct{}, maxConcurrentSyncRequests),
+	}
+
+	// Fill up the maximum in flight syncRequests for this server.
+	// Used in JetStream catchup semantics.
+	for i := 0; i < maxConcurrentSyncRequests; i++ {
+		s.syncOutSem <- struct{}{}
 	}
 
 	if opts.TLSRateLimit > 0 {
@@ -531,39 +550,6 @@ func NewServer(opts *Options) (*Server, error) {
 	s.handleSignals()
 
 	return s, nil
-}
-
-var semVerRe = regexp.MustCompile(`\Av?([0-9]+)\.?([0-9]+)?\.?([0-9]+)?`)
-
-func versionComponents(version string) (major, minor, patch int, err error) {
-	m := semVerRe.FindStringSubmatch(version)
-	if m == nil {
-		return 0, 0, 0, errors.New("invalid semver")
-	}
-	major, err = strconv.Atoi(m[1])
-	if err != nil {
-		return -1, -1, -1, err
-	}
-	minor, err = strconv.Atoi(m[2])
-	if err != nil {
-		return -1, -1, -1, err
-	}
-	patch, err = strconv.Atoi(m[3])
-	if err != nil {
-		return -1, -1, -1, err
-	}
-	return major, minor, patch, err
-}
-
-func versionAtLeast(version string, emajor, eminor, epatch int) bool {
-	major, minor, patch, err := versionComponents(version)
-	if err != nil {
-		return false
-	}
-	if major < emajor || minor < eminor || patch < epatch {
-		return false
-	}
-	return true
 }
 
 func (s *Server) logRejectedTLSConns() {
@@ -1265,7 +1251,7 @@ func (s *Server) setSystemAccount(acc *Account) error {
 		sid:     1,
 		servers: make(map[string]*serverUpdate),
 		replies: make(map[string]msgHandler),
-		sendq:   newIPQueue(ipQueue_Logger("System send", s.ipqLog)), // of *pubMsg
+		sendq:   s.newIPQueue("System sendQ"), // of *pubMsg
 		resetCh: make(chan struct{}),
 		sq:      s.newSendQ(),
 		statsz:  eventsHBInterval,
@@ -1397,7 +1383,7 @@ func (s *Server) registerAccountNoLock(acc *Account) *Account {
 	acc.srv = s
 	acc.updated = time.Now().UTC()
 	accName := acc.Name
-	jsEnabled := acc.jsLimits != nil
+	jsEnabled := len(acc.jsLimits) > 0
 	acc.mu.Unlock()
 
 	if opts := s.getOpts(); opts != nil && len(opts.JsAccDefaultDomain) > 0 {
@@ -1607,16 +1593,20 @@ func (s *Server) Start() {
 	s.Noticef("Starting nats-server")
 
 	gc := gitCommit
-	if gc == "" {
+	if gc == _EMPTY_ {
 		gc = "not set"
 	}
 
 	// Snapshot server options.
 	opts := s.getOpts()
+	clusterName := s.ClusterName()
 
 	s.Noticef("  Version:  %s", VERSION)
 	s.Noticef("  Git:      [%s]", gc)
 	s.Debugf("  Go build: %s", s.info.GoVersion)
+	if clusterName != _EMPTY_ {
+		s.Noticef("  Cluster:  %s", clusterName)
+	}
 	s.Noticef("  Name:     %s", s.info.Name)
 	if opts.JetStream {
 		s.Noticef("  Node:     %s", getHash(s.info.Name))
@@ -1637,7 +1627,7 @@ func (s *Server) Start() {
 	s.grRunning = true
 	s.grMu.Unlock()
 
-	s.startIPQLogger()
+	s.startRateLimitLogExpiration()
 
 	// Pprof http endpoint for the profiler.
 	if opts.ProfPort != 0 {
@@ -1747,7 +1737,7 @@ func (s *Server) Start() {
 	// own system account if one is not present.
 	if opts.JetStream {
 		// Make sure someone is not trying to enable on the system account.
-		if sa := s.SystemAccount(); sa != nil && sa.jsLimits != nil {
+		if sa := s.SystemAccount(); sa != nil && len(sa.jsLimits) > 0 {
 			s.Fatalf("Not allowed to enable JetStream on the system account")
 		}
 		cfg := &JetStreamConfig{
@@ -1775,7 +1765,7 @@ func (s *Server) Start() {
 				hasGlobal = true
 			}
 			acc.mu.RLock()
-			hasJs := acc.jsLimits != nil
+			hasJs := len(acc.jsLimits) > 0
 			acc.mu.RUnlock()
 			if hasJs {
 				s.checkJetStreamExports()
@@ -1787,7 +1777,9 @@ func (s *Server) Start() {
 		// go ahead and enable JS on $G in case we are in simple mixed mode setup.
 		if total == 2 && hasSys && hasGlobal && !s.standAloneMode() {
 			ga.mu.Lock()
-			ga.jsLimits = dynamicJSAccountLimits
+			ga.jsLimits = map[string]JetStreamAccountLimits{
+				_EMPTY_: dynamicJSAccountLimits,
+			}
 			ga.mu.Unlock()
 			s.checkJetStreamExports()
 			ga.enableAllJetStreamServiceImportsAndMappings()
@@ -2005,11 +1997,6 @@ func (s *Server) Shutdown() {
 	for doneExpected > 0 {
 		<-s.done
 		doneExpected--
-	}
-
-	// Stop the IPQueue logger (before the grWG.Wait() call)
-	if s.ipqLog != nil {
-		s.ipqLog.stop()
 	}
 
 	// Wait for go routines to be done.
@@ -2263,6 +2250,7 @@ const (
 	AccountzPath = "/accountz"
 	JszPath      = "/jsz"
 	HealthzPath  = "/healthz"
+	IPQueuesPath = "/ipqueuesz"
 )
 
 func (s *Server) basePath(p string) string {
@@ -2294,9 +2282,11 @@ func (cl *captureHTTPServerLog) Write(p []byte) (int, error) {
 // we instruct the TLS handshake to ask for the tls configuration to be
 // used for a specific client. We don't care which client, we always use
 // the same TLS configuration.
-func (s *Server) getTLSConfig(_ *tls.ClientHelloInfo) (*tls.Config, error) {
+func (s *Server) getMonitoringTLSConfig(_ *tls.ClientHelloInfo) (*tls.Config, error) {
 	opts := s.getOpts()
-	return opts.TLSConfig, nil
+	tc := opts.TLSConfig.Clone()
+	tc.ClientAuth = tls.NoClientCert
+	return tc, nil
 }
 
 // Start the monitoring server
@@ -2321,7 +2311,7 @@ func (s *Server) startMonitoring(secure bool) error {
 		}
 		hp = net.JoinHostPort(opts.HTTPHost, strconv.Itoa(port))
 		config := opts.TLSConfig.Clone()
-		config.GetConfigForClient = s.getTLSConfig
+		config.GetConfigForClient = s.getMonitoringTLSConfig
 		config.ClientAuth = tls.NoClientCert
 		httpListener, err = tls.Listen("tcp", hp, config)
 
@@ -2367,6 +2357,8 @@ func (s *Server) startMonitoring(secure bool) error {
 	mux.HandleFunc(s.basePath(JszPath), s.HandleJsz)
 	// Healthz
 	mux.HandleFunc(s.basePath(HealthzPath), s.HandleHealthz)
+	// IPQueuesz
+	mux.HandleFunc(s.basePath(IPQueuesPath), s.HandleIPQueuesz)
 
 	// Do not set a WriteTimeout because it could cause cURL/browser
 	// to return empty response or unable to display page if the
@@ -3391,7 +3383,7 @@ func (s *Server) lameDuckMode() {
 
 	// If we are running any raftNodes transfer leaders.
 	if hadTransfers := s.transferRaftLeaders(); hadTransfers {
-		// They will tranfer leadership quickly, but wait here for a second.
+		// They will transfer leadership quickly, but wait here for a second.
 		select {
 		case <-time.After(time.Second):
 		case <-s.quitCh:
@@ -3630,34 +3622,38 @@ func (s *Server) updateRemoteSubscription(acc *Account, sub *subscription, delta
 	s.updateLeafNodes(acc, sub, delta)
 }
 
-func (s *Server) startIPQLogger() {
-	s.ipqLog = &srvIPQueueLogger{
-		ch:   make(chan string, 128),
-		done: make(chan struct{}),
-		s:    s,
-	}
-	s.startGoRoutine(s.ipqLog.run)
-}
+func (s *Server) startRateLimitLogExpiration() {
+	interval := time.Second
+	s.startGoRoutine(func() {
+		defer s.grWG.Done()
 
-func (l *srvIPQueueLogger) stop() {
-	close(l.done)
-}
-
-func (l *srvIPQueueLogger) log(name string, pending int) {
-	select {
-	case l.ch <- fmt.Sprintf("%s queue pending size: %v", name, pending):
-	default:
-	}
-}
-
-func (l *srvIPQueueLogger) run() {
-	defer l.s.grWG.Done()
-	for {
-		select {
-		case w := <-l.ch:
-			l.s.Warnf("%s", w)
-		case <-l.done:
-			return
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.quitCh:
+				return
+			case interval = <-s.rateLimitLoggingCh:
+				ticker.Reset(interval)
+			case <-ticker.C:
+				s.rateLimitLogging.Range(func(k, v interface{}) bool {
+					start := v.(time.Time)
+					if time.Since(start) >= interval {
+						s.rateLimitLogging.Delete(k)
+					}
+					return true
+				})
+			}
 		}
+	})
+}
+
+func (s *Server) changeRateLimitLogInterval(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	select {
+	case s.rateLimitLoggingCh <- d:
+	default:
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"hash/maphash"
 	"io/ioutil"
 	"math"
@@ -25,6 +26,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -74,7 +76,7 @@ type Account struct {
 	imports      importMap
 	exports      exportMap
 	js           *jsAccount
-	jsLimits     *JetStreamAccountLimits
+	jsLimits     map[string]JetStreamAccountLimits
 	limits
 	expired      bool
 	incomplete   bool
@@ -160,6 +162,10 @@ const (
 	Streamed
 	Chunked
 )
+
+var commaSeparatorRegEx = regexp.MustCompile(`,\s*`)
+var partitionMappingFunctionRegEx = regexp.MustCompile(`{{\s*partition\s*\((.*)\)\s*}}`)
+var wildcardMappingFunctionRegEx = regexp.MustCompile(`{{\s*wildcard\s*\((.*)\)\s*}}`)
 
 // String helper.
 func (rt ServiceRespType) String() string {
@@ -1700,8 +1706,7 @@ func (a *Account) checkForReverseEntry(reply string, si *serviceImport, checkInt
 		return
 	}
 
-	sres := a.imports.rrMap[reply]
-	if sres == nil {
+	if sres := a.imports.rrMap[reply]; sres == nil {
 		a.mu.RUnlock()
 		return
 	}
@@ -1722,9 +1727,11 @@ func (a *Account) checkForReverseEntry(reply string, si *serviceImport, checkInt
 
 	// Delete the appropriate entries here based on optional si.
 	a.mu.Lock()
+	// We need a new lookup here because we have released the lock.
+	sres := a.imports.rrMap[reply]
 	if si == nil {
 		delete(a.imports.rrMap, reply)
-	} else {
+	} else if sres != nil {
 		// Find the one we are looking for..
 		for i, sre := range sres {
 			if sre.msub == si.from {
@@ -1743,6 +1750,8 @@ func (a *Account) checkForReverseEntry(reply string, si *serviceImport, checkInt
 	// If we are here we no longer have interest and we have
 	// response entries that we should clean up.
 	if si == nil {
+		// sres is now known to have been removed from a.imports.rrMap, so we
+		// can safely (data race wise) iterate through.
 		for _, sre := range sres {
 			acc := sre.acc
 			var trackingCleanup bool
@@ -3030,9 +3039,6 @@ func (s *Server) updateAccountClaimsWithRefresh(a *Account, ac *jwt.AccountClaim
 	}
 
 	jsEnabled := s.JetStreamEnabled()
-	if jsEnabled && a == s.SystemAccount() {
-		s.checkJetStreamExports()
-	}
 
 	streamTokenExpirationChanged := false
 	serviceTokenExpirationChanged := false
@@ -3268,15 +3274,41 @@ func (s *Server) updateAccountClaimsWithRefresh(a *Account, ac *jwt.AccountClaim
 		a.srv = s
 	}
 
-	// Setup js limits regardless of whether this server has jsEnabled.
-	if ac.Limits.JetStreamLimits.DiskStorage != 0 || ac.Limits.JetStreamLimits.MemoryStorage != 0 {
-		// JetStreamAccountLimits and jwt.JetStreamLimits use same value for unlimited
-		a.jsLimits = &JetStreamAccountLimits{
-			MaxMemory:        ac.Limits.JetStreamLimits.MemoryStorage,
-			MaxStore:         ac.Limits.JetStreamLimits.DiskStorage,
-			MaxStreams:       int(ac.Limits.JetStreamLimits.Streams),
-			MaxConsumers:     int(ac.Limits.JetStreamLimits.Consumer),
-			MaxBytesRequired: ac.Limits.JetStreamLimits.MaxBytesRequired,
+	if ac.Limits.IsJSEnabled() {
+		toUnlimited := func(value int64) int64 {
+			if value > 0 {
+				return value
+			}
+			return -1
+		}
+		if ac.Limits.JetStreamLimits.DiskStorage != 0 || ac.Limits.JetStreamLimits.MemoryStorage != 0 {
+			// JetStreamAccountLimits and jwt.JetStreamLimits use same value for unlimited
+			a.jsLimits = map[string]JetStreamAccountLimits{
+				_EMPTY_: {
+					MaxMemory:            ac.Limits.JetStreamLimits.MemoryStorage,
+					MaxStore:             ac.Limits.JetStreamLimits.DiskStorage,
+					MaxStreams:           int(ac.Limits.JetStreamLimits.Streams),
+					MaxConsumers:         int(ac.Limits.JetStreamLimits.Consumer),
+					MemoryMaxStreamBytes: toUnlimited(ac.Limits.JetStreamLimits.MemoryMaxStreamBytes),
+					StoreMaxStreamBytes:  toUnlimited(ac.Limits.JetStreamLimits.DiskMaxStreamBytes),
+					MaxBytesRequired:     ac.Limits.JetStreamLimits.MaxBytesRequired,
+					MaxAckPending:        int(toUnlimited(ac.Limits.JetStreamLimits.MaxAckPending)),
+				},
+			}
+		} else {
+			a.jsLimits = map[string]JetStreamAccountLimits{}
+			for t, l := range ac.Limits.JetStreamTieredLimits {
+				a.jsLimits[t] = JetStreamAccountLimits{
+					MaxMemory:            l.MemoryStorage,
+					MaxStore:             l.DiskStorage,
+					MaxStreams:           int(l.Streams),
+					MaxConsumers:         int(l.Consumer),
+					MemoryMaxStreamBytes: toUnlimited(l.MemoryMaxStreamBytes),
+					StoreMaxStreamBytes:  toUnlimited(l.DiskMaxStreamBytes),
+					MaxBytesRequired:     l.MaxBytesRequired,
+					MaxAckPending:        int(toUnlimited(l.MaxAckPending)),
+				}
+			}
 		}
 	} else if a.jsLimits != nil {
 		// covers failed update followed by disable
@@ -4132,18 +4164,65 @@ type transform struct {
 	src, dest string
 	dtoks     []string
 	stoks     []string
-	dtpi      []int8
+	dtpi      [][]int // destination token position indexes
+	dtpinp    []int32 // destination token position index number of partitions
 }
 
-// Helper to pull raw place holder index. Returns -1 if not a place holder.
-func placeHolderIndex(token string) int {
-	if len(token) > 1 && token[0] == '$' {
-		var tp int
-		if n, err := fmt.Sscanf(token, "$%d", &tp); err == nil && n == 1 {
-			return tp
+func getMappingFunctionArgs(functionRegEx *regexp.Regexp, token string) []string {
+	commandStrings := functionRegEx.FindStringSubmatch(token)
+	if len(commandStrings) > 1 {
+		return commaSeparatorRegEx.Split(commandStrings[1], -1)
+	}
+	return nil
+}
+
+// Helper to pull raw place holder indexes and number of partitions. Returns -1 if not a place holder.
+func placeHolderIndex(token string) ([]int, int32, error) {
+	if len(token) > 1 {
+		// old $1, $2, etc... mapping format still supported to maintain backwards compatibility
+		if token[0] == '$' { // simple non-partition mapping
+			tp, err := strconv.Atoi(token[1:])
+			if err != nil {
+				return []int{-1}, -1, nil
+			}
+			return []int{tp}, -1, nil
+		}
+
+		// New 'moustache' style mapping
+		// wildcard(wildcard token index) (equivalent to $)
+		args := getMappingFunctionArgs(wildcardMappingFunctionRegEx, token)
+		if args != nil {
+			if len(args) == 1 {
+				tp, err := strconv.Atoi(strings.Trim(args[0], " "))
+				if err != nil {
+					return []int{}, -1, err
+				}
+				return []int{tp}, -1, nil
+			}
+		}
+
+		// partition(number of partitions, token1, token2, ...)
+		args = getMappingFunctionArgs(partitionMappingFunctionRegEx, token)
+		if args != nil {
+			if len(args) >= 2 {
+				tphnp, err := strconv.Atoi(strings.Trim(args[0], " "))
+				if err != nil {
+					return []int{}, -1, err
+				}
+				var numPositions = len(args[1:])
+				tps := make([]int, numPositions)
+				for ti, t := range args[1:] {
+					i, err := strconv.Atoi(strings.Trim(t, " "))
+					if err != nil {
+						return []int{}, -1, err
+					}
+					tps[ti] = i
+				}
+				return tps, int32(tphnp), nil
+			}
 		}
 	}
-	return -1
+	return []int{-1}, -1, nil
 }
 
 // newTransform will create a new transform checking the src and dest subjects for accuracy.
@@ -4157,7 +4236,8 @@ func newTransform(src, dest string) (*transform, error) {
 		return nil, ErrBadSubject
 	}
 
-	var dtpi []int8
+	var dtpi [][]int
+	var dtpinb []int32
 
 	// If the src has partial wildcards then the dest needs to have the token place markers.
 	if npwcs > 0 || hasFwc {
@@ -4171,25 +4251,33 @@ func newTransform(src, dest string) (*transform, error) {
 
 		nphs := 0
 		for _, token := range dtokens {
-			tp := placeHolderIndex(token)
-			if tp >= 0 {
-				if tp > npwcs {
-					return nil, ErrBadSubject
-				}
+			tp, nb, err := placeHolderIndex(token)
+			if err != nil {
+				return nil, ErrBadSubjectMappingDestination
+			}
+			if tp[0] >= 0 {
 				nphs++
 				// Now build up our runtime mapping from dest to source tokens.
-				dtpi = append(dtpi, int8(sti[tp]))
+				var stis []int
+				for _, position := range tp {
+					if position > npwcs {
+						return nil, ErrBadSubjectMappingDestination
+					}
+					stis = append(stis, sti[position])
+				}
+				dtpi = append(dtpi, stis)
+				dtpinb = append(dtpinb, nb)
 			} else {
-				dtpi = append(dtpi, -1)
+				dtpi = append(dtpi, []int{-1})
+				dtpinb = append(dtpinb, -1)
 			}
 		}
-
-		if nphs != npwcs {
-			return nil, ErrBadSubject
+		if nphs < npwcs {
+			return nil, ErrBadSubjectMappingDestination
 		}
 	}
 
-	return &transform{src: src, dest: dest, dtoks: dtokens, stoks: stokens, dtpi: dtpi}, nil
+	return &transform{src: src, dest: dest, dtoks: dtokens, stoks: stokens, dtpi: dtpi, dtpinp: dtpinb}, nil
 }
 
 // match will take a literal published subject that is associated with a client and will match and transform
@@ -4233,6 +4321,13 @@ func (tr *transform) transformSubject(subject string) (string, error) {
 	return tr.transform(tts)
 }
 
+func (tr *transform) getHashPartition(key []byte, numBuckets int) string {
+	h := fnv.New32a()
+	h.Write(key)
+
+	return strconv.Itoa(int(h.Sum32() % uint32(numBuckets)))
+}
+
 // Do a transform on the subject to the dest subject.
 func (tr *transform) transform(tokens []string) (string, error) {
 	if len(tr.dtpi) == 0 {
@@ -4248,7 +4343,7 @@ func (tr *transform) transform(tokens []string) (string, error) {
 	li := len(tr.dtpi) - 1
 	for i, index := range tr.dtpi {
 		// <0 means use destination token.
-		if index < 0 {
+		if index[0] < 0 {
 			token = tr.dtoks[i]
 			// Break if fwc
 			if len(token) == 1 && token[0] == fwc {
@@ -4256,7 +4351,18 @@ func (tr *transform) transform(tokens []string) (string, error) {
 			}
 		} else {
 			// >= 0 means use source map index to figure out which source token to pull.
-			token = tokens[index]
+			if tr.dtpinp[i] > 0 { // there is a valid (i.e. not -1) value for number of partitions, this is a partition transform token
+				var (
+					_buffer       [64]byte
+					keyForHashing = _buffer[:0]
+				)
+				for _, sourceToken := range tr.dtpi[i] {
+					keyForHashing = append(keyForHashing, []byte(tokens[sourceToken])...)
+				}
+				token = tr.getHashPartition(keyForHashing, int(tr.dtpinp[i]))
+			} else { // back to normal substitution
+				token = tokens[tr.dtpi[i][0]]
+			}
 		}
 		b.WriteString(token)
 		if i < li {

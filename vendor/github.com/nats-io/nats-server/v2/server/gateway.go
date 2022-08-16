@@ -1013,6 +1013,13 @@ func (c *client) processGatewayInfo(info *Info) {
 			return
 		}
 
+		// Check for duplicate server name with servers in our cluster
+		if s.isDuplicateServerName(info.Name) {
+			c.Errorf("Remote server has a duplicate name: %q", info.Name)
+			c.closeConnection(DuplicateServerName)
+			return
+		}
+
 		// Possibly add URLs that we get from the INFO protocol.
 		if len(info.GatewayURLs) > 0 {
 			cfg.updateURLs(info.GatewayURLs)
@@ -1083,6 +1090,13 @@ func (c *client) processGatewayInfo(info *Info) {
 
 	} else if isFirstINFO {
 		// This is the first INFO of an inbound connection...
+
+		// Check for duplicate server name with servers in our cluster
+		if s.isDuplicateServerName(info.Name) {
+			c.Errorf("Remote server has a duplicate name: %q", info.Name)
+			c.closeConnection(DuplicateServerName)
+			return
+		}
 
 		s.registerInboundGatewayConnection(cid, c)
 		c.Noticef("Inbound gateway connection from %q (%s) registered", info.Gateway, info.ID)
@@ -2810,7 +2824,7 @@ func (c *client) handleGatewayReply(msg []byte) (processed bool) {
 	// If route is nil, we will process the incoming message locally.
 	if route == nil {
 		// Check if this is a service reply subject (_R_)
-		isServiceReply := len(acc.imports.services) > 0 && isServiceReply(c.pa.subject)
+		isServiceReply := isServiceReply(c.pa.subject)
 
 		var queues [][]byte
 		if len(r.psubs)+len(r.qsubs) > 0 {

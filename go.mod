@@ -9,11 +9,11 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
-	github.com/nats-io/jsm.go v0.0.30
+	github.com/nats-io/jsm.go v0.0.33
 	github.com/nats-io/jwt v1.2.2
-	github.com/nats-io/jwt/v2 v2.2.1-0.20220509180118-3bcd719cc7d0
-	github.com/nats-io/nats-server/v2 v2.7.5-0.20220309212130-5c0d1999ff72
-	github.com/nats-io/nats.go v1.13.1-0.20220308171302-2f2f6968e98d
+	github.com/nats-io/jwt/v2 v2.3.0
+	github.com/nats-io/nats-server/v2 v2.8.4
+	github.com/nats-io/nats.go v1.16.0
 	github.com/nats-io/nkeys v0.3.0
 	github.com/nats-io/nuid v1.0.1
 	github.com/onsi/gomega v1.4.3 // indirect
