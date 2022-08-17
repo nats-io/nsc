@@ -5,6 +5,15 @@
 
 #include "textflag.h"
 
+// func _dummy_()
+TEXT ·_dummy_(SB), $0
+#ifdef GOAMD64_v4
+#ifndef GOAMD64_v3
+#define GOAMD64_v3
+#endif
+#endif
+	RET
+
 // func encodeBlockAsm(dst []byte, src []byte) int
 // Requires: BMI, SSE2
 TEXT ·encodeBlockAsm(SB), $65560-56
@@ -253,17 +262,6 @@ matchlen_loopback_repeat_extend_encodeBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -791,17 +789,6 @@ matchlen_loopback_match_nolit_encodeBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -1134,17 +1121,36 @@ memmove_emit_remainder_encodeBlockAsm:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm
 
 emit_lit_memmove_emit_remainder_encodeBlockAsm_memmove_move_8through16:
@@ -1466,17 +1472,6 @@ matchlen_loopback_repeat_extend_encodeBlockAsm4MB:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -1963,17 +1958,6 @@ matchlen_loopback_match_nolit_encodeBlockAsm4MB:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -2276,17 +2260,36 @@ memmove_emit_remainder_encodeBlockAsm4MB:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm4MB
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm4MB
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm4MB
 
 emit_lit_memmove_emit_remainder_encodeBlockAsm4MB_memmove_move_8through16:
@@ -2597,17 +2600,6 @@ matchlen_loopback_repeat_extend_encodeBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -2979,17 +2971,6 @@ matchlen_loopback_match_nolit_encodeBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -3189,17 +3170,36 @@ memmove_emit_remainder_encodeBlockAsm12B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm12B
 
 emit_lit_memmove_emit_remainder_encodeBlockAsm12B_memmove_move_8through16:
@@ -3510,17 +3510,6 @@ matchlen_loopback_repeat_extend_encodeBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -3892,17 +3881,6 @@ matchlen_loopback_match_nolit_encodeBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -4102,17 +4080,36 @@ memmove_emit_remainder_encodeBlockAsm10B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm10B
 
 emit_lit_memmove_emit_remainder_encodeBlockAsm10B_memmove_move_8through16:
@@ -4423,17 +4420,6 @@ matchlen_loopback_repeat_extend_encodeBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -4795,17 +4781,6 @@ matchlen_loopback_match_nolit_encodeBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -4999,17 +4974,36 @@ memmove_emit_remainder_encodeBlockAsm8B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeBlockAsm8B
 
 emit_lit_memmove_emit_remainder_encodeBlockAsm8B_memmove_move_8through16:
@@ -5225,17 +5219,6 @@ matchlen_loopback_match_nolit_encodeBetterBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -5979,8 +5962,9 @@ memmove_emit_remainder_encodeBetterBlockAsm:
 	MOVL SI, BX
 
 	// genMemMoveShort
-	CMPQ BX, $0x04
-	JLE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_4
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_3
 	CMPQ BX, $0x08
 	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_4through7
 	CMPQ BX, $0x10
@@ -5989,9 +5973,18 @@ memmove_emit_remainder_encodeBetterBlockAsm:
 	JBE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_4:
-	MOVL (CX), SI
-	MOVL SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
 	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm
 
 emit_lit_memmove_emit_remainder_encodeBetterBlockAsm_memmove_move_4through7:
@@ -6214,17 +6207,6 @@ matchlen_loopback_match_nolit_encodeBetterBlockAsm4MB:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -6911,8 +6893,9 @@ memmove_emit_remainder_encodeBetterBlockAsm4MB:
 	MOVL SI, BX
 
 	// genMemMoveShort
-	CMPQ BX, $0x04
-	JLE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_4
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_3
 	CMPQ BX, $0x08
 	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_4through7
 	CMPQ BX, $0x10
@@ -6921,9 +6904,18 @@ memmove_emit_remainder_encodeBetterBlockAsm4MB:
 	JBE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_4:
-	MOVL (CX), SI
-	MOVL SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm4MB
+
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
 	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm4MB
 
 emit_lit_memmove_emit_remainder_encodeBetterBlockAsm4MB_memmove_move_4through7:
@@ -7138,17 +7130,6 @@ matchlen_loopback_match_nolit_encodeBetterBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -7689,8 +7670,9 @@ memmove_emit_remainder_encodeBetterBlockAsm12B:
 	MOVL SI, BX
 
 	// genMemMoveShort
-	CMPQ BX, $0x04
-	JLE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_4
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_3
 	CMPQ BX, $0x08
 	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_4through7
 	CMPQ BX, $0x10
@@ -7699,9 +7681,18 @@ memmove_emit_remainder_encodeBetterBlockAsm12B:
 	JBE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_4:
-	MOVL (CX), SI
-	MOVL SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
 	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm12B
 
 emit_lit_memmove_emit_remainder_encodeBetterBlockAsm12B_memmove_move_4through7:
@@ -7916,17 +7907,6 @@ matchlen_loopback_match_nolit_encodeBetterBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -8467,8 +8447,9 @@ memmove_emit_remainder_encodeBetterBlockAsm10B:
 	MOVL SI, BX
 
 	// genMemMoveShort
-	CMPQ BX, $0x04
-	JLE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_4
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_3
 	CMPQ BX, $0x08
 	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_4through7
 	CMPQ BX, $0x10
@@ -8477,9 +8458,18 @@ memmove_emit_remainder_encodeBetterBlockAsm10B:
 	JBE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_4:
-	MOVL (CX), SI
-	MOVL SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
 	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm10B
 
 emit_lit_memmove_emit_remainder_encodeBetterBlockAsm10B_memmove_move_4through7:
@@ -8694,17 +8684,6 @@ matchlen_loopback_match_nolit_encodeBetterBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -9235,8 +9214,9 @@ memmove_emit_remainder_encodeBetterBlockAsm8B:
 	MOVL SI, BX
 
 	// genMemMoveShort
-	CMPQ BX, $0x04
-	JLE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_4
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_3
 	CMPQ BX, $0x08
 	JB   emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_4through7
 	CMPQ BX, $0x10
@@ -9245,9 +9225,18 @@ memmove_emit_remainder_encodeBetterBlockAsm8B:
 	JBE  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_4:
-	MOVL (CX), SI
-	MOVL SI, (AX)
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
 	JMP  memmove_end_copy_emit_remainder_encodeBetterBlockAsm8B
 
 emit_lit_memmove_emit_remainder_encodeBetterBlockAsm8B_memmove_move_4through7:
@@ -9584,17 +9573,6 @@ matchlen_loopback_repeat_extend_encodeSnappyBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R10, R10
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R10, R10
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R10, R10
 
@@ -9918,17 +9896,6 @@ matchlen_loopback_match_nolit_encodeSnappyBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -10127,17 +10094,36 @@ memmove_emit_remainder_encodeSnappyBlockAsm:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm
 
 emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm_memmove_move_8through16:
@@ -10448,17 +10434,6 @@ matchlen_loopback_repeat_extend_encodeSnappyBlockAsm64K:
 #ifdef GOAMD64_v3
 	TZCNTQ R10, R10
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R10, R10
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R10, R10
 
@@ -10739,17 +10714,6 @@ matchlen_loopback_match_nolit_encodeSnappyBlockAsm64K:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -10905,17 +10869,36 @@ memmove_emit_remainder_encodeSnappyBlockAsm64K:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm64K
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm64K
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm64K
 
 emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm64K_memmove_move_8through16:
@@ -11226,17 +11209,6 @@ matchlen_loopback_repeat_extend_encodeSnappyBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R10, R10
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R10, R10
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R10, R10
 
@@ -11517,17 +11489,6 @@ matchlen_loopback_match_nolit_encodeSnappyBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -11683,17 +11644,36 @@ memmove_emit_remainder_encodeSnappyBlockAsm12B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm12B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm12B_memmove_move_8through16:
@@ -12004,17 +11984,6 @@ matchlen_loopback_repeat_extend_encodeSnappyBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R10, R10
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R10, R10
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R10, R10
 
@@ -12295,17 +12264,6 @@ matchlen_loopback_match_nolit_encodeSnappyBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -12461,17 +12419,36 @@ memmove_emit_remainder_encodeSnappyBlockAsm10B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm10B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm10B_memmove_move_8through16:
@@ -12782,17 +12759,6 @@ matchlen_loopback_repeat_extend_encodeSnappyBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R10, R10
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R10, R10
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R10, R10
 
@@ -13071,17 +13037,6 @@ matchlen_loopback_match_nolit_encodeSnappyBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R9, R9
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R9, R9
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R9, R9
 
@@ -13235,17 +13190,36 @@ memmove_emit_remainder_encodeSnappyBlockAsm8B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBlockAsm8B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBlockAsm8B_memmove_move_8through16:
@@ -13461,17 +13435,6 @@ matchlen_loopback_match_nolit_encodeSnappyBetterBlockAsm:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -13850,17 +13813,36 @@ memmove_emit_remainder_encodeSnappyBetterBlockAsm:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm
 
 emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm_memmove_move_8through16:
@@ -14068,17 +14050,6 @@ matchlen_loopback_match_nolit_encodeSnappyBetterBlockAsm64K:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -14386,17 +14357,36 @@ memmove_emit_remainder_encodeSnappyBetterBlockAsm64K:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm64K
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm64K
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm64K
 
 emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm64K_memmove_move_8through16:
@@ -14604,17 +14594,6 @@ matchlen_loopback_match_nolit_encodeSnappyBetterBlockAsm12B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -14922,17 +14901,36 @@ memmove_emit_remainder_encodeSnappyBetterBlockAsm12B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm12B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm12B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm12B_memmove_move_8through16:
@@ -15140,17 +15138,6 @@ matchlen_loopback_match_nolit_encodeSnappyBetterBlockAsm10B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -15458,17 +15445,36 @@ memmove_emit_remainder_encodeSnappyBetterBlockAsm10B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm10B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm10B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm10B_memmove_move_8through16:
@@ -15676,17 +15682,6 @@ matchlen_loopback_match_nolit_encodeSnappyBetterBlockAsm8B:
 #ifdef GOAMD64_v3
 	TZCNTQ R11, R11
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ R11, R11
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ R11, R11
 
@@ -15992,17 +15987,36 @@ memmove_emit_remainder_encodeSnappyBetterBlockAsm8B:
 	MOVL SI, BX
 
 	// genMemMoveShort
+	CMPQ BX, $0x03
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_1or2
+	JE   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_3
 	CMPQ BX, $0x08
-	JLE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_8
+	JB   emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_4through7
 	CMPQ BX, $0x10
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_8through16
 	CMPQ BX, $0x20
 	JBE  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_17through32
 	JMP  emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_33through64
 
-emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_8:
-	MOVQ (CX), SI
-	MOVQ SI, (AX)
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_1or2:
+	MOVB (CX), SI
+	MOVB -1(CX)(BX*1), CL
+	MOVB SI, (AX)
+	MOVB CL, -1(AX)(BX*1)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_3:
+	MOVW (CX), SI
+	MOVB 2(CX), CL
+	MOVW SI, (AX)
+	MOVB CL, 2(AX)
+	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm8B
+
+emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_4through7:
+	MOVL (CX), SI
+	MOVL -4(CX)(BX*1), CX
+	MOVL SI, (AX)
+	MOVL CX, -4(AX)(BX*1)
 	JMP  memmove_end_copy_emit_remainder_encodeSnappyBetterBlockAsm8B
 
 emit_lit_memmove_emit_remainder_encodeSnappyBetterBlockAsm8B_memmove_move_8through16:
@@ -16644,17 +16658,6 @@ matchlen_loopback_standalone:
 #ifdef GOAMD64_v3
 	TZCNTQ BX, BX
 
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef GOAMD64_v4
-	TZCNTQ BX, BX
-
-#define TZCNTQ_EMITTED 1
-#endif
-
-#ifdef TZCNTQ_EMITTED
-#undef TZCNTQ_EMITTED
 #else
 	BSFQ BX, BX
 

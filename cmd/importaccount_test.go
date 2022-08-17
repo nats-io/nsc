@@ -95,6 +95,7 @@ func Test_ImportDecoratedAccount(t *testing.T) {
 	require.NoError(t, err)
 	normal := filepath.Join(ts.Dir, "a.jwt")
 	err = Write(normal, a)
+	require.NoError(t, err)
 
 	// save a decorated jwt
 	decorated := filepath.Join(ts.Dir, "decorated_a.jwt")

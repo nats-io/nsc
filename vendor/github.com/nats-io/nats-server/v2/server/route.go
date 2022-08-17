@@ -582,7 +582,7 @@ func (c *client) processRouteInfo(info *Info) {
 		c.mu.Unlock()
 		// This is now an error and we close the connection. We need unique names for JetStream clustering.
 		c.Errorf("Remote server has a duplicate name: %q", info.Name)
-		c.closeConnection(DuplicateRoute)
+		c.closeConnection(DuplicateServerName)
 		return
 	}
 
@@ -1289,7 +1289,7 @@ func (s *Server) createRoute(conn net.Conn, rURL *url.URL) *client {
 		}
 	}
 
-	c := &client{srv: s, nc: conn, opts: ClientOpts{}, kind: ROUTER, msubs: -1, mpay: -1, route: r}
+	c := &client{srv: s, nc: conn, opts: ClientOpts{}, kind: ROUTER, msubs: -1, mpay: -1, route: r, start: time.Now()}
 
 	// Grab server variables
 	s.mu.Lock()
@@ -2026,4 +2026,25 @@ func (s *Server) removeRoute(c *client) {
 	}
 	s.removeFromTempClients(cid)
 	s.mu.Unlock()
+}
+
+func (s *Server) isDuplicateServerName(name string) bool {
+	if name == _EMPTY_ {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.info.Name == name {
+		return true
+	}
+	for _, r := range s.routes {
+		r.mu.Lock()
+		duplicate := r.route.remoteName == name
+		r.mu.Unlock()
+		if duplicate {
+			return true
+		}
+	}
+	return false
 }
