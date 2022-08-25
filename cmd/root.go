@@ -195,6 +195,10 @@ var rootCmd = &cobra.Command{
 		}
 		return nil
 	},
+	Run: func(cmd *cobra.Command, args []string) {
+		// we are only called when asked for the version
+		cmd.Printf("nsc version %s\n", cmd.Version)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -238,7 +242,9 @@ func SetEnvOptions() {
 
 func init() {
 	SetEnvOptions()
-	HoistRootFlags(GetRootCmd())
+	root := GetRootCmd()
+	root.Flags().BoolP("version", "v", false, "version for nsc")
+	HoistRootFlags(root)
 }
 
 // HoistRootFlags adds persistent flags that would be added by the cobra framework
