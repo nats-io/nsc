@@ -39,6 +39,9 @@ func (e *SigningKeysParams) BindFlags(flagName string, shorthand string, kind nk
 }
 
 func (e *SigningKeysParams) valid(s string) error {
+	if s == "generate" {
+		return nil
+	}
 	_, err := e.resolve(s)
 	return err
 }
