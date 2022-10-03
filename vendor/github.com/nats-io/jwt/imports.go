@@ -62,7 +62,7 @@ func (i *Import) Validate(actPubKey string, vr *ValidationResults) {
 	}
 
 	if i.Account == "" {
-		vr.AddWarning("account to import from is not specified")
+		vr.AddError("account to import from is not specified")
 	}
 
 	i.Subject.Validate(vr)
@@ -78,22 +78,22 @@ func (i *Import) Validate(actPubKey string, vr *ValidationResults) {
 
 	if i.Token != "" {
 		// Check to see if its an embedded JWT or a URL.
-		if url, err := url.Parse(i.Token); err == nil && url.Scheme != "" {
+		if u, err := url.Parse(i.Token); err == nil && u.Scheme != "" {
 			c := &http.Client{Timeout: 5 * time.Second}
-			resp, err := c.Get(url.String())
+			resp, err := c.Get(u.String())
 			if err != nil {
-				vr.AddWarning("import %s contains an unreachable token URL %q", i.Subject, i.Token)
+				vr.AddError("import %s contains an unreachable token URL %q", i.Subject, i.Token)
 			}
 
 			if resp != nil {
 				defer resp.Body.Close()
 				body, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
-					vr.AddWarning("import %s contains an unreadable token URL %q", i.Subject, i.Token)
+					vr.AddError("import %s contains an unreadable token URL %q", i.Subject, i.Token)
 				} else {
 					act, err = DecodeActivationClaims(string(body))
 					if err != nil {
-						vr.AddWarning("import %s contains a url %q with an invalid activation token", i.Subject, i.Token)
+						vr.AddError("import %s contains a URL %q with an invalid activation token", i.Subject, i.Token)
 					}
 				}
 			}
@@ -101,23 +101,30 @@ func (i *Import) Validate(actPubKey string, vr *ValidationResults) {
 			var err error
 			act, err = DecodeActivationClaims(i.Token)
 			if err != nil {
-				vr.AddWarning("import %q contains an invalid activation token", i.Subject)
+				vr.AddError("import %q contains an invalid activation token", i.Subject)
 			}
 		}
 	}
 
 	if act != nil {
-		if act.Issuer != i.Account {
-			vr.AddWarning("activation token doesn't match account for import %q", i.Subject)
+		if !(act.Issuer == i.Account || act.IssuerAccount == i.Account) {
+			vr.AddError("activation token doesn't match account for import %q", i.Subject)
 		}
-
 		if act.ClaimsData.Subject != actPubKey {
-			vr.AddWarning("activation token doesn't match account it is being included in, %q", i.Subject)
+			vr.AddError("activation token doesn't match account it is being included in, %q", i.Subject)
 		}
-	} else {
-		vr.AddWarning("no activation provided for import %s", i.Subject)
+		if act.ImportType != i.Type {
+			vr.AddError("mismatch between token import type %s and type of import %s", act.ImportType, i.Type)
+		}
+		act.validateWithTimeChecks(vr, false)
+		subj := i.Subject
+		if i.IsService() && i.To != "" {
+			subj = i.To
+		}
+		if !subj.IsContainedIn(act.ImportSubject) {
+			vr.AddError("activation token import subject %q doesn't match import %q", act.ImportSubject, i.Subject)
+		}
 	}
-
 }
 
 // Imports is a list of import structs

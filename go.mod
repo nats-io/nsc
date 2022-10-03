@@ -10,7 +10,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jsm.go v0.0.33
-	github.com/nats-io/jwt v1.2.2
+	github.com/nats-io/jwt v1.2.3-0.20210314221642-a826c77dc9d2
 	github.com/nats-io/jwt/v2 v2.3.0
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
@@ -23,8 +23,9 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.8 // indirect
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
+	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
 
 go 1.16
