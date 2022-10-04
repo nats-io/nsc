@@ -423,7 +423,6 @@ func obtainRequestKey(ctx ActionCtx, subPrune *store.Report) (nkeys.KeyPair, str
 	}
 	var okp nkeys.KeyPair
 	for _, k := range keys {
-		var err error
 		if okp, err = ctx.StoreCtx().KeyStore.GetKeyPair(k); err == nil {
 			break
 		}
