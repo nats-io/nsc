@@ -16,7 +16,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+
+	"strconv"
 	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
@@ -25,9 +28,6 @@ import (
 	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
 )
-
-// blank limits
-var blankLimits = jwt.JetStreamLimits{}
 
 func validatorUrlOrEmpty() cli.Opt {
 	return cli.Val(func(v string) error {
@@ -48,14 +48,14 @@ func validatorMaxLen(max int) cli.Opt {
 }
 
 func createEditAccount() *cobra.Command {
-	var params EditAccountParams
+	params := &EditAccountParams{}
 	cmd := &cobra.Command{
 		Use:          "account",
 		Short:        "Edit an account",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunAction(cmd, args, &params)
+			return RunAction(cmd, args, params)
 		},
 	}
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
@@ -75,12 +75,12 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.subscriptions, "subscriptions", "", "set maximum subscription for the account (-1 is unlimited)")
 	// changed flag names by prefixing them with js-
 	// to replace them mark the old names as hidden (so using them does not break) and add new flags with correct name
-	cmd.Flags().VarP(&params.memStorage, "mem-storage", "", "")
-	cmd.Flags().VarP(&params.diskStorage, "disk-storage", "", "")
-	params.streams = -1
-	cmd.Flags().VarP(&params.streams, "streams", "", "")
-	params.consumer = -1
-	cmd.Flags().VarP(&params.consumer, "consumer", "", "")
+	cmd.Flags().VarP(&params.MemStorage, "mem-storage", "", "")
+	cmd.Flags().VarP(&params.DiskStorage, "disk-storage", "", "")
+	params.Streams = -1
+	cmd.Flags().VarP(&params.Streams, "streams", "", "")
+	params.Consumer = -1
+	cmd.Flags().VarP(&params.Consumer, "consumer", "", "")
 	cmd.Flags().MarkHidden("mem-storage")
 	cmd.Flags().MarkHidden("disk-storage")
 	cmd.Flags().MarkHidden("streams")
@@ -89,6 +89,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().MarkDeprecated("disk-storage", "it got renamed to --js-disk-storage")
 	cmd.Flags().MarkDeprecated("streams", "it got renamed to --js-streams")
 	cmd.Flags().MarkDeprecated("consumer", "it got renamed to --js-consumer")
+
 	cmd.Flags().BoolVarP(&params.exportsWc, "wildcard-exports", "", true, "exports can contain wildcards")
 	cmd.Flags().BoolVarP(&params.disallowBearer, "disallow-bearer", "", false, "require user jwt to not be bearer token")
 	cmd.Flags().StringSliceVarP(&params.rmSigningKeys, "rm-sk", "", nil, "remove signing key - comma separated list or option can be specified multiple times")
@@ -97,11 +98,24 @@ func createEditAccount() *cobra.Command {
 	params.PermissionsParams.bindSetFlags(cmd, "default permissions")
 	params.PermissionsParams.bindRemoveFlags(cmd, "default permissions")
 
-	// global JS settings
-	params.bindTierLimits("", cmd)
-	// tiered R1 and R3
-	params.bindTierLimits("R1", cmd)
-	params.bindTierLimits("R3", cmd)
+	// jetstream limits
+	// tier applies to all assets
+	params.Tier = 0
+	cmd.Flags().IntVarP(&params.Tier, "js-tier", "", 0, "JetStream: replication tier (0 creates a configuration that applies to all assets) ")
+	cmd.Flags().IntVarP(&params.DeleteTier, "rm-js-tier", "", -1, "JetStream: remove replication limits for the specified tier (0 is the global tier) this flag is exclusive of all other js flags")
+	cmd.Flags().VarP(&params.MemStorage, "js-mem-storage", "", "JetStream: set maximum memory storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	cmd.Flags().VarP(&params.DiskStorage, "js-disk-storage", "", "JetStream: set maximum disk storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	params.Streams = -1
+	cmd.Flags().VarP(&params.Streams, "js-streams", "", "JetStream: set maximum streams for the account (-1 is unlimited)")
+	params.Consumer = -1
+	cmd.Flags().VarP(&params.Consumer, "js-consumer", "", "JetStream: set maximum consumer for the account (-1 is unlimited)")
+	params.MemMaxStreamBytes = -1
+	cmd.Flags().VarP(&params.MemMaxStreamBytes, "js-max-mem-stream", "", "JetStream: set maximum size of a memory stream for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	params.DiskMaxStreamBytes = -1
+	cmd.Flags().VarP(&params.DiskMaxStreamBytes, "js-max-disk-stream", "", "JetStream: set maximum size of a disk stream for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)")
+	cmd.Flags().BoolVarP(&params.MaxBytesRequired, "js-max-bytes-required", "", false, "JetStream: set whether max stream is required when creating a stream")
+	params.MaxAckPending = -1
+	cmd.Flags().VarP(&params.MaxAckPending, "js-max-ack-pending", "", "JetStream: set number of maximum acks that can be pending for a consumer in the account")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
@@ -114,14 +128,16 @@ func init() {
 }
 
 type JetStreamLimitParams struct {
-	memStorage         NumberParams
-	diskStorage        NumberParams
-	streams            NumberParams
-	consumer           NumberParams
-	memMaxStreamBytes  NumberParams
-	diskMaxStreamBytes NumberParams
-	maxBytesRequired   bool
-	maxAckPending      NumberParams
+	Tier               int
+	DeleteTier         int
+	MemStorage         NumberParams
+	DiskStorage        NumberParams
+	Streams            NumberParams
+	Consumer           NumberParams
+	MemMaxStreamBytes  NumberParams
+	DiskMaxStreamBytes NumberParams
+	MaxBytesRequired   bool
+	MaxAckPending      NumberParams
 }
 
 type EditAccountParams struct {
@@ -145,8 +161,6 @@ type EditAccountParams struct {
 	data           NumberParams
 	signingKeys    SigningKeysParams
 	rmSigningKeys  []string
-	r1             JetStreamLimitParams
-	r3             JetStreamLimitParams
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -156,19 +170,35 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
+	hasDeleteTier := ctx.AnySet("rm-js-tier")
+	hasJsSetFlags := ctx.AnySet("js-tier", "js-mem-storage",
+		"js-disk-storage",
+		"js-streams",
+		"js-consumer",
+		"js-max-mem-stream",
+		"js-max-disk-stream",
+		"js-max-bytes-required",
+		"js-max-ack-pending")
+
+	if hasDeleteTier == true && hasJsSetFlags {
+		return fmt.Errorf("rm-js-tier is exclusive of all other js options")
+	}
+
 	if !InteractiveFlag && ctx.NothingToDo(
 		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions",
 		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
 		"allow-pub-response", "allow-pub", "allow-pubsub", "allow-sub", "deny-pub", "deny-pubsub", "deny-sub",
 		"rm-response-perms", "rm", "max-responses", "mem-storage", "disk-storage", "streams", "consumer", "disallow-bearer",
-		"js-mem-storage", "js-r1-mem-storage", "js-r3-mem-storage",
-		"js-disk-storage", "js-r1-disk-storage", "js-r3-disk-storage",
-		"js-streams", "js-r1-streams", "js-r3-streams",
-		"js-consumer", "js-r1-consumer", "js-r3-consumer",
-		"js-max-mem-stream", "js-r1-max-mem-stream", "js-r3-max-mem-stream",
-		"js-max-disk-stream", "js-r1-max-disk-stream", "js-r3-max-disk-stream",
-		"js-max-bytes-required", "js-r1-max-bytes-required", "js-r3-max-bytes-required",
-		"js-max-ack-pending", "js-r1-max-ack-pending", "js-r3-max-ack-pending") {
+		"js-tier",
+		"rm-js-tier",
+		"js-mem-storage",
+		"js-disk-storage",
+		"js-streams",
+		"js-consumer",
+		"js-max-mem-stream",
+		"js-max-disk-stream",
+		"js-max-bytes-required",
+		"js-max-ack-pending") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -183,161 +213,104 @@ func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
 	return nil
 }
 
-// flag generated a tiered flag name js-mem-storage => js-r1-mem-storage
-func flagName(name, tier string) string {
-	if tier == "" {
-		return name
-	}
-	tier = strings.ToLower(tier)
-	post := strings.TrimPrefix(name, "js-")
-	return fmt.Sprintf("js-%s-%s", tier, post)
-}
-
-func (p *EditAccountParams) getTierLimitsParams(tier string) (*JetStreamLimitParams, error) {
-	// target parameters where we copy existing limits
-	var target *JetStreamLimitParams
-
-	switch tier {
-	case "":
-		target = &p.JetStreamLimitParams
-		break
-	case "R1":
-		target = &p.r1
-		break
-	case "R3":
-		target = &p.r3
-		break
-	default:
-		return target, fmt.Errorf("unknown tier limit %q", tier)
-	}
-	return target, nil
-}
-
-func (p *EditAccountParams) bindTierLimits(tier string, cmd *cobra.Command) error {
-	params, err := p.getTierLimitsParams(tier)
-	if err != nil {
-		return err
-	}
-
-	label := tier
-	if label != "" {
-		label = fmt.Sprintf("%s ", label)
-	}
-
-	// r3 limits
-	cmd.Flags().VarP(&params.memStorage, flagName("js-mem-storage", tier), "", fmt.Sprintf("JetStream: set %smaximum memory storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)", label))
-	cmd.Flags().VarP(&params.diskStorage, flagName("js-disk-storage", tier), "", fmt.Sprintf("JetStream: set %smaximum disk storage in bytes for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)", label))
-	params.streams = -1
-	cmd.Flags().VarP(&params.streams, flagName("js-streams", tier), "", fmt.Sprintf("JetStream: set %smaximum streams for the account (-1 is unlimited)", label))
-	params.consumer = -1
-	cmd.Flags().VarP(&params.consumer, flagName("js-consumer", tier), "", fmt.Sprintf("JetStream: set %smaximum consumer for the account (-1 is unlimited)", label))
-	cmd.Flags().VarP(&params.memMaxStreamBytes, flagName("js-max-mem-stream", tier), "", fmt.Sprintf("JetStream: set %smaximum size of a memory stream for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)", label))
-	params.memMaxStreamBytes = -1
-	cmd.Flags().VarP(&params.diskMaxStreamBytes, flagName("js-max-disk-stream", tier), "", fmt.Sprintf("JetStream: set %smaximum size of a disk stream for the account (-1 is unlimited / 0 disabled) (units: k/m/g/t kib/mib/gib/tib)", label))
-	params.diskMaxStreamBytes = -1
-	cmd.Flags().BoolVarP(&params.maxBytesRequired, flagName("js-max-bytes-required", tier), "", false, fmt.Sprintf("JetStream: set whether %smax stream is required when creating a stream", label))
-	cmd.Flags().VarP(&params.maxAckPending, flagName("js-max-ack-pending", tier), "", fmt.Sprintf("JetStream: set number of maximum acks that can be pending for a %sconsumer in the account", label))
-	return nil
-}
-
-func (p *EditAccountParams) getTierLimits(tier string) (jwt.JetStreamLimits, error) {
+func (p *EditAccountParams) getTierLimits(tier int) (*jwt.JetStreamLimits, error) {
 	// the source of existing limits in the JWT
-	var src jwt.JetStreamLimits
-
+	var src *jwt.JetStreamLimits
 	switch tier {
-	case "":
-		src = p.claim.Limits.JetStreamLimits
-		break
-	case "R1":
-		if len(p.claim.Limits.JetStreamTieredLimits) == 0 {
-			src = blankLimits
-		} else {
-			src = p.claim.Limits.JetStreamTieredLimits["R1"]
-		}
-		break
-	case "R3":
-		if len(p.claim.Limits.JetStreamTieredLimits) == 0 {
-			src = blankLimits
-		} else {
-			src = p.claim.Limits.JetStreamTieredLimits["R3"]
-		}
-		break
+	case 0:
+		src = &p.claim.Limits.JetStreamLimits
 	default:
-		return src, fmt.Errorf("unknown tier limit %q", tier)
+		if len(p.claim.Limits.JetStreamTieredLimits) == 0 {
+			src = &jwt.JetStreamLimits{}
+		} else {
+
+			v, ok := p.claim.Limits.JetStreamTieredLimits[fmt.Sprintf("R%d", tier)]
+			if !ok {
+				v = jwt.JetStreamLimits{}
+			}
+			src = &v
+		}
 	}
 	return src, nil
 }
 
-//func (p *EditAccountParams) getTierSettings(tier string) (jwt.JetStreamLimits, *JetStreamLimitParams, error) {
-//	// the source of existing limits in the JWT
-//	var src jwt.JetStreamLimits
-//	// target parameters where we copy existing limits
-//	var target *JetStreamLimitParams
-//
-//	switch tier {
-//	case "":
-//		src = p.claim.Limits.JetStreamLimits
-//		target = &p.JetStreamLimitParams
-//		break
-//	case "R1":
-//		if len(p.claim.Limits.JetStreamTieredLimits) == 0 {
-//			src = blankLimits
-//		} else {
-//			src = p.claim.Limits.JetStreamTieredLimits["R1"]
-//		}
-//		target = &p.r1
-//		break
-//	case "R3":
-//		if len(p.claim.Limits.JetStreamTieredLimits) == 0 {
-//			src = blankLimits
-//		} else {
-//			src = p.claim.Limits.JetStreamTieredLimits["R3"]
-//		}
-//		target = &p.r3
-//		break
-//	default:
-//		return src, target, fmt.Errorf("unknown tier limit %q", tier)
-//	}
-//	return src, target, nil
-//}
-
-func (p *EditAccountParams) loadLimits(ctx ActionCtx, tier string) error {
+func (p *EditAccountParams) loadLimits(ctx ActionCtx, tier int) error {
 	src, err := p.getTierLimits(tier)
 	if err != nil {
 		return err
 	}
-	if src == blankLimits {
+	if !jsLimitsSet(src) || p.JetStreamLimitParams.DeleteTier != -1 {
 		// we don't have pre-existing limits, so we can skip this
 		return nil
 	}
-	target, err := p.getTierLimitsParams(tier)
+	if !(ctx.CurrentCmd().Flags().Changed("js-mem-storage") || ctx.CurrentCmd().Flags().Changed("mem-storage")) {
+		p.JetStreamLimitParams.MemStorage = NumberParams(src.MemoryStorage)
+	}
+	if !(ctx.CurrentCmd().Flags().Changed("js-disk-storage") || ctx.CurrentCmd().Flags().Changed("disk-storage")) {
+		p.JetStreamLimitParams.DiskStorage = NumberParams(src.DiskStorage)
+	}
+	if !(ctx.CurrentCmd().Flags().Changed("js-streams") || ctx.CurrentCmd().Flags().Changed("streams")) {
+		p.JetStreamLimitParams.Streams = NumberParams(src.Streams)
+	}
+	if !(ctx.CurrentCmd().Flags().Changed("js-consumer") || ctx.CurrentCmd().Flags().Changed("consumer")) {
+		p.JetStreamLimitParams.Consumer = NumberParams(src.Consumer)
+	}
+	if !ctx.CurrentCmd().Flags().Changed("js-max-mem-stream") {
+		p.JetStreamLimitParams.MemMaxStreamBytes = NumberParams(src.MemoryMaxStreamBytes)
+	}
+	if !ctx.CurrentCmd().Flags().Changed("js-max-disk-stream") {
+		p.JetStreamLimitParams.DiskMaxStreamBytes = NumberParams(src.DiskMaxStreamBytes)
+	}
+	if !ctx.CurrentCmd().Flags().Changed("js-max-ack-pending") {
+		p.JetStreamLimitParams.MaxAckPending = NumberParams(src.MaxAckPending)
+	}
+	if !ctx.CurrentCmd().Flags().Changed("js-max-ack-required") {
+		p.JetStreamLimitParams.MaxBytesRequired = src.MaxBytesRequired
+	}
+	return nil
+}
+
+func jsLimitsSet(l *jwt.JetStreamLimits) bool {
+	return l.MemoryStorage != 0 || l.DiskStorage != 0 || l.Streams != 0 ||
+		l.Consumer != 0 || l.MaxAckPending != 0 || l.MemoryMaxStreamBytes != 0 ||
+		l.DiskMaxStreamBytes != 0 || l.MaxBytesRequired != false
+}
+
+func (p *EditAccountParams) validJsLimitConfig() error {
+	// do some early sanity on tiered / global limits
+	// if we have tier limits, global limits must not be set
+	tiered := len(p.claim.Limits.JetStreamTieredLimits)
+	keys := make([]string, tiered)
+	i := 0
+	for k := range p.claim.Limits.JetStreamTieredLimits {
+		keys[i] = k
+		i++
+	}
+	global, err := p.getTierLimits(0)
 	if err != nil {
 		return err
 	}
+	globalIsSet := jsLimitsSet(global)
 
-	if !ctx.CurrentCmd().Flags().Changed(flagName("js-mem-storage", tier)) {
-		target.memStorage = NumberParams(src.MemoryStorage)
+	// don't validate if removing as this will possibly fix the config or running interactive
+	if p.DeleteTier > -1 || InteractiveFlag {
+		return nil
 	}
-	if !ctx.CurrentCmd().Flags().Changed(flagName("js-disk-storage", tier)) {
-		target.diskStorage = NumberParams(src.DiskStorage)
+
+	// we have a bad configuration - this actually shouldn't trigger because
+	// the JWT library will discard the global value if tiered limits
+	// are present - however we keep this here just in case
+	// https://github.com/nats-io/jwt/blob/main/v2/decoder_account.go#L48
+	if tiered > 0 && globalIsSet {
+		return fmt.Errorf("configuration cannot contain both global and tiered limits '%s' - please use the --rm-js-tier to remove undesired tier(s)", strings.Join(keys, ","))
 	}
-	if !ctx.CurrentCmd().Flags().Changed(flagName("js-streams", tier)) {
-		target.streams = NumberParams(src.Streams)
+	// trying to add global to tiered
+	if tiered > 0 && p.Tier == 0 {
+		return fmt.Errorf("cannot set a jetstream global limit when a configuration has tiered limits '%s'", strings.Join(keys, ","))
 	}
-	if !ctx.CurrentCmd().Flags().Changed(flagName("js-consumer", tier)) {
-		target.consumer = NumberParams(src.Consumer)
-	}
-	if !(ctx.CurrentCmd().Flags().Changed(flagName("js-max-mem-stream", tier))) {
-		target.memMaxStreamBytes = NumberParams(src.MemoryMaxStreamBytes)
-	}
-	if !(ctx.CurrentCmd().Flags().Changed(flagName("js-max-disk-stream", tier))) {
-		target.diskMaxStreamBytes = NumberParams(src.DiskMaxStreamBytes)
-	}
-	if !(ctx.CurrentCmd().Flags().Changed(flagName("js-max-ack-pending", tier))) {
-		target.maxAckPending = NumberParams(src.MaxAckPending)
-	}
-	if !(ctx.CurrentCmd().Flags().Changed(flagName("js-max-ack-required", tier))) {
-		target.maxBytesRequired = src.MaxBytesRequired
+	// trying to add tiered to global
+	if globalIsSet && p.Tier > 0 {
+		return errors.New("cannot set a jetstream tier limit when a configuration has a global limit")
 	}
 	return nil
 }
@@ -351,6 +324,10 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
+		return err
+	}
+
+	if err = p.validJsLimitConfig(); err != nil {
 		return err
 	}
 
@@ -382,32 +359,6 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.subscriptions = NumberParams(p.claim.Limits.Subs)
 	}
 
-	// deprecated
-	if !ctx.CurrentCmd().Flags().Changed("mem-storage") {
-		p.memStorage = NumberParams(p.claim.Limits.MemoryStorage)
-	}
-	// deprecated
-	if !ctx.CurrentCmd().Flags().Changed("disk-storage") {
-		p.diskStorage = NumberParams(p.claim.Limits.DiskStorage)
-	}
-	// deprecated
-	if !ctx.CurrentCmd().Flags().Changed("streams") {
-		p.streams = NumberParams(p.claim.Limits.Streams)
-	}
-	// deprecated
-	if !ctx.CurrentCmd().Flags().Changed("consumer") {
-		p.consumer = NumberParams(p.claim.Limits.Consumer)
-	}
-	if err := p.loadLimits(ctx, ""); err != nil {
-		return err
-	}
-	if err := p.loadLimits(ctx, "R1"); err != nil {
-		return err
-	}
-	if err := p.loadLimits(ctx, "R3"); err != nil {
-		return err
-	}
-
 	if !ctx.CurrentCmd().Flags().Changed("description") {
 		p.description = p.claim.Description
 	}
@@ -416,58 +367,88 @@ func (p *EditAccountParams) Load(ctx ActionCtx) error {
 		p.infoUrl = p.claim.InfoURL
 	}
 
+	if err := p.loadLimits(ctx, p.Tier); err != nil {
+		return err
+	}
+
 	return err
 }
 
-func (p *EditAccountParams) PostInteractiveTier(ctx ActionCtx, tier string) error {
-	target, err := p.getTierLimitsParams(tier)
+func (p *EditAccountParams) tierLabel() string {
+	if p.Tier > 0 {
+		return fmt.Sprintf("R%d", p.Tier)
+	}
+	return "global"
+}
+
+func (p *EditAccountParams) PostInteractiveTier(_ctx ActionCtx) error {
+	target := &p.JetStreamLimitParams
+
+	ok, err := cli.Confirm("set JetStream limits", false)
 	if err != nil {
 		return err
 	}
-	if tier == "" {
-		tier = "general"
+	if !ok {
+		return nil
 	}
-	if tier == "" {
-		ok, err := cli.Confirm(fmt.Sprintf("set %s JetStream limits", tier), false)
+
+	replication, err := cli.Prompt("edit tier (0 matches all tiers)", "0", cli.Val(func(s string) error {
+		v, err := strconv.Atoi(s)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			return nil
+		if v < 0 {
+			return errors.New("replication must be 0 or greater")
 		}
+		// make sure we don't have tiered
+		if v == 0 && len(p.claim.Limits.JetStreamTieredLimits) > 0 {
+			return errors.New("configuration has tier limits - global limits are not allowed")
+		}
+		// make sure we don't have global
+		if v > 0 && jsLimitsSet(&p.claim.Limits.JetStreamLimits) {
+			return errors.New("configuration has global limits - tiered limits are not allowed")
+		}
+		return nil
+	}))
+	if err != nil {
+		return err
 	}
-
-	if err = target.memStorage.Edit("max mem storage (-1 unlimited / 0 disabled)"); err != nil {
+	p.Tier, err = strconv.Atoi(replication)
+	if err != nil {
 		return err
 	}
 
-	if err = target.diskStorage.Edit("max disk storage (-1 unlimited / 0 disabled)"); err != nil {
+	if err = target.MemStorage.Edit("max mem storage (-1 unlimited / 0 disabled)"); err != nil {
 		return err
 	}
 
-	if target.memStorage != 0 || target.diskStorage != 0 {
-		if err = target.streams.Edit("max streams (-1 unlimited)"); err != nil {
+	if err = target.DiskStorage.Edit("max disk storage (-1 unlimited / 0 disabled)"); err != nil {
+		return err
+	}
+
+	if target.MemStorage != 0 || target.DiskStorage != 0 {
+		if err = target.Streams.Edit("max streams (-1 unlimited)"); err != nil {
+			return err
+		}
+		if err = target.Consumer.Edit("max consumer (-1 unlimited)"); err != nil {
+			return err
+		}
+		if err = target.MemMaxStreamBytes.Edit("max size for a memory stream (-1 unlimited)"); err != nil {
+			return err
+		}
+		if err = target.DiskMaxStreamBytes.Edit("max size for a disk stream (-1 unlimited)"); err != nil {
+			return err
+		}
+		if err = target.MaxAckPending.Edit("max number of pending acks for a consumer"); err != nil {
 			return err
 		}
 
-		if err = target.consumer.Edit("max consumer (-1 unlimited)"); err != nil {
-			return err
-		}
-		if err = target.memMaxStreamBytes.Edit("max size for a memory stream (-1 unlimited)"); err != nil {
-			return err
-		}
-		if err = target.diskMaxStreamBytes.Edit("max size for a disk stream (-1 unlimited)"); err != nil {
-			return err
-		}
-		if err = target.maxAckPending.Edit("max number of pending acks for a consumer"); err != nil {
-			return err
-		}
-
-		target.maxBytesRequired, err = cli.Confirm("require max bytes when creating a stream", false)
+		target.MaxBytesRequired, err = cli.Confirm("require max bytes when creating a stream", false)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -505,13 +486,7 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
-	if err = p.PostInteractiveTier(ctx, ""); err != nil {
-		return err
-	}
-	if err = p.PostInteractiveTier(ctx, "R1"); err != nil {
-		return err
-	}
-	if err = p.PostInteractiveTier(ctx, "R3"); err != nil {
+	if err = p.PostInteractiveTier(ctx); err != nil {
 		return err
 	}
 
@@ -552,7 +527,7 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 		return err
 	}
 	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
-		if p.memStorage != 0 || p.diskStorage != 0 || p.consumer != 0 || p.streams != 0 {
+		if p.MemStorage != 0 || p.DiskStorage != 0 || p.Consumer != 0 || p.Streams != 0 {
 			return fmt.Errorf("jetstream not available for system account")
 		}
 	}
@@ -572,6 +547,105 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 			}
 		}
 	}
+	return nil
+}
+
+func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
+	flags := ctx.CurrentCmd().Flags()
+
+	limits, err := p.getTierLimits(p.Tier)
+	if err != nil {
+		return err
+	}
+	params := &p.JetStreamLimitParams
+
+	// on delete we don't honor any of the JS options
+	if p.DeleteTier != -1 {
+		params.MemMaxStreamBytes = 0
+		params.DiskMaxStreamBytes = 0
+		params.MaxAckPending = 0
+		params.Streams = 0
+		params.Consumer = 0
+		params.DiskStorage = 0
+		params.MemStorage = 0
+		params.MaxBytesRequired = false
+	}
+
+	switch p.DeleteTier {
+	case -1:
+		break
+	case 0:
+		// values are zeroed by the params which are zeroed above
+		r.AddOK("deleted global limit")
+		break
+	default:
+		if p.claim.Limits.JetStreamTieredLimits != nil {
+			label := fmt.Sprintf("R%d", p.DeleteTier)
+			_, ok := p.claim.Limits.JetStreamTieredLimits[label]
+			if ok {
+				delete(p.claim.Limits.JetStreamTieredLimits, label)
+				r.AddOK("deleted tier limit %s", label)
+			} else {
+				return fmt.Errorf("account doesn't have tier %s limit", label)
+			}
+		} else {
+			return errors.New("account doesn't have tier limits")
+		}
+	}
+
+	if p.DeleteTier != -1 {
+		return nil
+	}
+
+	label := p.tierLabel()
+
+	limits.Streams = params.Streams.Int64()
+	if flags.Changed("js-streams") {
+		r.AddOK("changed %s max streams to %d", label, limits.Streams)
+	}
+
+	limits.Consumer = params.Consumer.Int64()
+	if flags.Changed("js-consumer") {
+		r.AddOK("changed %s max consumer to %d", label, limits.Consumer)
+	}
+
+	limits.MemoryStorage = params.MemStorage.Int64()
+	if flags.Changed("js-mem-storage") {
+		r.AddOK("changed %s max mem storage to %d", label, limits.MemoryStorage)
+	}
+
+	limits.MemoryMaxStreamBytes = params.MemMaxStreamBytes.Int64()
+	if flags.Changed("js-max-mem-stream") {
+		r.AddOK("changed %s max memory stream to %d", label, limits.MemoryMaxStreamBytes)
+	}
+
+	limits.DiskStorage = params.DiskStorage.Int64()
+	if flags.Changed("js-disk-storage") {
+		r.AddOK("changed %s max disk storage to %d", label, limits.DiskStorage)
+	}
+
+	limits.DiskMaxStreamBytes = params.DiskMaxStreamBytes.Int64()
+	if flags.Changed("js-max-disk-stream") {
+		r.AddOK("changed %s max disk stream to %d", label, limits.DiskMaxStreamBytes)
+	}
+	limits.MaxAckPending = params.MaxAckPending.Int64()
+	if flags.Changed("js-max-ack-pending") {
+		r.AddOK("changed %s max ack pending to %d", label, limits.MaxAckPending)
+	}
+	limits.MaxBytesRequired = params.MaxBytesRequired
+	if flags.Changed("js-max-ack-required") {
+		r.AddOK("changed %s max bytes required to %t", label, limits.MaxBytesRequired)
+	}
+
+	if p.Tier == 0 {
+		p.claim.Limits.JetStreamLimits = *limits
+	} else {
+		if p.claim.Limits.JetStreamTieredLimits == nil {
+			p.claim.Limits.JetStreamTieredLimits = make(map[string]jwt.JetStreamLimits)
+		}
+		p.claim.Limits.JetStreamTieredLimits[p.tierLabel()] = *limits
+	}
+
 	return nil
 }
 
@@ -642,24 +716,8 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddOK("changed max subscriptions to %d", p.claim.Limits.Subs)
 	}
 
-	p.claim.Limits.MemoryStorage = p.memStorage.Int64()
-	if flags.Changed("mem-storage") || flags.Changed("js-mem-storage") {
-		r.AddOK("changed max mem storage to %d", p.claim.Limits.MemoryStorage)
-	}
-
-	p.claim.Limits.DiskStorage = p.diskStorage.Int64()
-	if flags.Changed("disk-storage") || flags.Changed("js-disk-storage") {
-		r.AddOK("changed max disk storage to %d", p.claim.Limits.DiskStorage)
-	}
-
-	p.claim.Limits.Streams = p.streams.Int64()
-	if flags.Changed("streams") || flags.Changed("js-streams") {
-		r.AddOK("changed max streams to %d", p.claim.Limits.Streams)
-	}
-
-	p.claim.Limits.Consumer = p.consumer.Int64()
-	if flags.Changed("consumer") || flags.Changed("js-consumer") {
-		r.AddOK("changed max consumer to %d", p.claim.Limits.Consumer)
+	if err := p.applyLimits(ctx, r); err != nil {
+		return r, err
 	}
 
 	p.claim.Description = p.description

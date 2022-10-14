@@ -593,3 +593,11 @@ func (t *dateTime) String() string {
 func (t *dateTime) Type() string {
 	return "date-time"
 }
+
+func Debug(label string, v interface{}) {
+	d, err := json.MarshalIndent(v, "", " ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(label, string(d))
+}
