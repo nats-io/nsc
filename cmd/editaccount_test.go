@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2022 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2021 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package cmd
@@ -116,7 +114,8 @@ func Test_EditAccountLimits(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10mib", "--exports", "15",
 		"--imports", "20", "--payload", "1Kib", "--subscriptions", "30", "--leaf-conns", "31",
-		"--streams", "5", "--consumer", "6", "--disk-storage", "7", "--mem-storage", "8")
+		"--js-streams", "5", "--js-consumer", "6", "--js-disk-storage", "7", "--js-mem-storage", "8",
+		"--js-max-disk-stream", "9mib", "--js-max-mem-stream", "10", "--js-max-ack-pending", "11", "--js-max-bytes-required")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -132,6 +131,78 @@ func Test_EditAccountLimits(t *testing.T) {
 	require.Equal(t, int64(6), ac.Limits.Consumer)
 	require.Equal(t, int64(7), ac.Limits.DiskStorage)
 	require.Equal(t, int64(8), ac.Limits.MemoryStorage)
+	require.Equal(t, int64(1024*1024*9), ac.Limits.DiskMaxStreamBytes)
+	require.Equal(t, int64(10), ac.Limits.MemoryMaxStreamBytes)
+	require.Equal(t, int64(11), ac.Limits.MaxAckPending)
+	require.True(t, ac.Limits.MaxBytesRequired)
+}
+
+func Test_EditJsOptionsOnTierDelete(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(),
+		"--js-streams", "5", "--js-consumer", "6", "--js-disk-storage", "7")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, int64(5), ac.Limits.Streams)
+	require.Equal(t, int64(6), ac.Limits.Consumer)
+	require.Equal(t, int64(7), ac.Limits.DiskStorage)
+
+	_, _, err = ExecuteCmd(createEditAccount(),
+		"--js-streams", "1", "--rm-js-tier", "0")
+	require.Error(t, err)
+	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
+
+	_, _, err = ExecuteCmd(createEditAccount(),
+		"--rm-js-tier", "0")
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, int64(0), ac.Limits.Streams)
+	require.Equal(t, int64(0), ac.Limits.Consumer)
+	require.Equal(t, int64(0), ac.Limits.DiskStorage)
+}
+
+func Test_GlobalPreventsTiered(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(),
+		"--js-streams", "5", "--js-disk-storage", "10")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, int64(5), ac.Limits.Streams)
+
+	_, _, err = ExecuteCmd(createEditAccount(),
+		"--js-tier", "1", "--js-disk-storage", "10")
+	require.Error(t, err)
+	require.Equal(t, "cannot set a jetstream tier limit when a configuration has a global limit", err.Error())
+}
+
+func Test_TieredPreventsGlobal(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(),
+		"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, int64(5), ac.Limits.JetStreamTieredLimits["R2"].Streams)
+
+	_, _, err = ExecuteCmd(createEditAccount(),
+		"--js-disk-storage", "10")
+	require.Error(t, err)
+	require.Equal(t, "cannot set a jetstream global limit when a configuration has tiered limits 'R2'", err.Error())
 }
 
 func Test_EditAccountSigningKeys(t *testing.T) {
