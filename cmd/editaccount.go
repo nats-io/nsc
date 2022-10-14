@@ -576,6 +576,7 @@ func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
 		break
 	case 0:
 		// values are zeroed by the params which are zeroed above
+		p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
 		r.AddOK("deleted global limit")
 		break
 	default:
