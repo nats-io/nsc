@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createProfileCmd() *cobra.Command {
@@ -76,12 +78,12 @@ it targets the last object in the configuration path)
 			us := args[0]
 			u, err := ParseNscURL(us)
 			if err != nil {
-				return fmt.Errorf("error parsing %q:%v", us, err)
+				return fmt.Errorf("error parsing %q: %w", us, err)
 			}
 			params.nscu = u
 			q, err := u.query()
 			if err != nil {
-				return fmt.Errorf("error parsing query %q:%v", us, err)
+				return fmt.Errorf("error parsing query %q: %w", us, err)
 			}
 			if len(q) > 0 {
 				config := GetConfig()
@@ -156,6 +158,7 @@ const (
 type ProfileCmdParams struct {
 	nscu       *NscURL
 	results    *Profile
+	conf       *ToolConfig
 	oc         *jwt.OperatorClaims
 	ac         *jwt.AccountClaims
 	uc         *jwt.UserClaims
@@ -283,33 +286,42 @@ func (p *ProfileCmdParams) loadNames(c jwt.Claims) *stringSet {
 	names.add(cd.Name)
 	names.add(cd.Subject)
 
-	conf := GetConfig()
 	payload := c.Payload()
 	_, ok := payload.(jwt.Operator)
-	if ok && conf.Operator != "" {
-		names.add(conf.Operator)
+	if ok && p.conf.Operator != "" {
+		names.add(p.conf.Operator)
 	}
 	return names
 }
 
+// checkLoadOperator is used to check if the operator in the nsc: URL is a
+// known operator, and thus needs to work no matter what the current context
+// is; it will mutate the ctx Store appropriately and store away a conf.
 func (p *ProfileCmdParams) checkLoadOperator(ctx ActionCtx) error {
-	conf := GetConfig()
-	if conf.Operator == "" {
-		return errors.New("no operator set - `env --operator <name>`")
+	p.conf = GetConfig()
+	var err error
+
+	// We need to be sure that we load all operators known to the local nsc store.
+	// Using ctx.StoreCtx().Store would only load the _current_ operator.
+	allOperators := newStringSet()
+	for _, opName := range p.conf.ListOperators() {
+		allOperators.add(opName)
 	}
+	if !allOperators.contains(p.nscu.operator) {
+		return fmt.Errorf("invalid operator %q: not known to current system", p.nscu.operator)
+	}
+	p.conf.Operator = p.nscu.operator
+
+	ctx.StoreCtx().Store, err = store.LoadStore(filepath.Join(p.conf.StoreRoot, p.nscu.operator))
 
 	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not use alternative operator %q: %w", p.nscu.operator, err)
 	}
-	names := p.loadNames(oc)
-	names.add(conf.Operator)
 
-	if !names.contains(p.nscu.operator) {
-		return fmt.Errorf("invalid operator %q: make sure you have the right operator context", p.nscu.operator)
-	}
 	p.nscu.operator = oc.Name
 	p.oc = oc
+
 	return nil
 }
 
@@ -317,8 +329,7 @@ func (p *ProfileCmdParams) checkLoadAccount(ctx ActionCtx) error {
 	if p.nscu.account == "" {
 		return nil
 	}
-	config := GetConfig()
-	names, err := config.ListAccounts()
+	names, err := p.conf.ListAccounts()
 	if err != nil {
 		return err
 	}
@@ -589,8 +600,7 @@ func (p *ProfileCmdParams) addSeeds(ctx ActionCtx) error {
 }
 
 func (p *ProfileCmdParams) addOperatorName() {
-	conf := GetConfig()
-	p.results.Operator.Name = conf.Operator
+	p.results.Operator.Name = p.conf.Operator
 }
 
 func (p *ProfileCmdParams) addAccountName() {
