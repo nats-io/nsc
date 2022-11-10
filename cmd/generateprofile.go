@@ -300,19 +300,37 @@ func (p *ProfileCmdParams) loadNames(c jwt.Claims) *stringSet {
 func (p *ProfileCmdParams) checkLoadOperator(ctx ActionCtx) error {
 	p.conf = GetConfig()
 	var err error
+	// There's a sync mutex inside the store, we should try to only load each once.
+	allOperators := make(map[string]*store.Store)
+	aliases := make(map[string]string)
+	// We work with lower-cased aliases
+	lcURLOperator := strings.ToLower(p.nscu.operator)
 
 	// We need to be sure that we load all operators known to the local nsc store.
 	// Using ctx.StoreCtx().Store would only load the _current_ operator.
-	allOperators := newStringSet()
+	// We do still need to let the O.. nkey form be used though.
 	for _, opName := range p.conf.ListOperators() {
-		allOperators.add(opName)
+		s, err := store.LoadStore(filepath.Join(p.conf.StoreRoot, opName))
+		if err != nil {
+			continue
+		}
+		oc, err := s.ReadOperatorClaim()
+		if err != nil {
+			continue
+		}
+		allOperators[strings.ToLower(opName)] = s
+		aliases[opName] = opName
+		aliases[strings.ToLower(opName)] = opName
+		for alias := range p.loadNames(oc).set {
+			allOperators[alias] = s
+			aliases[alias] = opName
+		}
 	}
-	if !allOperators.contains(p.nscu.operator) {
+	if _, ok := allOperators[lcURLOperator]; !ok {
 		return fmt.Errorf("invalid operator %q: not known to current system", p.nscu.operator)
 	}
-	p.conf.Operator = p.nscu.operator
-
-	ctx.StoreCtx().Store, err = store.LoadStore(filepath.Join(p.conf.StoreRoot, p.nscu.operator))
+	p.conf.Operator = aliases[lcURLOperator]
+	ctx.StoreCtx().Store = allOperators[lcURLOperator]
 
 	oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 	if err != nil {
