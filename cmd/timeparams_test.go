@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -43,6 +43,7 @@ func TestParseExpiry(t *testing.T) {
 		{"3w", time.Now().AddDate(0, 0, 7*3).Unix(), false},
 		{"2M", time.Now().AddDate(0, 2, 0).Unix(), false},
 		{"2y", time.Now().AddDate(2, 0, 0).Unix(), false},
+		{"2.5d", 0, true},
 	}
 	for _, d := range tests {
 		v, err := ParseExpiry(d.input)
