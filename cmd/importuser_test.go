@@ -16,7 +16,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -56,7 +56,7 @@ func Test_ImportUserCreds(t *testing.T) {
 	require.NoError(t, err)
 
 	file := filepath.Join(ts.Dir, "user.creds")
-	err = ioutil.WriteFile(file, creds, 0666)
+	err = os.WriteFile(file, creds, 0666)
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", file)
 	require.NoError(t, err)
@@ -92,7 +92,7 @@ func Test_ImportUserJWT(t *testing.T) {
 	}
 
 	file := filepath.Join(ts.Dir, "user.jwt")
-	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+	err = os.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", file)
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func Test_ImportUserOtherAccount(t *testing.T) {
 	theJWT, err := uc.Encode(aKp)
 	require.NoError(t, err)
 	file := filepath.Join(ts.Dir, "user.jwt")
-	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+	err = os.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", file)
 	require.Error(t, err)

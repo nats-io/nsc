@@ -17,16 +17,16 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/nats-io/nuid"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func init() {
@@ -621,7 +621,7 @@ func (p *FixCmd) loadFile(fp string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(fp)
+	return os.ReadFile(fp)
 }
 
 func (p *FixCmd) loadJwt(fp string) (string, error) {

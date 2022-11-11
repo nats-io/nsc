@@ -16,13 +16,14 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createImportUserCmd() *cobra.Command {
@@ -82,7 +83,7 @@ func validateAndReport(claim jwt.Claims, force bool, r *store.Report) bool {
 
 func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 	r := store.NewDetailedReport(true)
-	content, err := ioutil.ReadFile(p.file)
+	content, err := os.ReadFile(p.file)
 	if err != nil {
 		r.AddError("failed to import %#q: %v", p.file, err)
 		return r, err

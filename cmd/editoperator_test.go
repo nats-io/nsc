@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,8 +25,9 @@ import (
 	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func Test_EditOperator(t *testing.T) {
@@ -54,7 +54,7 @@ func readJWT(t *testing.T, elem ...string) string {
 	t.Helper()
 	fp := filepath.Join(elem...)
 	require.FileExists(t, fp)
-	theJWT, err := ioutil.ReadFile(fp)
+	theJWT, err := os.ReadFile(fp)
 	require.NoError(t, err)
 	return string(theJWT)
 }

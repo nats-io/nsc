@@ -244,7 +244,7 @@ func (e *ExportsDescriber) Describe() string {
 			}
 		}
 
-		st := strings.Title(v.Type.String())
+		st := TitleCase(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
 		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
 	}
@@ -359,7 +359,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	}
 
 	if i.Token == "" {
-		table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, "", Wide(i.Account), "Yes")
+		table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, "", Wide(i.Account), "Yes")
 		return
 	}
 	expiration := ""
@@ -369,7 +369,7 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(i.Name, strings.Title(i.Type.String()), remote, local, expiration, Wide(i.Account), "No")
+	table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, expiration, Wide(i.Account), "No")
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
@@ -451,7 +451,7 @@ func (c *ActivationDescriber) Describe() string {
 	table.AddSeparator()
 	table.AddRow("Hash ID", hash)
 	table.AddSeparator()
-	table.AddRow("Import Type", strings.Title(c.ImportType.String()))
+	table.AddRow("Import Type", TitleCase(c.ImportType.String()))
 	table.AddRow("Import Subject", string(c.ImportSubject))
 	table.AddSeparator()
 

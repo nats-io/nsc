@@ -19,7 +19,7 @@ package store
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -44,7 +44,7 @@ func MakeTempStore(t *testing.T, name string, kp nkeys.KeyPair) *Store {
 }
 
 func MakeTempDir(t *testing.T) string {
-	p, err := ioutil.TempDir("", "store_test")
+	p, err := os.MkdirTemp("", "store_test")
 	require.NoError(t, err)
 	return p
 }
@@ -78,7 +78,7 @@ func CreateTestStore(t *testing.T, name string) *Store {
 func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
 	p := MakeTempDir(t)
 	fp := filepath.Join(p, "test")
-	require.NoError(t, ioutil.WriteFile(fp, []byte("hello"), 0666))
+	require.NoError(t, os.WriteFile(fp, []byte("hello"), 0666))
 
 	_, _, kp := CreateAccountKey(t)
 	_, err := CreateStore("foo", p, &NamedKey{Name: "foo", KP: kp})
@@ -88,7 +88,7 @@ func TestCreateStoreFailsOnNonEmptyDir(t *testing.T) {
 func TestUnsupportedKeyType(t *testing.T) {
 	p := MakeTempDir(t)
 	fp := filepath.Join(p, "test")
-	require.NoError(t, ioutil.WriteFile(fp, []byte("hello"), 0666))
+	require.NoError(t, os.WriteFile(fp, []byte("hello"), 0666))
 
 	kp, err := nkeys.CreateServer()
 	require.NoError(t, err)

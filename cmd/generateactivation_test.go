@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,7 +134,7 @@ func testExternalToken(t *testing.T, tokenpath string) *jwt.ActivationClaims {
 	_, err := os.Stat(tokenpath)
 	require.NoError(t, err)
 
-	d, err := ioutil.ReadFile(tokenpath)
+	d, err := os.ReadFile(tokenpath)
 	require.NoError(t, err)
 
 	s, err := jwt.ParseDecoratedJWT(d)
@@ -234,7 +233,7 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 
-	d, err := ioutil.ReadFile(outpath)
+	d, err := os.ReadFile(outpath)
 	require.NoError(t, err)
 
 	token, err := jwt.ParseDecoratedJWT(d)

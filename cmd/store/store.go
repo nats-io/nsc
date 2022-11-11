@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -141,12 +141,12 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 		}
 	}
 
-	files, err := ioutil.ReadDir(root)
+	dirEntries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(files) != 0 {
+	if len(dirEntries) != 0 {
 		return nil, fmt.Errorf("operator %q already exists in %#q", operator.Name, operatorsDir)
 	}
 
@@ -252,7 +252,7 @@ func (s *Store) Read(name ...string) ([]byte, error) {
 	s.Lock()
 	defer s.Unlock()
 	fp := s.resolve(name...)
-	d, err := ioutil.ReadFile(fp)
+	d, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %#q: %w", fp, err)
 	}
@@ -270,15 +270,15 @@ func (s *Store) Write(data []byte, name ...string) error {
 	if err := os.MkdirAll(dp, 0700); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(fp, data, 0600)
+	return os.WriteFile(fp, data, 0600)
 }
 
-func (s *Store) List(path ...string) ([]os.FileInfo, error) {
+func (s *Store) List(path ...string) ([]fs.DirEntry, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	fp := s.resolve(path...)
-	return ioutil.ReadDir(fp)
+	return os.ReadDir(fp)
 }
 
 // Delete the specified file name or subpath from the store
@@ -293,11 +293,11 @@ func (s *Store) ListSubContainers(name ...string) ([]string, error) {
 	var containers []string
 	fp := filepath.Join(name...)
 	if s.Has(fp) {
-		infos, err := s.List(fp)
+		dirEntries, err := s.List(fp)
 		if err != nil {
 			return nil, err
 		}
-		for _, i := range infos {
+		for _, i := range dirEntries {
 			if i.IsDir() {
 				if s.Has(fp, i.Name(), JwtName(i.Name())) {
 					containers = append(containers, i.Name())
@@ -312,11 +312,11 @@ func (s *Store) ListEntries(name ...string) ([]string, error) {
 	var entries []string
 	fp := filepath.Join(name...)
 	if s.Has(fp) {
-		infos, err := s.List(fp)
+		dirEntries, err := s.List(fp)
 		if err != nil {
 			return nil, err
 		}
-		for _, v := range infos {
+		for _, v := range dirEntries {
 			if !v.IsDir() && IsJwtName(v.Name()) {
 				entries = append(entries, PlainName(v.Name()))
 			}
@@ -361,7 +361,7 @@ func PushAccount(u string, data []byte) (Status, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	message, err := ioutil.ReadAll(resp.Body)
+	message, err := io.ReadAll(resp.Body)
 	return PushReport(resp.StatusCode, message), err
 }
 
@@ -471,11 +471,11 @@ func (s *Store) StoreRaw(data []byte) error {
 			issuer = uc.IssuerAccount
 		}
 		var account string
-		infos, err := s.List(Accounts)
+		dirEntries, err := s.List(Accounts)
 		if err != nil {
 			return err
 		}
-		for _, i := range infos {
+		for _, i := range dirEntries {
 			if i.IsDir() {
 				c, err := s.ReadAccountClaim(i.Name())
 				if err != nil {

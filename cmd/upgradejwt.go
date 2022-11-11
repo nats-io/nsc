@@ -19,7 +19,6 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/cliprompts/v2"
+
 	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/spf13/cobra"
@@ -51,7 +51,7 @@ func backup(file string, dir string) error {
 		if err != nil {
 			return err
 		}
-		dat, err := ioutil.ReadFile(path)
+		dat, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

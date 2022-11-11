@@ -19,7 +19,6 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,8 +26,9 @@ import (
 	jwtv1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func storeOperatorKey(t *testing.T, ts *TestStore, kp nkeys.KeyPair) {
@@ -109,7 +109,7 @@ func createOperator(t *testing.T, tempDir string, opName string) (fileV1 string,
 }
 
 func TestUpgradeNonManaged(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, _ := createOperator(t, tempDir, "O")
@@ -137,7 +137,7 @@ func TestUpgradeNonManaged(t *testing.T) {
 }
 
 func TestUpgradeNoKeyNonManaged(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, pub := createOperator(t, tempDir, "O")
@@ -167,7 +167,7 @@ func TestUpgradeNoKeyNonManaged(t *testing.T) {
 }
 
 func TestUpgradeManaged(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 	_, tokenV1, tfV2, tokenV2, _, _ := createOperator(t, tempDir, "O")
@@ -189,7 +189,7 @@ func TestUpgradeManaged(t *testing.T) {
 }
 
 func TestUpgradeBackup(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, _ := createOperator(t, tempDir, "O")

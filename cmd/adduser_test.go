@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -320,7 +319,7 @@ func Test_AddUserWithInteractiveCustomKey(t *testing.T) {
 	require.False(t, ts.KeyStore.HasPrivateKey(pk))
 
 	fp := filepath.Join(ts.Dir, "key")
-	err = ioutil.WriteFile(fp, sk, 0600)
+	err = os.WriteFile(fp, sk, 0600)
 	require.NoError(t, err)
 
 	inputs = []interface{}{"cc", false, fp, "0", "0"}
@@ -479,7 +478,7 @@ func Test_AddUser_Scoped(t *testing.T) {
 	s, pk, kp := CreateAccountKey(t)
 
 	// store seed in temporary file
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	defer os.Remove(f.Name())
 	require.NoError(t, err)
 	f.Write(s)

@@ -18,15 +18,15 @@ package store
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/home"
 	"github.com/nats-io/nuid"
+
+	"github.com/nats-io/nsc/home"
 )
 
 var NscNotGitIgnore bool
@@ -129,11 +129,11 @@ func KeysNeedMigration() (bool, error) {
 	if err != nil || !ok {
 		return false, err
 	}
-	infos, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, err
 	}
-	if len(infos) == 0 {
+	if len(entries) == 0 {
 		return false, nil
 	}
 	return IsOldKeyRing(dir)
@@ -224,7 +224,7 @@ func (k *KeyStore) MaybeStoreUserCreds(account string, user string, data []byte)
 		return "", err
 	}
 
-	return fp, ioutil.WriteFile(fp, data, 0600)
+	return fp, os.WriteFile(fp, data, 0600)
 }
 
 func keypath(kp nkeys.KeyPair) (string, error) {
@@ -310,11 +310,11 @@ func (k *KeyStore) Remove(pubkey string) error {
 		return err
 	}
 	pd := filepath.Dir(kp)
-	infos, err := ioutil.ReadDir(pd)
+	entries, err := os.ReadDir(pd)
 	// nothing to do from here, but attempt to cleanup
 	// empty directories - go won't delete empty dirs
 	// but we check anyway
-	if err == nil && len(infos) == 0 {
+	if err == nil && len(entries) == 0 {
 		os.Remove(pd)
 	}
 	return nil
@@ -338,7 +338,7 @@ func AddGitIgnore(dir string) error {
 # ignore all creds files
 **/*.creds
 `
-			return ioutil.WriteFile(ignoreFile, []byte(d), 0600)
+			return os.WriteFile(ignoreFile, []byte(d), 0600)
 		}
 	}
 	return nil
@@ -369,7 +369,7 @@ func StoreKey(kp nkeys.KeyPair) (string, error) {
 	_, err = os.Stat(fp)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err := ioutil.WriteFile(fp, seed, 0600)
+			err := os.WriteFile(fp, seed, 0600)
 			if err != nil {
 				return "", fmt.Errorf("error writing %#q: %w", fp, err)
 			}
@@ -377,7 +377,7 @@ func StoreKey(kp nkeys.KeyPair) (string, error) {
 		}
 	}
 
-	d, err := ioutil.ReadFile(fp)
+	d, err := os.ReadFile(fp)
 	if err != nil {
 		return "", fmt.Errorf("error reading %#q: %w", fp, err)
 	}
@@ -420,7 +420,7 @@ func dataFromFile(path string) ([]byte, error) {
 			return nil, err
 		}
 	}
-	return ioutil.ReadFile(path)
+	return os.ReadFile(path)
 }
 
 func keyFromFile(path string) (nkeys.KeyPair, error) {
@@ -654,7 +654,7 @@ func Write(name string, data []byte) error {
 	if err := MaybeMakeDir(filepath.Dir(name)); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(name, data, 0600)
+	return os.WriteFile(name, data, 0600)
 }
 
 func ExtractSeed(s string) (nkeys.KeyPair, error) {

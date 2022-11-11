@@ -18,12 +18,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createExportKeysCmd() *cobra.Command {
@@ -162,7 +162,7 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	for _, j := range wj {
 		if j.filepath != "" {
-			j.err = ioutil.WriteFile(j.filepath, j.data, 0700)
+			j.err = os.WriteFile(j.filepath, j.data, 0700)
 			if j.err != nil {
 				sr.AddError("error exporting %q: %v", j.description, j.err)
 			} else {

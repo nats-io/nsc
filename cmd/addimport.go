@@ -23,8 +23,9 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createAddImportCmd() *cobra.Command {
@@ -284,6 +285,9 @@ func (p *AddImportParams) addManualExport(_ ActionCtx) error {
 			}
 			return nil
 		}))
+		if err != nil {
+			return err
+		}
 		p.service, err = cli.Confirm("is import a service", true)
 		if err != nil {
 			return err

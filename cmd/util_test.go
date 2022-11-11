@@ -18,8 +18,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,8 +36,9 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 type TestStore struct {
@@ -92,7 +93,7 @@ func NewEmptyStore(t *testing.T) *TestStore {
 	require.NoError(t, err)
 
 	// debug the test that created the store
-	_ = ioutil.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
+	_ = os.WriteFile(filepath.Join(ts.Dir, "test.txt"), []byte(t.Name()), 0700)
 
 	err = ForceStoreRoot(t, ts.GetStoresRoot())
 	require.NoError(t, err)
@@ -306,7 +307,7 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, 
 
 	if ts.ImportRequiresToken(t, srcAccount, subject) {
 		token := ts.GenerateActivation(t, srcAccount, subject, targetAccountName)
-		f, err := ioutil.TempFile(ts.Dir, "token")
+		f, err := os.CreateTemp(ts.Dir, "token")
 		require.NoError(t, err)
 		_, err = f.WriteString(token)
 		require.NoError(t, err)
@@ -351,7 +352,7 @@ func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount strin
 }
 
 func MakeTempDir(t *testing.T) string {
-	p, err := ioutil.TempDir("", "store_test")
+	p, err := os.MkdirTemp("", "store_test")
 	require.NoError(t, err)
 	return p
 }
@@ -364,7 +365,7 @@ func StoreKey(t *testing.T, kp nkeys.KeyPair, dir string) string {
 	require.NoError(t, err)
 
 	fp := filepath.Join(dir, string(p)+".nk")
-	err = ioutil.WriteFile(fp, s, 0600)
+	err = os.WriteFile(fp, s, 0600)
 	require.NoError(t, err)
 	return fp
 }
@@ -519,7 +520,7 @@ func (ts *TestStore) GetConnz(t *testing.T) *server.Connz {
 	require.NoError(t, err)
 
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	require.NoError(t, err)
 
 	var connz server.Connz
@@ -707,7 +708,7 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, opts Ta
 
 		updateAccountHandler := func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				errHandler(w, err)
 				return
@@ -755,7 +756,7 @@ func RunTestAccountServerWithOperatorKP(t *testing.T, okp nkeys.KeyPair, opts Ta
 
 		updateActivationHandler := func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				errHandler(w, err)
 				return

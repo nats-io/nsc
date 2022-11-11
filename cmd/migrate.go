@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,8 +24,9 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createMigrateCmd() *cobra.Command {
@@ -321,12 +321,12 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 		udir := filepath.Join(filepath.Dir(j.url), store.Users)
 		fi, err := os.Stat(udir)
 		if err == nil && fi.IsDir() {
-			infos, err := ioutil.ReadDir(udir)
+			dirEntries, err := os.ReadDir(udir)
 			if err != nil {
 				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
 				return
 			}
-			for _, v := range infos {
+			for _, v := range dirEntries {
 				n := v.Name()
 				if !v.IsDir() && filepath.Ext(n) == ".jwt" {
 					up := filepath.Join(udir, n)

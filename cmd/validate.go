@@ -18,13 +18,14 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/xlab/tablewriter"
+
+	"github.com/nats-io/nsc/cmd/store"
 
 	"github.com/spf13/cobra"
 )
@@ -136,7 +137,7 @@ func (p *ValidateCmdParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *ValidateCmdParams) validateFile(ctx ActionCtx) error {
-	f, err := ioutil.ReadFile(p.file)
+	f, err := os.ReadFile(p.file)
 	if err != nil {
 		return err
 	}

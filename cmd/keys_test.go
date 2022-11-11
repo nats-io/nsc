@@ -17,20 +17,20 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func storeOldCreds(ts *TestStore, operator string, account string, user string, data []byte) error {
 	ks := filepath.Join(ts.Dir, "keys")
 	target := filepath.Join(ks, operator, "accounts", account, "users", fmt.Sprintf("%s.creds", user))
-	return ioutil.WriteFile(target, []byte(user), 0700)
+	return os.WriteFile(target, []byte(user), 0700)
 
 }
 
@@ -66,7 +66,7 @@ func storeOldKey(ts *TestStore, operator string, account string, user string, se
 		return err
 	}
 
-	return ioutil.WriteFile(target, seed, 0700)
+	return os.WriteFile(target, seed, 0700)
 }
 
 func Test_HasOldStructure(t *testing.T) {

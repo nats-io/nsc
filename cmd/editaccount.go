@@ -25,8 +25,9 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func validatorUrlOrEmpty() cli.Opt {
@@ -180,7 +181,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-max-bytes-required",
 		"js-max-ack-pending")
 
-	if hasDeleteTier == true && hasJsSetFlags {
+	if hasDeleteTier && hasJsSetFlags {
 		return fmt.Errorf("rm-js-tier is exclusive of all other js options")
 	}
 
@@ -273,7 +274,7 @@ func (p *EditAccountParams) loadLimits(ctx ActionCtx, tier int) error {
 func jsLimitsSet(l *jwt.JetStreamLimits) bool {
 	return l.MemoryStorage != 0 || l.DiskStorage != 0 || l.Streams != 0 ||
 		l.Consumer != 0 || l.MaxAckPending != 0 || l.MemoryMaxStreamBytes != 0 ||
-		l.DiskMaxStreamBytes != 0 || l.MaxBytesRequired != false
+		l.DiskMaxStreamBytes != 0 || l.MaxBytesRequired
 }
 
 func (p *EditAccountParams) validJsLimitConfig() error {
@@ -578,7 +579,6 @@ func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
 		// values are zeroed by the params which are zeroed above
 		p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
 		r.AddOK("deleted global limit")
-		break
 	default:
 		if p.claim.Limits.JetStreamTieredLimits != nil {
 			label := fmt.Sprintf("R%d", p.DeleteTier)
