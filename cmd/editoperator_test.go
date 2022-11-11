@@ -22,12 +22,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nats-io/nkeys"
-
 	"github.com/nats-io/jwt/v2"
-	"github.com/stretchr/testify/require"
-
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/cmd/store"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_EditOperator(t *testing.T) {
@@ -332,4 +331,20 @@ func Test_RmAccountServiceURL(t *testing.T) {
 	oc, err = ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.Equal(t, "", oc.AccountServerURL)
+}
+
+func Test_SKGenerateAddsOneKey(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+
+	keys, err := ts.KeyStore.AllKeys()
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(keys))
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", "generate")
+	require.NoError(t, err)
+
+	keys, err = ts.KeyStore.AllKeys()
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(keys))
 }
