@@ -18,7 +18,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,13 +35,13 @@ func Test_NatsResolverServerParse(t *testing.T) {
 	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
 	require.NoError(t, err)
 	// modify the generated file so the jwt directory does not get created where the test is running
-	data, err := ioutil.ReadFile(serverconf)
+	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
-	dir, err := ioutil.TempDir("", "Test_NatsResolverServerParse-jwt-")
+	dir, err := os.MkdirTemp("", "Test_NatsResolverServerParse-jwt-")
 	require.NoError(t, err)
 	defer os.Remove(dir)
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
-	err = ioutil.WriteFile(serverconf, data, 0660)
+	err = os.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
 	// test parsing
 	var opts server.Options

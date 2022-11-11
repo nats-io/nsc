@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -89,7 +88,7 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	require.Error(t, err)
 
 	// store seed in temporary file and keystore so it can be found
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	defer os.Remove(f.Name())
 	require.NoError(t, err)
 	f.Write(s)

@@ -28,8 +28,9 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func createPushCmd() *cobra.Command {
@@ -459,8 +460,8 @@ func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, deleteList []string, respLi
 	}
 	respPrune := multiRequest(nc, subPrune, "prune", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt),
 		func(srv string, data interface{}) {
-			if data, ok := data.(map[string]interface{}); ok {
-				subPrune.AddOK("pruned nats-server %s: %s", srv, data["message"])
+			if dataMap, ok := data.(map[string]interface{}); ok {
+				subPrune.AddOK("pruned nats-server %s: %s", srv, dataMap["message"])
 			} else {
 				subPrune.AddOK("pruned nats-server %s: %v", srv, data)
 			}
@@ -566,8 +567,8 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 				} else {
 					resp := multiRequest(nc, subAcc, "push account", "$SYS.REQ.CLAIMS.UPDATE", raw,
 						func(srv string, data interface{}) {
-							if data, ok := data.(map[string]interface{}); ok {
-								subAcc.AddOK("pushed %q to nats-server %s: %s", v, srv, data["message"])
+							if dataMap, ok := data.(map[string]interface{}); ok {
+								subAcc.AddOK("pushed %q to nats-server %s: %s", v, srv, dataMap["message"])
 							} else {
 								subAcc.AddOK("pushed %q to nats-server %s: %v", v, srv, data)
 							}

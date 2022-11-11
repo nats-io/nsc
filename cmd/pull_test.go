@@ -18,7 +18,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -154,13 +153,13 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
-	data, err := ioutil.ReadFile(serverconf)
+	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
-	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	dir, err := os.MkdirTemp("", "Test_SyncNatsResolver-jwt-")
 	require.NoError(t, err)
 	defer os.Remove(dir)
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
-	err = ioutil.WriteFile(serverconf, data, 0660)
+	err = os.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
 	// Create a new account, only known to the nats-server. This account can be pulled
 	opKey, err := ts.Store.GetRootPublicKey()
@@ -175,7 +174,7 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	claimOrig.Name = "acc-name"
 	theJwtToPull, err := claimOrig.Encode(opKp)
 	require.NoError(t, err)
-	ioutil.WriteFile(dir+string(os.PathSeparator)+subj+".jwt", []byte(theJwtToPull), 0660)
+	os.WriteFile(dir+string(os.PathSeparator)+subj+".jwt", []byte(theJwtToPull), 0660)
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
 	// only after server start as ports are not yet known in tests

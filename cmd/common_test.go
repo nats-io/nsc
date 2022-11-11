@@ -17,7 +17,7 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -48,7 +48,7 @@ func TestCommon_ResolvePath(t *testing.T) {
 }
 
 func TestCommon_GetOutput(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal("error creating tmpdir", err)
 	}
@@ -105,7 +105,7 @@ func Test_WriteDestinations(t *testing.T) {
 	_, _, err = ExecuteCmd(createWriteCmd(t), "--out", fn)
 	require.NoError(t, err)
 	require.FileExists(t, fn)
-	d, err := ioutil.ReadFile(fn)
+	d, err := os.ReadFile(fn)
 	require.NoError(t, err)
 	require.Contains(t, string(d), "hello")
 }
@@ -199,21 +199,21 @@ func TestCommon_ParseNumber(t *testing.T) {
 }
 
 func TestCommon_NKeyValidatorActualKey(t *testing.T) {
-	as, _, _ := CreateAccountKey(t)
+	aSeed, _, _ := CreateAccountKey(t)
 	fn := NKeyValidator(nkeys.PrefixByteAccount)
-	require.NoError(t, fn(string(as)))
+	require.NoError(t, fn(string(aSeed)))
 
-	os, _, _ := CreateOperatorKey(t)
-	require.Error(t, fn(string(os)))
+	oSeed, _, _ := CreateOperatorKey(t)
+	require.Error(t, fn(string(oSeed)))
 }
 
 func TestCommon_NKeyValidatorKeyInFile(t *testing.T) {
 	dir := MakeTempDir(t)
-	as, _, _ := CreateAccountKey(t)
-	os, _, _ := CreateOperatorKey(t)
+	aSeed, _, _ := CreateAccountKey(t)
+	oSeed, _, _ := CreateOperatorKey(t)
 
-	require.NoError(t, Write(filepath.Join(dir, "as.nk"), as))
-	require.NoError(t, Write(filepath.Join(dir, "os.nk"), os))
+	require.NoError(t, Write(filepath.Join(dir, "as.nk"), aSeed))
+	require.NoError(t, Write(filepath.Join(dir, "os.nk"), oSeed))
 
 	fn := NKeyValidator(nkeys.PrefixByteAccount)
 	require.NoError(t, fn(filepath.Join(dir, "as.nk")))
@@ -253,7 +253,7 @@ func TestCommon_IsValidDir(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, os.IsNotExist(err))
 
-	err = ioutil.WriteFile(tp, []byte("hello"), 0600)
+	err = os.WriteFile(tp, []byte("hello"), 0600)
 	require.NoError(t, err)
 	err = IsValidDir(tp)
 	require.Error(t, err)
@@ -347,12 +347,12 @@ func Test_NKeyValidator(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	os, opk, _ := CreateOperatorKey(t)
-	as, pk, _ := CreateAccountKey(t)
+	oSeed, opk, _ := CreateOperatorKey(t)
+	aSeed, pk, _ := CreateAccountKey(t)
 	asf := filepath.Join(ts.Dir, "account_seed_file.nk")
-	require.NoError(t, ioutil.WriteFile(asf, as, 0700))
+	require.NoError(t, os.WriteFile(asf, aSeed, 0700))
 	pkf := filepath.Join(ts.Dir, "account_public_file.nk")
-	require.NoError(t, ioutil.WriteFile(pkf, []byte(pk), 0700))
+	require.NoError(t, os.WriteFile(pkf, []byte(pk), 0700))
 	nff := filepath.Join(ts.Dir, "not_exist.nk")
 
 	var keyTests = []struct {
@@ -363,10 +363,10 @@ func Test_NKeyValidator(t *testing.T) {
 		{pkf, true},
 		{nff, false},
 		{ts.Dir, false},
-		{string(as), true},
-		{string(as), true},
+		{string(aSeed), true},
+		{string(aSeed), true},
 		{pk, true},
-		{string(os), false},
+		{string(oSeed), false},
 		{opk, false},
 		{"", false},
 		{"foo", false},
@@ -388,8 +388,8 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	os, opk, _ := CreateOperatorKey(t)
-	as, pk, _ := CreateAccountKey(t)
+	oSeed, opk, _ := CreateOperatorKey(t)
+	aSeed, pk, _ := CreateAccountKey(t)
 	as1, pk1, _ := CreateAccountKey(t)
 	as2, pk2, _ := CreateAccountKey(t)
 
@@ -399,7 +399,7 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 		arg string
 		ok  bool
 	}{
-		{string(os), false},
+		{string(oSeed), false},
 		{"", false},
 		{"foo", false},
 		{pk, false},
@@ -407,7 +407,7 @@ func Test_SeedNKeyValidatorMatching(t *testing.T) {
 		{opk, false},
 		{filepath.Join(ts.Dir, "notexist.nk"), false},
 		{string(as2), false},
-		{string(as), true},
+		{string(aSeed), true},
 		{string(as1), true},
 	}
 
@@ -430,7 +430,7 @@ func TestPushAccount(t *testing.T) {
 	hts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			require.NoError(t, err)
 		}

@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -122,12 +121,12 @@ func (c *ContextConfig) LoadStore(operatorName string) (*store.Store, error) {
 }
 
 func (c *ContextConfig) ListOperators() []string {
-	infos, err := ioutil.ReadDir(c.StoreRoot)
+	dirEntries, err := os.ReadDir(c.StoreRoot)
 	if err != nil {
 		return nil
 	}
 	var operators []string
-	for _, v := range infos {
+	for _, v := range dirEntries {
 		name := store.SafeName(filepath.Base(v.Name()))
 		fp := filepath.Join(c.StoreRoot, name, store.NSCFile)
 		info, err := os.Stat(fp)

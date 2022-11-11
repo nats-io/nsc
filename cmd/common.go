@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,6 +27,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -35,8 +35,11 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 // ResolvePath resolves a directory/file from an environment variable
@@ -91,7 +94,7 @@ func WriteJson(fp string, v interface{}) error {
 			return fmt.Errorf("error creating dirs %#q: %v", fp, err)
 		}
 	}
-	if err := ioutil.WriteFile(fp, data, 0600); err != nil {
+	if err := os.WriteFile(fp, data, 0600); err != nil {
 		return fmt.Errorf("error writing %#q: %v", fp, err)
 	}
 
@@ -139,7 +142,7 @@ func Read(fp string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(fp)
+	return os.ReadFile(fp)
 }
 
 func ParseNumber(s string) (int64, error) {
@@ -176,9 +179,9 @@ func HumanizedDate(d int64) string {
 	when := time.Unix(d, 0).UTC()
 
 	if now.After(when) {
-		return strings.TrimSpace(strings.Title(humanize.RelTime(when, now, "ago", "")))
+		return strings.TrimSpace(TitleCase(humanize.RelTime(when, now, "ago", "")))
 	} else {
-		return strings.TrimSpace(strings.Title("in " + humanize.RelTime(now, when, "", "")))
+		return strings.TrimSpace(TitleCase("in " + humanize.RelTime(now, when, "", "")))
 	}
 }
 
@@ -395,7 +398,7 @@ func PushAccount(u string, accountjwt []byte) (int, []byte, error) {
 		return 0, nil, err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	return resp.StatusCode, data, err
 }
 
@@ -600,4 +603,16 @@ func Debug(label string, v interface{}) {
 		panic(err)
 	}
 	fmt.Println(label, string(d))
+}
+
+var (
+	englishCaser cases.Caser
+	caserOnce    sync.Once
+)
+
+func TitleCase(s string) string {
+	caserOnce.Do(func() {
+		englishCaser = cases.Title(language.English)
+	})
+	return englishCaser.String(s)
 }

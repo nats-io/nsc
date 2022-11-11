@@ -19,11 +19,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/nats-io/jwt/v2"
+
 	"github.com/nats-io/nsc/cmd/store"
 )
 
@@ -110,7 +111,7 @@ func (cb *MemResolverConfigBuilder) GenerateConfig() ([]byte, error) {
 
 func (cb *MemResolverConfigBuilder) writeFile(dir string, name string, token string) (string, error) {
 	fp := filepath.Join(dir, store.JwtName(name))
-	err := ioutil.WriteFile(fp, []byte(token), 0666)
+	err := os.WriteFile(fp, []byte(token), 0666)
 	return fp, err
 }
 
@@ -160,7 +161,7 @@ func (cb *MemResolverConfigBuilder) GenerateDir() ([]byte, error) {
 	}
 	buf.WriteString("}\n")
 
-	err = ioutil.WriteFile(filepath.Join(cb.dir, "resolver.conf"), buf.Bytes(), 0666)
+	err = os.WriteFile(filepath.Join(cb.dir, "resolver.conf"), buf.Bytes(), 0666)
 	if err != nil {
 		return nil, err
 	}

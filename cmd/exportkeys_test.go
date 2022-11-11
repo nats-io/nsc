@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,9 +28,9 @@ import (
 )
 
 func requireEmptyDir(t *testing.T, dir string) {
-	infos, err := ioutil.ReadDir(dir)
+	dirEntries, err := os.ReadDir(dir)
 	require.NoError(t, err)
-	require.Len(t, infos, 0)
+	require.Len(t, dirEntries, 0)
 }
 
 func requireExportedKey(t *testing.T, dir string, pk string) {

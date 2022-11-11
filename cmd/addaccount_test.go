@@ -17,14 +17,15 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func Test_AddAccount(t *testing.T) {
@@ -147,7 +148,7 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	inputs := []interface{}{"A", true, "0", "0", 0, string(s1)}
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
-	accJWT, err := ioutil.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "A", "A.jwt"))
+	accJWT, err := os.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "A", "A.jwt"))
 	require.NoError(t, err)
 	ac, err := jwt.DecodeAccountClaims(string(accJWT))
 	require.NoError(t, err)
@@ -158,7 +159,7 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	inputs = []interface{}{"B", true, "0", "0", 1, string(s1)}
 	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
-	accJWT, err = ioutil.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "B", "B.jwt"))
+	accJWT, err = os.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "B", "B.jwt"))
 	require.NoError(t, err)
 	ac, err = jwt.DecodeAccountClaims(string(accJWT))
 	require.NoError(t, err)

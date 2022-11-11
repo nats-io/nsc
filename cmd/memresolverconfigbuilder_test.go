@@ -17,13 +17,14 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nsc/cmd/store"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/cmd/store"
 )
 
 func Test_MemResolverContainsStandardProperties(t *testing.T) {
@@ -157,7 +158,7 @@ func Test_MemResolverDir(t *testing.T) {
 	require.FileExists(t, filepath.Join(out, "B.jwt"))
 	resolver := filepath.Join(out, "resolver.conf")
 	require.FileExists(t, resolver)
-	d, err := ioutil.ReadFile(resolver)
+	d, err := os.ReadFile(resolver)
 	require.NoError(t, err)
 
 	contents := string(d)

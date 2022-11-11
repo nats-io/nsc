@@ -18,7 +18,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -147,14 +146,14 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC2")
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
-	data, err := ioutil.ReadFile(serverconf)
+	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
-	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	dir, err := os.MkdirTemp("", "Test_SyncNatsResolver-jwt-")
 	require.NoError(t, err)
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
 	data = bytes.ReplaceAll(data, []byte(`dir: '.\jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
 	data = bytes.ReplaceAll(data, []byte(`allow_delete: false`), []byte(fmt.Sprintf(`allow_delete: %t`, del)))
-	err = ioutil.WriteFile(serverconf, data, 0660)
+	err = os.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
@@ -294,13 +293,13 @@ func Test_SyncBadUrl(t *testing.T) {
 	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
-	data, err := ioutil.ReadFile(serverconf)
+	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
-	dir, err := ioutil.TempDir("", "Test_SyncNatsResolver-jwt-")
+	dir, err := os.MkdirTemp("", "Test_SyncNatsResolver-jwt-")
 	require.NoError(t, err)
 	defer os.Remove(dir)
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
-	err = ioutil.WriteFile(serverconf, data, 0660)
+	err = os.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)

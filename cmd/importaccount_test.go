@@ -16,7 +16,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -45,7 +45,7 @@ func Test_ImportAccountSelfSigned(t *testing.T) {
 	}
 
 	file := filepath.Join(ts.Dir, "account-selfsigned.jwt")
-	err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+	err = os.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func Test_ImportAccountOtherOperator(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, ac.IsSelfSigned())
 		file := filepath.Join(ts.Dir, "account.jwt")
-		err = ioutil.WriteFile(file, []byte(theJWT), 0666)
+		err = os.WriteFile(file, []byte(theJWT), 0666)
 		require.NoError(t, err)
 		if force {
 			_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file, "--force")

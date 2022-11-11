@@ -18,7 +18,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
+
 	"github.com/nats-io/nsc/cmd/store"
 )
 
@@ -78,11 +78,11 @@ func GetCwdCtx() *ContextConfig {
 	}
 
 	// search down
-	infos, err := ioutil.ReadDir(dir)
+	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
 	}
-	for _, v := range infos {
+	for _, v := range dirEntries {
 		if !v.IsDir() {
 			continue
 		}
@@ -152,7 +152,7 @@ func isOperatorDir(dir string) (store.Info, bool, error) {
 		return v, false, nil
 	}
 	if !fi.IsDir() {
-		d, err := ioutil.ReadFile(tf)
+		d, err := os.ReadFile(tf)
 		if err != nil {
 			return v, false, err
 		}
