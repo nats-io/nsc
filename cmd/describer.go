@@ -63,6 +63,14 @@ func (a *AccountDescriber) Describe() string {
 		table.AddSeparator()
 	}
 
+	if len(a.Authorization.AuthUsers) > 0 {
+		AddListValues(table, "Auth Callout Users", a.Authorization.AuthUsers)
+		if len(a.Authorization.AllowedAccounts) > 0 {
+			AddListValues(table, "Allowed Accounts", a.Authorization.AllowedAccounts)
+		}
+		table.AddSeparator()
+	}
+
 	addLimitRow := func(table *tablewriter.Table, name string, limit int64, inBytes bool) {
 		if limit > -1 {
 			val := fmt.Sprintf("%d", limit)

@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/cliprompts/v2 v2.0.0-20191226174129-372d79b36768
 	github.com/nats-io/jsm.go v0.0.33
 	github.com/nats-io/jwt v1.2.3-0.20210314221642-a826c77dc9d2
-	github.com/nats-io/jwt/v2 v2.3.0
+	github.com/nats-io/jwt/v2 v2.3.1-0.20221202180456-83b58fd54838
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
 	github.com/nats-io/nkeys v0.3.0
@@ -20,6 +20,7 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.7.0
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
+	golang.org/x/text v0.4.0
 )
 
 require (
@@ -48,7 +49,6 @@ require (
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
-	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	google.golang.org/appengine v1.3.0 // indirect
 	google.golang.org/protobuf v1.23.0 // indirect
