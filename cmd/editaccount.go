@@ -709,7 +709,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	p.claim.Limits.Payload = p.payload.Int64()
 	if flags.Changed("payload") {
-		r.AddOK("changed max imports to %d", p.claim.Limits.Payload)
+		r.AddOK("changed max payload size to %d", p.claim.Limits.Payload)
 	}
 
 	p.claim.Limits.Subs = p.subscriptions.Int64()
