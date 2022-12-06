@@ -205,6 +205,24 @@ func Test_TieredPreventsGlobal(t *testing.T) {
 	require.Equal(t, "cannot set a jetstream global limit when a configuration has tiered limits 'R2'", err.Error())
 }
 
+func Test_TieredDoesntPreventOtherClaims(t *testing.T) {
+	ts := NewTestStore(t, "edit account")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(),
+		"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, int64(5), ac.Limits.JetStreamTieredLimits["R2"].Streams)
+
+	_, _, err = ExecuteCmd(createEditAccount(),
+		"--sk", "generate")
+	require.NoError(t, err)
+}
+
 func Test_EditAccountSigningKeys(t *testing.T) {
 	ts := NewTestStore(t, "edit account")
 	defer ts.Done(t)
