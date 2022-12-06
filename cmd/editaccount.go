@@ -139,6 +139,7 @@ type JetStreamLimitParams struct {
 	DiskMaxStreamBytes NumberParams
 	MaxBytesRequired   bool
 	MaxAckPending      NumberParams
+	hasJSSetParams     bool
 }
 
 type EditAccountParams struct {
@@ -172,7 +173,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	hasDeleteTier := ctx.AnySet("rm-js-tier")
-	hasJsSetFlags := ctx.AnySet("js-tier", "js-mem-storage",
+	p.hasJSSetParams = ctx.AnySet("js-tier", "js-mem-storage",
 		"js-disk-storage",
 		"js-streams",
 		"js-consumer",
@@ -181,7 +182,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-max-bytes-required",
 		"js-max-ack-pending")
 
-	if hasDeleteTier && hasJsSetFlags {
+	if hasDeleteTier && p.hasJSSetParams {
 		return fmt.Errorf("rm-js-tier is exclusive of all other js options")
 	}
 
@@ -305,12 +306,12 @@ func (p *EditAccountParams) validJsLimitConfig() error {
 	if tiered > 0 && globalIsSet {
 		return fmt.Errorf("configuration cannot contain both global and tiered limits '%s' - please use the --rm-js-tier to remove undesired tier(s)", strings.Join(keys, ","))
 	}
-	// trying to add global to tiered
-	if tiered > 0 && p.Tier == 0 {
+	// trying to add global to tiered (only if js set params have been passed)
+	if tiered > 0 && p.Tier == 0 && p.hasJSSetParams {
 		return fmt.Errorf("cannot set a jetstream global limit when a configuration has tiered limits '%s'", strings.Join(keys, ","))
 	}
 	// trying to add tiered to global
-	if globalIsSet && p.Tier > 0 {
+	if globalIsSet && p.Tier > 0 && p.hasJSSetParams {
 		return errors.New("cannot set a jetstream tier limit when a configuration has a global limit")
 	}
 	return nil
