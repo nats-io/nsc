@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -27,17 +28,19 @@ type KeyCollectorParams struct {
 	Operator     bool
 	Accounts     bool
 	Users        bool
+	Curves       bool
 	All          bool
 	Unreferenced bool
 	Account      string
 	User         string
+	Curve        string
 	Filter       string
 }
 
 func (p *KeyCollectorParams) SetDefaults(ctx ActionCtx) error {
 	conf := GetConfig()
 
-	if ctx.NothingToDo("operator", "accounts", "users", "all") {
+	if ctx.NothingToDo("operator", "accounts", "users", "curve", "all") {
 		// default if no args
 		account := p.Account
 		if account == "" {
@@ -46,12 +49,14 @@ func (p *KeyCollectorParams) SetDefaults(ctx ActionCtx) error {
 		p.Operator = true
 		p.Account = account
 		p.Accounts = true
+		p.Curves = true
 		p.Users = true
 	}
 	if p.All {
 		p.Operator = true
 		p.Accounts = true
 		p.Users = true
+		p.Curves = true
 	}
 	return nil
 }
@@ -111,6 +116,14 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 		ask.Name = ac.Name
 		ask.Pub = k
 		ask.Signing = true
+		ask.Resolve(ks)
+		keys = append(keys, &ask)
+	}
+	if ac.Authorization.XKey != "" {
+		var ask Key
+		ask.Name = fmt.Sprintf(ac.Name)
+		ask.Pub = ac.Authorization.XKey
+		ask.Curve = true
 		ask.Resolve(ks)
 		keys = append(keys, &ask)
 	}
@@ -212,6 +225,7 @@ func (p *KeyCollectorParams) Run(ctx ActionCtx) (KeyList, error) {
 		var okeys KeyList
 		var akeys KeyList
 		var ukeys KeyList
+		var ckeys KeyList
 		for _, v := range all {
 			_, ok := m[v]
 			if !ok {
@@ -230,16 +244,20 @@ func (p *KeyCollectorParams) Run(ctx ActionCtx) (KeyList, error) {
 					akeys = append(akeys, &k)
 				case nkeys.PrefixByteUser:
 					ukeys = append(ukeys, &k)
+				case nkeys.PrefixByteCurve:
+					ckeys = append(ckeys, &k)
 				}
 			}
 		}
 		sort.Sort(okeys)
 		sort.Sort(akeys)
 		sort.Sort(ukeys)
+		sort.Sort(ckeys)
 		keys = KeyList{}
 		keys = append(keys, okeys...)
 		keys = append(keys, akeys...)
 		keys = append(keys, ukeys...)
+		keys = append(keys, ckeys...)
 	}
 
 	var keyFilter = strings.ToUpper(p.Filter)
@@ -269,6 +287,7 @@ type Key struct {
 	Parent       string
 	ExpectedKind nkeys.PrefixByte
 	Signing      bool
+	Curve        bool
 	KeyPath      string
 	Invalid      bool
 }

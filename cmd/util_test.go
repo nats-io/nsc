@@ -382,6 +382,10 @@ func CreateOperatorKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair)
 	return CreateNkey(t, nkeys.PrefixByteOperator)
 }
 
+func CreateCurveKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateNkey(t, nkeys.PrefixByteCurve)
+}
+
 func CreateNkey(t *testing.T, kind nkeys.PrefixByte) ([]byte, string, nkeys.KeyPair) {
 	kp, err := nkeys.CreatePair(kind)
 	require.NoError(t, err)

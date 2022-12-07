@@ -65,6 +65,7 @@ nsc list keys --account A (changes the account context to the specified account)
 	cmd.Flags().BoolVarP(&params.Operator, "operator", "o", false, "show operator keys")
 	cmd.Flags().BoolVarP(&params.Accounts, "accounts", "a", false, "show account keys")
 	cmd.Flags().BoolVarP(&params.Users, "users", "u", false, "show user keys")
+	cmd.Flags().BoolVarP(&params.Users, "curve", "x", false, "show curve keys")
 	cmd.Flags().StringVarP(&params.Account, "account", "", "", "show specified account keys")
 	cmd.Flags().StringVarP(&params.User, "user", "", "", "show specified user key")
 	cmd.Flags().BoolVarP(&params.All, "all", "A", false, "show operator, accounts and users")
@@ -147,6 +148,9 @@ func (p *ListKeysParams) Report(ks Keys) string {
 		if k.Signing {
 			sk = "*"
 		}
+		if k.Curve {
+			sk = "T"
+		}
 		stored := ""
 		if k.HasKey() {
 			stored = "*"
@@ -170,6 +174,7 @@ func (p *ListKeysParams) Report(ks Keys) string {
 	if hasUnreferenced {
 		s = fmt.Sprintf("%s[?] unreferenced key - may belong to a different operator context", s)
 	}
+	s = fmt.Sprintf("%s[ T ] auth callout encryption target\n", s)
 	return s
 }
 
@@ -181,6 +186,9 @@ func (p *ListKeysParams) ReportSeeds(ks Keys) string {
 		sk := ""
 		if k.Signing {
 			sk = "*"
+		}
+		if k.Curve {
+			sk = "T"
 		}
 
 		pad := ""
@@ -208,5 +216,6 @@ func (p *ListKeysParams) ReportSeeds(ks Keys) string {
 	s := table.Render()
 	s = fmt.Sprintf("%s[ ! ] seed is not stored\n", s)
 	s = fmt.Sprintf("%s[ERR] error reading seed\n", s)
+	s = fmt.Sprintf("%s[ T ] auth callout encryption target\n", s)
 	return s
 }

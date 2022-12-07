@@ -28,6 +28,7 @@ func createGenerateNKeyCmd() *cobra.Command {
 	params.operator.prefix = nkeys.PrefixByteOperator
 	params.account.prefix = nkeys.PrefixByteAccount
 	params.user.prefix = nkeys.PrefixByteUser
+	params.curve.prefix = nkeys.PrefixByteCurve
 
 	cmd := &cobra.Command{
 		Use:   "nkey",
@@ -39,6 +40,7 @@ func createGenerateNKeyCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.operator.generate, "operator", "o", false, "operator")
 	cmd.Flags().BoolVarP(&params.account.generate, "account", "a", false, "account")
 	cmd.Flags().BoolVarP(&params.user.generate, "user", "u", false, "user")
+	cmd.Flags().BoolVarP(&params.curve.generate, "curve", "x", false, "curve")
 	cmd.Flags().BoolVarP(&params.store, "store", "S", false, "store in the keystore")
 
 	return cmd
@@ -52,6 +54,7 @@ type GenerateNKeysParam struct {
 	operator KP
 	account  KP
 	user     KP
+	curve    KP
 	store    bool
 }
 
@@ -70,6 +73,8 @@ func (e *KP) kind() string {
 		return "account"
 	case nkeys.PrefixByteUser:
 		return "user"
+	case nkeys.PrefixByteCurve:
+		return "curve"
 	}
 	return ""
 }
@@ -110,8 +115,8 @@ func (e *KP) String(pubOnly bool) string {
 }
 
 func (p *GenerateNKeysParam) SetDefaults(ctx ActionCtx) error {
-	if !ctx.AnySet("operator", "account", "user") {
-		return fmt.Errorf("set --operator, --account, or --user")
+	if !ctx.AnySet("operator", "account", "user", "curve") {
+		return fmt.Errorf("set --operator, --account, --user, or --curve")
 	}
 	return nil
 }
@@ -135,7 +140,7 @@ func (p *GenerateNKeysParam) Validate(ctx ActionCtx) error {
 func (p *GenerateNKeysParam) Run(ctx ActionCtx) (store.Status, error) {
 	var err error
 	var jobs []*KP
-	jobs = append(jobs, &p.operator, &p.account, &p.user)
+	jobs = append(jobs, &p.operator, &p.account, &p.user, &p.curve)
 	for _, j := range jobs {
 		if j.generate {
 			if err := j.Generate(); err != nil {

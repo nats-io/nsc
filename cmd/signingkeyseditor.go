@@ -1,6 +1,6 @@
 /*
  *
- *  * Copyright 2018-2019 The NATS Authors
+ *  * Copyright 2018-2022 The NATS Authors
  *  * Licensed under the Apache License, Version 2.0 (the "License");
  *  * you may not use this file except in compliance with the License.
  *  * You may obtain a copy of the License at
@@ -35,7 +35,12 @@ type SigningKeysParams struct {
 func (e *SigningKeysParams) BindFlags(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
 	e.flagName = flagName
 	e.kind = kind
-	cmd.Flags().StringSliceVarP(&e.paths, flagName, shorthand, nil, `signing key or keypath or the value "generate"" to generate a key pair on the fly - comma separated list or option can be specified multiple times`)
+	if kind == nkeys.PrefixByteCurve {
+		e.paths = make([]string, 1)
+		cmd.Flags().StringVarP(&e.paths[0], flagName, shorthand, "", `curve key or keypath or the value "generate" to generate a curve encryption target key on the fly`)
+	} else {
+		cmd.Flags().StringSliceVarP(&e.paths, flagName, shorthand, nil, `signing key or keypath or the value "generate" to generate a key pair on the fly - comma separated list or option can be specified multiple times`)
+	}
 }
 
 func (e *SigningKeysParams) valid(s string) error {
@@ -63,14 +68,23 @@ func (e *SigningKeysParams) resolve(s string) (nkeys.KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if kp == nil {
-		return nil, fmt.Errorf("a signing key is required")
+		return nil, fmt.Errorf("a %s key is required", e.label())
 	}
 	if !store.KeyPairTypeOk(e.kind, kp) {
-		return nil, fmt.Errorf("invalid %s signing key %q", e.kind.String(), s)
+		return nil, fmt.Errorf("invalid %s %s key %q", e.kind.String(), e.label(), s)
 	}
 
 	return kp, nil
+}
+
+func (e *SigningKeysParams) label() string {
+	label := "signing"
+	if e.kind == nkeys.PrefixByteCurve {
+		label = "curve"
+	}
+	return label
 }
 
 func (e *SigningKeysParams) Valid() error {
@@ -108,10 +122,11 @@ func (e *SigningKeysParams) Edit() error {
 		e.paths[i] = sv
 	}
 	first := true
+
 	for {
-		m := "add a signing key"
+		m := fmt.Sprintf("add a %s key", e.label())
 		if !first || len(e.paths) > 0 {
-			m = "add another signing key"
+			m = fmt.Sprintf("add another %s key", e.label())
 		}
 		first = false
 

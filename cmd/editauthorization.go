@@ -33,6 +33,8 @@ type EditAccountCalloutParams struct {
 	AllowedAccounts   []string
 	RmAuthUsers       []string
 	RmAllowedAccounts []string
+	XKey              SigningKeysParams
+	RmXKey            bool
 	claim             *jwt.AccountClaims
 }
 
@@ -54,8 +56,8 @@ func createEditAuthorizationCallout() *cobra.Command {
 
 	cmd.Flags().StringSliceVarP(&params.RmAuthUsers, "rm-auth-user", "", nil, "removes a user public key that bypasses the authorization callout and is used by the authorization service itself")
 	cmd.Flags().StringSliceVarP(&params.RmAllowedAccounts, "rm-allowed-account", "", nil, "removes an account public key that the authorization service can bind authorized users to")
-
-	//cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
+	cmd.Flags().BoolVarP(&params.RmXKey, "rm-curve", "", false, "remove curve encryption target")
+	params.XKey.BindFlags("curve", "x", nkeys.PrefixByteCurve, cmd)
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -74,8 +76,14 @@ func (p *EditAccountCalloutParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	if ctx.NothingToDo("auth-user", "rm-auth-user", "allowed-account",
-		"rm-allowed-account", "disable") {
+		"rm-allowed-account", "disable", "curve", "rm-curve") {
 		return errors.New("please specify some options")
+	}
+
+	// fail if are given disable and other flags
+	if p.disable && ctx.AnySet("auth-user", "rm-auth-user", "allowed-account",
+		"rm-allowed-account", "curve", "rm-curve") {
+		return errors.New("--disable is exclusive of all other options")
 	}
 
 	return nil
@@ -124,8 +132,13 @@ func (p *EditAccountCalloutParams) Validate(ctx ActionCtx) error {
 	}
 
 	if p.disable {
-		// don't look for anything
 		return nil
+	}
+
+	if ctx.AnySet("curve") {
+		if err := p.XKey.Valid(); err != nil {
+			return err
+		}
 	}
 
 	for idx, k := range p.AuthUsers {
@@ -176,6 +189,8 @@ func (p *EditAccountCalloutParams) Run(ctx ActionCtx) (store.Status, error) {
 	var userRmReport []string
 	var accountReport []string
 	var accountRmReport []string
+	var curveReport []string
+
 	if !p.disable {
 		userReport = report(p.claim.Account.Authorization.AuthUsers,
 			p.AuthUsers,
@@ -200,6 +215,29 @@ func (p *EditAccountCalloutParams) Run(ctx ActionCtx) (store.Status, error) {
 			"deleted account %q",
 			"skipping account %q - as it's not currently set")
 		p.claim.Account.Authorization.AllowedAccounts.Remove(p.RmAllowedAccounts...)
+
+		if p.RmXKey {
+			old := p.claim.Account.Authorization.XKey
+			if old != "" {
+				p.claim.Account.Authorization.XKey = ""
+				curveReport = append(curveReport, fmt.Sprintf("removed %s curve key", old))
+			} else {
+				curveReport = append(curveReport, "remove curve key didn't do anything as the curve key was not set")
+			}
+		}
+
+		if ctx.AnySet("curve") {
+			ckeys, err := p.XKey.PublicKeys()
+			if err != nil {
+				return nil, err
+			}
+			if len(ckeys) > 1 {
+				return nil, errors.New("only one curve key can be specified")
+			}
+			p.claim.Authorization.XKey = ckeys[0]
+			curveReport = append(curveReport, fmt.Sprintf("set curve key %s", ckeys[0]))
+		}
+
 	} else {
 		p.claim.Account.Authorization = jwt.ExternalAuthorization{}
 	}
@@ -233,6 +271,11 @@ func (p *EditAccountCalloutParams) Run(ctx ActionCtx) (store.Status, error) {
 		for _, v := range accountRmReport {
 			r.AddOK(v)
 		}
+
+		for _, v := range curveReport {
+			r.AddOK(v)
+		}
+
 		if p.disable {
 			r.AddOK("removed external authorization configuration")
 		}

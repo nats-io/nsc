@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -226,13 +225,16 @@ func TestDescribeAccount_Callout(t *testing.T) {
 
 	_, uPK, _ := CreateUserKey(t)
 	_, aPK, _ := CreateAccountKey(t)
+	_, xPK, _ := CreateCurveKey(t)
 	_, _, err := ExecuteCmd(createEditAuthorizationCallout(),
 		"--auth-user", uPK,
-		"--allowed-account", aPK)
+		"--allowed-account", aPK,
+		"--curve", xPK)
 	require.NoError(t, err)
 
 	out, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 	require.Contains(t, out, fmt.Sprintf(" | %s", uPK))
 	require.Contains(t, out, fmt.Sprintf(" | %s", aPK))
+	require.Contains(t, out, fmt.Sprintf(" | %s", xPK))
 }
