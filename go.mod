@@ -1,6 +1,8 @@
-module github.com/nats-io/nsc
+module github.com/nats-io/nsc/v2
 
 go 1.19
+
+replace github.com/nats-io/nsc => ./
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -14,6 +16,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
 	github.com/nats-io/nkeys v0.3.0
+	github.com/nats-io/nsc v0.0.0-00010101000000-000000000000
 	github.com/nats-io/nuid v1.0.1
 	github.com/rhysd/go-github-selfupdate v1.2.2
 	github.com/spf13/cobra v0.0.3
@@ -40,7 +43,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
