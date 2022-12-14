@@ -21,9 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/nsc/cmd/store"
-
 	nats "github.com/nats-io/nats.go"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 )
 

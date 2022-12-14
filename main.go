@@ -16,7 +16,7 @@
 package main
 
 import (
-	"github.com/nats-io/nsc/cmd"
+	"github.com/nats-io/nsc/v2/cmd"
 )
 
 // The build system should inject this data.

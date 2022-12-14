@@ -22,7 +22,7 @@ import (
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
 )

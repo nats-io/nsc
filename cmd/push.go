@@ -30,7 +30,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 )
 
 func createPushCmd() *cobra.Command {

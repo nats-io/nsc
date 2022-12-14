@@ -38,7 +38,7 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 )
 
 type TestStore struct {

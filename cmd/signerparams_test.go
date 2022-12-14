@@ -21,10 +21,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/nats-io/nkeys"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )

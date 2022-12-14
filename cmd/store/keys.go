@@ -26,7 +26,7 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 
-	"github.com/nats-io/nsc/home"
+	"github.com/nats-io/nsc/v2/home"
 )
 
 var NscNotGitIgnore bool

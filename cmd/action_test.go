@@ -18,7 +18,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )

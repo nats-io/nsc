@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 

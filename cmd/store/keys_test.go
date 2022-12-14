@@ -20,9 +20,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nsc/home"
-
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/v2/home"
 	"github.com/stretchr/testify/require"
 )
 

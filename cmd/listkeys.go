@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nsc/cmd/store"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
 )
