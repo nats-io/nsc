@@ -68,6 +68,9 @@ func (a *AccountDescriber) Describe() string {
 		if len(a.Authorization.AllowedAccounts) > 0 {
 			AddListValues(table, "Allowed Accounts", a.Authorization.AllowedAccounts)
 		}
+		if a.Authorization.XKey != "" {
+			table.AddRow("Encrypt For", a.Authorization.XKey)
+		}
 		table.AddSeparator()
 	}
 

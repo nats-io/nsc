@@ -18,6 +18,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nats-io/nkeys"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -141,4 +144,51 @@ func Test_EditAuthorizationDeleteUser(t *testing.T) {
 	require.NotContains(t, ac.Authorization.AuthUsers, u2PK)
 	require.Contains(t, ac.Authorization.AllowedAccounts, aPK)
 	require.NotContains(t, ac.Authorization.AllowedAccounts, a2PK)
+}
+
+func Test_EditAuthorizationCurveKey(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, uPK, _ := CreateUserKey(t)
+	_, u2PK, _ := CreateUserKey(t)
+	_, aPK, _ := CreateAccountKey(t)
+	_, a2PK, _ := CreateAccountKey(t)
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(),
+		"--auth-user", fmt.Sprintf("%s,%s", uPK, u2PK),
+		"--allowed-account", fmt.Sprintf("%s,%s", aPK, a2PK),
+		"--curve", "generate")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Authorization.AuthUsers, uPK)
+	require.Contains(t, ac.Authorization.AuthUsers, u2PK)
+	require.Contains(t, ac.Authorization.AllowedAccounts, aPK)
+	require.Contains(t, ac.Authorization.AllowedAccounts, a2PK)
+	require.NotEmpty(t, ac.Authorization.XKey)
+	require.True(t, nkeys.IsValidPublicCurveKey(ac.Authorization.XKey))
+
+	// find the key in the store
+	kp, err := ts.KeyStore.GetKeyPair(ac.Authorization.XKey)
+	require.NoError(t, err)
+	sx, err := kp.Seed()
+	require.NoError(t, err)
+	assert.Equal(t, "SX", string(sx[0:2]))
+
+	_, _, err = ExecuteCmd(createEditAuthorizationCallout(),
+		"--rm-auth-user", u2PK,
+		"--rm-allowed-account", a2PK,
+		"--rm-curve")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Contains(t, ac.Authorization.AuthUsers, uPK)
+	require.NotContains(t, ac.Authorization.AuthUsers, u2PK)
+	require.Contains(t, ac.Authorization.AllowedAccounts, aPK)
+	require.NotContains(t, ac.Authorization.AllowedAccounts, a2PK)
+	require.Empty(t, ac.Authorization.XKey)
 }

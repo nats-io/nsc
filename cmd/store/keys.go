@@ -480,6 +480,8 @@ func IsPublicKey(kind nkeys.PrefixByte, key string) bool {
 		f = nkeys.IsValidPublicServerKey
 	case nkeys.PrefixByteUser:
 		f = nkeys.IsValidPublicUserKey
+	case nkeys.PrefixByteCurve:
+		f = nkeys.IsValidPublicCurveKey
 	default:
 		return false
 	}
@@ -501,6 +503,9 @@ func PubKeyType(pk string) (nkeys.PrefixByte, error) {
 	}
 	if nkeys.IsValidPublicUserKey(pk) {
 		return nkeys.PrefixByteUser, nil
+	}
+	if nkeys.IsValidPublicCurveKey(pk) {
+		return nkeys.PrefixByteCurve, nil
 	}
 	return 0, fmt.Errorf("unsupported key type")
 }

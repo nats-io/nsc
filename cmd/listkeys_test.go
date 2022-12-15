@@ -138,3 +138,37 @@ func Test_ListKeysNoKeyStore(t *testing.T) {
 	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
 	store.KeyStorePath = old
 }
+
+func Test_listKeysAuthorizationXKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, uPK, _ := CreateUserKey(t)
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--curve", "generate")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+
+	xPK := ac.Authorization.XKey
+	require.NotEmpty(t, xPK)
+
+	_, stderr, err := ExecuteCmd(createListKeysCmd(), "-A")
+	require.NoError(t, err)
+	stderr = StripTableDecorations(stderr)
+	require.Contains(t, stderr, xPK)
+
+	_, _, err = ExecuteCmd(createEditAuthorizationCallout(), "--rm-curve")
+	require.NoError(t, err)
+
+	_, stderr, err = ExecuteCmd(createListKeysCmd(), "-A")
+	require.NoError(t, err)
+	stderr = StripTableDecorations(stderr)
+	require.NotContains(t, stderr, xPK)
+
+	_, stderr, err = ExecuteCmd(createListKeysCmd(), "--not-referenced")
+	require.NoError(t, err)
+	stderr = StripTableDecorations(stderr)
+	require.Contains(t, stderr, xPK)
+}

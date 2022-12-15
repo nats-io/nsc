@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2022 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -67,8 +67,10 @@ nsc export keys --account <name> (changes the account context to the specified a
 	cmd.Flags().BoolVarP(&params.Operator, "operator", "o", false, "export operator keys")
 	cmd.Flags().BoolVarP(&params.Accounts, "accounts", "a", false, "export account keys")
 	cmd.Flags().BoolVarP(&params.Users, "users", "u", false, "export user keys")
+	cmd.Flags().BoolVarP(&params.Curves, "curves", "", false, "export curve keys")
 	cmd.Flags().StringVarP(&params.Account, "account", "", "", "change account context to the named account")
 	cmd.Flags().StringVarP(&params.User, "user", "", "", "export specified user key")
+	cmd.Flags().StringVarP(&params.Curve, "curve", "", "", "export specified curve key")
 	cmd.Flags().BoolVarP(&params.All, "all", "A", false, "export operator, accounts and users keys")
 	cmd.Flags().StringVarP(&params.Filter, "filter", "f", "", "export keys containing string")
 	cmd.Flags().BoolVarP(&params.Unreferenced, "not-referenced", "", false, "export keys that are not referenced in the current operator context")

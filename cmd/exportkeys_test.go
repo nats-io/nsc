@@ -108,8 +108,17 @@ func Test_ExportAllContext(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
+	upk := ts.GetUserPublicKey(t, "AA", "UU")
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--account", "AA", "--auth-user", upk, "--curve", "generate")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("AA")
+	require.NoError(t, err)
+	xpk := ac.Authorization.XKey
+
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--all", "--dir", exportDir)
+
+	_, _, err = ExecuteCmd(createExportKeysCmd(), "--all", "--dir", exportDir)
 	require.NoError(t, err)
 
 	opk := ts.GetOperatorPublicKey(t)
@@ -118,7 +127,6 @@ func Test_ExportAllContext(t *testing.T) {
 	apk := ts.GetAccountPublicKey(t, "A")
 	requireExportedKey(t, exportDir, apk)
 
-	upk := ts.GetUserPublicKey(t, "A", "U")
 	requireExportedKey(t, exportDir, upk)
 
 	aapk := ts.GetAccountPublicKey(t, "AA")
@@ -126,6 +134,8 @@ func Test_ExportAllContext(t *testing.T) {
 
 	uupk := ts.GetUserPublicKey(t, "AA", "UU")
 	requireExportedKey(t, exportDir, uupk)
+
+	requireExportedKey(t, exportDir, xpk)
 }
 
 func Test_ExportAccount(t *testing.T) {
@@ -187,4 +197,42 @@ func Test_ExportNoKeyStore(t *testing.T) {
 	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", ts.Dir)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
+}
+
+func Test_ExportXKeyNotReferenced(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	exportDir := filepath.Join(ts.Dir, "export")
+
+	_, xPK, kp := CreateCurveKey(t)
+	ts.KeyStore.Store(kp)
+	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "--curve", xPK, "--not-referenced")
+	require.NoError(t, err)
+	requireExportedKey(t, exportDir, xPK)
+}
+
+func Test_ExportXKeyInContext(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, uPK, _ := CreateUserKey(t)
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--curve", "generate")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	xPK := ac.Authorization.XKey
+	require.NotEmpty(t, xPK)
+
+	exportDir := filepath.Join(ts.Dir, "export")
+	_, _, err = ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "--curves")
+	require.NoError(t, err)
+	requireExportedKey(t, exportDir, xPK)
+
+	exportDir = filepath.Join(ts.Dir, "export2")
+	_, _, err = ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "-A")
+	require.NoError(t, err)
+	requireExportedKey(t, exportDir, xPK)
 }
