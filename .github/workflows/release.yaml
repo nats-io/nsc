@@ -61,6 +61,10 @@ jobs:
           # We have seen a couple of bugs, so are locking this for now.
           # v1.8.3-pro fixes some issues in brew architecture image variants
           # which led to <https://github.com/nats-io/homebrew-nats-tools/issues/9>
+          #
+          # 2022-12-14: testing carefully for the 2.7.5 -> v2.7.6 transition,
+          # (v prefix, and v2 in the go modules), we used "1.13.1-pro" for testing,
+          # so lets make sure that we build with the version we tested worked.
           version: v1.13.1-pro
           args: release --rm-dist
         env:
