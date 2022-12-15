@@ -61,7 +61,7 @@ jobs:
           # We have seen a couple of bugs, so are locking this for now.
           # v1.8.3-pro fixes some issues in brew architecture image variants
           # which led to <https://github.com/nats-io/homebrew-nats-tools/issues/9>
-          version: v1.8.3-pro
+          version: v1.13.1-pro
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
