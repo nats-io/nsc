@@ -196,8 +196,8 @@ var rootCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		// we are only called when asked for the version
-		cmd.Printf("nsc version %s\n", cmd.Version)
+		// print command help by default
+		cmd.Help()
 	},
 }
 
