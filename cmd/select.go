@@ -16,8 +16,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -47,10 +45,6 @@ func selectOperatorCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if NscCwdOnly {
-				return fmt.Errorf("%s is set - change your cwd to use context", NscCwdOnlyEnv)
-			}
-
 			current := GetConfig()
 			if err := current.ContextConfig.Update("", args[0], ""); err != nil {
 				return err
@@ -73,10 +67,6 @@ func selectAccountCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if NscCwdOnly {
-				return fmt.Errorf("%s is set - change your cwd to use context", NscCwdOnlyEnv)
-			}
-
 			current := GetConfig()
 			if err := current.ContextConfig.Update("", "", args[0]); err != nil {
 				return err
