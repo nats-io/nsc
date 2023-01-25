@@ -196,6 +196,9 @@ func validUserSigners(ctx ActionCtx, accName string) ([]string, error) {
 			signers = append(signers, signingKey)
 		}
 	}
+	if opc.StrictSigningKeyUsage && len(ac.SigningKeys) == 0 {
+		return nil, errors.New("operator requires signing keys but account does not have any configured")
+	}
 	return signers, nil
 }
 
