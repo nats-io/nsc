@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20200221130455-2737f3b8cbb9
 	github.com/nats-io/jsm.go v0.0.35
-	github.com/nats-io/jwt v1.2.3-0.20210314221642-a826c77dc9d2
+	github.com/nats-io/jwt v1.2.3-0.20230120223832-e80579a7c131
 	github.com/nats-io/jwt/v2 v2.3.1-0.20221214233435-ff7baa9e5e73
 	github.com/nats-io/nats-server/v2 v2.9.6
 	github.com/nats-io/nats.go v1.21.0

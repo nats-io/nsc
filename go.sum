@@ -77,8 +77,8 @@ github.com/nats-io/cliprompts/v2 v2.0.0-20200221130455-2737f3b8cbb9 h1:d9PC9CwHL
 github.com/nats-io/cliprompts/v2 v2.0.0-20200221130455-2737f3b8cbb9/go.mod h1:oweZn7AeaVJYKlNHfCIhznJVsdySLSng55vfuINE/d0=
 github.com/nats-io/jsm.go v0.0.35 h1:l03xuGttRA9b81Q0P/WEGm3e5DYof743ZEI4nQR3PUs=
 github.com/nats-io/jsm.go v0.0.35/go.mod h1:AkNKZTxbvdFBOJCdlKuLHsRlOP+AI4hV9REQKmq3sWw=
-github.com/nats-io/jwt v1.2.3-0.20210314221642-a826c77dc9d2 h1:Y5jKuPP58S+Fm96nMqInCvSwUKLAm+u8hD96qpiRSCo=
-github.com/nats-io/jwt v1.2.3-0.20210314221642-a826c77dc9d2/go.mod h1:kIiOxe25rMg5oMi63AjFkNK2F1q7ISvH+aaKzAXprDs=
+github.com/nats-io/jwt v1.2.3-0.20230120223832-e80579a7c131 h1:KpUj2fKSLhV43+ifaqaE8d93KCRvnmbOTen+7BPDjvk=
+github.com/nats-io/jwt v1.2.3-0.20230120223832-e80579a7c131/go.mod h1:X932J1wD12qK2tV+W9+GQGCnHf8WET/r2HyC34xjgaI=
 github.com/nats-io/jwt/v2 v2.3.1-0.20221214233435-ff7baa9e5e73 h1:YPnTZkw0tAZE2zmbG8LlTS0GGfCSPbAu00Gfi+DVi+0=
 github.com/nats-io/jwt/v2 v2.3.1-0.20221214233435-ff7baa9e5e73/go.mod h1:DYujvzCMZzUuqB3i1Pnpf1YtkuTwhdI84Aah9wRXkK0=
 github.com/nats-io/nats-server/v2 v2.9.6 h1:RTtK+rv/4CcliOuqGsy58g7MuWkBaWmF5TUNwuUo9Uw=
