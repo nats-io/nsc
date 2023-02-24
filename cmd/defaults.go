@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,11 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/nsc/v2/cmd/store"
-	"github.com/nats-io/nsc/v2/home"
-
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/home"
 )
 
 // NscHomeEnv the folder for the config file
@@ -203,8 +202,8 @@ func LoadOrInit(configDir string, dataDir string, keystoreDir string) (*ToolConf
 		return nil, err
 	}
 
-	// is the struct modified from the file
-	if (ToolConfig{}) == config {
+	if !NscCwdOnly && (ToolConfig{}) == config {
+		// is the struct modified from the file - so this is a first run here
 		config.GithubUpdates = github
 
 		config.LastUpdate = time.Now().UTC().Unix() // this is not "true" but avoids the initial check
