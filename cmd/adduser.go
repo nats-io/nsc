@@ -213,6 +213,11 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("user name is required")
 	}
 
+	if strings.Contains(p.userName, "/") || strings.Contains(p.userName, "\\") {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("name cannot contain '/' or '\\'")
+	}
+
 	if p.userName == "*" {
 		p.userName = GetRandomName(0)
 	}

@@ -329,3 +329,12 @@ func TestImportReIssuedOperator(t *testing.T) {
 	require.NoError(t, err)
 	checkOp(pubNew)
 }
+
+func Test_AddOperatorBadName(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "A/B")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+}
