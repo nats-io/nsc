@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -63,7 +63,7 @@ func (aes AccountExportChoices) String() []string {
 func (aec *AccountExportChoice) String() string {
 	// label
 	if aec.Selection == nil {
-		footer := ""
+		footer := fmt.Sprintf("[%s]", aec.Subject)
 		if aec.AccountExport.Description != "" {
 			footer = aec.AccountExport.Description
 		}
@@ -72,6 +72,10 @@ func (aec *AccountExportChoice) String() string {
 		}
 		return fmt.Sprintf("%s: %s", aec.Name, footer)
 	}
+	// the cli ui is expecting an unique name in the select
+	// if not the index returned on selection will match the
+	// last one in the list
+	accName := aec.Name
 	// an actual export
 	k := "->"
 	if aec.Selection.IsService() {
@@ -92,10 +96,10 @@ func (aec *AccountExportChoice) String() string {
 	}
 
 	if aec.Selection.Name == string(aec.Selection.Subject) {
-		return fmt.Sprintf("  %s %s %s%s", k, aec.Selection.Subject, p, footer)
+		return fmt.Sprintf("  %s %s %s %s%s", accName, k, aec.Selection.Subject, p, footer)
 	}
 
-	return fmt.Sprintf("  %s [%s] %s %s%s", k, aec.Selection.Name, aec.Selection.Subject, p, footer)
+	return fmt.Sprintf("  %s %s [%s] %s %s%s", accName, k, aec.Selection.Name, aec.Selection.Subject, p, footer)
 }
 
 type AccountImport struct {
