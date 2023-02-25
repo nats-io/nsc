@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -70,4 +71,16 @@ func TestEnv_FailsBadAccount(t *testing.T) {
 	_, _, err := ExecuteCmd(createEnvCmd(), "-a", "A")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "\"A\" not in accounts for operator \"O\"")
+}
+
+func TestAllDir(t *testing.T) {
+	p := MakeTempDir(t)
+	defer os.RemoveAll(p)
+
+	_, stderr, err := ExecuteCmd(rootCmd, "env", "--all-dirs", p)
+	require.NoError(t, err)
+	stderr = StripTableDecorations(stderr)
+	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", p))
+	require.Contains(t, stderr, fmt.Sprintf("$NSC_HOME Yes %s", p))
+	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", p))
 }
