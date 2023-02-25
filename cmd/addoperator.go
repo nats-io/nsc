@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
@@ -250,6 +251,10 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 	if p.name == "" {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("operator name is required")
+	}
+	if strings.Contains(p.name, "/") || strings.Contains(p.name, "\\") {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("name cannot contain '/' or '\\'")
 	}
 
 	if err = p.TimeParams.Validate(); err != nil {

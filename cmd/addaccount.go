@@ -180,6 +180,11 @@ func (p *AddAccountParams) Validate(ctx ActionCtx) error {
 		return fmt.Errorf("account name is required")
 	}
 
+	if strings.Contains(p.name, "/") || strings.Contains(p.name, "\\") {
+		ctx.CurrentCmd().SilenceUsage = false
+		return fmt.Errorf("name cannot contain '/' or '\\'")
+	}
+
 	if p.name == "*" {
 		p.name = GetRandomName(0)
 	}

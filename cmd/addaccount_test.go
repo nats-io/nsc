@@ -284,3 +284,12 @@ func Test_AddAccount_Pubs(t *testing.T) {
 	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo", "bar"})
 	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Deny, []string{"bar"})
 }
+
+func Test_AddAccountBadName(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "A/B")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+}
