@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -26,12 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/jwt/v2"
-
-	"github.com/spf13/cobra"
-
 	"github.com/mitchellh/go-homedir"
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,10 +46,10 @@ func TestCommon_ResolvePath(t *testing.T) {
 }
 
 func TestCommon_GetOutput(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal("error creating tmpdir", err)
-	}
+	dir := MakeTempDir(t)
+	defer func() {
+		os.RemoveAll(dir)
+	}()
 
 	type testd struct {
 		fp      string

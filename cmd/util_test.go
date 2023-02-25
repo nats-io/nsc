@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -70,6 +70,9 @@ func ResetSharedFlags() {
 	Json = false
 	Raw = false
 	JsonPath = ""
+	ConfigDirFlag = ""
+	DataDirFlag = ""
+	KeysDirFlag = ""
 }
 
 func NewEmptyStore(t *testing.T) *TestStore {
@@ -233,7 +236,16 @@ func (ts *TestStore) Done(t *testing.T) {
 	cli.ResetPromptLib()
 	if t.Failed() {
 		t.Log("test artifacts:", ts.Dir)
+	} else {
+		os.RemoveAll(ts.Dir)
 	}
+}
+
+func (ts *TestStore) AddSubDir(t *testing.T, name ...string) string {
+	name = append([]string{ts.Dir}, name...)
+	dir := filepath.Join(name...)
+	require.NoError(t, os.MkdirAll(dir, 0777))
+	return dir
 }
 
 func (ts *TestStore) List(t *testing.T) {
@@ -352,7 +364,7 @@ func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount strin
 }
 
 func MakeTempDir(t *testing.T) string {
-	p, err := os.MkdirTemp("", "store_test")
+	p, err := os.MkdirTemp("", "nsc_test")
 	require.NoError(t, err)
 	return p
 }
