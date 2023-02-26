@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,7 +19,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
@@ -133,7 +135,8 @@ func Test_ProfileSeedIDs(t *testing.T) {
 
 	// add a signing key
 	osk, opk, okp := CreateOperatorKey(t)
-	ts.KeyStore.Store(okp)
+	_, err := ts.KeyStore.Store(okp)
+	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	kp, err := ts.KeyStore.GetKeyPair(oc.Issuer)
@@ -293,4 +296,51 @@ func TestKey_ProfileBasics(t *testing.T) {
 
 		ts.Done(t)
 	}
+}
+
+func loadNscEnvProfile(t *testing.T, path string) *Profile {
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	p := Profile{}
+	require.NoError(t, json.Unmarshal(data, &p))
+	return &p
+}
+
+func TestGenerateProfile_MultipleOperators(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	ts.AddOperator(t, "OO")
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out := filepath.Join(ts.Dir, "profile.json")
+	_, _, err := ExecuteCmd(createProfileCmd(), "--output-file", out, "nsc://O/A/U")
+	require.NoError(t, err)
+	profile := loadNscEnvProfile(t, out)
+	require.Contains(t, profile.UserCreds, "/O/A/U.creds")
+}
+
+func TestGenerateProfile_NamesSeedsKeys(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out := filepath.Join(ts.Dir, "profile.json")
+	_, _, err := ExecuteCmd(createProfileCmd(), "--output-file", out, "nsc://O/A/U?&names&seeds&keys")
+	require.NoError(t, err)
+
+	profile := loadNscEnvProfile(t, out)
+	require.NotEmpty(t, profile.Operator.Name)
+	require.NotEmpty(t, profile.Operator.Key)
+	require.NotEmpty(t, profile.Operator.Seed)
+	require.NotEmpty(t, profile.Account.Name)
+	require.NotEmpty(t, profile.Account.Key)
+	require.NotEmpty(t, profile.Account.Seed)
+	require.NotEmpty(t, profile.User.Name)
+	require.NotEmpty(t, profile.User.Key)
+	require.NotEmpty(t, profile.User.Seed)
 }
