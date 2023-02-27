@@ -60,18 +60,16 @@ func createGenerateContext() *cobra.Command {
 
 func (p *GenerateContextParams) SetDefaults(ctx ActionCtx) error {
 	p.AccountContextParams.SetDefaults(ctx)
-	if p.user == "" {
-		if p.AccountContextParams.Name != "" {
-			entries, err := ctx.StoreCtx().Store.ListEntries(store.Accounts, p.AccountContextParams.Name, store.Users)
-			if err != nil {
-				return err
-			}
-			switch len(entries) {
-			case 0:
-				return fmt.Errorf("account %q has no users", p.AccountContextParams.Name)
-			case 1:
-				p.user = entries[0]
-			}
+	if p.user == "" && p.AccountContextParams.Name != "" {
+		entries, err := ctx.StoreCtx().Store.ListEntries(store.Accounts, p.AccountContextParams.Name, store.Users)
+		if err != nil {
+			return err
+		}
+		switch len(entries) {
+		case 0:
+			return fmt.Errorf("account %q has no users", p.AccountContextParams.Name)
+		case 1:
+			p.user = entries[0]
 		}
 	}
 
@@ -101,8 +99,7 @@ func (p *GenerateContextParams) Validate(ctx ActionCtx) error {
 	if p.context == "" {
 		return fmt.Errorf("context name is required")
 	}
-	if strings.Contains(p.context, "/") ||
-		strings.Contains(p.context, "\\") {
+	if strings.ContainsAny(p.context, "/\\") {
 		return fmt.Errorf("context name cannot contain filepath separators")
 	}
 	if p.AccountContextParams.Name == "" {
