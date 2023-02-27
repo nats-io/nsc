@@ -31,7 +31,7 @@ func createDescribeJwtCmd() *cobra.Command {
 		Use:          "jwt",
 		Short:        "Describe a jwt/creds file",
 		Args:         MaxArgs(0),
-		Example:      fmt.Sprintf(`%s describe -f pathorurl`, GetToolName()),
+		Example:      fmt.Sprintf(`%s describe jwt -f pathorurl`, GetToolName()),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunStoreLessAction(cmd, args, &params); err != nil {

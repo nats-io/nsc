@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -118,8 +118,11 @@ func toPublicKey(s string, kind nkeys.PrefixByte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if kp == nil {
+		return "", fmt.Errorf("%q is not a valid %s key", s, kind)
+	}
 	if err := nkeys.CompatibleKeyPair(kp, kind); err != nil {
-		return "", fmt.Errorf("%s is not a valid %s key", s, kind)
+		return "", fmt.Errorf("%q is not a valid %s key", s, kind)
 	}
 	return kp.PublicKey()
 }

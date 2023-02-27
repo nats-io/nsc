@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,7 +44,7 @@ func Test_EditAuthorizationBadUser(t *testing.T) {
 	_, aPK, _ := CreateAccountKey(t)
 	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", aPK)
 	require.Error(t, err)
-	require.Equal(t, fmt.Sprintf("%s is not a valid user key", aPK), err.Error())
+	require.Equal(t, fmt.Sprintf("%q is not a valid user key", aPK), err.Error())
 }
 
 func Test_EditAuthorizationBadAccount(t *testing.T) {
@@ -56,7 +56,17 @@ func Test_EditAuthorizationBadAccount(t *testing.T) {
 	_, aPK, _ := CreateUserKey(t)
 	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--allowed-account", aPK)
 	require.Error(t, err)
-	require.Equal(t, fmt.Sprintf("%s is not a valid account key", aPK), err.Error())
+	require.Equal(t, fmt.Sprintf("%q is not a valid account key", aPK), err.Error())
+}
+
+func Test_EditAuthorizationBadNonNkey(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--allowed-account", "hello")
+	require.Error(t, err)
+	require.Equal(t, fmt.Sprintf("%q is not a valid account key", "hello"), err.Error())
 }
 
 func Test_EditAuthorizationJustUser(t *testing.T) {

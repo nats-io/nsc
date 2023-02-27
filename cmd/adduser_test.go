@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
@@ -553,5 +554,40 @@ func Test_AddUser_RotateScoped(t *testing.T) {
 	require.NoError(t, err)
 	// With the re-signing issue in place, this edit command would fail.
 	_, _, err = ExecuteCmd(HoistRootFlags(createEditUserCmd()), "--name", "UA", "--tag", "foo3", "-K", "user-role2")
+	require.NoError(t, err)
+}
+
+func Test_AddUsersWithSharedSigningKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	// store seed in temporary file
+	newKey := func() string {
+		_, pk, kp := CreateAccountKey(t)
+		_, err := ts.KeyStore.Store(kp)
+		require.NoError(t, err)
+		return pk
+	}
+
+	sk := newKey()
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(), "--sk", sk)
+	require.NoError(t, err)
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	assert.Contains(t, ac.SigningKeys, sk)
+
+	ts.AddAccount(t, "B")
+	_, _, err = ExecuteCmd(createEditAccount(), "B", "--sk", sk)
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	assert.Contains(t, ac.SigningKeys, sk)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "u", "--account", "A", "-K", sk)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "u", "--account", "B", "-K", sk)
 	require.NoError(t, err)
 }
