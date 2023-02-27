@@ -30,12 +30,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var ConfigDirFlag string
-var KeysDirFlag string
-var DataDirFlag string
+var (
+	ConfigDirFlag   string
+	KeysDirFlag     string
+	DataDirFlag     string
+	AllDirFlag      string
+	KeyPathFlag     string
+	InteractiveFlag bool
+)
 
-var KeyPathFlag string
-var InteractiveFlag bool
 var NscCwdOnly bool
 var ErrNoOperator = errors.New("set an operator -- 'nsc env -o operatorName'")
 
@@ -155,6 +158,12 @@ var rootCmd = &cobra.Command{
 	Short: "nsc creates NATS operators, accounts, users, and manage their permissions.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
+		if AllDirFlag != "" {
+			ConfigDirFlag = AllDirFlag
+			DataDirFlag = AllDirFlag
+			KeysDirFlag = AllDirFlag
+		}
+
 		// if the flag is set we use it, if not check the old env
 		if ConfigDirFlag != "" {
 			if ConfigDirFlag, err = Expand(ConfigDirFlag); err != nil {
@@ -256,6 +265,6 @@ func HoistRootFlags(cmd *cobra.Command) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&ConfigDirFlag, "config-dir", "", "", "nsc config directory")
 	cmd.PersistentFlags().StringVarP(&DataDirFlag, "data-dir", "", "", "nsc data store directory")
 	cmd.PersistentFlags().StringVarP(&KeysDirFlag, "keystore-dir", "", "", "nsc keystore directory")
-
+	cmd.PersistentFlags().StringVarP(&AllDirFlag, "all-dirs", "H", "", "sets --config-dir, --data-dir, and --keystore-dir to the same value")
 	return cmd
 }

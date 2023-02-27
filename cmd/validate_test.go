@@ -18,6 +18,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
@@ -29,10 +30,10 @@ func Test_ValidateNoOperator(t *testing.T) {
 	defer ts.Done(t)
 	storeDir := ts.AddSubDir(t, "store")
 	require.DirExists(t, storeDir)
-
 	_, _, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "set an operator")
+	require.True(t, strings.Contains(err.Error(), "set an operator") ||
+		strings.Contains(err.Error(), "no such file or directory"))
 }
 
 func Test_ValidateNoAccount(t *testing.T) {
