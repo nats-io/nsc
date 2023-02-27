@@ -252,7 +252,7 @@ func (p *AddOperatorParams) Validate(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("operator name is required")
 	}
-	if strings.Contains(p.name, "/") || strings.Contains(p.name, "\\") {
+	if strings.ContainsAny(p.name, "/\\") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("name cannot contain '/' or '\\'")
 	}
