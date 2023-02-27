@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -119,14 +118,16 @@ func Test_ProfileIDs(t *testing.T) {
 	u := ts.GetUserPublicKey(t, "A", "U")
 
 	out := path.Join(ts.Dir, "out.json")
-	nu := fmt.Sprintf("nsc://%s/%s/%s?operatorName&accountName&userName", o, a, u)
-	_, _, err := ExecuteCmd(createProfileCmd(), "-o", out, nu)
+	_, _, err := ExecuteCmd(createProfileCmd(), "-o", out, "nsc://O/A/U?keys&names")
 	require.NoError(t, err)
 
 	r := loadResults(t, out)
 	require.Equal(t, "O", r.Operator.Name)
+	require.Equal(t, o, r.Operator.Key)
 	require.Equal(t, "A", r.Account.Name)
+	require.Equal(t, a, r.Account.Key)
 	require.Equal(t, "U", r.User.Name)
+	require.Equal(t, u, r.User.Key)
 }
 
 func Test_ProfileSeedIDs(t *testing.T) {
@@ -151,12 +152,8 @@ func Test_ProfileSeedIDs(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	o := ts.GetOperatorPublicKey(t)
-	a := ts.GetAccountPublicKey(t, "A")
-	u := ts.GetUserPublicKey(t, "A", "U")
-
 	out := path.Join(ts.Dir, "out.json")
-	nu := fmt.Sprintf("nsc://%s/%s/%s?operatorSeed=%s", o, a, u, opk)
+	nu := fmt.Sprintf("nsc://O/A/U?operatorSeed=%s", opk)
 	_, _, err = ExecuteCmd(createProfileCmd(), "-o", out, nu)
 	require.NoError(t, err)
 
@@ -188,7 +185,7 @@ func Test_ProfileStoreAndKeysDir(t *testing.T) {
 
 	out := path.Join(ts.Dir, "out.json")
 
-	u := fmt.Sprintf("nsc://O/A/U?operatorName&accountName&userName&operatorKey&accountKey&userKey&store=%s&keyStore=%s", ts.StoreDir, ts.KeysDir)
+	u := fmt.Sprintf("nsc://O/A/U?names&keys&store=%s&keyStore=%s", ts.StoreDir, ts.KeysDir)
 
 	_, _, err = ExecuteCmd(rootCmd, "generate", "profile", "-o", out, u)
 	require.NoError(t, err)

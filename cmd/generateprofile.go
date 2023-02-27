@@ -25,9 +25,8 @@ import (
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
-	"github.com/spf13/cobra"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func createProfileCmd() *cobra.Command {
@@ -105,17 +104,6 @@ userName&accountName&operatorName)
 				}
 			}()
 
-			if u.operator != "" {
-				if err := config.SetOperator(u.operator); err != nil {
-					return err
-				}
-			}
-			if u.account != "" {
-				if err := config.SetAccount(u.account); err != nil {
-					return err
-				}
-			}
-
 			params.nscu = u
 			q, err := u.query()
 			if err != nil {
@@ -143,6 +131,16 @@ userName&accountName&operatorName)
 						return err
 					}
 					store.KeyStorePath = ks
+				}
+			}
+			if u.operator != "" {
+				if err := config.SetOperator(u.operator); err != nil {
+					return err
+				}
+			}
+			if u.account != "" {
+				if err := config.SetAccount(u.account); err != nil {
+					return err
 				}
 			}
 			return RunAction(cmd, args, &params)
