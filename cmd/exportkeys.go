@@ -138,6 +138,9 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	sr := store.NewDetailedReport(true)
 	keys.KeyList, err = p.KeyCollectorParams.Run(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, k := range keys.KeyList {
 		var j ExportJob
 		j.description = k.Pub
