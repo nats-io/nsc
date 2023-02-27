@@ -47,9 +47,7 @@ func TestCommon_ResolvePath(t *testing.T) {
 
 func TestCommon_GetOutput(t *testing.T) {
 	dir := MakeTempDir(t)
-	defer func() {
-		os.RemoveAll(dir)
-	}()
+	defer os.RemoveAll(dir)
 
 	type testd struct {
 		fp      string
