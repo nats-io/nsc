@@ -590,3 +590,14 @@ func Test_AddUsersWithSharedSigningKey(t *testing.T) {
 	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "u", "--account", "B", "-K", sk)
 	require.NoError(t, err)
 }
+
+func Test_AddUserBadName(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(CreateAddUserCmd(), "A/B")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+}
