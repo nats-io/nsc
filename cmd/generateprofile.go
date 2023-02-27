@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,9 +25,8 @@ import (
 	"strings"
 
 	"github.com/nats-io/jwt/v2"
-	"github.com/spf13/cobra"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func createProfileCmd() *cobra.Command {
@@ -36,14 +35,15 @@ func createProfileCmd() *cobra.Command {
 		Use:   "profile",
 		Short: "Generate a profile from nsc 'URL' that can be used by tooling",
 		Example: `profile nsc://operator
-profile nsc://operator/account
-profile nsc://operator/account/user
-profile nsc://operator/account/user?operatorSeed&accountSeed&userSeed
-profile nsc://operator/account/user?operatorKey&accountKey&userKey
-profile nsc://operator?key&seed
-profile nsc://operator/account?key&seed
-profile nsc://operator/account/user?key&seed
-profile nsc://operator/account/user?store=/a/.nsc/nats&keystore=/foo/.nkeys
+nsc profile nsc://operator/account
+nsc profile nsc://operator/account/user
+nsc profile nsc://operator/account/user?names&seeds&keys
+nsc profile nsc://operator/account/user?operatorSeed&accountSeed&userSeed
+nsc profile nsc://operator/account/user?operatorKey&accountKey&userKey
+nsc profile nsc://operator?key&seed
+nsc profile nsc://operator/account?key&seed
+nsc profile nsc://operator/account/user?key&seed&name
+nsc profile nsc://operator/account/user?store=/a/.nsc/nats&keystore=/foo/.nkeys
 
 Output of the program looks like:
 {
@@ -62,45 +62,56 @@ store=<dir> that specifies a directory that contains the named operator
 operator, If no prefix (user/account/operator is provided, it targets 
 the last object in the configuration path)
 
+keys - includes the public keys for all entities (same as 
+userKey&accountKey&operatorKey)
+
 [user|account|operator]Seed=<optional public key> - include the seed for 
 user, account, operator, if an argument is provided, the seed for the 
 specified public key is provided - this allows targeting a signing key.
 If no prefix (user/account/operator is provided, it targets the last 
 object in the configuration path)
 
+seeds - includes the private keys for all entities (same as
+userSeed&accountSeed&operatorSeed)
+
 [user|account|operator]Name - includes the friendly name for the for 
 user, account, operator, If no prefix (user/account/operator is provided, 
 it targets the last object in the configuration path)
+
+names - includes the friendly names fro all the entities (same as 
+userName&accountName&operatorName)
 		`,
 
-		Args: cobra.MinimumNArgs(1),
+		Args:         cobra.MinimumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			us := args[0]
 			u, err := ParseNscURL(us)
 			if err != nil {
 				return fmt.Errorf("error parsing %q: %w", us, err)
 			}
+			config := GetConfig()
+			oldSR := config.StoreRoot
+			oldOp := config.Operator
+			oldAc := config.Account
+			defer func() {
+				_ = config.setStoreRoot(oldSR)
+				if oldOp != "" {
+					_ = config.SetOperator(oldOp)
+				}
+				if oldAc != "" {
+					_ = config.SetAccount(oldAc)
+				}
+			}()
+
 			params.nscu = u
 			q, err := u.query()
 			if err != nil {
 				return fmt.Errorf("error parsing query %q: %w", us, err)
 			}
 			if len(q) > 0 {
-				config := GetConfig()
-				oldSR := config.StoreRoot
-				oldOp := config.Operator
-				oldAc := config.Account
 				v, ok := q["store"]
 				if ok {
-					defer func() {
-						_ = config.setStoreRoot(oldSR)
-						if oldOp != "" {
-							_ = config.SetOperator(oldOp)
-						}
-						if oldAc != "" {
-							_ = config.SetAccount(oldAc)
-						}
-					}()
 					sr, err := Expand(v)
 					if err != nil {
 						return err
@@ -120,6 +131,16 @@ it targets the last object in the configuration path)
 						return err
 					}
 					store.KeyStorePath = ks
+				}
+			}
+			if u.operator != "" {
+				if err := config.SetOperator(u.operator); err != nil {
+					return err
+				}
+			}
+			if u.account != "" {
+				if err := config.SetAccount(u.account); err != nil {
+					return err
 				}
 			}
 			return RunAction(cmd, args, &params)
@@ -143,14 +164,17 @@ const (
 	accountKey   Arg = "accountkey"
 	userKey      Arg = "userkey"
 	key          Arg = "key"
+	allKeys      Arg = "keys"
 	operatorSeed Arg = "operatorseed"
 	accountSeed  Arg = "accountseed"
 	userSeed     Arg = "userseed"
 	seed         Arg = "seed"
+	allSeeds     Arg = "seeds"
 	operatorName Arg = "operatorname"
 	accountName  Arg = "accountname"
 	userName     Arg = "username"
 	name         Arg = "name"
+	allNames     Arg = "names"
 	keystoreDir  Arg = "keystore"
 	storeDir     Arg = "store"
 )
@@ -457,16 +481,17 @@ func (p *ProfileCmdParams) addKeys() error {
 	if len(q) == 0 {
 		return nil
 	}
+	_, keys := q[allKeys]
 	_, ok := q[operatorKey]
-	if ok {
+	if ok || keys {
 		p.addOperatorKeys()
 	}
 	_, ok = q[accountKey]
-	if ok {
+	if ok || keys {
 		p.addAccountKeys()
 	}
 	_, ok = q[userKey]
-	if ok {
+	if ok || keys {
 		p.addUserKeys()
 	}
 	_, ok = q[key]
@@ -574,22 +599,23 @@ func (p *ProfileCmdParams) addSeeds(ctx ActionCtx) error {
 	if len(q) == 0 {
 		return nil
 	}
+	_, seeds := q[allSeeds]
 	v, ok := q[operatorSeed]
-	if ok {
+	if ok || seeds {
 		err := p.addOperatorSeed(ctx, v)
 		if err != nil {
 			return err
 		}
 	}
 	v, ok = q[accountSeed]
-	if ok {
+	if ok || seeds {
 		err := p.addAccountSeed(ctx, v)
 		if err != nil {
 			return err
 		}
 	}
 	v, ok = q[userSeed]
-	if ok {
+	if ok || seeds {
 		err := p.addUserSeed(ctx, v)
 		if err != nil {
 			return err
@@ -602,12 +628,14 @@ func (p *ProfileCmdParams) addSeeds(ctx ActionCtx) error {
 			if err != nil {
 				return err
 			}
-		} else if p.nscu.account != "" {
+		}
+		if p.nscu.account != "" {
 			err := p.addAccountSeed(ctx, "")
 			if err != nil {
 				return err
 			}
-		} else {
+		}
+		if p.nscu.operator != "" {
 			err := p.addOperatorSeed(ctx, "")
 			if err != nil {
 				return err
@@ -644,25 +672,28 @@ func (p *ProfileCmdParams) addNames() error {
 		return nil
 	}
 
+	_, names := q[allNames]
 	_, ok := q[operatorName]
-	if ok {
+	if ok || names {
 		p.addOperatorName()
 	}
 	_, ok = q[accountName]
-	if ok {
+	if ok || names {
 		p.addAccountName()
 	}
 	_, ok = q[userName]
-	if ok {
+	if ok || names {
 		p.addUserName()
 	}
 	_, ok = q[name]
 	if ok {
 		if p.nscu.user != "" {
 			p.addUserName()
-		} else if p.nscu.account != "" {
+		}
+		if p.nscu.account != "" {
 			p.addAccountName()
-		} else {
+		}
+		if p.nscu.operator != "" {
 			p.addOperatorName()
 		}
 	}
