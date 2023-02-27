@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -515,4 +515,43 @@ func Test_AddWilcdardImport(t *testing.T) {
 	}
 
 	tests.Run(t, "root", "add")
+}
+
+func TestAddImport_SameName(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "database")
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "stream.database", false)
+	ts.AddAccount(t, "B")
+	ts.AddExport(t, "B", jwt.Stream, "stream.database", false)
+
+	// account, locally available, name, local subj,
+	// database, true, A: -> stream.database, "stream.database", "ingest
+	input := []interface{}{2, true, 1, "ingest.a", "ingest.a"}
+	_, _, err := ExecuteInteractiveCmd(createAddImportCmd(), input)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("database")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 1)
+	require.Equal(t, "ingest.a", ac.Imports[0].Name)
+	require.Equal(t, "ingest.a", string(ac.Imports[0].LocalSubject))
+	require.Equal(t, "stream.database", string(ac.Imports[0].Subject))
+	require.True(t, ac.Imports[0].IsStream())
+	require.Equal(t, ts.GetAccountPublicKey(t, "A"), ac.Imports[0].Account)
+
+	input = []interface{}{2, true, 3, "ingest.b", "ingest.b"}
+	_, _, err = ExecuteInteractiveCmd(createAddImportCmd(), input)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("database")
+	require.NoError(t, err)
+	require.Len(t, ac.Imports, 2)
+	require.Equal(t, "ingest.b", ac.Imports[1].Name)
+	require.Equal(t, "ingest.b", string(ac.Imports[1].LocalSubject))
+	require.Equal(t, "stream.database", string(ac.Imports[1].Subject))
+	require.True(t, ac.Imports[1].IsStream())
+	require.Equal(t, ts.GetAccountPublicKey(t, "B"), ac.Imports[1].Account)
 }

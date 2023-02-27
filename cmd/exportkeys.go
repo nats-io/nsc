@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,9 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func createExportKeysCmd() *cobra.Command {
@@ -47,6 +46,10 @@ accounts and users. These keys may be referenced in a different  operator contex
 The --filter flag allows you to specify a few letters in a public key and export only 
 those keys that matching the filter (provided the key type matches --operator, --account,
 --user (or --all).
+
+The --include-jwts flag will export the JWT configurations named by their identity key.
+This allows you to export an entire configuration tree of operators, accounts, users
+and their keys to a directory. To recreate an environment from this export use 'nsc fix'.
 `,
 		Example: `nsc export keys --dir <path> (exports the current operator, account and users keys)
 nsc export keys --operator --accounts --users (exports current operators, all accounts, and users)
@@ -77,6 +80,7 @@ nsc export keys --account <name> (changes the account context to the specified a
 	cmd.Flags().StringVarP(&params.Dir, "dir", "d", "", "directory to export keys to")
 	cmd.Flags().BoolVarP(&params.Force, "force", "F", false, "overwrite existing files")
 	cmd.Flags().BoolVarP(&params.Remove, "remove", "R", false, "removes the original key file from the keyring after exporting it")
+	cmd.Flags().BoolVarP(&params.IncludeJwts, "include-jwts", "", false, "include jwts")
 	cmd.MarkFlagRequired("dir")
 
 	return cmd
@@ -87,9 +91,10 @@ func init() {
 }
 
 type ExportKeysParams struct {
-	Force  bool
-	Remove bool
-	Dir    string
+	Force       bool
+	Remove      bool
+	Dir         string
+	IncludeJwts bool
 	KeyCollectorParams
 }
 
@@ -154,6 +159,25 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 		wj = append(wj, j)
 	}
 
+	if p.IncludeJwts {
+		for _, k := range keys.KeyList {
+			if k.Jwt == nil {
+				continue
+			}
+			var j ExportJob
+			j.description = fmt.Sprintf("%s.jwt (%s)", k.Pub, k.Name)
+			j.filepath = filepath.Join(p.Dir, fmt.Sprintf("%s.jwt", k.Pub))
+			_, err = os.Stat(j.filepath)
+			if os.IsNotExist(err) || (err == nil && p.Force) {
+				j.data = k.Jwt
+			} else {
+				sr.AddError("%#q already exists - specify --force to overwrite", j.filepath)
+				continue
+			}
+			wj = append(wj, j)
+		}
+	}
+
 	if keys.Len() == 0 {
 		return nil, errors.New("no keys found to export")
 	}
@@ -164,7 +188,7 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	for _, j := range wj {
 		if j.filepath != "" {
-			j.err = os.WriteFile(j.filepath, j.data, 0700)
+			j.err = os.WriteFile(j.filepath, j.data, 0600)
 			if j.err != nil {
 				sr.AddError("error exporting %q: %v", j.description, j.err)
 			} else {
@@ -184,7 +208,7 @@ func (p *ExportKeysParams) Run(ctx ActionCtx) (store.Status, error) {
 			sr.AddWarning("skipped %q - no seed available", j.description)
 		}
 	}
-	return sr, err
+	return sr, nil
 }
 
 type ExportJob struct {

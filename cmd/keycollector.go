@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -78,6 +78,10 @@ func (p *KeyCollectorParams) handleOperator(ctx ActionCtx) (KeyList, error) {
 	oki.ExpectedKind = nkeys.PrefixByteOperator
 	oki.Pub = oc.Subject
 	oki.Resolve(sctx.KeyStore)
+	oki.Jwt, err = sctx.Store.ReadRawOperatorClaim()
+	if err != nil {
+		return nil, err
+	}
 	keys = append(keys, &oki)
 
 	for _, k := range oc.SigningKeys {
@@ -108,6 +112,10 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 	aki.Name = ac.Name
 	aki.ExpectedKind = nkeys.PrefixByteAccount
 	aki.Pub = ac.Subject
+	aki.Jwt, err = s.ReadRawAccountClaim(name)
+	if err != nil {
+		return nil, err
+	}
 	aki.Resolve(ks)
 	keys = append(keys, &aki)
 
@@ -167,6 +175,10 @@ func (p *KeyCollectorParams) handleUser(ctx ActionCtx, account string, name stri
 	uki.Name = uc.Name
 	uki.Pub = uc.Subject
 	uki.ExpectedKind = nkeys.PrefixByteUser
+	uki.Jwt, err = s.ReadRawUserClaim(account, name)
+	if err != nil {
+		return nil, err
+	}
 	uki.Resolve(ks)
 	return &uki, nil
 }
@@ -290,6 +302,7 @@ type Key struct {
 	Curve        bool
 	KeyPath      string
 	Invalid      bool
+	Jwt          []byte
 }
 
 func (k *Key) Resolve(ks store.KeyStore) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,9 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nats-io/nsc/v2/cmd/store"
-
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -235,4 +234,26 @@ func Test_ExportXKeyInContext(t *testing.T) {
 	_, _, err = ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "-A")
 	require.NoError(t, err)
 	requireExportedKey(t, exportDir, xPK)
+}
+
+func Test_ExportKeyJwt(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	o := ts.GetOperatorPublicKey(t)
+	a := ts.GetAccountPublicKey(t, "A")
+	u := ts.GetUserPublicKey(t, "A", "U")
+
+	exportDir := filepath.Join(ts.Dir, "export")
+	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "-A", "--include-jwts")
+	require.NoError(t, err)
+	requireExportedKey(t, exportDir, o)
+	require.FileExists(t, filepath.Join(exportDir, fmt.Sprintf("%s.jwt", o)))
+	requireExportedKey(t, exportDir, a)
+	require.FileExists(t, filepath.Join(exportDir, fmt.Sprintf("%s.jwt", a)))
+	requireExportedKey(t, exportDir, u)
+	require.FileExists(t, filepath.Join(exportDir, fmt.Sprintf("%s.jwt", u)))
 }

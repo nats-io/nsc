@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -109,8 +109,7 @@ func createOperator(t *testing.T, tempDir string, opName string) (fileV1 string,
 }
 
 func TestUpgradeNonManaged(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	tempDir := MakeTempDir(t)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, _ := createOperator(t, tempDir, "O")
 	ts := NewTestStoreWithOperatorJWT(t, token)
@@ -137,14 +136,13 @@ func TestUpgradeNonManaged(t *testing.T) {
 }
 
 func TestUpgradeNoKeyNonManaged(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	tempDir := MakeTempDir(t)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, pub := createOperator(t, tempDir, "O")
 	ts := NewTestStoreWithOperatorJWT(t, token)
 	defer ts.Done(t)
 	makeNonManaged(t, ts, "O", kp)
-	err = ts.KeyStore.Remove(pub)
+	err := ts.KeyStore.Remove(pub)
 	require.NoError(t, err)
 	checkJwtVersion(t, ts, "O", 1, token)
 	executeFailingCmd(t, "list", "keys")                     // could be any command
@@ -167,8 +165,7 @@ func TestUpgradeNoKeyNonManaged(t *testing.T) {
 }
 
 func TestUpgradeManaged(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	tempDir := MakeTempDir(t)
 	defer os.RemoveAll(tempDir)
 	_, tokenV1, tfV2, tokenV2, _, _ := createOperator(t, tempDir, "O")
 	ts := NewTestStoreWithOperatorJWT(t, tokenV1)
@@ -189,8 +186,7 @@ func TestUpgradeManaged(t *testing.T) {
 }
 
 func TestUpgradeBackup(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	tempDir := MakeTempDir(t)
 	defer os.RemoveAll(tempDir)
 	_, token, _, _, kp, _ := createOperator(t, tempDir, "O")
 	ts := NewTestStoreWithOperatorJWT(t, token)
@@ -198,7 +194,7 @@ func TestUpgradeBackup(t *testing.T) {
 	makeNonManaged(t, ts, "O", kp)
 	checkJwtVersion(t, ts, "O", 1, token)
 	backup := filepath.Join(ts.Dir, "test.zip")
-	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{true, backup, false}, "upgrade-jwt") // only works in interactive mode
+	_, _, err := ExecuteInteractiveCmd(rootCmd, []interface{}{true, backup, false}, "upgrade-jwt") // only works in interactive mode
 	require.NoError(t, err)
 	closer, err := zip.OpenReader(backup)
 	require.NoError(t, err)

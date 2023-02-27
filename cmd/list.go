@@ -58,7 +58,8 @@ func createListOperatorsCmd() *cobra.Command {
 			}
 			operators := config.ListOperators()
 			if len(operators) == 0 {
-				fmt.Println("no operators defined - init an environment")
+				fmt.Printf("no operators defined in store dir %q\n"+
+					"init an environment or change the store root with `env --store <dir>`", config.StoreRoot)
 			} else {
 				sort.Strings(operators)
 				var infos []*EntryInfo
