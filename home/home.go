@@ -92,3 +92,14 @@ func NscDataHome(dir string) string {
 	}
 	return dataHome(dir)
 }
+
+func NatsCliContextDir() string {
+	return filepath.Join(config, "nats", "context")
+}
+
+// SetTestConfigDir only for tests!
+func SetTestConfigDir(dir string) string {
+	old := config
+	config = dir
+	return old
+}

@@ -70,6 +70,10 @@ func ResetSharedFlags() {
 	Json = false
 	Raw = false
 	JsonPath = ""
+	AllDirFlag = ""
+	ConfigDirFlag = ""
+	DataDirFlag = ""
+	KeysDirFlag = ""
 }
 
 func NewEmptyStore(t *testing.T) *TestStore {
