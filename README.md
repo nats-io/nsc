@@ -62,7 +62,7 @@ included. You can mount a local volume to get `nsc` accounts, nkeys, and other
 config back on the host using Docker as follows:
 
 ```sh
-docker run --rm -it -v $(pwd)/nsc:/nsc synadia/nats-box:latest
+docker run --rm -it -v $(pwd)/nsc:/nsc natsio/nats-box:latest
 
 # In case NSC not initialized already:
 nats-box:~# nsc init
