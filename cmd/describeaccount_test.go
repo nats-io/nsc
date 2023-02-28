@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -237,4 +237,16 @@ func TestDescribeAccount_Callout(t *testing.T) {
 	require.Contains(t, out, fmt.Sprintf(" | %s", uPK))
 	require.Contains(t, out, fmt.Sprintf(" | %s", aPK))
 	require.Contains(t, out, fmt.Sprintf(" | %s", xPK))
+}
+
+func TestDescribeAccount_SubjectEncoding(t *testing.T) {
+	ts := NewTestStore(t, "test")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", true)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
+	require.NoError(t, err)
+	require.Contains(t, out, "foo.>")
 }
