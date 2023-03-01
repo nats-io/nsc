@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,14 +23,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/nkeys"
-
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
-	"github.com/spf13/cobra"
-
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func createPushCmd() *cobra.Command {
@@ -57,6 +55,7 @@ push -P -A (all accounts)`,
 	cmd.Flags().StringVarP(&params.removeAcc, "account-removal", "R", "", "remove specific account. Only works with nats-resolver enabled nats-server. Mutually exclusive of prune/diff.")
 	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server. (Default is system account specified by operator)")
 	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
+	cmd.Flags().IntVarP(&params.timeout, "timeout", "", 1, "timeout in seconds [1-60] to wait for responses from the server (only applicable to nats-resolver configurations, and applies per operation)")
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -76,6 +75,7 @@ type PushCmdParams struct {
 	diff        bool
 	removeAcc   string
 	targeted    []string
+	timeout     int
 
 	accountList []string
 }
@@ -298,6 +298,12 @@ func (p *PushCmdParams) PostInteractive(_ ActionCtx) error {
 }
 
 func (p *PushCmdParams) Validate(ctx ActionCtx) error {
+	if p.timeout < 1 {
+		p.timeout = 1
+	}
+	if p.timeout > 60 {
+		p.timeout = 60
+	}
 	if p.ASU == "" {
 		return errors.New("no account server url or nats-server url was provided by the operator jwt")
 	}
@@ -374,7 +380,7 @@ func (p *PushCmdParams) getSelectedAccounts() ([]string, error) {
 	return []string{}, nil
 }
 
-func multiRequest(nc *nats.Conn, report *store.Report, operation string, subject string, reqData []byte, respHandler func(srv string, data interface{})) int {
+func multiRequest(nc *nats.Conn, timeout int, report *store.Report, operation string, subject string, reqData []byte, respHandler func(srv string, data interface{})) int {
 	ib := nats.NewInbox()
 	sub, err := nc.SubscribeSync(ib)
 	if err != nil {
@@ -388,7 +394,7 @@ func multiRequest(nc *nats.Conn, report *store.Report, operation string, subject
 	responses := 0
 	now := time.Now()
 	start := now
-	end := start.Add(time.Second)
+	end := start.Add(time.Second * time.Duration(timeout))
 	for ; end.After(now); now = time.Now() { // try with decreasing timeout until we dont get responses
 		if resp, err := sub.NextMsg(end.Sub(now)); err != nil {
 			if err != nats.ErrTimeout || responses == 0 {
@@ -440,14 +446,14 @@ func obtainRequestKey(ctx ActionCtx, subPrune *store.Report) (nkeys.KeyPair, str
 	return okp, opPk, nil
 }
 
-func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, deleteList []string, respList int, subPrune *store.Report) {
+func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, timeout int, report *store.Report, deleteList []string, expectedResponses int) {
 	if len(deleteList) == 0 {
-		subPrune.AddOK("nothing to prune")
+		report.AddOK("nothing to prune")
 		return
 	}
-	okp, opPk, err := obtainRequestKey(ctx, subPrune)
+	okp, opPk, err := obtainRequestKey(ctx, report)
 	if err != nil {
-		subPrune.AddError("Could not obtain Operator key to sign the delete request (err:%v)", err)
+		report.AddError("Could not obtain Operator key to sign the delete request (err:%v)", err)
 		return
 	}
 	defer okp.Wipe()
@@ -456,23 +462,22 @@ func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, deleteList []string, respLi
 	claim.Data["accounts"] = deleteList
 	pruneJwt, err := claim.Encode(okp)
 	if err != nil {
-		subPrune.AddError("Could not encode delete request (err:%v)", err)
+		report.AddError("Could not encode delete request (err:%v)", err)
 	}
-	respPrune := multiRequest(nc, subPrune, "prune", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt),
-		func(srv string, data interface{}) {
-			if dataMap, ok := data.(map[string]interface{}); ok {
-				subPrune.AddOK("pruned nats-server %s: %s", srv, dataMap["message"])
-			} else {
-				subPrune.AddOK("pruned nats-server %s: %v", srv, data)
-			}
-		})
-	if respList > 0 {
-		if respPrune < respList {
-			subPrune.AddError("Fewer server responded to prune (%d) than to earlier list (%d)."+
-				" Accounts may not be completely pruned.", respPrune, respList)
-		} else if respPrune > respList {
-			subPrune.AddError("More server responded to prune (%d) than to earlier list (%d)."+
-				" Not every Account may have been included for pruning.", respPrune, respList)
+	respPrune := multiRequest(nc, timeout, report, "prune", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt), func(srv string, data interface{}) {
+		if dataMap, ok := data.(map[string]interface{}); ok {
+			report.AddOK("pruned nats-server %s: %s", srv, dataMap["message"])
+		} else {
+			report.AddOK("pruned nats-server %s: %v", srv, data)
+		}
+	})
+	if expectedResponses > 0 {
+		if respPrune < expectedResponses {
+			report.AddError("Fewer server responded to 'prune' (%d) than to 'list' (%d)."+
+				" Accounts may not be completely pruned.", respPrune, expectedResponses)
+		} else if respPrune > expectedResponses {
+			report.AddError("More servers responded to 'prune' (%d) than to 'list' (%d)."+
+				" Not every Account may have been included for pruning.", respPrune, expectedResponses)
 		}
 	}
 }
@@ -496,24 +501,23 @@ func createMapping(ctx ActionCtx, rep *store.Report, accountList []string) (map[
 	return mapping, nil
 }
 
-func listNonPresentAccounts(nc *nats.Conn, subPrune *store.Report, mapping map[string]string) (int, []string) {
+func listNonPresentAccounts(nc *nats.Conn, timeout int, report *store.Report, mapping map[string]string) (int, []string) {
 	deleteList := make([]string, 0, 1024)
-	responseCount := multiRequest(nc, subPrune, "list accounts", "$SYS.REQ.CLAIMS.LIST", nil,
-		func(srv string, d interface{}) {
-			data := d.([]interface{})
-			subAccPrune := store.NewReport(store.OK, "list %d accounts from nats-server %s", len(data), srv)
-			subPrune.Add(subAccPrune)
-			for _, acc := range data {
-				acc := acc.(string)
-				if name, ok := mapping[acc]; ok {
-					subAccPrune.AddOK("account %s named %s exists", acc, name)
-				} else {
-					subAccPrune.AddOK("account %s only exists in server", acc)
-					deleteList = append(deleteList, acc)
-				}
+	responseCount := multiRequest(nc, timeout, report, "list accounts", "$SYS.REQ.CLAIMS.LIST", nil, func(srv string, d interface{}) {
+		data := d.([]interface{})
+		subAccPrune := store.NewReport(store.OK, "list %d accounts from nats-server %s", len(data), srv)
+		report.Add(subAccPrune)
+		for _, acc := range data {
+			acc := acc.(string)
+			if name, ok := mapping[acc]; ok {
+				subAccPrune.AddOK("account %s named %s exists", acc, name)
+			} else {
+				subAccPrune.AddOK("account %s only exists in server", acc)
+				deleteList = append(deleteList, acc)
 			}
-		})
-	subPrune.AddOK("listed accounts from a total of %d nats-server", responseCount)
+		}
+	})
+	report.AddOK("listed accounts from a total of %d nats-server", responseCount)
 	return responseCount, deleteList
 }
 
@@ -565,14 +569,13 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 				if raw, err := ctx.StoreCtx().Store.Read(store.Accounts, v, store.JwtName(v)); err != nil {
 					subAcc.AddError("failed to read account %q: %v", v, err)
 				} else {
-					resp := multiRequest(nc, subAcc, "push account", "$SYS.REQ.CLAIMS.UPDATE", raw,
-						func(srv string, data interface{}) {
-							if dataMap, ok := data.(map[string]interface{}); ok {
-								subAcc.AddOK("pushed %q to nats-server %s: %s", v, srv, dataMap["message"])
-							} else {
-								subAcc.AddOK("pushed %q to nats-server %s: %v", v, srv, data)
-							}
-						})
+					resp := multiRequest(nc, p.timeout, subAcc, "push account", "$SYS.REQ.CLAIMS.UPDATE", raw, func(srv string, data interface{}) {
+						if dataMap, ok := data.(map[string]interface{}); ok {
+							subAcc.AddOK("pushed %q to nats-server %s: %s", v, srv, dataMap["message"])
+						} else {
+							subAcc.AddOK("pushed %q to nats-server %s: %v", v, srv, data)
+						}
+					})
 					subAcc.AddOK("pushed to a total of %d nats-server", resp)
 				}
 			}
@@ -584,12 +587,12 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			if err != nil {
 				return r, nil
 			}
-			responseCount, deleteList := listNonPresentAccounts(nc, subPrune, mapping)
-			sendDeleteRequest(ctx, nc, deleteList, responseCount, subPrune)
+			responseCount, deleteList := listNonPresentAccounts(nc, p.timeout, subPrune, mapping)
+			sendDeleteRequest(ctx, nc, p.timeout, subPrune, deleteList, responseCount)
 		} else if p.removeAcc != "" {
 			subRemove := store.NewReport(store.OK, "prune nats-server with nats account resolver")
 			r.Add(subRemove)
-			sendDeleteRequest(ctx, nc, []string{p.removeAcc}, -1, subRemove)
+			sendDeleteRequest(ctx, nc, p.timeout, subRemove, []string{p.removeAcc}, -1)
 		} else if p.diff {
 			subDiff := store.NewReport(store.OK, "diff nats-server with nats account resolver")
 			r.Add(subDiff)
@@ -604,7 +607,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 				return r, nil
 			}
 
-			listNonPresentAccounts(nc, subDiff, mapping)
+			listNonPresentAccounts(nc, p.timeout, subDiff, mapping)
 		}
 	}
 	return r, nil
