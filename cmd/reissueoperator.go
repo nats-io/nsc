@@ -51,8 +51,8 @@ var reIssue = &cobra.Command{
 }
 
 func init() {
-	reIssue.AddCommand(createReIssueOperatorCmd())
 	GetRootCmd().AddCommand(reIssue)
+	reIssue.AddCommand(createReIssueOperatorCmd())
 }
 
 type reIssueOperator struct {
