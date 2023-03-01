@@ -125,4 +125,19 @@ jobs:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: matrix.canonical
 
+      - name: Bad versions creep defense
+        id: go-module-versions
+        # The go.mod includes tests, and some of our tests explicitly pull in jwtv1, which is unmaintained and has security issues.
+        # It's only in the tests, so that's not critical enough to need to rewrite things at this time.
+        # But we don't want the _binary_ to link against v1.  So we want to check what the actual binary links against.
+        # Add whatever other checks we care about here.
+        run: |
+          go build
+          go version -m ./nsc > versions
+          if grep -qsE '^[[:space:]]+dep[[:space:]]+github\.com/nats-io/jwt[[:space:]]' versions; then
+            echo "::error title=Bad dependency in binary::JWT library v1 detected"
+            exit 1
+          fi
+        if: matrix.canonical
+
 #EOF
