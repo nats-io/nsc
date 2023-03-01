@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -94,9 +94,13 @@ func bodyAsJson(data []byte) ([]byte, error) {
 	if err := json.Unmarshal(d, &m); err != nil {
 		return nil, fmt.Errorf("error parsing json: %v", err)
 	}
-	f, err := json.MarshalIndent(m, "", " ")
-	if err != nil {
+
+	j := &bytes.Buffer{}
+	encoder := json.NewEncoder(j)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", " ")
+	if err := encoder.Encode(m); err != nil {
 		return nil, fmt.Errorf("error formatting json: %v", err)
 	}
-	return f, nil
+	return j.Bytes(), nil
 }
