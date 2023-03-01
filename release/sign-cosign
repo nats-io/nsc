@@ -27,7 +27,11 @@ if [[ -f "$signature" ]]; then
 	rm -f -- "$signature"
 fi
 
+# We redirect stdin from /dev/null to skip any terminal prompts
+# cosign 2.x: requires --yes to say that it's okay to upload to transparency logs
 cosign sign-blob \
 	--key <( printf '%s\n' "$SIGNING_KEY_COSIGN" ) \
 	--output-signature "$signature" \
-	"$artifact"
+	--yes \
+	"$artifact" \
+	</dev/null

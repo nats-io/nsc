@@ -3,15 +3,10 @@ on:
   # We use goreleaser in release mode, so if we do a workflow_dispatch rule here then we should prompt for a tag to check out.
   push:
     tags:
-      # At present (2022-02) the nsc auto-updater logic requires that we name the tags without the v prefix.
-      # Obviously if we change that, we'll still have an installed base with the old logic so won't be able to start using the new naming for some time.
-      # We match on v* for consistency and with an eye to the future.
-      # To avoid random experimental tags creating releases, we use ${major}.* and ${nextmajor}.* for the rules which will actually match.
-      # We allow 0.0.X for debugging of release engineering processes, where it won't create a new release.
-      - 'v*'
-      - '0.0.*'
-      - '2.*'
-      - '3.*'
+      # From 2.7.6 onwards, we use the vX.Y.Z tag naming pattern.
+      # Before then, we used non-version tags.
+      # Going forward, for new releases, we only need to support v.
+      - 'v[0-9]*'
 
 permissions:
   # Control the GITHUB_TOKEN permissions; GitHub's docs on which permission scopes control what are a little lacking.
@@ -61,8 +56,8 @@ jobs:
           # We have seen a couple of bugs, so are locking this for now.
           # v1.8.3-pro fixes some issues in brew architecture image variants
           # which led to <https://github.com/nats-io/homebrew-nats-tools/issues/9>
-          version: v1.13.1-pro
-          args: release --rm-dist
+          version: v1.15.2-pro
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
