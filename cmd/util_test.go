@@ -31,8 +31,8 @@ import (
 	"time"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	jwt1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
+	jwt1 "github.com/nats-io/jwt/v2/v1compat"
 	"github.com/nats-io/nats-server/v2/server"
 	nats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"

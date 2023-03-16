@@ -26,10 +26,11 @@ import (
 	"testing"
 	"time"
 
-	jwtv1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/v2/cmd/store"
+	jwtv1 "github.com/nats-io/jwt/v2/v1compat"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nsc/v2/cmd/store"
 )
 
 func Test_AddOperator(t *testing.T) {

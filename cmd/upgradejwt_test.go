@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	jwtv1 "github.com/nats-io/jwt"
 	"github.com/nats-io/jwt/v2"
+	jwtv1 "github.com/nats-io/jwt/v2/v1compat"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 
