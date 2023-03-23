@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -119,4 +119,44 @@ func Test_ImportUserOtherAccount(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", file)
 	require.Error(t, err)
+}
+
+func Test_ImportUserFromDescribe(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+	creds := filepath.Join(ts.Dir, "u.creds")
+	_, _, err := ExecuteCmd(createGenerateCredsCmd(), "--output-file", creds)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "U")
+	require.NoError(t, err)
+
+	// import a creds
+	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", creds)
+	require.NoError(t, err)
+
+	// generate a jwt with describe, and import it
+	cmd := createDescribeUserCmd()
+	cmd.Flags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
+	fp := filepath.Join(ts.Dir, "u.jwt")
+	_, _, err = ExecuteCmd(cmd, "--raw", "--output-file", fp)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "U")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", fp)
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(fp))
+
+	// generate a jwt with describe that is not armored, and import it
+	cmd = createDescribeUserCmd()
+	cmd.Flags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
+	stdout, _, err := ExecuteCmd(cmd, "--raw")
+	require.NoError(t, err)
+	require.NoError(t, Write(fp, []byte(stdout)))
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "U")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createImportUserCmd(), "--file", fp)
+	require.NoError(t, err)
 }
