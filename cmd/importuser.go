@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -55,7 +55,7 @@ type ImportUser struct {
 	fileImport
 }
 
-func (p *ImportUser) SetDefaults(ctx ActionCtx) error {
+func (p *ImportUser) SetDefaults(_ctx ActionCtx) error {
 	return nil
 }
 
@@ -88,16 +88,16 @@ func (p *ImportUser) Run(ctx ActionCtx) (store.Status, error) {
 		r.AddError("failed to import %#q: %v", p.file, err)
 		return r, err
 	}
-	theJWT := ""
+	theJWT := strings.TrimSpace(string(content))
 	var kp nkeys.KeyPair
-	if strings.HasSuffix(p.file, ".jwt") {
-		theJWT = string(content)
-	} else {
-		if theJWT, err = jwt.ParseDecoratedJWT(content); err == nil {
-			if kp, err = jwt.ParseDecoratedUserNKey(content); err != nil {
-				r.AddError("failed to parse decorated key in %#q: %v", p.file, err)
-				return r, err
-			}
+	if !strings.HasPrefix(theJWT, "ey") {
+		theJWT, err = jwt.ParseDecoratedJWT(content)
+		if err != nil {
+			r.AddError("failed to parse decorated JWT in %q: %v", p.file, err)
+			return r, err
+		}
+		if kp, err = jwt.ParseDecoratedUserNKey(content); err != nil {
+			r.AddWarning("failed to parse decorated key in %#q: %v", p.file, err)
 		}
 	}
 	claim, err := jwt.DecodeUserClaims(theJWT)
