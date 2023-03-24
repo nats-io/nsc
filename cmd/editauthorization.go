@@ -52,10 +52,10 @@ func createEditAuthorizationCallout() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&params.disable, "disable", "", false, "disable external authorization")
 	cmd.Flags().StringSliceVarP(&params.AuthUsers, "auth-user", "", nil, "adds a user public key that bypasses the authorization callout and is used by the authorization service itself")
-	cmd.Flags().StringSliceVarP(&params.AllowedAccounts, "allowed-account", "", nil, "adds an account public key that the authorization service can bind authorized users to")
+	cmd.Flags().StringSliceVarP(&params.AllowedAccounts, "allowed-account", "", nil, "adds an account public key that the authorization service can bind authorized users to (specify '*' to allow any account that the service can generate users for)")
 
 	cmd.Flags().StringSliceVarP(&params.RmAuthUsers, "rm-auth-user", "", nil, "removes a user public key that bypasses the authorization callout and is used by the authorization service itself")
-	cmd.Flags().StringSliceVarP(&params.RmAllowedAccounts, "rm-allowed-account", "", nil, "removes an account public key that the authorization service can bind authorized users to")
+	cmd.Flags().StringSliceVarP(&params.RmAllowedAccounts, "rm-allowed-account", "", nil, "removes an account public key or the '*' wildcard that the authorization service can bind authorized users to")
 	cmd.Flags().BoolVarP(&params.RmXKey, "rm-curve", "", false, "remove curve encryption target")
 	params.XKey.BindFlags("curve", "x", nkeys.PrefixByteCurve, cmd)
 	params.AccountContextParams.BindFlags(cmd)
@@ -114,6 +114,9 @@ func (p *EditAccountCalloutParams) PostInteractive(_ ActionCtx) error {
 
 // toPublicKey resolves the public and checks the key for proper type
 func toPublicKey(s string, kind nkeys.PrefixByte) (string, error) {
+	if s == jwt.AnyAccount {
+		return s, nil
+	}
 	kp, err := store.ResolveKey(s)
 	if err != nil {
 		return "", err
