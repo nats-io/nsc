@@ -46,7 +46,7 @@ func createGenerateContext() *cobra.Command {
 		Short:        "Generate nats cli user context",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
-		Example:      `nsc generate context --account a --user u --name contextName`,
+		Example:      `nsc generate context --account a --user u --context contextName`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunAction(cmd, args, &params)
 		},
