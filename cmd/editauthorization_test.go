@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nats-io/jwt/v2"
+
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/assert"
 
@@ -119,6 +121,28 @@ func Test_EditAuthorizationDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, ac.Authorization.AuthUsers)
 	require.Empty(t, ac.Authorization.AllowedAccounts)
+}
+
+func Test_EditAuthorizationWildcardBasics(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, uPK, _ := CreateUserKey(t)
+	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--allowed-account", jwt.AnyAccount)
+	require.NoError(t, err)
+
+	_, aPK, _ := CreateAccountKey(t)
+	_, _, err = ExecuteCmd(createEditAuthorizationCallout(), "--allowed-account", aPK)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "AllowedAccounts can only be a list of accounts or \"*\"")
+
+	_, _, err = ExecuteCmd(createEditAuthorizationCallout(), "--rm-allowed-account", jwt.AnyAccount)
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAuthorizationCallout(), "--allowed-account", aPK)
+	require.NoError(t, err)
 }
 
 func Test_EditAuthorizationDeleteUser(t *testing.T) {
