@@ -46,7 +46,7 @@ builds:
       - goos: freebsd
         goarch: 386
     binary: nsc
-    main: ./main.go
+    main: .
     env:
       - CGO_ENABLED=0
     # reproducible builds:
