@@ -1,18 +1,16 @@
 /*
+ * Copyright 2018-2023 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  * Copyright 2018-2019 The NATS Authors
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package store
@@ -370,4 +368,74 @@ func TestStore_GetAccountKeys(t *testing.T) {
 	require.Len(t, keys, 2)
 	require.Equal(t, apub, keys[0])
 	require.Equal(t, apub2, keys[1])
+}
+
+func assertErrorMessage(t *testing.T, err error, errMsg string) {
+	require.Error(t, err)
+	if errMsg != "" {
+		require.Equal(t, errMsg, err.Error())
+	}
+}
+
+func assertError(t *testing.T, v interface{}, err error, errMsg string) {
+	require.Nil(t, v)
+	assertErrorMessage(t, err, errMsg)
+}
+
+func TestStore_NilStore(t *testing.T) {
+	var s *Store
+	require.Empty(t, s.Resolve("A"))
+	require.False(t, s.IsManaged())
+	require.False(t, s.Has("foo"))
+	require.False(t, s.HasAccount("foo"))
+	require.Equal(t, "", s.GetName())
+	assertErrorMessage(t, s.Write(nil, "hello"), NoStoreSetError)
+	assertErrorMessage(t, s.StoreRaw(nil), NoStoreSetError)
+	assertErrorMessage(t, s.Delete("foo"), NoStoreSetError)
+
+	list, err := s.List(Accounts)
+	assertError(t, list, err, NoStoreSetError)
+
+	r, err := s.StoreClaim(nil)
+	assertError(t, r, err, NoStoreSetError)
+
+	k, err := s.GetRootPublicKey()
+	require.Empty(t, k)
+	assertErrorMessage(t, err, NoStoreSetError)
+
+	e, err := s.ListEntries("foo")
+	assertError(t, e, err, NoStoreSetError)
+
+	sub, err := s.ListSubContainers("A")
+	assertError(t, sub, err, NoStoreSetError)
+
+	cd, err := s.LoadClaim("A")
+	assertError(t, cd, err, NoStoreSetError)
+
+	gc, err := s.LoadDefaultEntity(Accounts)
+	assertError(t, gc, err, NoStoreSetError)
+
+	gc, err = s.LoadRootClaim()
+	assertError(t, gc, err, NoStoreSetError)
+
+	ra, err := s.Read("A")
+	assertError(t, ra, err, NoStoreSetError)
+
+	ac, err := s.ReadAccountClaim("A")
+	assertError(t, ac, err, NoStoreSetError)
+
+	d, err := s.ReadRawAccountClaim("A")
+	assertError(t, d, err, NoStoreSetError)
+
+	oc, err := s.ReadOperatorClaim()
+	assertError(t, oc, err, NoStoreSetError)
+
+	d, err = s.ReadRawOperatorClaim()
+	assertError(t, d, err, NoStoreSetError)
+
+	uc, err := s.ReadUserClaim("A", "U")
+	assertError(t, uc, err, NoStoreSetError)
+
+	d, err = s.ReadRawUserClaim("A", "U")
+	assertError(t, d, err, NoStoreSetError)
 }

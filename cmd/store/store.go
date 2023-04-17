@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,6 +46,12 @@ const Accounts = "accounts"
 var standardDirs = []string{Accounts}
 
 var ErrNotExist = errors.New("resource does not exist")
+
+const NoStoreSetError = "no store set"
+
+var ErrNoStoreSet = errors.New(NoStoreSetError)
+
+const Empty = ""
 
 // Store is a directory that contains nsc assets
 type Store struct {
@@ -172,7 +178,7 @@ func CreateStore(env string, operatorsDir string, operator *NamedKey) (*Store, e
 	}
 
 	for _, d := range standardDirs {
-		dp := s.resolve(d, "")
+		dp := s.Resolve(d, Empty)
 		if err = os.MkdirAll(dp, 0700); err != nil {
 			return nil, fmt.Errorf("error creating %#q: %v", dp, err)
 		}
@@ -219,20 +225,22 @@ func LoadStore(dir string) (*Store, error) {
 }
 
 func (s *Store) IsManaged() bool {
+	if s == nil {
+		return false
+	}
 	return s.Info.Managed
 }
 
-func (s *Store) resolve(name ...string) string {
-	return filepath.Join(s.Dir, filepath.Join(name...))
-}
-
 func (s *Store) Resolve(name ...string) string {
+	if s == nil {
+		return Empty
+	}
 	return filepath.Join(s.Dir, filepath.Join(name...))
 }
 
 // Has returns true if the specified asset exists
 func (s *Store) Has(name ...string) bool {
-	fp := s.resolve(name...)
+	fp := s.Resolve(name...)
 	return s.has(fp)
 }
 
@@ -249,9 +257,12 @@ func (s *Store) has(fp string) bool {
 
 // Read reads the specified file name or subpath from the store
 func (s *Store) Read(name ...string) ([]byte, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	s.Lock()
 	defer s.Unlock()
-	fp := s.resolve(name...)
+	fp := s.Resolve(name...)
 	d, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %#q: %w", fp, err)
@@ -261,10 +272,13 @@ func (s *Store) Read(name ...string) ([]byte, error) {
 
 // Write writes the specified file name or subpath in the store
 func (s *Store) Write(data []byte, name ...string) error {
+	if s == nil {
+		return ErrNoStoreSet
+	}
 	s.Lock()
 	defer s.Unlock()
 
-	fp := s.resolve(name...)
+	fp := s.Resolve(name...)
 	dp := filepath.Dir(fp)
 
 	if err := os.MkdirAll(dp, 0700); err != nil {
@@ -274,22 +288,31 @@ func (s *Store) Write(data []byte, name ...string) error {
 }
 
 func (s *Store) List(path ...string) ([]fs.DirEntry, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	s.Lock()
 	defer s.Unlock()
 
-	fp := s.resolve(path...)
+	fp := s.Resolve(path...)
 	return os.ReadDir(fp)
 }
 
 // Delete the specified file name or subpath from the store
 func (s *Store) Delete(name ...string) error {
+	if s == nil {
+		return ErrNoStoreSet
+	}
 	s.Lock()
 	defer s.Unlock()
-	fp := s.resolve(name...)
+	fp := s.Resolve(name...)
 	return os.Remove(fp)
 }
 
 func (s *Store) ListSubContainers(name ...string) ([]string, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	var containers []string
 	fp := filepath.Join(name...)
 	if s.Has(fp) {
@@ -309,6 +332,9 @@ func (s *Store) ListSubContainers(name ...string) ([]string, error) {
 }
 
 func (s *Store) ListEntries(name ...string) ([]string, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	var entries []string
 	fp := filepath.Join(name...)
 	if s.Has(fp) {
@@ -412,6 +438,9 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 }
 
 func (s *Store) StoreClaim(data []byte) (*Report, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	ct, err := s.ClaimType(data)
 	if err != nil {
 		return nil, err
@@ -449,6 +478,9 @@ func (s *Store) StoreClaim(data []byte) (*Report, error) {
 }
 
 func (s *Store) StoreRaw(data []byte) error {
+	if s == nil {
+		return ErrNoStoreSet
+	}
 	ct, err := s.ClaimType(data)
 	if err != nil {
 		return err
@@ -505,6 +537,9 @@ func (s *Store) StoreRaw(data []byte) error {
 }
 
 func (s *Store) GetName() string {
+	if s == nil {
+		return Empty
+	}
 	return s.Info.Name
 }
 
@@ -524,6 +559,9 @@ func PlainName(name string) string {
 }
 
 func (s *Store) loadJson(v interface{}, name ...string) error {
+	if s == nil {
+		return ErrNoStoreSet
+	}
 	if s.Has(name...) {
 		d, err := s.Read(name...)
 		if err != nil {
@@ -539,6 +577,9 @@ func (s *Store) loadJson(v interface{}, name ...string) error {
 }
 
 func (s *Store) LoadClaim(name ...string) (*jwt.GenericClaims, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	if s.Has(name...) {
 		d, err := s.Read(name...)
 		if err != nil {
@@ -566,6 +607,9 @@ func (s *Store) ReadOperatorClaim() (*jwt.OperatorClaims, error) {
 }
 
 func (s *Store) ReadRawOperatorClaim() ([]byte, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	fn := JwtName(s.GetName())
 	if s.Has(fn) {
 		d, err := s.Read(fn)
@@ -590,6 +634,9 @@ func (s *Store) ReadAccountClaim(name string) (*jwt.AccountClaims, error) {
 }
 
 func (s *Store) ReadRawAccountClaim(name string) ([]byte, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	if s.Has(Accounts, name, JwtName(name)) {
 		d, err := s.Read(Accounts, name, JwtName(name))
 		if err != nil {
@@ -613,6 +660,9 @@ func (s *Store) ReadUserClaim(accountName string, name string) (*jwt.UserClaims,
 }
 
 func (s *Store) ReadRawUserClaim(accountName string, name string) ([]byte, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	if s.Has(Accounts, accountName, Users, JwtName(name)) {
 		d, err := s.Read(Accounts, accountName, Users, JwtName(name))
 		if err != nil {
@@ -624,6 +674,9 @@ func (s *Store) ReadRawUserClaim(accountName string, name string) ([]byte, error
 }
 
 func (s *Store) LoadRootClaim() (*jwt.GenericClaims, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	fn := JwtName(s.GetName())
 	if s.Has(fn) {
 		return s.LoadClaim(fn)
@@ -632,6 +685,9 @@ func (s *Store) LoadRootClaim() (*jwt.GenericClaims, error) {
 }
 
 func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
+	if s == nil {
+		return nil, ErrNoStoreSet
+	}
 	dirs, err := s.ListSubContainers(kind)
 	if err != nil {
 		return nil, fmt.Errorf("error listing %s: %w", kind, err)
@@ -667,6 +723,9 @@ func (s *Store) LoadDefaultEntity(kind string) (*jwt.GenericClaims, error) {
 }
 
 func (s *Store) GetRootPublicKey() (string, error) {
+	if s == nil {
+		return "", ErrNoStoreSet
+	}
 	c, err := s.LoadRootClaim()
 	if err != nil {
 		return "", err
