@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -33,7 +33,7 @@ func createImportKeysCmd() *cobra.Command {
 		Short: "Imports all nkeys found in a directory",
 		Long:  `Imports all nkeys found in a directory`,
 		Example: `nsc import keys --dir <path>
-nsc import keys --recursive --dir <path>
+nsc import keys --recurse --dir <path>
 `,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
