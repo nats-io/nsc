@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -143,15 +143,22 @@ func run(ctx ActionCtx, action interface{}) error {
 
 	rs, err := e.Run(ctx)
 	if rs != nil {
-		ctx.CurrentCmd().Println(rs.Message())
+		if err := Write("--", []byte(rs.Message())); err != nil {
+			return err
+		}
 		sum, ok := rs.(store.Summarizer)
 		if ok {
 			m, err := sum.Summary()
 			if err != nil {
 				return err
 			}
+			if len(m) > 0 && !strings.HasSuffix(m, "\n") {
+				m = fmt.Sprintf("%s\n", m)
+			}
 			if m != "" {
-				ctx.CurrentCmd().Println(strings.TrimSuffix(m, "\n"))
+				if err := Write("--", []byte(m)); err != nil {
+					return err
+				}
 			}
 		}
 	}

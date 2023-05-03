@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -152,7 +152,9 @@ func (p *GenerateNKeysParam) Run(ctx ActionCtx) (store.Status, error) {
 					return nil, err
 				}
 			}
-			ctx.CurrentCmd().Println(j.String(p.store))
+			if err := Write("--", []byte(j.String(p.store))); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return nil, nil
