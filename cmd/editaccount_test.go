@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,11 +16,11 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nats-io/nkeys"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -353,4 +353,42 @@ func Test_EditOperatorDisallowBearerToken(t *testing.T) {
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--bearer")
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "account disallows bearer token")
+}
+
+func Test_EditSysAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "SYS")
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	require.NoError(t, err)
+
+	// test setting any flag will generate an error and the flag is reported
+	jsOptions := []string{
+		"js-max-bytes-required",
+
+		"js-tier",
+		"js-mem-storage",
+		"js-disk-storage",
+		"js-streams",
+		"js-consumer",
+		"js-max-mem-stream",
+		"js-max-disk-stream",
+		"js-max-ack-pending",
+	}
+	// setting any JS flags, will fail the edit
+	for idx, n := range jsOptions {
+		flag := fmt.Sprintf("--%s", n)
+		if idx > 0 {
+			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag, "1")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), flag)
+		} else {
+			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), flag)
+		}
+	}
+	// defaults are removed automatically
+	_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A")
+	require.NoError(t, err)
 }

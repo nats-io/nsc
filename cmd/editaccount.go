@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,16 +18,14 @@ package cmd
 import (
 	"errors"
 	"fmt"
-
 	"strconv"
 	"strings"
 
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/spf13/cobra"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func validatorUrlOrEmpty() cli.Opt {
@@ -119,6 +117,8 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.MaxAckPending, "js-max-ack-pending", "", "JetStream: set number of maximum acks that can be pending for a consumer in the account")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
+	cmd.Flags().BoolVarP(&params.disableJetStream, "js-disable", "", false, "JetStream:  sets options --js-streams, --js-consumer, --js-mem-storage --js-max-mem-stream, --js-disk-storage, --js-max-disk-stream to 0")
+
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
 	return cmd
@@ -148,21 +148,22 @@ type EditAccountParams struct {
 	GenericClaimsParams
 	PermissionsParams
 	JetStreamLimitParams
-	claim          *jwt.AccountClaims
-	token          string
-	infoUrl        string
-	description    string
-	conns          NumberParams
-	leafConns      NumberParams
-	exports        NumberParams
-	disallowBearer bool
-	exportsWc      bool
-	imports        NumberParams
-	subscriptions  NumberParams
-	payload        NumberParams
-	data           NumberParams
-	signingKeys    SigningKeysParams
-	rmSigningKeys  []string
+	claim            *jwt.AccountClaims
+	token            string
+	infoUrl          string
+	description      string
+	conns            NumberParams
+	leafConns        NumberParams
+	exports          NumberParams
+	disallowBearer   bool
+	exportsWc        bool
+	imports          NumberParams
+	subscriptions    NumberParams
+	payload          NumberParams
+	data             NumberParams
+	signingKeys      SigningKeysParams
+	rmSigningKeys    []string
+	disableJetStream bool
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -204,7 +205,23 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
+
+	if p.disableJetStream {
+		p.doDisableJetStream()
+	}
 	return nil
+}
+
+func (p *EditAccountParams) doDisableJetStream() {
+	p.Tier = 0
+	p.Consumer = 0
+	p.Streams = 0
+	p.DiskStorage = 0
+	p.MemStorage = 0
+	p.MemMaxStreamBytes = 0
+	p.DiskMaxStreamBytes = 0
+	p.MaxBytesRequired = false
+	p.MaxAckPending = 0
 }
 
 func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
@@ -517,6 +534,49 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 	return nil
 }
 
+func (p *EditAccountParams) checkSystemAccount(ctx ActionCtx) error {
+	// if we are not editing system account ignore
+	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount != p.claim.Subject {
+		return nil
+	}
+	var mustUnset []string
+
+	if p.Tier != 0 {
+		mustUnset = append(mustUnset, "--js-tier")
+	}
+	if p.MemStorage > 0 {
+		mustUnset = append(mustUnset, "--js-mem-storage")
+	}
+	if p.DiskStorage > 0 {
+		mustUnset = append(mustUnset, "--js-disk-storage")
+	}
+	if p.Streams > 0 {
+		mustUnset = append(mustUnset, "--js-streams")
+	}
+	if p.Consumer > 0 {
+		mustUnset = append(mustUnset, "--js-consumer")
+	}
+	if p.MemMaxStreamBytes > 0 {
+		mustUnset = append(mustUnset, "--js-max-mem-stream")
+	}
+	if p.DiskMaxStreamBytes > 0 {
+		mustUnset = append(mustUnset, "--js-max-disk-stream")
+	}
+	if p.MaxBytesRequired {
+		mustUnset = append(mustUnset, "--js-max-bytes-required")
+	}
+	if p.MaxAckPending > 0 {
+		mustUnset = append(mustUnset, "--js-max-ack-pending")
+	}
+	if len(mustUnset) == 0 {
+		// no user specified values set - so set to zero/false
+		p.doDisableJetStream()
+	} else {
+		return fmt.Errorf("system account cannot have jetstream related settings - please rerun without: %s", strings.Join(mustUnset, " "))
+	}
+	return nil
+}
+
 func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	var err error
 	if err = p.signingKeys.Valid(); err != nil {
@@ -528,10 +588,8 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 	if err = p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
 		return err
 	}
-	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount == p.claim.Subject {
-		if p.MemStorage != 0 || p.DiskStorage != 0 || p.Consumer != 0 || p.Streams != 0 {
-			return fmt.Errorf("jetstream not available for system account")
-		}
+	if err = p.checkSystemAccount(ctx); err != nil {
+		return err
 	}
 	if err := p.PermissionsParams.Validate(); err != nil {
 		return err
