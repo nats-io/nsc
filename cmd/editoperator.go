@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -189,6 +189,32 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	return p.SignerParams.Edit(ctx)
 }
 
+func (p *EditOperatorParams) setSystemAccount(ctx ActionCtx) error {
+	if p.sysAcc != "" {
+		if !nkeys.IsValidPublicAccountKey(p.sysAcc) {
+			if acc, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAcc); err != nil {
+				return err
+			} else {
+				if acc.Limits.JetStreamTieredLimits != nil {
+					return fmt.Errorf("system accounts cannot have tiered JetStream limits - run %q first", fmt.Sprintf("nsc edit account %s --js-disable", acc.Name))
+				}
+				if acc.Limits.JetStreamLimits.Streams != 0 ||
+					acc.Limits.JetStreamLimits.Consumer != 0 ||
+					acc.Limits.JetStreamLimits.MaxAckPending != 0 ||
+					acc.Limits.JetStreamLimits.DiskMaxStreamBytes != 0 ||
+					acc.Limits.JetStreamLimits.MemoryMaxStreamBytes != 0 ||
+					acc.Limits.JetStreamLimits.DiskStorage != 0 ||
+					acc.Limits.JetStreamLimits.MemoryStorage != 0 ||
+					acc.Limits.JetStreamLimits.MaxBytesRequired {
+					return fmt.Errorf("system accounts cannot have JetStream limits - run %q first", fmt.Sprintf("nsc edit account %s --js-disable", acc.Name))
+				}
+				p.sysAcc = acc.Subject
+			}
+		}
+	}
+	return nil
+}
+
 func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 	var err error
 	if err = p.GenericClaimsParams.Valid(); err != nil {
@@ -200,14 +226,8 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			return err
 		}
 	}
-	if p.sysAcc != "" {
-		if !nkeys.IsValidPublicAccountKey(p.sysAcc) {
-			if acc, err := ctx.StoreCtx().Store.ReadAccountClaim(p.sysAcc); err != nil {
-				return err
-			} else {
-				p.sysAcc = acc.Subject
-			}
-		}
+	if err := p.setSystemAccount(ctx); err != nil {
+		return err
 	}
 	if p.reqSk {
 		accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)

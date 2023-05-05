@@ -365,7 +365,6 @@ func Test_EditSysAccount(t *testing.T) {
 	// test setting any flag will generate an error and the flag is reported
 	jsOptions := []string{
 		"js-max-bytes-required",
-
 		"js-tier",
 		"js-mem-storage",
 		"js-disk-storage",
@@ -391,4 +390,14 @@ func Test_EditSysAccount(t *testing.T) {
 	// defaults are removed automatically
 	_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A")
 	require.NoError(t, err)
+}
+
+func Test_TierRmAndDisabled(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(createEditAccount(), "A", "--rm-js-tier", "1", "--js-disable")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "js-disable is exclusive of all other js options")
 }

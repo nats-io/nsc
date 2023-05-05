@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -347,4 +347,31 @@ func Test_SKGenerateAddsOneKey(t *testing.T) {
 	keys, err = ts.KeyStore.AllKeys()
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(keys))
+}
+
+func Test_SysAccountCannotHaveJetStream(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+
+	// global JS limits shouldn't work
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createEditAccount(), "A", "--js-disk-storage", "1024")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--system-account", "A")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "system accounts cannot have JetStream limits - run \"nsc edit account A --js-disable\" first")
+
+	// tiered JS limits shouldn't work
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-disable")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-tier", "3", "--js-disk-storage", "1024")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--system-account", "A")
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "system accounts cannot have tiered JetStream limits - run \"nsc edit account A --js-disable\" first")
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-disable")
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--system-account", "A")
+	require.NoError(t, err)
 }

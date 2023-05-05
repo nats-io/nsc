@@ -117,7 +117,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.MaxAckPending, "js-max-ack-pending", "", "JetStream: set number of maximum acks that can be pending for a consumer in the account")
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
-	cmd.Flags().BoolVarP(&params.disableJetStream, "js-disable", "", false, "JetStream:  sets options --js-streams, --js-consumer, --js-mem-storage --js-max-mem-stream, --js-disk-storage, --js-max-disk-stream to 0")
+	cmd.Flags().BoolVarP(&params.disableJetStream, "js-disable", "", false, "disables all JetStream limits in the account by deleting any limits")
 
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -187,6 +187,10 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		return fmt.Errorf("rm-js-tier is exclusive of all other js options")
 	}
 
+	if p.disableJetStream && (p.hasJSSetParams || hasDeleteTier) {
+		return fmt.Errorf("js-disable is exclusive of all other js options")
+	}
+
 	if !InteractiveFlag && ctx.NothingToDo(
 		"start", "expiry", "tag", "rm-tag", "conns", "leaf-conns", "exports", "imports", "subscriptions",
 		"payload", "data", "wildcard-exports", "sk", "rm-sk", "description", "info-url", "response-ttl", "allow-pub-response",
@@ -201,27 +205,13 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-max-mem-stream",
 		"js-max-disk-stream",
 		"js-max-bytes-required",
-		"js-max-ack-pending") {
+		"js-max-ack-pending",
+		"js-disable") {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
 
-	if p.disableJetStream {
-		p.doDisableJetStream()
-	}
 	return nil
-}
-
-func (p *EditAccountParams) doDisableJetStream() {
-	p.Tier = 0
-	p.Consumer = 0
-	p.Streams = 0
-	p.DiskStorage = 0
-	p.MemStorage = 0
-	p.MemMaxStreamBytes = 0
-	p.DiskMaxStreamBytes = 0
-	p.MaxBytesRequired = false
-	p.MaxAckPending = 0
 }
 
 func (p *EditAccountParams) PreInteractive(ctx ActionCtx) error {
@@ -251,6 +241,21 @@ func (p *EditAccountParams) getTierLimits(tier int) (*jwt.JetStreamLimits, error
 		}
 	}
 	return src, nil
+}
+
+func (p *EditAccountParams) doDisableJetStream(r *store.Report) error {
+	if !p.disableJetStream {
+		return nil
+	}
+	p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
+	r.AddOK("deleted global limit")
+	if p.claim.Limits.JetStreamTieredLimits != nil {
+		for k := range p.claim.Limits.JetStreamTieredLimits {
+			r.AddOK("deleted tier limit %s", k)
+		}
+	}
+	p.claim.Limits.JetStreamTieredLimits = nil
+	return nil
 }
 
 func (p *EditAccountParams) loadLimits(ctx ActionCtx, tier int) error {
@@ -539,6 +544,11 @@ func (p *EditAccountParams) checkSystemAccount(ctx ActionCtx) error {
 	if op, _ := ctx.StoreCtx().Store.ReadOperatorClaim(); op.SystemAccount != p.claim.Subject {
 		return nil
 	}
+
+	if p.claim.Limits.JetStreamTieredLimits != nil {
+		return errors.New("system account cannot have JetStream limits - please rerun with --js-disable")
+	}
+
 	var mustUnset []string
 
 	if p.Tier != 0 {
@@ -570,7 +580,16 @@ func (p *EditAccountParams) checkSystemAccount(ctx ActionCtx) error {
 	}
 	if len(mustUnset) == 0 {
 		// no user specified values set - so set to zero/false
-		p.doDisableJetStream()
+		// reset all the flags to zero
+		p.Tier = 0
+		p.Consumer = 0
+		p.Streams = 0
+		p.DiskStorage = 0
+		p.MemStorage = 0
+		p.MemMaxStreamBytes = 0
+		p.DiskMaxStreamBytes = 0
+		p.MaxBytesRequired = false
+		p.MaxAckPending = 0
 	} else {
 		return fmt.Errorf("system account cannot have jetstream related settings - please rerun without: %s", strings.Join(mustUnset, " "))
 	}
@@ -652,9 +671,12 @@ func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
 			return errors.New("account doesn't have tier limits")
 		}
 	}
-
 	if p.DeleteTier != -1 {
 		return nil
+	}
+
+	if p.disableJetStream {
+		return p.doDisableJetStream(r)
 	}
 
 	label := p.tierLabel()
