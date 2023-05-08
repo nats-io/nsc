@@ -249,10 +249,8 @@ func (p *EditAccountParams) doDisableJetStream(r *store.Report) error {
 	}
 	p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
 	r.AddOK("deleted global limit")
-	if p.claim.Limits.JetStreamTieredLimits != nil {
-		for k := range p.claim.Limits.JetStreamTieredLimits {
-			r.AddOK("deleted tier limit %s", k)
-		}
+	for k := range p.claim.Limits.JetStreamTieredLimits {
+		r.AddOK("deleted tier limit %s", k)
 	}
 	p.claim.Limits.JetStreamTieredLimits = nil
 	return nil
