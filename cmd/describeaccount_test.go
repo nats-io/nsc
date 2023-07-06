@@ -18,6 +18,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
@@ -249,4 +252,35 @@ func TestDescribeAccount_SubjectEncoding(t *testing.T) {
 	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
 	require.NoError(t, err)
 	require.Contains(t, out, "foo.>")
+}
+
+func TestDescribeAccount_Output(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	p := filepath.Join(ts.Dir, "A.json")
+	_, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json", "--output-file", p)
+	require.NoError(t, err)
+	data, err := os.ReadFile(p)
+	require.NoError(t, err)
+
+	ac := jwt.AccountClaims{}
+	require.NoError(t, json.Unmarshal(data, &ac))
+	require.Equal(t, "A", ac.Name)
+
+	p = filepath.Join(ts.Dir, "A.txt")
+	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "--output-file", p)
+	require.NoError(t, err)
+	data, err = os.ReadFile(p)
+	require.NoError(t, err)
+	strings.Contains(string(data), "Account Details")
+
+	p = filepath.Join(ts.Dir, "A.jwt")
+	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "--raw", "--output-file", p)
+	require.NoError(t, err)
+	data, err = os.ReadFile(p)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "-----BEGIN NATS ACCOUNT JWT-----\ney")
 }
