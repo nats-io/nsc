@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -188,6 +188,44 @@ func (t *flagTable) find(flag string) {
 }
 
 func (t *flagTable) render() string {
+	var buf bytes.Buffer
+
+	allFlags := make(map[string]bool)
+	for _, c := range t.commands {
+		for n := range c.flagMap {
+			allFlags[n] = true
+		}
+	}
+	var cols []string
+	for k := range allFlags {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+	cols = append([]string{"cmd"}, cols...)
+
+	buf.WriteString(strings.Join(cols, ","))
+	buf.WriteString("\n")
+
+	for _, c := range t.commands {
+		sf := []string{c.name}
+		for i := 1; i < len(cols); i++ {
+			v, ok := c.flagMap[cols[i]]
+			if v != "" {
+				sf = append(sf, v)
+			} else if ok {
+				sf = append(sf, "-")
+			} else {
+				sf = append(sf, "")
+			}
+		}
+		buf.WriteString(strings.Join(sf, ","))
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
+
+func (t *flagTable) ResetFlagDefaults() string {
 	var buf bytes.Buffer
 
 	allFlags := make(map[string]bool)
