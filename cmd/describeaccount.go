@@ -102,7 +102,7 @@ func (p *DescribeAccountParams) PostInteractive(_ ActionCtx) error {
 
 func (p *DescribeAccountParams) Run(_ ActionCtx) (store.Status, error) {
 	if Raw || Json || JsonPath != "" {
-		if !IsStdOut(p.outputFile) {
+		if !IsStdOut(p.outputFile) && Raw {
 			var err error
 			p.raw, err = jwt.DecorateJWT(string(p.raw))
 			if err != nil {
