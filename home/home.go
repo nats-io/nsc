@@ -24,10 +24,12 @@ import (
 
 const StoresSubDirName = "stores"
 const KeysSubDirName = "keys"
+const XdgConfigHome = "XDG_CONFIG_HOME"
+const XdgDataHome = "XDG_DATA_HOME"
 
 var home, _ = homedir.Dir()
-var config = envOrValue("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-var data = envOrValue("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+var config = envOrValue(XdgConfigHome, filepath.Join(home, ".config"))
+var data = envOrValue(XdgDataHome, filepath.Join(home, ".local", "share"))
 
 func envOrValue(name, value string) string {
 	ev := os.Getenv(name)

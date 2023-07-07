@@ -18,10 +18,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +36,7 @@ func TestEnv_DefaultOutput(t *testing.T) {
 	require.NoError(t, err)
 	stderr = StripTableDecorations(stderr)
 	require.NoError(t, err)
-	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
+	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH (deprecated) Yes %s", AbbrevHomePaths(store.GetKeysDir())))
 	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
 	require.Contains(t, stderr, "Current Operator test")
 }
@@ -49,7 +51,7 @@ func TestEnv_SetAccountOutput(t *testing.T) {
 	_, stderr, err := ExecuteCmd(createEnvCmd(), "--operator", "test", "--account", "B")
 	require.NoError(t, err)
 	stderr = StripTableDecorations(stderr)
-	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", AbbrevHomePaths(store.GetKeysDir())))
+	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH (deprecated) Yes %s", AbbrevHomePaths(store.GetKeysDir())))
 	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", AbbrevHomePaths(filepath.Dir(ts.Store.Dir))))
 	require.Contains(t, stderr, "Current Operator test")
 	require.Contains(t, stderr, "Current Account B")
@@ -77,10 +79,14 @@ func TestAllDir(t *testing.T) {
 	p := MakeTempDir(t)
 	defer os.RemoveAll(p)
 
-	_, stderr, err := ExecuteCmd(rootCmd, "env", "--all-dirs", p)
+	_, _, err := ExecuteCmd(rootCmd, "env", "--all-dirs", p)
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
-	require.Contains(t, stderr, fmt.Sprintf("$NKEYS_PATH Yes %s", p))
-	require.Contains(t, stderr, fmt.Sprintf("$NSC_HOME Yes %s", p))
-	require.Contains(t, stderr, fmt.Sprintf("Current Store Dir %s", p))
+
+	_, _, err = ExecuteCmd(rootCmd, "add", "operator", "O", "--all-dirs", p)
+	require.NoError(t, err)
+
+	assert.FileExists(t, path.Join(p, "nsc.json"))
+	assert.DirExists(t, path.Join(p, "creds"))
+	assert.DirExists(t, path.Join(p, "keys"))
+	assert.DirExists(t, path.Join(p, "O"))
 }

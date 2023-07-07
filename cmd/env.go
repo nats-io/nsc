@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,7 +21,6 @@ import (
 
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/nats-io/nsc/v2/home"
-
 	"github.com/spf13/cobra"
 	"github.com/xlab/tablewriter"
 )
@@ -95,10 +94,12 @@ func (p *SetContextParams) PrintEnv(cmd *cobra.Command) {
 	table := tablewriter.CreateTable()
 	table.AddTitle("NSC Environment")
 	table.AddHeaders("Setting", "Set", "Effective Value")
+	table.AddRow("$"+home.XdgConfigHome, envSet(home.XdgConfigHome), os.Getenv(home.XdgConfigHome))
+	table.AddRow("$"+home.XdgDataHome, envSet(home.XdgDataHome), os.Getenv(home.XdgDataHome))
 	table.AddRow("$"+NscCwdOnlyEnv, envSet(NscCwdOnlyEnv), "If set, default operator/account from cwd only")
 	table.AddRow("$"+NscNoGitIgnoreEnv, envSet(NscNoGitIgnoreEnv), "If set, no .gitignore files written")
-	table.AddRow("$"+store.NKeysPathEnv, envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
-	table.AddRow("$"+NscHomeEnv, envSet(NscHomeEnv), AbbrevHomePaths(ConfigDirFlag))
+	table.AddRow("$"+store.NKeysPathEnv+" (deprecated)", envSet(store.NKeysPathEnv), AbbrevHomePaths(store.GetKeysDir()))
+	table.AddRow("$"+NscHomeEnv+" (deprecated)", envSet(NscHomeEnv), AbbrevHomePaths(ConfigDirFlag))
 	table.AddRow("$"+NscRootCasNatsEnv, envSet(NscRootCasNatsEnv),
 		"If set, root CAs in the referenced file will be used for nats connections")
 	table.AddRow("", "", "If not set, will default to the system trust store")
