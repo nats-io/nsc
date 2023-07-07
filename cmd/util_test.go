@@ -30,6 +30,8 @@ import (
 	"testing"
 	"time"
 
+	flag "github.com/spf13/pflag"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	jwt1 "github.com/nats-io/jwt/v2/v1compat"
@@ -74,6 +76,25 @@ func ResetSharedFlags() {
 	ConfigDirFlag = ""
 	DataDirFlag = ""
 	KeysDirFlag = ""
+	var buf Stack
+	buf.Push(rootCmd)
+	for {
+		c := buf.Pop()
+		if c == nil {
+			break
+		}
+		if c.HasSubCommands() {
+			for _, sub := range c.Commands() {
+				buf.Push(sub)
+			}
+		}
+		flags := c.Flags()
+		flags.VisitAll(func(f *flag.Flag) {
+			if f.Changed {
+				_ = f.Value.Set(f.DefValue)
+			}
+		})
+	}
 }
 
 func NewEmptyStore(t *testing.T) *TestStore {

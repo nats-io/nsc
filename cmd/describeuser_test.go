@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
@@ -243,5 +246,35 @@ func TestDescribeUser_Times(t *testing.T) {
 	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
 	require.NoError(t, err)
 	require.Contains(t, stdout, "16:04:05-17:04:09")
+}
 
+func TestDescribeUser_Output(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "aa")
+
+	p := filepath.Join(ts.Dir, "aa.json")
+	_, _, err := ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--json", "--output-file", p)
+	require.NoError(t, err)
+	data, err := os.ReadFile(p)
+	require.NoError(t, err)
+	uc := jwt.UserClaims{}
+	require.NoError(t, json.Unmarshal(data, &uc))
+	require.Equal(t, "aa", uc.Name)
+
+	p = filepath.Join(ts.Dir, "aa.txt")
+	_, _, err = ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--output-file", p)
+	require.NoError(t, err)
+	data, err = os.ReadFile(p)
+	require.NoError(t, err)
+	strings.Contains(string(data), "User Details")
+
+	p = filepath.Join(ts.Dir, "aa.jwt")
+	_, _, err = ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--raw", "--output-file", p)
+	require.NoError(t, err)
+	data, err = os.ReadFile(p)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "-----BEGIN NATS USER JWT-----\ney")
 }
