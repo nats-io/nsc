@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -311,13 +312,16 @@ func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userNam
 	require.NoError(t, err)
 }
 
-func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, public bool) {
+func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.ExportType, subject string, accountTokenPosition uint, public bool) {
 	flags := []string{"--account", accountName, "--subject", subject}
 	if !public {
 		flags = append(flags, "--private")
 	}
 	if kind == jwt.Service {
 		flags = append(flags, "--service")
+	}
+	if accountTokenPosition > 0 {
+		flags = append(flags, "--account-token-position", strconv.Itoa(int(accountTokenPosition)))
 	}
 
 	ts.AddAccount(t, accountName)

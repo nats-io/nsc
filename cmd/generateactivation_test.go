@@ -30,7 +30,7 @@ func Test_GenerateActivation(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -47,8 +47,8 @@ func Test_GenerateActivationMultiple(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Stream, "bar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "bar.>", 0, false)
 	ts.AddAccount(t, "B")
 
 	_, pub, _ := CreateAccountKey(t)
@@ -67,8 +67,8 @@ func Test_GenerateActivationMultipleAccountRequired(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Stream, "bar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "bar.>", 0, false)
 	ts.AddAccount(t, "B")
 	GetConfig().SetAccount("")
 	_, _, err := ExecuteCmd(createGenerateActivationCmd())
@@ -91,7 +91,7 @@ func Test_GenerateActivationNoPrivateExports(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", true)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, true)
 
 	_, _, err := ExecuteCmd(createGenerateActivationCmd())
 	require.Error(t, err)
@@ -103,7 +103,7 @@ func Test_GenerateActivationOutputsFile(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, false)
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -118,7 +118,7 @@ func Test_GenerateActivationTargetAccountByName(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, false)
 
 	ts.AddAccount(t, "B")
 
@@ -157,7 +157,7 @@ func Test_InteractiveGenerate(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, false)
 
 	cmd := createGenerateActivationCmd()
 	HoistRootFlags(cmd)
@@ -177,7 +177,7 @@ func Test_InteractiveExternalKeyGenerate(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, false)
 
 	cmd := createGenerateActivationCmd()
 	HoistRootFlags(cmd)
@@ -198,7 +198,7 @@ func Test_InteractiveMultipleAccountsGenerate(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foo", false)
+	ts.AddExport(t, "A", jwt.Service, "foo", 0, false)
 	ts.AddAccount(t, "B")
 
 	cmd := createGenerateActivationCmd()
@@ -220,7 +220,7 @@ func Test_GenerateActivationUsingSigningKey(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	sk, pk, _ := CreateAccountKey(t)
-	ts.AddExport(t, "A", jwt.Stream, "foo", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, false)
 	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
 	require.NoError(t, err)
 
@@ -256,7 +256,7 @@ func Test_InteractiveGenerateActivationPush(t *testing.T) {
 	require.NoError(t, err)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	_, apk, _ := CreateAccountKey(t)
 

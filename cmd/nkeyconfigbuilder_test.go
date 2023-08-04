@@ -76,8 +76,8 @@ func Test_NkeyResolverExportsStreamsServices(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "service.>", true)
-	ts.AddExport(t, "A", jwt.Stream, "stream.>", true)
+	ts.AddExport(t, "A", jwt.Service, "service.>", 0, true)
+	ts.AddExport(t, "A", jwt.Stream, "stream.>", 0, true)
 
 	builder := NewNKeyConfigBuilder()
 
@@ -102,8 +102,8 @@ func Test_NkeyResolverExportsPrivateStreamsServices(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "service.>", false)
-	ts.AddExport(t, "A", jwt.Stream, "stream.>", false)
+	ts.AddExport(t, "A", jwt.Service, "service.>", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "stream.>", 0, false)
 
 	builder := NewNKeyConfigBuilder()
 
@@ -128,8 +128,8 @@ func Test_NkeyResolverMapsImporter(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "service.b", false)
-	ts.AddExport(t, "A", jwt.Stream, "stream.a", false)
+	ts.AddExport(t, "A", jwt.Service, "service.b", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "stream.a", 0, false)
 
 	ts.AddAccount(t, "B")
 

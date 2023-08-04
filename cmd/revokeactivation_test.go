@@ -28,9 +28,9 @@ func TestRevokeActivation(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Service, "bar", false)
-	ts.AddExport(t, "A", jwt.Service, "public", true) // we support revoking public exports
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "bar", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "public", 0, true) // we support revoking public exports
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -57,8 +57,8 @@ func TestRevokeActivationAt(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Service, "bar", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "bar", 0, false)
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -83,11 +83,11 @@ func TestRevokeActivationForStreamInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Service, "bar", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "bar", 0, false)
 	ts.AddAccount(t, "B")
-	ts.AddExport(t, "B", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "B", jwt.Service, "bar", false)
+	ts.AddExport(t, "B", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "B", jwt.Service, "bar", 0, false)
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -123,11 +123,11 @@ func TestRevokeActivationForServiceInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "A", jwt.Service, "bar", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "bar", 0, false)
 	ts.AddAccount(t, "B")
-	ts.AddExport(t, "B", jwt.Stream, "foo.>", false)
-	ts.AddExport(t, "B", jwt.Service, "bar", false)
+	ts.AddExport(t, "B", jwt.Stream, "foo.>", 0, false)
+	ts.AddExport(t, "B", jwt.Service, "bar", 0, false)
 
 	_, pub, _ := CreateAccountKey(t)
 
@@ -171,7 +171,7 @@ func TestRevokeActivationServiceNoExports(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*")
 	require.Error(t, err)
@@ -182,7 +182,7 @@ func TestRevokeActivationStreamNoExports(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "q", false)
+	ts.AddExport(t, "A", jwt.Stream, "q", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
 	require.Error(t, err)
@@ -193,8 +193,8 @@ func TestRevokeActivationSubjectRequired(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
-	ts.AddExport(t, "A", jwt.Service, "qq", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "qq", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
 	require.Error(t, err)
@@ -205,7 +205,7 @@ func TestRevokeActivationExportNotFound(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "foo")
 	require.Error(t, err)
@@ -216,7 +216,7 @@ func TestRevokeActivationDefaultSubject(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
 	require.NoError(t, err)
@@ -226,7 +226,7 @@ func TestRevokeActivationAll(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "q")
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestRevokeActivationBadInteractiveAt(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	input := []interface{}{true, 0, "*", "hello"}
 	_, _, err := ExecuteInteractiveCmd(createRevokeActivationCmd(), input)

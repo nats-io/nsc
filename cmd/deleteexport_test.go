@@ -26,9 +26,9 @@ func Test_DeleteExport(t *testing.T) {
 	ts := NewTestStore(t, "add_server")
 	defer ts.Done(t)
 
-	ts.AddExport(t, "A", jwt.Stream, "foo", true)
-	ts.AddExport(t, "A", jwt.Stream, "baz", true)
-	ts.AddExport(t, "B", jwt.Service, "bar", true)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, true)
+	ts.AddExport(t, "A", jwt.Stream, "baz", 0, true)
+	ts.AddExport(t, "B", jwt.Service, "bar", 0, true)
 
 	tests := CmdTests{
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A"}, nil, []string{"subject is required"}, true},
@@ -44,8 +44,8 @@ func Test_DeleteExportAccountRequired(t *testing.T) {
 	ts := NewTestStore(t, "add_server")
 	defer ts.Done(t)
 
-	ts.AddExport(t, "A", jwt.Stream, "foo", true)
-	ts.AddExport(t, "B", jwt.Service, "bar", true)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, true)
+	ts.AddExport(t, "B", jwt.Service, "bar", 0, true)
 	GetConfig().SetAccount("")
 	_, _, err := ExecuteCmd(createDeleteExportCmd(), "--subject", "foo")
 	require.Error(t, err)
@@ -59,8 +59,8 @@ func Test_DeleteExportInteractiveManagedStore(t *testing.T) {
 	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
-	ts.AddExport(t, "A", jwt.Stream, "foo", true)
-	ts.AddExport(t, "A", jwt.Stream, "baz", true)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, true)
+	ts.AddExport(t, "A", jwt.Stream, "baz", 0, true)
 	ts.AddAccount(t, "B")
 
 	cmd := createDeleteExportCmd()

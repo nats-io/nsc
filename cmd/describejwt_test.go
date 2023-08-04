@@ -97,7 +97,7 @@ func TestDescribe_Activation(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	ts.AddExport(t, "A", jwt.Stream, "AA.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "AA.>", 0, false)
 
 	token := ts.GenerateActivation(t, "A", "AA.>", "B")
 	tp := filepath.Join(ts.Dir, "token.jwt")
@@ -123,7 +123,7 @@ func TestDescribe_ActivationWithSigner(t *testing.T) {
 	ts.AddAccount(t, "B")
 
 	// generate an export, normally signed by the account
-	ts.AddExport(t, "A", jwt.Stream, "AA.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "AA.>", 0, false)
 	token := ts.GenerateActivation(t, "A", "AA.>", "B")
 	tp := filepath.Join(ts.Dir, "token.jwt")
 	require.NoError(t, Write(tp, []byte(token)))
