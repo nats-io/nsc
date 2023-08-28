@@ -78,7 +78,7 @@ userSeed&accountSeed&operatorSeed)
 user, account, operator, If no prefix (user/account/operator is provided, 
 it targets the last object in the configuration path)
 
-names - includes the friendly names fro all the entities (same as 
+names - includes the friendly names for all the entities (same as 
 userName&accountName&operatorName)
 		`,
 
@@ -145,7 +145,6 @@ userName&accountName&operatorName)
 			}
 			return RunAction(cmd, args, &params)
 		},
-		Hidden: true,
 	}
 	cmd.Flags().StringVarP(&params.outputFile, "output-file", "o", "--", "output file, '--' is stdout")
 
