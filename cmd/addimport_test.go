@@ -32,7 +32,7 @@ func Test_AddImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 
@@ -61,7 +61,7 @@ func Test_AddImportSelfImportsRejected(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	token := ts.GenerateActivation(t, "A", "foobar.>", "A")
 	fp := filepath.Join(ts.Dir, "token.jwt")
@@ -77,7 +77,7 @@ func Test_AddImportFromURL(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 
@@ -102,7 +102,7 @@ func Test_AddImportInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -135,7 +135,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -164,7 +164,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Service, "foobar.>", 0, false)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -194,7 +194,7 @@ func Test_AddPublicImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, true)
 	ts.AddAccount(t, "B")
 
 	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", "A", "--remote-subject", "foobar.>")
@@ -230,7 +230,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "foobar.>", true)
+	ts.AddExport(t, "A", jwt.Service, "foobar.>", 0, true)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -262,8 +262,8 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
-	ts.AddExport(t, "A", jwt.Service, "q.*", true)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, true)
+	ts.AddExport(t, "A", jwt.Service, "q.*", 0, true)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -311,7 +311,7 @@ func Test_AddImportWithSigningKeyToken(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
 	require.NoError(t, err)
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 	token := ts.GenerateActivationWithSigner(t, "A", "foobar.>", "B", sk)
@@ -348,7 +348,7 @@ func Test_AddDecoratedToken(t *testing.T) {
 	ts.AddAccount(t, "A")
 	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
 	require.NoError(t, err)
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 	token := ts.GenerateActivationWithSigner(t, "A", "foobar.>", "B", sk)
@@ -371,8 +371,8 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", true)
-	ts.AddExport(t, "A", jwt.Service, "q", true)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, true)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, true)
 
 	akp := ts.GetAccountKey(t, "A")
 	require.NotNil(t, akp)
@@ -420,7 +420,7 @@ func Test_ImportStreamHandlesDecorations(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foobar.>", false)
+	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 	ac := ts.GenerateActivation(t, "A", "foobar.>", "B")
@@ -444,7 +444,7 @@ func Test_ImportServiceHandlesDecorations(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", false)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	ts.AddAccount(t, "B")
 	ac := ts.GenerateActivation(t, "A", "q", "B")
@@ -486,10 +486,10 @@ func Test_AddWilcdardImport(t *testing.T) {
 
 	ts.AddAccount(t, "B")
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "priv-srvc.>", false)
-	ts.AddExport(t, "A", jwt.Stream, "priv-strm.>", false)
-	ts.AddExport(t, "A", jwt.Service, "pub-srvc.>", true)
-	ts.AddExport(t, "A", jwt.Stream, "pub-strm.>", true)
+	ts.AddExport(t, "A", jwt.Service, "priv-srvc.>", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "priv-strm.>", 0, false)
+	ts.AddExport(t, "A", jwt.Service, "pub-srvc.>", 0, true)
+	ts.AddExport(t, "A", jwt.Stream, "pub-strm.>", 0, true)
 
 	aPub := ts.GetAccountPublicKey(t, "A")
 
@@ -523,9 +523,9 @@ func TestAddImport_SameName(t *testing.T) {
 
 	ts.AddAccount(t, "database")
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "stream.database", false)
+	ts.AddExport(t, "A", jwt.Stream, "stream.database", 0, false)
 	ts.AddAccount(t, "B")
-	ts.AddExport(t, "B", jwt.Stream, "stream.database", false)
+	ts.AddExport(t, "B", jwt.Stream, "stream.database", 0, false)
 
 	// account, locally available, name, local subj,
 	// database, true, A: -> stream.database, "stream.database", "ingest

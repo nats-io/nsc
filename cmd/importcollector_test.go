@@ -27,8 +27,8 @@ func Test_ImportCollectorBasics(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "A2")
-	ts.AddExport(t, "A2", jwt.Service, "foo", true)
-	ts.AddExport(t, "A2", jwt.Stream, "bar", false)
+	ts.AddExport(t, "A2", jwt.Service, "foo", 0, true)
+	ts.AddExport(t, "A2", jwt.Stream, "bar", 0, false)
 	ts.AddAccount(t, "A3")
 
 	exports, err := GetAllExports()

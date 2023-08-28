@@ -18,6 +18,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -237,7 +238,7 @@ func toYesNo(tf bool) string {
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Public", "Revocations", "Tracking")
+	table.AddHeaders("Name", "Type", "Subject", "Account Token Position", "Public", "Revocations", "Tracking")
 	for _, v := range e.Exports {
 		mon := "N/A"
 		rt := ""
@@ -257,7 +258,13 @@ func (e *ExportsDescriber) Describe() string {
 
 		st := TitleCase(v.Type.String())
 		k := fmt.Sprintf("%s%s", st, rt)
-		table.AddRow(v.Name, k, v.Subject, toYesNo(!v.TokenReq), len(v.Revocations), mon)
+
+		tp := "-"
+		if v.AccountTokenPosition > 0 {
+			tp = strconv.Itoa(int(v.AccountTokenPosition))
+		}
+
+		table.AddRow(v.Name, k, v.Subject, tp, toYesNo(!v.TokenReq), len(v.Revocations), mon)
 	}
 
 	tableDesc := tablewriter.CreateTable()

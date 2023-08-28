@@ -27,8 +27,8 @@ func Test_DeleteImport(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo", false)
-	ts.AddExport(t, "A", jwt.Stream, "bar", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "bar", 0, false)
 
 	ts.AddAccount(t, "B")
 	ts.AddImport(t, "A", "foo", "B")
@@ -49,7 +49,7 @@ func Test_DeleteImportAccountRequired(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, false)
 	ts.AddAccount(t, "B")
 	ts.AddImport(t, "A", "foo", "B")
 
@@ -64,8 +64,8 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo", false)
-	ts.AddExport(t, "A", jwt.Stream, "bar", false)
+	ts.AddExport(t, "A", jwt.Stream, "foo", 0, false)
+	ts.AddExport(t, "A", jwt.Stream, "bar", 0, false)
 
 	ts.AddAccount(t, "B")
 	ts.AddImport(t, "A", "foo", "B")

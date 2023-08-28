@@ -28,7 +28,7 @@ func Test_EditExport_Private(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "a", true)
+	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
 	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--private", "--response-type", jwt.ResponseTypeChunked)
 	require.NoError(t, err)
@@ -43,7 +43,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "a", true)
+	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -65,8 +65,8 @@ func Test_EditExportInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "a", true)
-	ts.AddExport(t, "A", jwt.Service, "b", true)
+	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
+	ts.AddExport(t, "A", jwt.Service, "b", 0, true)
 
 	link := "http://foo/bar"
 	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "1s", "desc", link})
@@ -87,7 +87,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "a", true)
+	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
 	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", "", ""})
 	require.NoError(t, err)
@@ -107,7 +107,7 @@ func Test_EditExportRmLatencySampling(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "a", true)
+	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
 	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "header", "--latency", "metrics.a")
 	require.NoError(t, err)

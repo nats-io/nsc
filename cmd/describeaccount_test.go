@@ -152,7 +152,7 @@ func TestDescribeAccount_Latency(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Service, "q", true)
+	ts.AddExport(t, "A", jwt.Service, "q", 0, true)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	ac.Exports[0].Latency = &jwt.ServiceLatency{Sampling: 10, Results: "lat"}
@@ -247,7 +247,7 @@ func TestDescribeAccount_SubjectEncoding(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	ts.AddExport(t, "A", jwt.Stream, "foo.>", true)
+	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, true)
 
 	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
 	require.NoError(t, err)
@@ -283,4 +283,25 @@ func TestDescribeAccount_Output(t *testing.T) {
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "-----BEGIN NATS ACCOUNT JWT-----\ney")
+}
+
+func TestDescribeAccount_Exports(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddExport(t, "A", jwt.Stream, "foo.bar.*.>", 0, true)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account")
+	require.NoError(t, err)
+	require.Contains(t, out, "| Account Token Position |")
+	require.Contains(t, out, "foo.bar.*.> | -")
+
+	ts.AddAccount(t, "B")
+	ts.AddExport(t, "B", jwt.Stream, "foo.bar.*.>", 3, true)
+
+	out, _, err = ExecuteCmd(rootCmd, "describe", "account", "-n", "B")
+	require.NoError(t, err)
+	require.Contains(t, out, "| Account Token Position |")
+	require.Contains(t, out, "foo.bar.*.> | 3")
 }
