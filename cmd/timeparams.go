@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2023 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -32,8 +32,8 @@ type TimeParams struct {
 }
 
 func (p *TimeParams) BindFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&p.Start, "start", "", "0", "valid from ('0' is always, '3d' is three days) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
-	cmd.Flags().StringVarP(&p.Expiry, "expiry", "", "0", "valid until ('0' is always, '2M' is two months) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
+	cmd.Flags().StringVarP(&p.Start, "start", "", "", "valid from ('0' is always, '3d' is three days) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
+	cmd.Flags().StringVarP(&p.Expiry, "expiry", "", "", "valid until ('0' is always, '2M' is two months) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)")
 }
 
 func (p *TimeParams) valid(value string, label string, oldOK bool) error {
