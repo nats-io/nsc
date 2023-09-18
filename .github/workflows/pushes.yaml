@@ -38,13 +38,13 @@ jobs:
         # The canonical entry is the only one where we run vet/lint/style checks.
         # `experimental: true` entries do not cause the tests to fail.
         include:
-          - go: '1.19.x'
+          - go: '1.21.x'
             os: ubuntu-latest
             canonical: true
-          - go: '1.19.x'
+          - go: '1.21.x'
             os: windows-latest
             canonical: false
-          - go: '1.19.x'
+          - go: '1.21.x'
             os: macos-latest
             canonical: false
 
