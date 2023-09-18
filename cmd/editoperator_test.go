@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
@@ -374,4 +375,25 @@ func Test_SysAccountCannotHaveJetStream(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--system-account", "A")
 	require.NoError(t, err)
+}
+
+func Test_ExpireShouldNotBeUnset(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--expiry", "1y")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	now := time.Now().UTC().Year()
+	expires := oc.Expires
+	year := time.Unix(oc.Expires, 0).UTC().Year()
+	require.Equal(t, now+1, year)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--service-url", "nats://localhost:4222")
+	require.NoError(t, err)
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, expires, oc.Expires)
 }
