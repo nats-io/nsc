@@ -1,6 +1,6 @@
 module github.com/nats-io/nsc/v2
 
-go 1.19
+go 1.21
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20200221130455-2737f3b8cbb9
 	github.com/nats-io/jsm.go v0.0.35
-	github.com/nats-io/jwt/v2 v2.5.0
+	github.com/nats-io/jwt/v2 v2.5.2
 	github.com/nats-io/nats-server/v2 v2.9.6
 	github.com/nats-io/nats.go v1.24.0
 	github.com/nats-io/nkeys v0.4.4
