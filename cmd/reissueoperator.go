@@ -149,7 +149,7 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	r.AddOK("operator %q successfully changed identity to: %s", op.Name, opPub)
 	if p.turnIntoSigningKey {
-		r.AddOK("old operator key %q turned into signing key", opPub)
+		r.AddOK("old operator key %q turned into signing key", oldPubKey)
 		return r, nil
 	}
 	accounts, err := s.ListSubContainers(store.Accounts)

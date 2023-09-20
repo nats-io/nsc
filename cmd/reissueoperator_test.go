@@ -35,11 +35,18 @@ func Test_ReIssue(t *testing.T) {
 	// add testing account
 	ts.AddAccount(t, "A")
 
-	_, _, err = ExecuteCmd(createReIssueOperatorCmd(), "--convert-to-signing-key")
+	_, stderr, err := ExecuteCmd(createReIssueOperatorCmd(), "--convert-to-signing-key")
 	require.NoError(t, err)
 	op3, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
 	require.NotEqual(t, op2.Subject, op3.Subject)
+	require.Equal(
+		t,
+		stderr,
+		"[ OK ] operator \"O\" successfully changed identity to: "+op3.Subject+"\n"+
+			"[ OK ] old operator key \""+op2.Subject+"\" turned into signing key\n"+
+			"all jobs succeeded\n",
+	)
 	require.Len(t, op3.SigningKeys, 1)
 	require.True(t, op3.SigningKeys.Contains(op2.Subject))
 
