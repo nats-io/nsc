@@ -231,7 +231,7 @@ func (p *PullParams) maybeStoreJWT(ctx ActionCtx, sub *store.Report, token strin
 	}
 	remote := remoteClaim.IssuedAt
 	if (orig > remote) && !p.Overwrite {
-		sub.AddError("local jwt for %q is newer than remote version - specify --force to overwrite", remoteClaim.Name)
+		sub.AddError("local jwt for %q is newer than remote version - specify --overwrite-newer to overwrite", remoteClaim.Name)
 		return
 	}
 	if err := ctx.StoreCtx().Store.StoreRaw([]byte(token)); err != nil {
