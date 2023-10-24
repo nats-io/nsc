@@ -246,7 +246,7 @@ func (p *PushCmdParams) validURL(s string) error {
 		return err
 	}
 	scheme := strings.ToLower(u.Scheme)
-	supported := []string{"http", "https", "nats"}
+	supported := []string{"http", "https", "nats", "ws", "wss"}
 
 	ok := false
 	for _, v := range supported {
@@ -271,7 +271,7 @@ func (p *PushCmdParams) PreInteractive(ctx ActionCtx) error {
 	if p.ASU, err = cli.Prompt("Account Server URL or nats-resolver enabled nats-server URL", p.ASU, cli.Val(p.validURL)); err != nil {
 		return err
 	}
-	if IsNatsUrl(p.ASU) {
+	if IsResolverURL(p.ASU) {
 		if p.sysAcc == "" {
 			if p.sysAcc, err = ctx.StoreCtx().PickAccount(p.sysAcc); err != nil {
 				return err
@@ -307,7 +307,7 @@ func (p *PushCmdParams) Validate(ctx ActionCtx) error {
 	if p.ASU == "" {
 		return errors.New("no account server url or nats-server url was provided by the operator jwt")
 	}
-	if !IsNatsUrl(p.ASU) && p.prune {
+	if !IsResolverURL(p.ASU) && p.prune {
 		return errors.New("prune only works for nats based account resolver")
 	}
 
@@ -529,7 +529,7 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	r := store.NewDetailedReport(true)
-	if !IsNatsUrl(p.ASU) {
+	if !IsResolverURL(p.ASU) {
 		for _, v := range p.targeted {
 			sub := store.NewReport(store.OK, "push %s to account server", v)
 			sub.Opt = store.DetailsOnErrorOrWarning
