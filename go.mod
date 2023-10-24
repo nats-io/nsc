@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0-20231014115920-801ca035562a
 	github.com/nats-io/jsm.go v0.1.0
-	github.com/nats-io/jwt/v2 v2.5.2
+	github.com/nats-io/jwt/v2 v2.5.3-0.20231024223625-012e7a3a42dc
 	github.com/nats-io/nats-server/v2 v2.10.0
 	github.com/nats-io/nats.go v1.31.0
 	github.com/nats-io/nkeys v0.4.5
@@ -55,5 +55,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/nats-io/jwt/v2 => github.com/nats-io/jwt/v2 v2.5.3-0.20231024221234-2810af66e796
