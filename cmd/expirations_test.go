@@ -17,9 +17,10 @@ package cmd
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_ExpirationsNone(t *testing.T) {

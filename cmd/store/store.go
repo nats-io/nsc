@@ -396,6 +396,19 @@ func IsNatsUrl(url string) bool {
 	return strings.HasPrefix(url, "nats://") || strings.HasPrefix(url, ",nats://")
 }
 
+func IsAccountServerURL(u string) bool {
+	u = strings.ToLower(u)
+	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")
+}
+
+func IsResolverURL(u string) bool {
+	u = strings.ToLower(u)
+	return strings.HasPrefix(u, "nats://") ||
+		strings.HasPrefix(u, "tls://") ||
+		strings.HasPrefix(u, "ws://") ||
+		strings.HasPrefix(u, "wss://")
+}
+
 func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 	ac, err := jwt.DecodeAccountClaims(string(data))
 	if err != nil {
@@ -407,7 +420,7 @@ func (s *Store) handleManagedAccount(data []byte) (*Report, error) {
 		return nil, fmt.Errorf("unable to push to the operator - failed to read operator claim: %w", err)
 	}
 	r := NewDetailedReport(false)
-	if oc.AccountServerURL == "" || IsNatsUrl(oc.AccountServerURL) {
+	if oc.AccountServerURL == "" || IsResolverURL(oc.AccountServerURL) {
 		r.Label = "stored self signed account jwt"
 		r.AddWarning("unable to push to %q - operator doesn't set an account server url or manual exchange necessary", oc.Name)
 		return r, nil

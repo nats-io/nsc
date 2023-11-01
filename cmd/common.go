@@ -458,6 +458,14 @@ func IsNatsUrl(url string) bool {
 	return store.IsNatsUrl(url)
 }
 
+func IsAccountServerURL(u string) bool {
+	return store.IsAccountServerURL(u)
+}
+
+func IsResolverURL(u string) bool {
+	return store.IsResolverURL(u)
+}
+
 func ValidSigner(kp nkeys.KeyPair, signers []string) (bool, error) {
 	pk, err := kp.PublicKey()
 	if err != nil {

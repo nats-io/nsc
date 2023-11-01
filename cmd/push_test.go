@@ -319,3 +319,40 @@ func Test_SyncBadUrl(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(filesPre), 2)
 }
+
+func Test_SyncWs(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	require.NoError(t, err)
+	serverconf := filepath.Join(ts.Dir, "server.conf")
+	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	require.NoError(t, err)
+	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	require.NoError(t, err)
+	// modify the generated file so testing becomes easier by knowing where the jwt directory is
+	data, err := os.ReadFile(serverconf)
+	require.NoError(t, err)
+	dir := ts.AddSubDir(t, "resolver")
+
+	ws := `websocket: { 
+  port: -1 
+  no_tls: true
+}`
+	data = append(data, ws...)
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	err = os.WriteFile(serverconf, data, 0660)
+	require.NoError(t, err)
+	ports := ts.RunServerWithConfig(t, serverconf)
+	require.NotNil(t, ports)
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.WebSocket[0])
+	require.NoError(t, err)
+	// Try again, thus also testing if the server is still around
+	// Provide explicit system account user to connect
+	_, _, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	require.NoError(t, err)
+	// test to assure AC1/AC2/SYS where pushed
+	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
+	require.NoError(t, err)
+	require.Equal(t, len(filesPre), 2)
+}

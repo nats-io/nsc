@@ -168,7 +168,7 @@ func (p *GenerateActivationParams) PostInteractive(ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	if oc.AccountServerURL != "" && !IsNatsUrl(oc.AccountServerURL) {
+	if oc.AccountServerURL != "" && IsAccountServerURL(oc.AccountServerURL) {
 		m := fmt.Sprintf("push the activation to %q", oc.AccountServerURL)
 		p.push, err = cli.Confirm(m, false)
 		if err != nil {
@@ -274,7 +274,7 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		if oc.AccountServerURL == "" {
 			return nil, fmt.Errorf("operator %s doesn't have an account server url configured", oc.Name)
-		} else if IsNatsUrl(oc.AccountServerURL) {
+		} else if IsResolverURL(oc.AccountServerURL) {
 			return nil, fmt.Errorf("activation push is only supported for http base account server not nats-resover enabled nats-server")
 		}
 		u, err := url.Parse(oc.AccountServerURL)
