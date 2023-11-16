@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
@@ -875,35 +874,6 @@ func (ctx *Context) ResolveKey(flagValue string, kinds ...nkeys.PrefixByte) (nke
 	return kp, err
 }
 
-func (ctx *Context) PickAccount(name string) (string, error) {
-	if name == "" {
-		name = ctx.Account.Name
-	}
-
-	accounts, err := ctx.Store.ListSubContainers(Accounts)
-	if err != nil {
-		return "", err
-	}
-	if len(accounts) == 0 {
-		return "", fmt.Errorf("no accounts defined - add one first")
-	}
-	if len(accounts) == 1 {
-		name = accounts[0]
-	}
-	if len(accounts) > 1 {
-		i, err := cli.Select("select account", name, accounts)
-		if err != nil {
-			return "", err
-		}
-		name = accounts[i]
-	}
-
-	// allow downstream use of context to have account
-	ctx.Account.Name = name
-
-	return name, nil
-}
-
 // Returns an user name for the account if there's only one user
 func (ctx *Context) DefaultUser(accountName string) *string {
 	users, err := ctx.Store.ListEntries(Accounts, accountName, Users)
@@ -926,41 +896,6 @@ func (ctx *Context) DefaultUserClaim(accountName string) (*jwt.UserClaims, error
 		return userClaim, nil
 	}
 	return nil, fmt.Errorf("no default user available for account %s", accountName)
-}
-
-func (ctx *Context) PickUser(accountName string) (string, error) {
-	var err error
-	if accountName == "" {
-		accountName = ctx.Account.Name
-	}
-
-	if accountName == "" {
-		accountName, err = ctx.PickAccount(accountName)
-		if err != nil {
-			return "", err
-		}
-	}
-	// allow downstream use of context to have account
-	ctx.Account.Name = accountName
-
-	users, err := ctx.Store.ListEntries(Accounts, accountName, Users)
-	if err != nil {
-		return "", err
-	}
-	if len(users) == 0 {
-		return "", fmt.Errorf("account %q doesn't have any users - add one first", accountName)
-	}
-	if len(users) == 1 {
-		return users[0], nil
-	}
-	if len(users) > 1 {
-		i, err := cli.Select("select user", "", users)
-		if err != nil {
-			return "", err
-		}
-		return users[i], nil
-	}
-	return "", nil
 }
 
 // GetAccountKeys returns the public keys for the named account followed

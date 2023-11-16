@@ -55,7 +55,7 @@ func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *AccountContextParams) Edit(ctx ActionCtx) error {
 	var err error
-	name, err := ctx.StoreCtx().PickAccount(p.Name)
+	name, err := PickAccount(ctx.StoreCtx(), p.Name)
 	if err != nil {
 		return err
 	}
