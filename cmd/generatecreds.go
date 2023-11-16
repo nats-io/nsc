@@ -88,7 +88,7 @@ func (p *GenerateCredsParams) PreInteractive(ctx ActionCtx) error {
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
-	p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
+	p.user, err = PickUser(ctx.StoreCtx(), p.AccountContextParams.Name)
 	if err != nil {
 		return err
 	}

@@ -273,12 +273,12 @@ func (p *PushCmdParams) PreInteractive(ctx ActionCtx) error {
 	}
 	if IsResolverURL(p.ASU) {
 		if p.sysAcc == "" {
-			if p.sysAcc, err = ctx.StoreCtx().PickAccount(p.sysAcc); err != nil {
+			if p.sysAcc, err = PickAccount(ctx.StoreCtx(), p.sysAcc); err != nil {
 				return err
 			}
 		}
 		if p.sysAccUser == "" {
-			p.sysAccUser, err = ctx.StoreCtx().PickUser(p.sysAcc)
+			p.sysAccUser, err = PickUser(ctx.StoreCtx(), p.sysAcc)
 		}
 	}
 	return err

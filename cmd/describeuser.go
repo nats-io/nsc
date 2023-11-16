@@ -66,7 +66,7 @@ func (p *DescribeUserParams) PreInteractive(ctx ActionCtx) error {
 		return err
 	}
 	if p.user == "" {
-		p.user, err = ctx.StoreCtx().PickUser(p.AccountContextParams.Name)
+		p.user, err = PickUser(ctx.StoreCtx(), p.AccountContextParams.Name)
 		if err != nil {
 			return err
 		}

@@ -176,7 +176,7 @@ func (p *EditOperatorParams) PostInteractive(ctx ActionCtx) error {
 	if ok, err := cli.Confirm("Set system account", false); err != nil {
 		return err
 	} else if ok {
-		p.sysAcc, err = ctx.StoreCtx().PickAccount("")
+		p.sysAcc, err = PickAccount(ctx.StoreCtx(), "")
 		if err != nil {
 			return err
 		}
