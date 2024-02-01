@@ -138,3 +138,85 @@ func Test_EditScopedSk_ResolveAny(t *testing.T) {
 		"--sk", "foo", "--subs", "10")
 	require.Error(t, err)
 }
+
+func Test_EditScopedSkAddGenerates(t *testing.T) {
+	ts := NewTestStore(t, "edit scope")
+	defer ts.Done(t)
+
+	_, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+
+	// add the scope with a generate
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	pk := ac.SigningKeys.Keys()[0]
+	scope, ok := ac.SigningKeys.GetScope(pk)
+	require.True(t, ok)
+	us, ok := scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+
+	// get the scope with the key
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", pk, "--role", "foo")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(pk)
+	require.True(t, ok)
+	us, ok = scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Equal(t, us.Role, "foo")
+}
+
+func Test_EditScopedSkByRole(t *testing.T) {
+	ts := NewTestStore(t, "edit scope")
+	defer ts.Done(t)
+
+	_, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+
+	// add the scope with a generate
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	require.NoError(t, err)
+
+	// get the scope by saying that the key is the role
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--allow-pub", ">")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok := ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok := scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Equal(t, us.Role, "foo")
+	require.Len(t, us.Template.Pub.Allow, 1)
+
+	// get the scope by just specifying the role
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--role", "foo", "--allow-sub", ">")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok = scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Equal(t, us.Role, "foo")
+	require.Len(t, us.Template.Sub.Allow, 1)
+}

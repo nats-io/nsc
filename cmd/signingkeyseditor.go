@@ -43,6 +43,17 @@ func (e *SigningKeysParams) BindFlags(flagName string, shorthand string, kind nk
 	}
 }
 
+func (e *SigningKeysParams) BindFlagsForOne(flagName string, shorthand string, kind nkeys.PrefixByte, cmd *cobra.Command) {
+	e.flagName = flagName
+	e.kind = kind
+	if kind == nkeys.PrefixByteCurve {
+		e.paths = make([]string, 1)
+		cmd.Flags().StringVarP(&e.paths[0], flagName, shorthand, "", `curve key or keypath or the value "generate" to generate a curve encryption target key on the fly`)
+	} else {
+		cmd.Flags().StringSliceVarP(&e.paths, flagName, shorthand, nil, `signing key or keypath or the value "generate" to generate a key pair on the fly`)
+	}
+}
+
 func (e *SigningKeysParams) valid(s string) error {
 	if s == "generate" {
 		return nil
@@ -94,6 +105,10 @@ func (e *SigningKeysParams) Valid() error {
 		}
 	}
 	return nil
+}
+
+func (e *SigningKeysParams) Empty() bool {
+	return len(e.paths) == 0
 }
 
 func (e *SigningKeysParams) PublicKeys() ([]string, error) {

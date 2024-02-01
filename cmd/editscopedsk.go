@@ -40,8 +40,8 @@ nsc edit signing-key --account <n> --sk <sk> --allow-sub <subject>,...
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().StringVarP(&params.skName, "sk", "", "", "signing key to set scope for or role name for already existing scoped signing key")
 	cmd.Flags().StringVarP(&params.role, "role", "", "", "role associated with the signing key scope")
+	params.sk.BindFlagsForOne("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.AccountContextParams.BindFlags(cmd)
 	params.UserPermissionLimits.BindFlags(cmd)
 	return cmd
@@ -52,6 +52,7 @@ func init() {
 }
 
 type EditScopedSkParams struct {
+	sk     SigningKeysParams
 	skName string
 	role   string
 	claim  *jwt.AccountClaims
@@ -66,6 +67,7 @@ func (p *EditScopedSkParams) SetDefaults(ctx ActionCtx) error {
 		return err
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+
 	return nil
 }
 
@@ -80,14 +82,49 @@ func (p *EditScopedSkParams) Load(ctx ActionCtx) error {
 		return err
 	}
 
-	if p.skName == "" {
-		ctx.CurrentCmd().SilenceUsage = false
-		return fmt.Errorf("signing key is required")
-	}
-
 	p.claim, err = ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
 	if err != nil {
 		return err
+	}
+
+	if p.sk.Empty() && p.role != "" {
+		kp := keyByRoleName(ctx.StoreCtx().KeyStore, p.claim, p.role)
+		if kp != nil {
+			s, err := kp.PublicKey()
+			if err != nil {
+				return err
+			}
+			p.sk.paths = append(p.sk.paths, s)
+		}
+	}
+
+	// try to normalize the values
+	if err := p.sk.Valid(); err != nil {
+		// if we are not valid, that means we didn't get a sk or "generate"
+		if len(p.sk.paths) > 0 {
+			// try that as a scope role
+			kp := keyByRoleName(ctx.StoreCtx().KeyStore, p.claim, p.sk.paths[0])
+			if kp != nil {
+				s, err := kp.PublicKey()
+				if err != nil {
+					return err
+				}
+				p.skName = s
+			}
+		}
+	}
+
+	if p.skName == "" {
+		pks, err := p.sk.PublicKeys()
+		if err != nil {
+			return err
+		}
+		if len(pks) > 0 {
+			p.skName = pks[0]
+		} else {
+			ctx.CurrentCmd().SilenceUsage = false
+			return fmt.Errorf("signing key is required")
+		}
 	}
 
 	s, found := p.claim.SigningKeys.GetScope(p.skName)
