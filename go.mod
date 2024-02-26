@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/cliprompts/v2 v2.0.0-20231014115920-801ca035562a
 	github.com/nats-io/jsm.go v0.1.0
 	github.com/nats-io/jwt/v2 v2.5.5
-	github.com/nats-io/nats-server/v2 v2.10.4
+	github.com/nats-io/nats-server/v2 v2.10.11
 	github.com/nats-io/nats.go v1.33.1
 	github.com/nats-io/nkeys v0.4.7
 	github.com/nats-io/nuid v1.0.1
@@ -49,7 +49,7 @@ require (
 	golang.org/x/oauth2 v0.17.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
