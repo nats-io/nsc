@@ -117,7 +117,8 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", 0}
+
+	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", false, 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
@@ -146,7 +147,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	input := []interface{}{1, true, 1, "my import", "barfoo.>", 0}
+	input := []interface{}{1, true, 1, "my import", "barfoo.>", true, 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -157,6 +158,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	require.Equal(t, "barfoo.>", string(ac.Imports[0].LocalSubject))
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.Equal(t, apub, ac.Imports[0].Account)
+	require.True(t, ac.Imports[0].AllowTrace)
 }
 
 func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
@@ -241,7 +243,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	// B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
+	//   B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
 	input := []interface{}{1, false, true, apub, "foobar.x.*", true, "test", "test.foobar.alberto.*", 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
@@ -274,8 +276,8 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
-	// B, don't pick, public, A's pubkey, remote sub, stream, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", 0}
+	// B, don't pick, public, A's pubkey, remote sub, stream, name, local subj "test.foobar.>, allow-tracing, key
+	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", true, 0}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -287,6 +289,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
+	require.True(t, ac.Imports[0].AllowTrace)
 
 	// B, don't pick, public, A's pubkey, remote sub, service, name test, local subj "test.foobar.>, key
 	input = []interface{}{1, false, true, apub, "q.*", true, "q", "qq.*", 0}
@@ -385,7 +388,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	HoistRootFlags(cmd)
 
 	// B, pick, stream foobar, name test, local subj "test.foobar.>, key
-	input := []interface{}{1, true, 1, "test", "test.foobar.>"}
+	input := []interface{}{1, true, 1, "test", "test.foobar.>", true}
 	_, _, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
@@ -398,6 +401,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 	require.Equal(t, "foobar.>", string(ac.Imports[0].Subject))
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, apub, ac.Imports[0].Account)
+	require.True(t, ac.Imports[0].AllowTrace)
 
 	// B, pick, service q, name q service, local subj qq
 	input = []interface{}{1, true, 2, true, "q service", "qq", 0}
@@ -529,7 +533,7 @@ func TestAddImport_SameName(t *testing.T) {
 
 	// account, locally available, name, local subj,
 	// database, true, A: -> stream.database, "stream.database", "ingest
-	input := []interface{}{2, true, 1, "ingest.a", "ingest.a"}
+	input := []interface{}{2, true, 1, "ingest.a", "ingest.a", true}
 	_, _, err := ExecuteInteractiveCmd(createAddImportCmd(), input)
 	require.NoError(t, err)
 
@@ -542,7 +546,7 @@ func TestAddImport_SameName(t *testing.T) {
 	require.True(t, ac.Imports[0].IsStream())
 	require.Equal(t, ts.GetAccountPublicKey(t, "A"), ac.Imports[0].Account)
 
-	input = []interface{}{2, true, 3, "ingest.b", "ingest.b"}
+	input = []interface{}{2, true, 3, "ingest.b", "ingest.b", true}
 	_, _, err = ExecuteInteractiveCmd(createAddImportCmd(), input)
 	require.NoError(t, err)
 
@@ -554,4 +558,5 @@ func TestAddImport_SameName(t *testing.T) {
 	require.Equal(t, "stream.database", string(ac.Imports[1].Subject))
 	require.True(t, ac.Imports[1].IsStream())
 	require.Equal(t, ts.GetAccountPublicKey(t, "B"), ac.Imports[1].Account)
+	require.True(t, ac.Imports[1].AllowTrace)
 }

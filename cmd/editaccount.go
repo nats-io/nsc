@@ -885,7 +885,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		} else {
 			p.claim.Trace = &jwt.MsgTrace{}
 			p.claim.Trace.Destination = jwt.Subject(p.traceContextSubject)
-			r.AddOK("changed trace context subject to %d", p.claim.Trace.Sampling)
+			r.AddOK("changed trace context subject to %q", p.claim.Trace.Destination)
 		}
 	}
 
@@ -895,7 +895,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 		// we already validated that the subject is there either existing or new
 		p.claim.Trace.Sampling = int(p.traceContextSampling.Int64())
-		r.AddOK("changed trace context sampling to %d", p.claim.Trace.Sampling)
+		r.AddOK("changed trace context sampling to %d%%", p.claim.Trace.Sampling)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)

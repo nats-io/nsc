@@ -48,6 +48,8 @@ func createAddImportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.remote, "remote-subject", "", "", "remote subject (only public imports)")
 	cmd.Flags().BoolVarP(&params.service, "service", "", false, "service")
 	cmd.Flags().BoolVarP(&params.share, "share", "", false, "share data when tracking latency (service only)")
+	cmd.Flags().BoolVarP(&params.allowTrace, "allow-trace", "", false, "allow trace requests")
+
 	params.AccountContextParams.BindFlags(cmd)
 
 	return cmd
@@ -70,6 +72,7 @@ type AddImportParams struct {
 	name       string
 	public     bool
 	share      bool
+	allowTrace bool
 }
 
 func (p *AddImportParams) longHelp() string {
@@ -444,6 +447,13 @@ func (p *AddImportParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	if !p.service {
+		p.allowTrace, err = cli.Confirm("allow tracing", false)
+		if err != nil {
+			return err
+		}
+	}
+
 	if err = p.SignerParams.Edit(ctx); err != nil {
 		return err
 	}
@@ -542,7 +552,10 @@ func (p *AddImportParams) createImport() *jwt.Import {
 	if p.service {
 		im.Type = jwt.Service
 		im.Share = p.share
+	} else if p.allowTrace {
+		im.AllowTrace = true
 	}
+
 	if p.tokenSrc != "" {
 		if IsURL(p.tokenSrc) {
 			im.Token = p.tokenSrc

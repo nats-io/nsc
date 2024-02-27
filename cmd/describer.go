@@ -277,7 +277,12 @@ func (e *ExportsDescriber) Describe() string {
 			tp = strconv.Itoa(int(v.AccountTokenPosition))
 		}
 
-		table.AddRow(v.Name, k, v.Subject, tp, toYesNo(!v.TokenReq), len(v.Revocations), mon, toYesNo(v.AllowTrace))
+		allowTrace := yn(v.AllowTrace)
+		if v.IsStream() {
+			allowTrace = "N/A"
+		}
+
+		table.AddRow(v.Name, k, v.Subject, tp, toYesNo(!v.TokenReq), len(v.Revocations), mon, allowTrace)
 	}
 
 	tableDesc := tablewriter.CreateTable()
@@ -362,7 +367,7 @@ func NewImportsDescriber(imports jwt.Imports) *ImportsDescriber {
 func (i *ImportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Imports")
-	table.AddHeaders("Name", "Type", "Remote", "Local", "Expires", "From Account", "Public")
+	table.AddHeaders("Name", "Type", "Remote", "Local", "Expires", "From Account", "Public", "Allow Trace")
 
 	for _, v := range i.Imports {
 		NewImportDescriber(*v).Brief(table)
@@ -389,8 +394,13 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 		local = string(i.LocalSubject)
 	}
 
+	allowTrace := yn(i.AllowTrace)
+	if i.IsService() {
+		allowTrace = "N/A"
+	}
+
 	if i.Token == "" {
-		table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, "", Wide(i.Account), "Yes")
+		table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, "", Wide(i.Account), "Yes", allowTrace)
 		return
 	}
 	expiration := ""
@@ -400,7 +410,8 @@ func (i *ImportDescriber) Brief(table *tablewriter.Table) {
 	} else {
 		expiration = RenderDate(ac.Expires)
 	}
-	table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, expiration, Wide(i.Account), "No")
+
+	table.AddRow(i.Name, TitleCase(i.Type.String()), remote, local, expiration, Wide(i.Account), "No", allowTrace)
 }
 
 func (i *ImportDescriber) IsRemoteImport() bool {
