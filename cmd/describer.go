@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -186,6 +186,19 @@ func (a *AccountDescriber) Describe() string {
 		table.AddRow("Revocations", fmt.Sprintf("%d", len(a.Revocations)))
 	}
 
+	table.AddSeparator()
+	if a.Trace == nil {
+		table.AddRow("Tracing Context", "Disabled")
+	} else {
+		table.AddRow("Tracing Context", "Enabled")
+		table.AddRow("Subject", a.Trace.Destination)
+		if a.Trace.Sampling == 0 {
+			table.AddRow("Sampling", "100%")
+		} else {
+			table.AddRow("Sampling", fmt.Sprintf("%d%%", a.Trace.Sampling))
+		}
+	}
+
 	buf.WriteString(table.Render())
 
 	if len(a.Exports) > 0 {
@@ -238,7 +251,7 @@ func toYesNo(tf bool) string {
 func (e *ExportsDescriber) Describe() string {
 	table := tablewriter.CreateTable()
 	table.AddTitle("Exports")
-	table.AddHeaders("Name", "Type", "Subject", "Account Token Position", "Public", "Revocations", "Tracking")
+	table.AddHeaders("Name", "Type", "Subject", "Account Token Position", "Public", "Revocations", "Tracking", "Allow Trace")
 	for _, v := range e.Exports {
 		mon := "N/A"
 		rt := ""
@@ -264,7 +277,7 @@ func (e *ExportsDescriber) Describe() string {
 			tp = strconv.Itoa(int(v.AccountTokenPosition))
 		}
 
-		table.AddRow(v.Name, k, v.Subject, tp, toYesNo(!v.TokenReq), len(v.Revocations), mon)
+		table.AddRow(v.Name, k, v.Subject, tp, toYesNo(!v.TokenReq), len(v.Revocations), mon, toYesNo(v.AllowTrace))
 	}
 
 	tableDesc := tablewriter.CreateTable()

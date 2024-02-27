@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -132,4 +132,36 @@ func Test_EditExportNoExports(t *testing.T) {
 	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have exports")
+}
+
+func TestEditServiceExportWTracing(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--service", "--subject", "q", "--allow-trace")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, ac.Exports[0].AllowTrace)
+
+	_, _, err = ExecuteCmd(createEditExportCmd(), "--service", "--subject", "q", "--allow-trace=false")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.False(t, ac.Exports[0].AllowTrace)
+}
+
+func TestEditStreamExportWTracing(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "q")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "q", "--allow-trace")
+	require.Error(t, err)
 }
