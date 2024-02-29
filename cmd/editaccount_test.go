@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/nats-io/jwt/v2"
 	"testing"
 	"time"
 
@@ -400,4 +401,77 @@ func Test_TierRmAndDisabled(t *testing.T) {
 	_, _, err := ExecuteCmd(createEditAccount(), "A", "--rm-js-tier", "1", "--js-disable")
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "js-disable is exclusive of all other js options")
+}
+
+func Test_TracingSampling(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	// cannot set sampling if no subject
+	_, _, err := ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "50")
+	require.Error(t, err)
+	require.Equal(t, "trace-context-sampling requires a subject", err.Error())
+
+	// set a subject
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces")
+	require.NoError(t, err)
+
+	// range checks
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "101")
+	require.Error(t, err)
+	require.Equal(t, "tracing sampling rate must be between 1-100", err.Error())
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "-1")
+	require.Error(t, err)
+	require.Equal(t, "tracing sampling rate must be between 1-100", err.Error())
+
+	// disable and set
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "50", "--trace-context-subject", "")
+	require.Error(t, err)
+	require.Equal(t, "cannot set context sampling rate when disabling the trace context", err.Error())
+}
+
+func Test_TracingSubject(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Nil(t, ac.Trace)
+
+	// no op
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "")
+	require.NoError(t, err)
+
+	// bad subjects are checked by jwt lib, just making sure we are catching
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces.*")
+	require.Error(t, err)
+	require.Equal(t, "tracing subjects cannot contain wildcards: \"traces.*\"", err.Error())
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces.here")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac.Trace)
+	require.Equal(t, jwt.Subject("traces.here"), ac.Trace.Destination)
+	require.Equal(t, 0, ac.Trace.Sampling)
+
+	// we have a subject, so set the sampling
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "75")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.NotNil(t, ac.Trace)
+	require.Equal(t, jwt.Subject("traces.here"), ac.Trace.Destination)
+	require.Equal(t, 75, ac.Trace.Sampling)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "")
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Nil(t, ac.Trace)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -180,7 +180,7 @@ func TestAddServiceExportInteractive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	input := []interface{}{0, 1, "bar.>", "Bar Stream", true, true, "header", "foo", 0, "1s", 0}
+	input := []interface{}{0, 1, "bar.>", "Bar Stream", true, true, "header", "foo", 0, "1s", true, 0}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
 	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
@@ -194,6 +194,7 @@ func TestAddServiceExportInteractive(t *testing.T) {
 	require.Equal(t, jwt.Service, ac.Exports[0].Type)
 	require.Equal(t, time.Second, ac.Exports[0].ResponseThreshold)
 	require.Equal(t, jwt.Headers, ac.Exports[0].Latency.Sampling)
+	require.Equal(t, true, ac.Exports[0].AllowTrace)
 
 }
 
@@ -257,7 +258,7 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	cmd := createAddExportCmd()
 
 	// service, subject, name, private, track, freq
-	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1, "0"}
+	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1, "0", true}
 	_, _, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
@@ -270,4 +271,27 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 	require.Equal(t, jwt.SamplingRate(100), ac.Exports[0].Latency.Sampling)
 	require.EqualValues(t, jwt.ResponseTypeStream, ac.Exports[0].ResponseType)
 	require.Equal(t, time.Duration(0), ac.Exports[0].ResponseThreshold)
+	require.Equal(t, true, ac.Exports[0].AllowTrace)
+}
+
+func TestAddServiceExportWTracing(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--service", "--subject", "q", "--allow-trace")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, ac.Exports[0].AllowTrace)
+}
+
+func TestAddStreamExportWTracing(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "q", "--allow-trace")
+	require.Error(t, err)
 }

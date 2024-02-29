@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -121,6 +121,10 @@ func createEditAccount() *cobra.Command {
 
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
+
+	cmd.Flags().StringVarP(&params.traceContextSubject, "trace-context-subject", "", "trace.messages", "sets the subject where w3c trace context information is sent. Set to \"\" to disable")
+	cmd.Flags().VarP(&params.traceContextSampling, "trace-context-sampling", "", "set the trace context sampling rate (1-100) - 0 default is 100")
+
 	return cmd
 }
 
@@ -148,22 +152,24 @@ type EditAccountParams struct {
 	GenericClaimsParams
 	PermissionsParams
 	JetStreamLimitParams
-	claim            *jwt.AccountClaims
-	token            string
-	infoUrl          string
-	description      string
-	conns            NumberParams
-	leafConns        NumberParams
-	exports          NumberParams
-	disallowBearer   bool
-	exportsWc        bool
-	imports          NumberParams
-	subscriptions    NumberParams
-	payload          NumberParams
-	data             NumberParams
-	signingKeys      SigningKeysParams
-	rmSigningKeys    []string
-	disableJetStream bool
+	claim                *jwt.AccountClaims
+	token                string
+	infoUrl              string
+	description          string
+	conns                NumberParams
+	leafConns            NumberParams
+	exports              NumberParams
+	disallowBearer       bool
+	exportsWc            bool
+	imports              NumberParams
+	subscriptions        NumberParams
+	payload              NumberParams
+	data                 NumberParams
+	signingKeys          SigningKeysParams
+	rmSigningKeys        []string
+	disableJetStream     bool
+	traceContextSubject  string
+	traceContextSampling NumberParams
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -206,7 +212,10 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-max-disk-stream",
 		"js-max-bytes-required",
 		"js-max-ack-pending",
-		"js-disable") {
+		"js-disable",
+		"trace-context-subject",
+		"trace-context-sampling",
+	) {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
@@ -534,6 +543,25 @@ func (p *EditAccountParams) PostInteractive(ctx ActionCtx) error {
 		return err
 	}
 
+	ok, err := cli.Confirm("Enable context tracing?", false)
+	if err != nil {
+		return err
+	}
+	if ok {
+		p.traceContextSubject, err = cli.Prompt("Trace context subject?", p.traceContextSubject)
+		if err != nil {
+			return err
+		}
+		if err = p.traceContextSampling.Edit("Trace context sampling rate [1-100]"); err != nil {
+			return err
+		}
+		if p.traceContextSampling.Int64() < 0 {
+			_ = p.traceContextSampling.Set("0")
+		} else if p.traceContextSampling.Int64() > 100 {
+			_ = p.traceContextSampling.Set("100")
+		}
+	}
+
 	return nil
 }
 
@@ -624,6 +652,36 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 			}
 		}
 	}
+
+	if p.traceContextSubject != "" {
+		subj := jwt.Subject(p.traceContextSubject)
+		var v jwt.ValidationResults
+		subj.Validate(&v)
+		if !v.IsEmpty() {
+			errs := v.Errors()
+			return errs[0]
+		}
+		if subj.HasWildCards() {
+			return fmt.Errorf("tracing subjects cannot contain wildcards: %q", subj)
+		}
+	}
+	flags := ctx.CurrentCmd().Flags()
+	if flags.Changed("trace-context-sampling") {
+		if p.claim.Trace == nil {
+			p.claim.Trace = &jwt.MsgTrace{}
+		}
+		// we are changing the sampling do we have a subject
+		if p.claim.Trace.Destination == "" {
+			if p.traceContextSubject == "" || !flags.Changed("trace-context-subject") {
+				return errors.New("trace-context-sampling requires a subject")
+			}
+		}
+
+		if p.traceContextSampling.Int64() < 0 || p.traceContextSampling.Int64() > 100 {
+			return errors.New("tracing sampling rate must be between 1-100")
+		}
+	}
+
 	return nil
 }
 
@@ -816,6 +874,28 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	if s != nil {
 		r.Add(s.Details...)
+	}
+
+	// if they provided the flag we change it
+	if flags.Changed("trace-context-subject") {
+		// if they set us to "", we disable it
+		if p.traceContextSubject == "" {
+			p.claim.Trace = nil
+			r.AddOK("disabled trace context")
+		} else {
+			p.claim.Trace = &jwt.MsgTrace{}
+			p.claim.Trace.Destination = jwt.Subject(p.traceContextSubject)
+			r.AddOK("changed trace context subject to %q", p.claim.Trace.Destination)
+		}
+	}
+
+	if flags.Changed("trace-context-sampling") {
+		if p.claim.Trace == nil {
+			return r, errors.New("cannot set context sampling rate when disabling the trace context")
+		}
+		// we already validated that the subject is there either existing or new
+		p.claim.Trace.Sampling = int(p.traceContextSampling.Int64())
+		r.AddOK("changed trace context sampling to %d%%", p.claim.Trace.Sampling)
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)

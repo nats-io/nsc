@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -52,6 +52,8 @@ func createAddExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
 	params.AccountContextParams.BindFlags(cmd)
 
+	cmd.Flags().BoolVarP(&params.allowTrace, "allow-trace", "", false, "allow trace requests")
+
 	cmd.Flags().UintVarP(&params.accountTokenPosition, "account-token-position", "", 0, "subject token position where account is expected (public exports only)")
 	cmd.Flags().BoolVarP(&params.advertise, "advertise", "", false, "advertise export")
 	cmd.Flag("advertise").Hidden = true
@@ -77,6 +79,7 @@ type AddExportParams struct {
 	responseThreshold    time.Duration
 	accountTokenPosition uint
 	advertise            bool
+	allowTrace           bool
 }
 
 func (p *AddExportParams) longHelp() string {
@@ -106,6 +109,8 @@ func (p *AddExportParams) SetDefaults(ctx ActionCtx) error {
 	if p.export.Name == "" {
 		p.export.Name = p.subject
 	}
+
+	p.export.AllowTrace = p.allowTrace
 
 	return nil
 }
@@ -187,6 +192,12 @@ func (p *AddExportParams) PreInteractive(ctx ActionCtx) error {
 		if err != nil {
 			return err
 		}
+
+		ok, err = cli.Confirm("allow tracing", false)
+		if err != nil {
+			return err
+		}
+		p.export.AllowTrace = ok
 	}
 
 	if err := p.SignerParams.Edit(ctx); err != nil {

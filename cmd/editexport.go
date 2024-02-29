@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -49,6 +49,7 @@ func createEditExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.description, "description", "", "", "Description for this export")
 	cmd.Flags().StringVarP(&params.infoUrl, "info-url", "", "", "Link for more info on this export")
 	cmd.Flags().DurationVarP(&params.responseThreshold, "response-threshold", "", 0, "response threshold duration (units ms/s/m/h) (services only)")
+	cmd.Flags().BoolVarP(&params.allowTrace, "allow-trace", "", false, "allow trace requests")
 
 	hm := fmt.Sprintf("response type for the service [%s | %s | %s] (services only)", jwt.ResponseTypeSingleton, jwt.ResponseTypeStream, jwt.ResponseTypeChunked)
 	cmd.Flags().StringVarP(&params.responseType, "response-type", "", jwt.ResponseTypeSingleton, hm)
@@ -78,12 +79,13 @@ type EditExportParams struct {
 	infoUrl           string
 	description       string
 	responseThreshold time.Duration
+	allowTrace        bool
 }
 
 func (p *EditExportParams) SetDefaults(ctx ActionCtx) error {
 	if !InteractiveFlag {
 		if ctx.NothingToDo("name", "subject", "service", "private", "latency", "sampling", "response-type",
-			"description", "info-url") {
+			"description", "info-url", "allow-trace") {
 			return errors.New("please specify some options")
 		}
 	}
@@ -276,6 +278,10 @@ func (p *EditExportParams) Validate(ctx ActionCtx) error {
 		return errors.New("response threshold is only applicable to services")
 	}
 
+	if !p.service && p.allowTrace {
+		return errors.New("allow trace is only applicable to services")
+	}
+
 	if err = p.SignerParams.Resolve(ctx); err != nil {
 		return err
 	}
@@ -332,6 +338,10 @@ func (p *EditExportParams) syncOptions(ctx ActionCtx) {
 
 	if !(cmd.Flag("info-url").Changed) {
 		p.infoUrl = old.InfoURL
+	}
+
+	if !(cmd.Flag("allow-trace").Changed) {
+		p.allowTrace = old.AllowTrace
 	}
 }
 
@@ -415,6 +425,13 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	export.InfoURL = p.infoUrl
 	if export.InfoURL != old.InfoURL {
 		r.AddOK(`changed info url to %q`, p.infoUrl)
+	}
+
+	if ctx.CurrentCmd().Flags().Changed("allow-trace") {
+		export.AllowTrace = p.allowTrace
+		if export.AllowTrace != old.AllowTrace {
+			r.AddOK(`changed allowed trace to %t`, p.allowTrace)
+		}
 	}
 
 	p.claim.Exports[p.index] = &export
