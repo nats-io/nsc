@@ -475,3 +475,51 @@ func Test_TracingSubject(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, ac.Trace)
 }
+
+func Test_EnableTier(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{DiskStorage: -1, MemoryStorage: -1})
+}
+
+func Test_EnableTierDoesntClobber(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	require.Error(t, err)
+	require.Equal(t, "jetstream tier global is already enabled", err.Error())
+}
+
+func Test_EnableTierNoOtherFlag(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0", "--rm-js-tier", "0")
+	require.Error(t, err)
+	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
+}

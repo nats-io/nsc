@@ -118,6 +118,7 @@ func createEditAccount() *cobra.Command {
 
 	cmd.Flags().StringVarP(&params.AccountContextParams.Name, "name", "n", "", "account to edit")
 	cmd.Flags().BoolVarP(&params.disableJetStream, "js-disable", "", false, "disables all JetStream limits in the account by deleting any limits")
+	cmd.Flags().IntVarP(&params.enableJetStream, "js-enable", "", -1, "enables JetStream for the specified tier")
 
 	params.signingKeys.BindFlags("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.TimeParams.BindFlags(cmd)
@@ -168,6 +169,7 @@ type EditAccountParams struct {
 	signingKeys          SigningKeysParams
 	rmSigningKeys        []string
 	disableJetStream     bool
+	enableJetStream      int
 	traceContextSubject  string
 	traceContextSampling NumberParams
 }
@@ -180,14 +182,17 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
 
 	hasDeleteTier := ctx.AnySet("rm-js-tier")
-	p.hasJSSetParams = ctx.AnySet("js-tier", "js-mem-storage",
+	p.hasJSSetParams = ctx.AnySet("js-tier",
+		"js-mem-storage",
 		"js-disk-storage",
 		"js-streams",
 		"js-consumer",
 		"js-max-mem-stream",
 		"js-max-disk-stream",
 		"js-max-bytes-required",
-		"js-max-ack-pending")
+		"js-max-ack-pending",
+		"js-enable",
+	)
 
 	if hasDeleteTier && p.hasJSSetParams {
 		return fmt.Errorf("rm-js-tier is exclusive of all other js options")
@@ -195,6 +200,27 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 
 	if p.disableJetStream && (p.hasJSSetParams || hasDeleteTier) {
 		return fmt.Errorf("js-disable is exclusive of all other js options")
+	}
+
+	hasEnableTier := ctx.AnySet("js-enable")
+	p.hasJSSetParams = ctx.AnySet("js-tier",
+		"js-mem-storage",
+		"js-disk-storage",
+		"js-streams",
+		"js-consumer",
+		"js-max-mem-stream",
+		"js-max-disk-stream",
+		"js-max-bytes-required",
+		"js-max-ack-pending",
+		"rm-js-tier",
+	)
+
+	if hasEnableTier && p.hasJSSetParams {
+		return fmt.Errorf("js-enable is exclusive of all other js options")
+	}
+
+	if p.disableJetStream && (p.hasJSSetParams || hasEnableTier) {
+		return fmt.Errorf("js-enable is exclusive of all other js options")
 	}
 
 	if !InteractiveFlag && ctx.NothingToDo(
@@ -213,6 +239,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-max-bytes-required",
 		"js-max-ack-pending",
 		"js-disable",
+		"js-enable",
 		"trace-context-subject",
 		"trace-context-sampling",
 	) {
@@ -604,6 +631,7 @@ func (p *EditAccountParams) checkSystemAccount(ctx ActionCtx) error {
 	if p.MaxAckPending > 0 {
 		mustUnset = append(mustUnset, "--js-max-ack-pending")
 	}
+
 	if len(mustUnset) == 0 {
 		// no user specified values set - so set to zero/false
 		// reset all the flags to zero
@@ -682,6 +710,20 @@ func (p *EditAccountParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
+	if p.enableJetStream > -1 {
+		tier, err := p.getTierLimits(p.enableJetStream)
+		if err != nil {
+			return err
+		}
+		if jsLimitsSet(tier) {
+			label := "global"
+			if p.enableJetStream > 0 {
+				label = fmt.Sprintf("R%d", p.enableJetStream)
+			}
+			return fmt.Errorf("jetstream tier %s is already enabled", label)
+		}
+	}
+
 	return nil
 }
 
@@ -694,8 +736,8 @@ func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
 	}
 	params := &p.JetStreamLimitParams
 
-	// on delete we don't honor any of the JS options
-	if p.DeleteTier != -1 {
+	// on delete or enable we don't honor any of the JS options
+	if p.DeleteTier != -1 || p.enableJetStream != -1 {
 		params.MemMaxStreamBytes = 0
 		params.DiskMaxStreamBytes = 0
 		params.MaxAckPending = 0
@@ -706,33 +748,69 @@ func (p *EditAccountParams) applyLimits(ctx ActionCtx, r *store.Report) error {
 		params.MaxBytesRequired = false
 	}
 
-	switch p.DeleteTier {
-	case -1:
-		break
-	case 0:
-		// values are zeroed by the params which are zeroed above
-		p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
-		r.AddOK("deleted global limit")
-	default:
-		if p.claim.Limits.JetStreamTieredLimits != nil {
-			label := fmt.Sprintf("R%d", p.DeleteTier)
-			_, ok := p.claim.Limits.JetStreamTieredLimits[label]
-			if ok {
-				delete(p.claim.Limits.JetStreamTieredLimits, label)
-				r.AddOK("deleted tier limit %s", label)
+	if p.DeleteTier != -1 {
+		switch p.DeleteTier {
+		case -1:
+			break
+		case 0:
+			// values are zeroed by the params which are zeroed above
+			p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{}
+			r.AddOK("deleted global limit")
+		default:
+			if p.claim.Limits.JetStreamTieredLimits != nil {
+				label := fmt.Sprintf("R%d", p.DeleteTier)
+				_, ok := p.claim.Limits.JetStreamTieredLimits[label]
+				if ok {
+					delete(p.claim.Limits.JetStreamTieredLimits, label)
+					r.AddOK("deleted tier limit %s", label)
+				} else {
+					return fmt.Errorf("account doesn't have tier %s limit", label)
+				}
 			} else {
-				return fmt.Errorf("account doesn't have tier %s limit", label)
+				return errors.New("account doesn't have tier limits")
 			}
-		} else {
-			return errors.New("account doesn't have tier limits")
 		}
 	}
+
 	if p.DeleteTier != -1 {
 		return nil
 	}
 
 	if p.disableJetStream {
 		return p.doDisableJetStream(r)
+	}
+
+	if p.enableJetStream != -1 {
+		switch p.enableJetStream {
+		case -1:
+			break
+		case 0:
+			// values are zeroed by the params which are zeroed above
+			p.claim.Limits.JetStreamLimits = jwt.JetStreamLimits{
+				DiskStorage:   -1,
+				MemoryStorage: -1,
+			}
+			r.AddOK("enabled global limit")
+		default:
+			label := fmt.Sprintf("R%d", p.enableJetStream)
+			_, ok := p.claim.Limits.JetStreamTieredLimits[label]
+			if ok {
+				return fmt.Errorf("tier limit %s is already enabled", label)
+			} else {
+				if p.claim.Limits.JetStreamTieredLimits == nil {
+					p.claim.Limits.JetStreamTieredLimits = make(map[string]jwt.JetStreamLimits)
+				}
+				p.claim.Limits.JetStreamTieredLimits[label] = jwt.JetStreamLimits{
+					DiskStorage:   -1,
+					MemoryStorage: -1,
+				}
+				r.AddOK("enabled tier limit %s", label)
+			}
+		}
+	}
+
+	if p.enableJetStream != -1 {
+		return nil
 	}
 
 	label := p.tierLabel()
