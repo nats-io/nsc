@@ -135,17 +135,19 @@ func Test_SyncManualServer(t *testing.T) {
 
 func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	t.Helper()
-	ts := NewEmptyStore(t)
 
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	ts := NewTestStore(t, "O")
+	ts.AddAccount(t, "SYS")
+	ts.AddAccount(t, "AC1")
+	ts.AddAccount(t, "AC2")
+
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
 	require.NoError(t, err)
+
 	serverconf := filepath.Join(ts.Dir, "server.conf")
 	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
-	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC2")
-	require.NoError(t, err)
+
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
 	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
@@ -174,10 +176,42 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	return dir, filesPre, ts
 }
 
+func Test_SyncNatsResolverDeleteNoOperatorKey(t *testing.T) {
+	_, _, ts := deleteSetup(t, true)
+	defer ts.Done(t)
+
+	opk, err := ts.OperatorKey.PublicKey()
+	require.NoError(t, err)
+	require.NoError(t, ts.KeyStore.Remove(opk))
+
+	_, stderr, err := ExecuteCmd(createPushCmd(), "--prune")
+	t.Log(stderr)
+	require.Error(t, err)
+}
+
+func Test_SyncNatsResolverDeleteOperatorKeyInFlag(t *testing.T) {
+	_, _, ts := deleteSetup(t, true)
+	defer ts.Done(t)
+
+	okp := ts.OperatorKey
+	seed, err := okp.Seed()
+	require.NoError(t, err)
+
+	opk, err := ts.OperatorKey.PublicKey()
+	require.NoError(t, err)
+	require.NoError(t, ts.KeyStore.Remove(opk))
+
+	cmd := createPushCmd()
+	HoistRootFlags(cmd)
+	_, _, err = ExecuteCmd(cmd, "--prune", "-K", string(seed))
+	require.NoError(t, err)
+}
+
 func Test_SyncNatsResolverDelete(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, true)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createPushCmd(), "--prune", "--system-account", "SYS", "--system-user", "sys")
+
+	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
 	require.NoError(t, err)
 	// test to assure AC1/SYS where pushed/pruned
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")

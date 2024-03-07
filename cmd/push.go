@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -397,7 +398,7 @@ func multiRequest(nc *nats.Conn, timeout int, report *store.Report, operation st
 	end := start.Add(time.Second * time.Duration(timeout))
 	for ; end.After(now); now = time.Now() { // try with decreasing timeout until we dont get responses
 		if resp, err := sub.NextMsg(end.Sub(now)); err != nil {
-			if err != nats.ErrTimeout || responses == 0 {
+			if !errors.Is(err, nats.ErrTimeout) || responses == 0 {
 				report.AddError("failed to get response to %s: %v", operation, err)
 			}
 		} else if ok, srv, data := processResponse(report, resp); ok {
@@ -410,16 +411,16 @@ func multiRequest(nc *nats.Conn, timeout int, report *store.Report, operation st
 	return responses
 }
 
-func obtainRequestKey(ctx ActionCtx, subPrune *store.Report) (nkeys.KeyPair, string, error) {
+func obtainRequestKey(ctx ActionCtx, subPrune *store.Report) (nkeys.KeyPair, error) {
 	opc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 	if err != nil {
 		subPrune.AddError("Operator needed to prune (err:%v)", err)
-		return nil, "", err
+		return nil, err
 	}
 	keys, err := ctx.StoreCtx().GetOperatorKeys()
 	if err != nil {
 		subPrune.AddError("Operator keys needed to prune (err:%v)", err)
-		return nil, "", err
+		return nil, err
 	}
 	if opc.StrictSigningKeyUsage {
 		if len(keys) > 1 {
@@ -428,22 +429,25 @@ func obtainRequestKey(ctx ActionCtx, subPrune *store.Report) (nkeys.KeyPair, str
 			keys = []string{}
 		}
 	}
-	var okp nkeys.KeyPair
 	for _, k := range keys {
-		if okp, err = ctx.StoreCtx().KeyStore.GetKeyPair(k); err == nil {
-			break
+		kp, err := ctx.StoreCtx().KeyStore.GetKeyPair(k)
+		if err != nil {
+			return nil, err
+		}
+		if kp != nil && !reflect.ValueOf(kp).IsNil() {
+			return kp, nil
 		}
 	}
-	if okp == nil {
-		subPrune.AddError("Operator private key needed to prune (err:%v)", err)
-		return nil, "", err
-	}
-	opPk, err := okp.PublicKey()
+
+	// if we are here we don't have it - see if it was provided by the
+	kp, err := ctx.StoreCtx().ResolveKey(KeyPathFlag, nkeys.PrefixByteOperator)
 	if err != nil {
-		subPrune.AddError("Public key needed to prune (err:%v)", err)
-		return nil, "", err
+		return nil, err
 	}
-	return okp, opPk, nil
+	if kp != nil && !reflect.ValueOf(kp).IsNil() {
+		return kp, nil
+	}
+	return nil, errors.New("operator keys needed to prune: no operator keys were not found in the keystore")
 }
 
 func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, timeout int, report *store.Report, deleteList []string, expectedResponses int) {
@@ -451,18 +455,25 @@ func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, timeout int, report *store.
 		report.AddOK("nothing to prune")
 		return
 	}
-	okp, opPk, err := obtainRequestKey(ctx, report)
+	okp, err := obtainRequestKey(ctx, report)
 	if err != nil {
 		report.AddError("Could not obtain Operator key to sign the delete request (err:%v)", err)
 		return
 	}
 	defer okp.Wipe()
 
+	opPk, err := okp.PublicKey()
+	if err != nil {
+		report.AddError("Error decoding the operator public key (err:%v)", err)
+		return
+	}
+
 	claim := jwt.NewGenericClaims(opPk)
 	claim.Data["accounts"] = deleteList
 	pruneJwt, err := claim.Encode(okp)
 	if err != nil {
 		report.AddError("Could not encode delete request (err:%v)", err)
+		return
 	}
 	respPrune := multiRequest(nc, timeout, report, "prune", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt), func(srv string, data interface{}) {
 		if dataMap, ok := data.(map[string]interface{}); ok {
