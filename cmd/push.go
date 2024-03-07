@@ -397,7 +397,7 @@ func multiRequest(nc *nats.Conn, timeout int, report *store.Report, operation st
 	end := start.Add(time.Second * time.Duration(timeout))
 	for ; end.After(now); now = time.Now() { // try with decreasing timeout until we dont get responses
 		if resp, err := sub.NextMsg(end.Sub(now)); err != nil {
-			if err != nats.ErrTimeout || responses == 0 {
+			if !errors.Is(err, nats.ErrTimeout) || responses == 0 {
 				report.AddError("failed to get response to %s: %v", operation, err)
 			}
 		} else if ok, srv, data := processResponse(report, resp); ok {
@@ -463,6 +463,7 @@ func sendDeleteRequest(ctx ActionCtx, nc *nats.Conn, timeout int, report *store.
 	pruneJwt, err := claim.Encode(okp)
 	if err != nil {
 		report.AddError("Could not encode delete request (err:%v)", err)
+		return
 	}
 	respPrune := multiRequest(nc, timeout, report, "prune", "$SYS.REQ.CLAIMS.DELETE", []byte(pruneJwt), func(srv string, data interface{}) {
 		if dataMap, ok := data.(map[string]interface{}); ok {
