@@ -23,7 +23,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -34,7 +34,7 @@ jobs:
       #  docker/setup-buildx-action@v1
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           check-latest: true
@@ -48,18 +48,25 @@ jobs:
         run: |
           go vet ./...
 
+      - name: Create GitHub App Token
+        id: token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NATSIO_ARTIFACT_CROSS_REPO_PUSHER_APP_ID }}
+          private-key: ${{ secrets.NATSIO_ARTIFACT_CROSS_REPO_PUSHER_PRIVATE_KEY }}
+          owner: "nats-io"
+          repositories: "homebrew-nats-tools"
+
       - name: Run GoReleaser
         id: goreleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser-pro
-          # We have seen a couple of bugs, so are locking this for now.
-          # v1.8.3-pro fixes some issues in brew architecture image variants
-          # which led to <https://github.com/nats-io/homebrew-nats-tools/issues/9>
-          version: v1.15.2-pro
+          version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_APP_TOKEN: ${{ steps.token.outputs.token }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           SIGNING_KEY_COSIGN: ${{ secrets.RELEASE_SIGNING_KEY_COSIGN }}
           SIGNING_KEY_SSH: ${{ secrets.RELEASE_SIGNING_KEY_SSH }}
