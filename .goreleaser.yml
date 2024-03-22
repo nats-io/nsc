@@ -67,7 +67,6 @@ archives:
     # '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     format: zip
-    rlcp: true
     files:
       - none*
 
@@ -99,6 +98,7 @@ brews:
     repository:
       owner: nats-io
       name: homebrew-nats-tools
+      token: "{{ .Env.GITHUB_APP_TOKEN }}"
     url_template: 'https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}.zip'
     homepage: "https://github.com/nats-io/nsc"
     description: "A tool for creating NATS account and user access configurations"
