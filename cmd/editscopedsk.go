@@ -41,6 +41,7 @@ nsc edit signing-key --account <n> --sk <sk> --allow-sub <subject>,...
 		},
 	}
 	cmd.Flags().StringVarP(&params.role, "role", "", "", "role associated with the signing key scope")
+	cmd.Flags().StringVarP(&params.description, "description", "", "", "user description associated with the role")
 	params.sk.BindFlagsForOne("sk", "", nkeys.PrefixByteAccount, cmd)
 	params.AccountContextParams.BindFlags(cmd)
 	params.UserPermissionLimits.BindFlags(cmd)
@@ -52,10 +53,11 @@ func init() {
 }
 
 type EditScopedSkParams struct {
-	sk     SigningKeysParams
-	skName string
-	role   string
-	claim  *jwt.AccountClaims
+	sk          SigningKeysParams
+	skName      string
+	role        string
+	description string
+	claim       *jwt.AccountClaims
 	UserPermissionLimits
 	AccountContextParams
 	SignerParams
@@ -178,6 +180,9 @@ func (p *EditScopedSkParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	if ctx.AnySet("role") {
 		scope.(*jwt.UserScope).Role = p.role
+	}
+	if ctx.AnySet("description") {
+		scope.(*jwt.UserScope).Description = p.description
 	}
 	s, err := p.UserPermissionLimits.Run(ctx, &(scope.(*jwt.UserScope).Template))
 	if err != nil {

@@ -163,7 +163,7 @@ func Test_EditScopedSkAddGenerates(t *testing.T) {
 	require.NotNil(t, us)
 
 	// get the scope with the key
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", pk, "--role", "foo")
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", pk, "--role", "foo", "--description", "hello")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -175,6 +175,7 @@ func Test_EditScopedSkAddGenerates(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, us)
 	require.Equal(t, us.Role, "foo")
+	require.Equal(t, us.Description, "hello")
 }
 
 func Test_EditScopedSkByRole(t *testing.T) {
