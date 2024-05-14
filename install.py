@@ -39,6 +39,7 @@ FILENAME_LOOKUP = {
     "linux": {
         "amd64": "nsc-linux-amd64.zip",
         "arm64": "nsc-linux-arm64.zip",
+        "armv7": "nsc-linux-armv7.zip",
     },
     "win32": {
         "amd64": "nsc-windows-amd64.zip",
@@ -54,6 +55,8 @@ def release_url(platform, arch, tag):
         arch = "amd64"
     elif arch == "aarch64":
         arch = "arm64"
+    elif arch == "armv7l": # reported by debian Buster on Raspberry Pi 3B+
+        arch = "armv7"
     try:
         filename = FILENAME_LOOKUP[platform][arch]
     except KeyError:
