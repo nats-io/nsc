@@ -601,3 +601,23 @@ func Test_AddUserBadName(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
 }
+
+func Test_AddUserRequireSk(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys", "--sk", "generate")
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "U")
+	require.Error(t, err)
+	require.Equal(t, "unable to issue users when operator requires signing keys and the account has none", err.Error())
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--sk", "generate")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(CreateAddUserCmd(), "U")
+	require.NoError(t, err)
+}

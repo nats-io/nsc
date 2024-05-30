@@ -222,6 +222,20 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		p.userName = GetRandomName(0)
 	}
 
+	s := ctx.StoreCtx().Store
+	claim, err := s.ReadAccountClaim(p.AccountContextParams.Name)
+	if err != nil {
+		return fmt.Errorf("reading account %q failed: %v", p.AccountContextParams.Name, err)
+	}
+
+	o, err := s.ReadOperatorClaim()
+	if err != nil {
+		return err
+	}
+	if o.StrictSigningKeyUsage && len(claim.SigningKeys) == 0 {
+		return errors.New("unable to issue users when operator requires signing keys and the account has none")
+	}
+
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
@@ -253,12 +267,11 @@ func (p *AddUserParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
-	s := ctx.StoreCtx().Store
-	if claim, err := s.ReadAccountClaim(p.AccountContextParams.Name); err != nil {
-		return fmt.Errorf("reading account %q failed: %v", p.AccountContextParams.Name, err)
-	} else if claim.Limits.DisallowBearer && p.bearer {
+	if claim.Limits.DisallowBearer && p.bearer {
 		return fmt.Errorf("account %q forbids the use of bearer token", p.AccountContextParams.Name)
-	} else if s.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.userName)) {
+	}
+
+	if s.Has(store.Accounts, p.AccountContextParams.Name, store.Users, store.JwtName(p.userName)) {
 		return fmt.Errorf("the user %q already exists", p.userName)
 	}
 
