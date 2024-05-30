@@ -159,3 +159,24 @@ func Test_DeleteUserFromDiffAccountInteractive(t *testing.T) {
 	_, err = os.Stat(ts.KeyStore.GetUserCredsPath("A", "a"))
 	require.True(t, os.IsNotExist(err))
 }
+
+func Test_RevokeUserRequiresOperatorKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	_, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+
+	opk, err := ts.Store.GetRootPublicKey()
+	require.NoError(t, err)
+	require.NoError(t, ts.KeyStore.Remove(opk))
+
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--revoke")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U")
+	require.NoError(t, err)
+}
