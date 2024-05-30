@@ -211,7 +211,7 @@ func TestDescribeAccount_JSTiers(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
-	out, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
+	out, _, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 	require.Contains(t, out, " | R1")
 	require.Contains(t, out, " | R3")
