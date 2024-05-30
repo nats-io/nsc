@@ -166,8 +166,10 @@ func (p *DeleteUserParams) Validate(ctx ActionCtx) error {
 		}
 	}
 
-	if err := p.SignerParams.Resolve(ctx); err != nil {
-		return err
+	if p.revoke {
+		if err := p.SignerParams.Resolve(ctx); err != nil {
+			return err
+		}
 	}
 
 	return nil
