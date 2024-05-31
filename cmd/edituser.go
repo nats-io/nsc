@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -187,7 +187,9 @@ func (p *EditUserParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *EditUserParams) Validate(ctx ActionCtx) error {
-	p.UserPermissionLimits.Validate(ctx)
+	if err := p.UserPermissionLimits.Validate(ctx); err != nil {
+		return err
+	}
 
 	if err := p.GenericClaimsParams.Valid(); err != nil {
 		return err
@@ -355,8 +357,8 @@ func (p *UserPermissionLimits) BindFlags(cmd *cobra.Command) {
 	cmd.Flags().VarP(&p.locale, "locale", "", "set the locale with which time values are interpreted")
 	cmd.Flags().StringSliceVarP(&p.src, "source-network", "", nil, "add source network for connection - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&p.rmSrc, "rm-source-network", "", nil, "remove source network for connection - comma separated list or option can be specified multiple times")
-	cmd.Flags().StringSliceVarP(&p.connTypes, "conn-type", "", nil, fmt.Sprintf("set allowed connection types: %s %s %s %s %s %s - comma separated list or option can be specified multiple times",
-		jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnodeWS, jwt.ConnectionTypeMqttWS))
+	cmd.Flags().StringSliceVarP(&p.connTypes, "conn-type", "", nil, fmt.Sprintf("set allowed connection types: %s %s %s %s %s %s %s - comma separated list or option can be specified multiple times",
+		jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard, jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnodeWS, jwt.ConnectionTypeMqttWS, jwt.ConnectionTypeInProcess))
 	cmd.Flags().StringSliceVarP(&p.rmConnTypes, "rm-conn-type", "", nil, "remove connection types - comma separated list or option can be specified multiple times")
 	cmd.Flags().Int64VarP(&p.maxSubs, "subs", "", -1, "set maximum number of subscriptions (-1 is unlimited)")
 	p.maxData = -1
@@ -398,7 +400,8 @@ func (p *UserPermissionLimits) Validate(ctx ActionCtx) error {
 		u := strings.ToUpper(k)
 		switch u {
 		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard,
-			jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnodeWS, jwt.ConnectionTypeMqttWS:
+			jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnodeWS, jwt.ConnectionTypeMqttWS,
+			jwt.ConnectionTypeInProcess:
 		default:
 			return fmt.Errorf("unknown connection type %s", k)
 		}

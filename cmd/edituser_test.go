@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -505,5 +505,18 @@ func Test_EditUserData(t *testing.T) {
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, int64(1024), uc.Limits.Data)
+	require.NoError(t, err)
+}
+
+func Test_EditUserConnection(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--conn-type", "hello")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--conn-type", jwt.ConnectionTypeInProcess)
 	require.NoError(t, err)
 }
