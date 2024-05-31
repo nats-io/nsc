@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -111,7 +112,7 @@ func (p *EditOperatorParams) Load(ctx ActionCtx) error {
 		p.sysAcc = oc.SystemAccount
 	}
 
-	if !p.reqSk {
+	if !ctx.CurrentCmd().Flags().Changed("require-signing-keys") {
 		p.reqSk = oc.StrictSigningKeyUsage
 	}
 
@@ -254,6 +255,7 @@ func (p *EditOperatorParams) Validate(ctx ActionCtx) error {
 			}
 		}
 	}
+
 	if err = p.signingKeys.Valid(); err != nil {
 		return err
 	}
@@ -287,6 +289,12 @@ func (p *EditOperatorParams) Run(ctx ActionCtx) (store.Status, error) {
 		p.claim.StrictSigningKeyUsage = p.reqSk
 		r.AddOK("strict signing key usage set to: %t", p.reqSk)
 	}
+
+	if p.claim.StrictSigningKeyUsage && len(p.claim.SigningKeys) == 0 {
+		fmt.Printf("%t\n", p.reqSk)
+		return nil, errors.New("operator requires at least one signing key")
+	}
+
 	flags := ctx.CurrentCmd().Flags()
 	p.claim.AccountServerURL = p.asu
 	if flags.Changed("account-jwt-server-url") {

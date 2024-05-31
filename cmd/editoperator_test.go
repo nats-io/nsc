@@ -397,3 +397,26 @@ func Test_ExpireShouldNotBeUnset(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expires, oc.Expires)
 }
+
+func Test_CannotSetRequireSKWithoutSK(t *testing.T) {
+	ts := NewTestStore(t, "0")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys")
+	require.Error(t, err)
+	require.Equal(t, "operator requires at least one signing key", err.Error())
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys", "--sk", "generate")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--require-signing-keys=false", "--rm-sk", oc.SigningKeys[0])
+	require.NoError(t, err)
+
+	oc, err = ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.False(t, oc.StrictSigningKeyUsage)
+	require.Empty(t, oc.SigningKeys)
+}
