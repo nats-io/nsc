@@ -37,6 +37,8 @@ func createDeleteMappingCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP((*string)(&params.from), "from", "f", "", "map from subject (required)")
 	cmd.Flags().StringVarP((*string)(&params.to), "to", "t", "", "to subject. When present, only that particular mapping is removed. Otherwise all mappings for from subject are.")
+	cmd.Flags().StringVarP(&params.cluster, "cluster", "", "", "in which cluster this mapping should apply")
+
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
@@ -48,9 +50,10 @@ func init() {
 type DeleteMappingParams struct {
 	AccountContextParams
 	SignerParams
-	claim *jwt.AccountClaims
-	from  jwt.Subject
-	to    jwt.Subject
+	claim   *jwt.AccountClaims
+	from    jwt.Subject
+	to      jwt.Subject
+	cluster string
 }
 
 func (p *DeleteMappingParams) SetDefaults(ctx ActionCtx) error {
@@ -101,7 +104,7 @@ func (p *DeleteMappingParams) Run(ctx ActionCtx) (store.Status, error) {
 	if p.to != "" {
 		list := p.claim.Mappings[p.from]
 		for i, l := range list {
-			if l.Subject == p.to {
+			if l.Subject == p.to && l.Cluster == p.cluster {
 				if i == 0 {
 					if len(list) == 1 {
 						delete(p.claim.Mappings, p.from)
@@ -126,9 +129,17 @@ func (p *DeleteMappingParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 	if p.to == "" {
-		r.AddOK("deleted all mapping for %s", p.from)
+		if p.cluster != "" {
+			r.AddOK("deleted all mapping in cluster %s for %s", p.cluster, p.from)
+		} else {
+			r.AddOK("deleted all mapping for %s", p.from)
+		}
 	} else {
-		r.AddOK("deleted mapping %s -> %s", p.from, p.to)
+		if p.cluster != "" {
+			r.AddOK("deleted mapping %s -> %s in cluster %s", p.cluster, p.from, p.cluster)
+		} else {
+			r.AddOK("deleted mapping %s -> %s", p.from, p.to)
+		}
 	}
 	rs, err := ctx.StoreCtx().Store.StoreClaim([]byte(token))
 	if rs != nil {

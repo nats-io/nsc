@@ -17,9 +17,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/nats-io/jwt/v2"
 	"testing"
 	"time"
+
+	"github.com/nats-io/jwt/v2"
 
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"

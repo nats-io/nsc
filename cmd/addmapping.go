@@ -120,7 +120,7 @@ func (p *AddMappingParams) Validate(ctx ActionCtx) error {
 	if v, ok := (p.claim.Mappings)[p.from]; ok {
 		set := false
 		for i, w := range v {
-			if w.Subject == m.Subject {
+			if w.Subject == m.Subject && w.Cluster == m.Cluster {
 				v[i] = m
 				set = true
 				break

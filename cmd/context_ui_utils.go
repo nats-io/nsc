@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nsc/v2/cmd/store"
 )
