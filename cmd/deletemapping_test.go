@@ -18,6 +18,8 @@ package cmd
 import (
 	"testing"
 
+	"github.com/nats-io/jwt/v2"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,4 +78,68 @@ func Test_DeleteMapping(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ac)
 	require.Len(t, ac.Mappings, 0)
+}
+
+func TestDeleteMappingWithCluster(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	// add a default mapping at a 100, default mapping at max
+	_, _, err := ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	require.NoError(t, err)
+
+	// add a mapping that has the same subject, but using a cluster
+	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100", "--cluster", "A")
+	require.NoError(t, err)
+
+	// verify we have both mappings
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	m := ac.Mappings["q"]
+	require.NotNil(t, m)
+	require.Len(t, m, 2)
+	require.Equal(t, jwt.WeightedMapping{
+		Subject: "qq",
+		Weight:  100,
+		Cluster: "",
+	}, m[0])
+	require.Equal(t, jwt.WeightedMapping{
+		Subject: "qq",
+		Weight:  100,
+		Cluster: "A",
+	}, m[1])
+
+	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--from", "q", "--to", "qq")
+	require.NoError(t, err)
+
+	// deleted the one without the cluster
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	m = ac.Mappings["q"]
+	require.NotNil(t, m)
+	require.Len(t, m, 1)
+	require.Equal(t, jwt.WeightedMapping{
+		Subject: "qq",
+		Weight:  100,
+		Cluster: "A",
+	}, m[0])
+
+	// add the default mapping again
+	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--from", "q", "--to", "qq", "--cluster", "A")
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	m = ac.Mappings["q"]
+	require.NotNil(t, m)
+	require.Len(t, m, 1)
+	require.Equal(t, jwt.WeightedMapping{
+		Subject: "qq",
+		Weight:  100,
+		Cluster: "",
+	}, m[0])
 }
