@@ -109,6 +109,14 @@ func (p *EditUserParams) SetDefaults(ctx ActionCtx) error {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
 	}
+	// allow the user to enter inputs in lc
+	for i, v := range p.connTypes {
+		p.connTypes[i] = strings.ToUpper(v)
+	}
+	for i, v := range p.rmConnTypes {
+		p.rmConnTypes[i] = strings.ToUpper(v)
+	}
+
 	return nil
 }
 
@@ -159,6 +167,11 @@ func (p *EditUserParams) Load(ctx ActionCtx) error {
 	p.claim, err = ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.name)
 	if err != nil {
 		return err
+	}
+
+	// if the JWT has an allowed connection type in lowercase fix it
+	for i, v := range p.claim.UserPermissionLimits.AllowedConnectionTypes {
+		p.claim.UserPermissionLimits.AllowedConnectionTypes[i] = strings.ToUpper(v)
 	}
 
 	p.UserPermissionLimits.Load(ctx, p.claim.UserPermissionLimits)
@@ -409,7 +422,15 @@ func (p *UserPermissionLimits) Validate(ctx ActionCtx) error {
 	}
 	rmConnTypes := make([]string, len(p.rmConnTypes))
 	for i, k := range p.rmConnTypes {
-		rmConnTypes[i] = strings.ToUpper(k)
+		u := strings.ToUpper(k)
+		switch u {
+		case jwt.ConnectionTypeLeafnode, jwt.ConnectionTypeMqtt, jwt.ConnectionTypeStandard,
+			jwt.ConnectionTypeWebsocket, jwt.ConnectionTypeLeafnodeWS, jwt.ConnectionTypeMqttWS,
+			jwt.ConnectionTypeInProcess:
+		default:
+			return fmt.Errorf("unknown rm connection type %s", k)
+		}
+		rmConnTypes[i] = u
 	}
 	p.rmConnTypes = rmConnTypes
 
