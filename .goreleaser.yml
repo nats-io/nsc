@@ -7,7 +7,7 @@
 # It is an explicit goal to have reproducible builds.
 
 project_name: nsc
-
+version: 2
 release:
   github:
     owner: nats-io
@@ -74,7 +74,7 @@ checksum:
   name_template: 'SHA256SUMS-{{ .ProjectName }}.txt'
 
 snapshot:
-  name_template: 'dev'
+  version_template: 'dev'
 
 signs:
   - id: cosign
@@ -94,7 +94,7 @@ signs:
 
 brews:
   - name: nsc
-    folder: Formula
+    directory: Formula
     repository:
       owner: nats-io
       name: homebrew-nats-tools
