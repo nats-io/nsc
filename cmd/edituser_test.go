@@ -16,6 +16,8 @@
 package cmd
 
 import (
+	"github.com/nats-io/nsc/v2/cmd/store"
+	"strings"
 	"testing"
 	"time"
 
@@ -519,4 +521,77 @@ func Test_EditUserConnection(t *testing.T) {
 
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--conn-type", jwt.ConnectionTypeInProcess)
 	require.NoError(t, err)
+}
+
+func Test_EditUserConnectionCase(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	akp, err := ts.KeyStore.GetKeyPair(ac.Subject)
+	require.NoError(t, err)
+
+	claim, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+
+	// add lower case conn type - this is prevented now, but worked in the past
+	claim.AllowedConnectionTypes.Add(strings.ToLower(jwt.ConnectionTypeStandard))
+	token, err := claim.Encode(akp)
+	require.NoError(t, err)
+
+	err = ts.Store.Write([]byte(token), store.Accounts, "A", store.Users, store.JwtName("U"))
+	require.NoError(t, err)
+
+	claim, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Len(t, claim.AllowedConnectionTypes, 1)
+	require.Contains(t, claim.AllowedConnectionTypes, strings.ToLower(jwt.ConnectionTypeStandard))
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--conn-type", strings.ToLower(jwt.ConnectionTypeMqtt))
+	require.NoError(t, err)
+
+	claim, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Len(t, claim.AllowedConnectionTypes, 2)
+	require.Contains(t, claim.AllowedConnectionTypes, jwt.ConnectionTypeMqtt)
+	// we expect the set fixed it
+	require.Contains(t, claim.AllowedConnectionTypes, jwt.ConnectionTypeStandard)
+}
+
+func Test_EditUserConnectionDeleteCase(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	akp, err := ts.KeyStore.GetKeyPair(ac.Subject)
+	require.NoError(t, err)
+
+	claim, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+
+	// add lower case conn type - this is prevented now, but worked in the past
+	claim.AllowedConnectionTypes.Add(strings.ToLower(jwt.ConnectionTypeStandard))
+	token, err := claim.Encode(akp)
+	require.NoError(t, err)
+
+	err = ts.Store.Write([]byte(token), store.Accounts, "A", store.Users, store.JwtName("U"))
+	require.NoError(t, err)
+
+	claim, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Len(t, claim.AllowedConnectionTypes, 1)
+	require.Contains(t, claim.AllowedConnectionTypes, strings.ToLower(jwt.ConnectionTypeStandard))
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-conn-type", jwt.ConnectionTypeStandard)
+	require.NoError(t, err)
+
+	claim, err = ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Len(t, claim.AllowedConnectionTypes, 0)
 }
