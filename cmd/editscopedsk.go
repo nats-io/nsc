@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
@@ -69,6 +70,11 @@ func (p *EditScopedSkParams) SetDefaults(ctx ActionCtx) error {
 		return err
 	}
 	p.SignerParams.SetDefaults(nkeys.PrefixByteOperator, true, ctx)
+
+	// allow the user to enter inputs in lc
+	for i, v := range p.connTypes {
+		p.connTypes[i] = strings.ToUpper(v)
+	}
 
 	return nil
 }
@@ -153,6 +159,12 @@ func (p *EditScopedSkParams) Load(ctx ActionCtx) error {
 	if s == nil {
 		s = &jwt.UserScope{}
 	}
+
+	// if the signing key has an allowed connection type in lowercase fix it
+	for i, v := range s.(*jwt.UserScope).Template.AllowedConnectionTypes {
+		s.(*jwt.UserScope).Template.AllowedConnectionTypes[i] = strings.ToUpper(v)
+	}
+
 	return p.UserPermissionLimits.Load(ctx, s.(*jwt.UserScope).Template)
 }
 
@@ -161,7 +173,9 @@ func (p *EditScopedSkParams) PostInteractive(ctx ActionCtx) error {
 }
 
 func (p *EditScopedSkParams) Validate(ctx ActionCtx) error {
-	p.UserPermissionLimits.Validate(ctx)
+	if err := p.UserPermissionLimits.Validate(ctx); err != nil {
+		return err
+	}
 
 	if err := p.SignerParams.ResolveWithPriority(ctx, p.claim.Issuer); err != nil {
 		return err
