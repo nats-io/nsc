@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/jwt/v2"
@@ -220,4 +221,124 @@ func Test_EditScopedSkByRole(t *testing.T) {
 	require.NotNil(t, us)
 	require.Equal(t, us.Role, "foo")
 	require.Len(t, us.Template.Sub.Allow, 1)
+}
+
+func Test_EditScopedSkConnType(t *testing.T) {
+	ts := NewTestStore(t, "edit scope")
+	defer ts.Done(t)
+
+	_, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+
+	// add the scope with a generate
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	require.NoError(t, err)
+
+	// try to add invalid conn type
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--conn-type", "bar")
+	require.Error(t, err)
+
+	// add lower case conn type - this is prevented now, but worked in the past
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	scope, ok := ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	scope.(*jwt.UserScope).Template.AllowedConnectionTypes.Add(strings.ToLower(jwt.ConnectionTypeStandard))
+	ac.SigningKeys.AddScopedSigner(scope)
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	ts.Store.StoreClaim([]byte(token))
+	// test if lower case conn type was added correctly to the sk
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok := scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Len(t, us.Template.AllowedConnectionTypes, 1)
+	require.Equal(t, strings.ToLower(jwt.ConnectionTypeStandard), us.Template.AllowedConnectionTypes[0])
+
+	// add lower case conn type - should be transformed upper case
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--conn-type", strings.ToLower(jwt.ConnectionTypeMqtt))
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok = scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Len(t, us.Template.AllowedConnectionTypes, 2)
+	require.Equal(t, jwt.ConnectionTypeMqtt, us.Template.AllowedConnectionTypes[1])
+
+	// test if the set above fixed the lower case conn type added before
+	require.Equal(t, jwt.ConnectionTypeStandard, us.Template.AllowedConnectionTypes[0])
+}
+
+func Test_EditScopedSkRmConnType(t *testing.T) {
+	ts := NewTestStore(t, "edit scope")
+	defer ts.Done(t)
+
+	_, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+
+	ts.AddAccount(t, "A")
+
+	// add the scope with a generate
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	require.NoError(t, err)
+
+	// add lower case conn types - this is prevented now, but worked in the past
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	scope, ok := ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	scope.(*jwt.UserScope).Template.AllowedConnectionTypes.Add(strings.ToLower(jwt.ConnectionTypeStandard))
+	scope.(*jwt.UserScope).Template.AllowedConnectionTypes.Add(strings.ToLower(jwt.ConnectionTypeWebsocket))
+	ac.SigningKeys.AddScopedSigner(scope)
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	ts.Store.StoreClaim([]byte(token))
+	// test if lower case conn type was added correctly to the sk
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok := scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Len(t, us.Template.AllowedConnectionTypes, 2)
+	require.Equal(t, strings.ToLower(jwt.ConnectionTypeStandard), us.Template.AllowedConnectionTypes[0])
+	require.Equal(t, strings.ToLower(jwt.ConnectionTypeWebsocket), us.Template.AllowedConnectionTypes[1])
+
+	// remove first conn type via lower cased input
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--rm-conn-type", strings.ToLower(jwt.ConnectionTypeStandard))
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok = scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Len(t, us.Template.AllowedConnectionTypes, 1)
+	// remove second conn type via upper cased input
+	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--rm-conn-type", jwt.ConnectionTypeWebsocket)
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys.Keys(), 1)
+	scope, ok = ac.SigningKeys.GetScope(ac.SigningKeys.Keys()[0])
+	require.True(t, ok)
+	us, ok = scope.(*jwt.UserScope)
+	require.True(t, ok)
+	require.NotNil(t, us)
+	require.Len(t, us.Template.AllowedConnectionTypes, 0)
 }
