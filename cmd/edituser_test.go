@@ -16,10 +16,11 @@
 package cmd
 
 import (
-	"github.com/nats-io/nsc/v2/cmd/store"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/nats-io/nkeys"
 
@@ -115,7 +116,7 @@ func Test_EditUser_Tag(t *testing.T) {
 	require.NotNil(t, cc)
 
 	require.Len(t, cc.Tags, 3)
-	require.ElementsMatch(t, cc.Tags, []string{"a", "b", "c"})
+	require.ElementsMatch(t, cc.Tags, []string{"A", "B", "C"})
 
 	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-tag", "A,B")
 	require.NoError(t, err)
@@ -125,7 +126,7 @@ func Test_EditUser_Tag(t *testing.T) {
 	require.NotNil(t, cc)
 
 	require.Len(t, cc.Tags, 1)
-	require.ElementsMatch(t, cc.Tags, []string{"c"})
+	require.ElementsMatch(t, cc.Tags, []string{"C"})
 
 }
 

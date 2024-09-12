@@ -50,7 +50,7 @@ func Test_SyncOK(t *testing.T) {
 	// verify the tag was stored
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.Contains(t, ac.Tags, "a")
+	require.Contains(t, ac.Tags, "A")
 }
 
 func Test_SyncNoURL(t *testing.T) {
@@ -130,7 +130,7 @@ func Test_SyncManualServer(t *testing.T) {
 	// verify the tag was stored
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.Contains(t, ac.Tags, "a")
+	require.Contains(t, ac.Tags, "A")
 }
 
 func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {

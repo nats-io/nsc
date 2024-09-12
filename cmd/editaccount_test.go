@@ -67,7 +67,7 @@ func Test_EditAccount_Tag(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, ac.Tags, 3)
-	require.ElementsMatch(t, ac.Tags, []string{"a", "b", "c"})
+	require.ElementsMatch(t, ac.Tags, []string{"A", "B", "C"})
 }
 
 func Test_EditAccount_RmTag(t *testing.T) {
@@ -85,7 +85,7 @@ func Test_EditAccount_RmTag(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, ac.Tags, 1)
-	require.ElementsMatch(t, ac.Tags, []string{"c"})
+	require.ElementsMatch(t, ac.Tags, []string{"C"})
 }
 
 func Test_EditAccount_Times(t *testing.T) {

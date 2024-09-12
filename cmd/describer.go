@@ -443,10 +443,7 @@ func AddStandardClaimInfo(table *tablewriter.Table, claims jwt.Claims) {
 		}
 		tags = ac.Tags
 	}
-	if acc, ok := claims.(*jwt.ActivationClaims); ok {
-		if acc.IssuerAccount != "" {
-			issuer = acc.IssuerAccount
-		}
+	if acc, ok := claims.(*jwt.AccountClaims); ok {
 		tags = acc.Tags
 	}
 	if uc, ok := claims.(*jwt.UserClaims); ok {
