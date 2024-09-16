@@ -30,8 +30,9 @@ import (
 // GenericClaimsParams - TimeParams and tags
 type GenericClaimsParams struct {
 	TimeParams
-	tags   []string
-	rmTags []string
+	tags              []string
+	rmTags            []string
+	caseSensitiveTags bool
 }
 
 func (sp *GenericClaimsParams) Edit(current []string) error {
@@ -129,6 +130,16 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 		}
 	}
 
+	// if not case-sensitive, normalize the adds/removes
+	if !sp.caseSensitiveTags {
+		for idx, t := range sp.tags {
+			sp.tags[idx] = strings.ToLower(t)
+		}
+		for idx, t := range sp.rmTags {
+			sp.rmTags[idx] = strings.ToLower(t)
+		}
+	}
+
 	var tags *jwt.TagList
 
 	switch claim.ClaimType() {
@@ -143,17 +154,23 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 	default:
 		panic("unhandled claim type")
 	}
-
-	tags.Add(sp.tags...)
-	tags.Remove(sp.rmTags...)
+	if !sp.caseSensitiveTags {
+		tags.Add(sp.tags...)
+		tags.Remove(sp.rmTags...)
+	} else {
+		tags.AddCaseSensitive(sp.tags...)
+		if err := tags.RemoveCaseSensitive(sp.rmTags...); err != nil {
+			return err
+		}
+	}
 	sort.Strings(*tags)
 
 	if r != nil {
 		for _, t := range sp.tags {
-			r.AddOK("added tag %q", strings.ToLower(t))
+			r.AddOK("added tag %q", t)
 		}
 		for _, t := range sp.rmTags {
-			r.AddOK("removed tag %q", strings.ToLower(t))
+			r.AddOK("removed tag %q", t)
 		}
 	}
 	return nil

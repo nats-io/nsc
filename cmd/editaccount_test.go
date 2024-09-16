@@ -524,3 +524,22 @@ func Test_EnableTierNoOtherFlag(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
 }
+
+func Test_EditAccountCaseSensitiveTags(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	_, _, err := ExecuteCmd(createEditAccount(), "A", "--case-sensitive-tags", "--tag", "One,Two,three")
+	require.Nil(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--case-sensitive-tags", "--rm-tag", "Three")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "A", "--case-sensitive-tags", "--rm-tag", "three")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, ac.Tags, jwt.TagList{"One", "Two"})
+}

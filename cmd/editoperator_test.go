@@ -420,3 +420,21 @@ func Test_CannotSetRequireSKWithoutSK(t *testing.T) {
 	require.False(t, oc.StrictSigningKeyUsage)
 	require.Empty(t, oc.SigningKeys)
 }
+
+func Test_EditOperatorCaseSensitiveTags(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--case-sensitive-tags", "--tag", "One,Two,three")
+	require.Nil(t, err)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--case-sensitive-tags", "--rm-tag", "Three")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--case-sensitive-tags", "--rm-tag", "three")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Equal(t, ac.Tags, jwt.TagList{"One", "Two"})
+}

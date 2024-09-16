@@ -57,6 +57,7 @@ func createEditAccount() *cobra.Command {
 			return RunAction(cmd, args, params)
 		},
 	}
+	cmd.Flags().BoolVarP(&params.caseSensitiveTags, "case-sensitive-tags", "", false, "allow tags values that are not lowercase (false)")
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 	params.conns = -1

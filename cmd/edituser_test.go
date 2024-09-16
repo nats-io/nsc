@@ -16,10 +16,11 @@
 package cmd
 
 import (
-	"github.com/nats-io/nsc/v2/cmd/store"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/nats-io/nkeys"
 
@@ -594,4 +595,24 @@ func Test_EditUserConnectionDeleteCase(t *testing.T) {
 	claim, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Len(t, claim.AllowedConnectionTypes, 0)
+}
+
+func Test_EditUserCaseSensitiveTags(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "-a", "A", "U", "--case-sensitive-tags", "--tag", "One,Two,three")
+	require.Nil(t, err)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "-a", "A", "U", "--case-sensitive-tags", "--rm-tag", "Three")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "-a", "A", "U", "--case-sensitive-tags", "--rm-tag", "three")
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.Equal(t, ac.Tags, jwt.TagList{"One", "Two"})
 }
