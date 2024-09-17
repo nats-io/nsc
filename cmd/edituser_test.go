@@ -16,10 +16,11 @@
 package cmd
 
 import (
-	"github.com/nats-io/nsc/v2/cmd/store"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/nats-io/nkeys"
 
@@ -38,12 +39,13 @@ func Test_EditUser(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditUserCmd(), []string{"edit", "user"}, nil, []string{"specify an edit option"}, true},
-		{createEditUserCmd(), []string{"edit", "user", "--tag", "A", "--account", "A"}, nil, []string{"edited user \"a\""}, false},
+		{createEditUserCmd(), []string{"edit", "user", "--tag", "A", "--account", "A"}, nil, []string{"--tag \"A\" is not lowercased"}, true},
+		{createEditUserCmd(), []string{"edit", "user", "--tag", "a", "--account", "A"}, nil, []string{"edited user \"a\""}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "MQTT", "--rm-conn-type", "LEAFNODE", "--account", "A"}, nil, []string{"added connection type MQTT", "added connection type MQTT"}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "LEAFNODE_WS", "--account", "A"}, nil, []string{"added connection type LEAFNODE_WS"}, false},
 		{createEditUserCmd(), []string{"edit", "user", "--conn-type", "MQTT_WS", "--account", "A"}, nil, []string{"added connection type MQTT_WS"}, false},
-		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B"}, nil, []string{"user name is required"}, true},
-		{createEditUserCmd(), []string{"edit", "user", "--tag", "B", "--account", "B", "--name", "bb"}, nil, []string{"edited user \"bb\""}, false},
+		{createEditUserCmd(), []string{"edit", "user", "--tag", "b", "--account", "B"}, nil, []string{"user name is required"}, true},
+		{createEditUserCmd(), []string{"edit", "user", "--tag", "b", "--account", "B", "--name", "bb"}, nil, []string{"edited user \"bb\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
@@ -107,7 +109,7 @@ func Test_EditUser_Tag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddUser(t, "A", "a")
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--tag", "A,B,C")
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--tag", "A,B,C", "--strict-tags")
 	require.NoError(t, err)
 
 	cc, err := ts.Store.ReadUserClaim("A", "a")
@@ -115,9 +117,9 @@ func Test_EditUser_Tag(t *testing.T) {
 	require.NotNil(t, cc)
 
 	require.Len(t, cc.Tags, 3)
-	require.ElementsMatch(t, cc.Tags, []string{"a", "b", "c"})
+	require.ElementsMatch(t, cc.Tags, []string{"A", "B", "C"})
 
-	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-tag", "A,B")
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-tag", "A,B", "--strict-tags")
 	require.NoError(t, err)
 
 	cc, err = ts.Store.ReadUserClaim("A", "a")
@@ -125,7 +127,7 @@ func Test_EditUser_Tag(t *testing.T) {
 	require.NotNil(t, cc)
 
 	require.Len(t, cc.Tags, 1)
-	require.ElementsMatch(t, cc.Tags, []string{"c"})
+	require.ElementsMatch(t, cc.Tags, []string{"C"})
 
 }
 
@@ -594,4 +596,30 @@ func Test_EditUserConnectionDeleteCase(t *testing.T) {
 	claim, err = ts.Store.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Len(t, claim.AllowedConnectionTypes, 0)
+}
+
+func TestEditUserStrictTags(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	_, _, err := ExecuteCmd(createEditUserCmd(), "--tag", "a")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-tag", "A")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--rm-tag \"A\" is not lowercased")
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--rm-tag", "A", "--strict-tags")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to remove tag: \"A\" - not found")
+
+	_, _, err = ExecuteCmd(createEditUserCmd(), "--tag", "A", "--strict-tags")
+	require.NoError(t, err)
+
+	uc, err := ts.Store.ReadUserClaim("A", "U")
+	require.NoError(t, err)
+	require.True(t, uc.Tags.Equals(&jwt.TagList{"A", "a"}))
 }

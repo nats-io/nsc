@@ -40,7 +40,7 @@ func Test_SyncOK(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// edit the jwt
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A", "--strict-tags")
 	require.NoError(t, err)
 
 	// sync the store
@@ -50,7 +50,8 @@ func Test_SyncOK(t *testing.T) {
 	// verify the tag was stored
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.Contains(t, ac.Tags, "a")
+	require.Contains(t, ac.Tags, "A")
+	require.True(t, ac.Tags.Contains("A"))
 }
 
 func Test_SyncNoURL(t *testing.T) {
@@ -120,7 +121,7 @@ func Test_SyncManualServer(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// edit the jwt
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "a")
 	require.NoError(t, err)
 
 	// sync the store
