@@ -8,6 +8,7 @@
 
 project_name: nsc
 version: 2
+
 release:
   github:
     owner: nats-io
@@ -74,7 +75,7 @@ checksum:
   name_template: 'SHA256SUMS-{{ .ProjectName }}.txt'
 
 snapshot:
-  version_template: 'dev'
+  name_template: 'dev'
 
 signs:
   - id: cosign
@@ -94,7 +95,7 @@ signs:
 
 brews:
   - name: nsc
-    directory: Formula
+    folder: Formula
     repository:
       owner: nats-io
       name: homebrew-nats-tools
