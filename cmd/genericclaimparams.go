@@ -30,9 +30,8 @@ import (
 // GenericClaimsParams - TimeParams and tags
 type GenericClaimsParams struct {
 	TimeParams
-	tags       []string
-	rmTags     []string
-	strictTags bool
+	tags   []string
+	rmTags []string
 }
 
 func (sp *GenericClaimsParams) Edit(current []string) error {
@@ -98,25 +97,7 @@ func (sp *GenericClaimsParams) remove(label string, values []string) ([]string, 
 }
 
 func (sp *GenericClaimsParams) Valid() error {
-	if err := sp.TimeParams.Validate(); err != nil {
-		return err
-	}
-	if !sp.strictTags {
-		for _, t := range sp.tags {
-			tt := strings.ToLower(t)
-			if t != tt {
-				return fmt.Errorf("--tag %q is not lowercased, specify option --strict-tags to honor non-lowercased values", t)
-			}
-		}
-		for _, t := range sp.rmTags {
-			tt := strings.ToLower(t)
-			if t != tt {
-				return fmt.Errorf("--rm-tag %q is not lowercased, specify option --strict-tags", t)
-			}
-		}
-	}
-
-	return nil
+	return sp.TimeParams.Validate()
 }
 
 func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Report) error {
@@ -161,9 +142,7 @@ func (sp *GenericClaimsParams) Run(ctx ActionCtx, claim jwt.Claims, r *store.Rep
 	}
 
 	tags.Add(sp.tags...)
-	if err := tags.Remove(sp.rmTags...); err != nil {
-		return err
-	}
+	tags.Remove(sp.rmTags...)
 	sort.Strings(*tags)
 
 	if r != nil {

@@ -426,23 +426,21 @@ func TestEditOperatorStrictTags(t *testing.T) {
 	defer ts.Done(t)
 
 	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--tag", "A")
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--tag", "a")
 	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-tag", "A")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "--rm-tag \"A\" is not lowercased")
+	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-tag", "A", "--strict-tags")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unable to remove tag: \"A\" - not found")
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-tag", "A")
+	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--tag", "A", "--strict-tags")
+	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--tag", "A")
 	require.NoError(t, err)
 
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
-	require.True(t, oc.Tags.Equals(&jwt.TagList{"A", "a"}))
+	require.True(t, oc.Tags.Equals(&jwt.TagList{"a"}))
 }

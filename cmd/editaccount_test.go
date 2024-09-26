@@ -75,17 +75,17 @@ func Test_EditAccount_RmTag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C", "--strict-tags")
+	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A,B", "--strict-tags")
+	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A,B")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 
 	require.Len(t, ac.Tags, 1)
-	require.ElementsMatch(t, ac.Tags, []string{"C"})
+	require.ElementsMatch(t, ac.Tags, []string{"c"})
 }
 
 func Test_EditAccount_Times(t *testing.T) {
@@ -535,17 +535,15 @@ func TestEditAccountStrictTags(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "--rm-tag \"A\" is not lowercased")
+	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A", "--strict-tags")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unable to remove tag: \"A\" - not found")
+	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A")
+	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A", "--strict-tags")
+	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
 	require.NoError(t, err)
 
 	uc, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.True(t, uc.Tags.Equals(&jwt.TagList{"A", "a"}))
+	require.True(t, uc.Tags.Equals(&jwt.TagList{"a"}))
 }
