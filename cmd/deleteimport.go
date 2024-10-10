@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -172,7 +173,7 @@ func (p *DeleteImportParams) Validate(ctx ActionCtx) error {
 		if p.srcAccount != "" {
 			m = fmt.Sprintf("%s from account %s", m, p.srcAccount)
 		}
-		return fmt.Errorf(m)
+		return errors.New(m)
 	}
 
 	if err = p.SignerParams.Resolve(ctx); err != nil {

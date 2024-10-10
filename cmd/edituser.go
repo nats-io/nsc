@@ -71,7 +71,6 @@ nsc edit user --name <n> --rm-response-perms
 			return RunAction(cmd, args, &params)
 		},
 	}
-	cmd.Flags().BoolVarP(&params.strictTags, "strict-tags", "", false, "allow tags to be case-sensitive, default false")
 	cmd.Flags().StringSliceVarP(&params.tags, "tag", "", nil, "add tags for user - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringSliceVarP(&params.rmTags, "rm-tag", "", nil, "remove tag - comma separated list or option can be specified multiple times")
 	cmd.Flags().StringVarP(&params.name, "name", "n", "", "user name")
