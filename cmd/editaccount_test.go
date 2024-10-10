@@ -37,7 +37,7 @@ func Test_EditAccount(t *testing.T) {
 		{createEditAccount(), []string{"edit", "account"}, nil, []string{"specify an edit option"}, true},
 		{createEditAccount(), []string{"edit", "account", "--info-url", "http://foo/bar"}, nil, []string{"changed info url to"}, false},
 		{createEditAccount(), []string{"edit", "account", "--description", "my account is about this"}, nil, []string{"changed description to"}, false},
-		{createEditAccount(), []string{"edit", "account", "--tag", "a", "--name", "A"}, nil, []string{"edited account \"A\""}, false},
+		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--name", "A"}, nil, []string{"edited account \"A\""}, false},
 	}
 
 	tests.Run(t, "root", "edit")
@@ -60,7 +60,7 @@ func Test_EditAccount_Tag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "a,b,c")
+	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -75,17 +75,17 @@ func Test_EditAccount_RmTag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C", "--strict-tags")
+	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A,B", "--strict-tags")
+	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A,B")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 
 	require.Len(t, ac.Tags, 1)
-	require.ElementsMatch(t, ac.Tags, []string{"C"})
+	require.ElementsMatch(t, ac.Tags, []string{"c"})
 }
 
 func Test_EditAccount_Times(t *testing.T) {
@@ -380,17 +380,17 @@ func Test_EditSysAccount(t *testing.T) {
 	for idx, n := range jsOptions {
 		flag := fmt.Sprintf("--%s", n)
 		if idx > 0 {
-			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "a", flag, "1")
+			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag, "1")
 			require.Error(t, err)
 			require.Contains(t, err.Error(), flag)
 		} else {
-			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "a", flag)
+			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), flag)
 		}
 	}
 	// defaults are removed automatically
-	_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "a")
+	_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A")
 	require.NoError(t, err)
 }
 
@@ -523,29 +523,4 @@ func Test_EnableTierNoOtherFlag(t *testing.T) {
 	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0", "--rm-js-tier", "0")
 	require.Error(t, err)
 	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
-}
-
-func TestEditAccountStrictTags(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
-	ts.AddAccount(t, "A")
-
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "a")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "--rm-tag \"A\" is not lowercased")
-
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A", "--strict-tags")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unable to remove tag: \"A\" - not found")
-
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A", "--strict-tags")
-	require.NoError(t, err)
-
-	uc, err := ts.Store.ReadAccountClaim("A")
-	require.NoError(t, err)
-	require.True(t, uc.Tags.Equals(&jwt.TagList{"A", "a"}))
 }

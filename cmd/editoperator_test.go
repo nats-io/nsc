@@ -43,7 +43,7 @@ func Test_EditOperator(t *testing.T) {
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk"}, nil, []string{"flag needs an argument"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "SAADOZRUTPZS6LIXS6CSSSW5GXY3DNMQMSDTVWHQNHQTIBPGNSADSMBPEU"}, nil, []string{"invalid operator signing key"}, true},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--sk", "OBMWGGURAFWMH3AFDX65TVIH4ZYSL7UKZ3LOH2ZRWIAU7PGZ3IJNR6W5"}, nil, []string{"edited operator"}, false},
-		{createEditOperatorCmd(), []string{"edit", "operator", "--tag", "o", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
+		{createEditOperatorCmd(), []string{"edit", "operator", "--tag", "O", "--start", "2019-04-13", "--expiry", "2050-01-01"}, nil, []string{"edited operator"}, false},
 		{createEditOperatorCmd(), []string{"edit", "operator", "--require-signing-keys"}, nil, []string{"needs to be issued with a signing key first"}, true},
 	}
 
@@ -419,30 +419,4 @@ func Test_CannotSetRequireSKWithoutSK(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, oc.StrictSigningKeyUsage)
 	require.Empty(t, oc.SigningKeys)
-}
-
-func TestEditOperatorStrictTags(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
-
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--tag", "A")
-	require.Error(t, err)
-
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--tag", "a")
-	require.NoError(t, err)
-
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-tag", "A")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "--rm-tag \"A\" is not lowercased")
-
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--rm-tag", "A", "--strict-tags")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unable to remove tag: \"A\" - not found")
-
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--tag", "A", "--strict-tags")
-	require.NoError(t, err)
-
-	oc, err := ts.Store.ReadOperatorClaim()
-	require.NoError(t, err)
-	require.True(t, oc.Tags.Equals(&jwt.TagList{"A", "a"}))
 }
