@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -233,5 +234,5 @@ func Test_ExpirationsTable(t *testing.T) {
 	require.Contains(t, stderr, "| O/A")
 	require.Contains(t, stderr, "| Soon    | O/A/U")
 	require.Contains(t, stderr, "In 59 Minutes |")
-	require.Contains(t, stderr, "creds/O/A/U.creds")
+	require.Contains(t, stderr, filepath.FromSlash("creds/O/A/U.creds"))
 }

@@ -28,10 +28,11 @@ import (
 func Test_ValidateNoOperator(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	storeDir := ts.AddSubDir(t, "store")
+	storeDir := ts.AddSubDir(t, "stores")
 	require.DirExists(t, storeDir)
 	_, _, err := ExecuteCmd(createValidateCommand())
 	require.Error(t, err)
+	t.Log(err.Error())
 	require.True(t, strings.Contains(err.Error(), "set an operator") ||
 		strings.Contains(err.Error(), "no such file or directory"))
 }

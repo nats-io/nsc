@@ -317,7 +317,7 @@ func TestGenerateProfile_MultipleOperators(t *testing.T) {
 	_, _, err := ExecuteCmd(createProfileCmd(), "--output-file", out, "nsc://O/A/U")
 	require.NoError(t, err)
 	profile := loadNscEnvProfile(t, out)
-	require.Contains(t, profile.UserCreds, "/O/A/U.creds")
+	require.Contains(t, profile.UserCreds, filepath.FromSlash("/O/A/U.creds"))
 }
 
 func TestGenerateProfile_NamesSeedsKeys(t *testing.T) {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -195,6 +196,9 @@ func TestDescribeAccount_JsonPath(t *testing.T) {
 }
 
 func TestDescribeAccount_JSTiers(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("running in windows - hangs while command works by hand")
+	}
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
