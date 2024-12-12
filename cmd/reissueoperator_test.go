@@ -67,6 +67,40 @@ func Test_ReIssue(t *testing.T) {
 	require.True(t, op4.DidSign(ac))
 }
 
+func Test_ReIssueWithKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	op1, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	// add testing account
+	ts.AddAccount(t, "A")
+	ac1, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, op1.DidSign(ac1))
+
+	seed, pub, _ := CreateOperatorKey(t)
+
+	cmd := createReIssueOperatorCmd()
+	HoistRootFlags(cmd)
+	_, stderr, err := ExecuteCmd(cmd, "-K", string(seed))
+	require.NoError(t, err)
+	op2, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.NotEqual(t, op1.Subject, op2.Subject)
+	require.Equal(t, pub, op2.Subject)
+	require.Equal(
+		t,
+		stderr,
+		"[ OK ] operator \"O\" successfully changed identity to: "+pub+"\n"+
+			"[ OK ] account \"A\" re-signed\n"+
+			"all jobs succeeded\n",
+	)
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.True(t, op2.DidSign(ac))
+}
+
 func Test_ReIssueStrict(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)

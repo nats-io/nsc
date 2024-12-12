@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
@@ -26,8 +27,12 @@ import (
 func createReIssueOperatorCmd() *cobra.Command {
 	var params reIssueOperator
 	cmd := &cobra.Command{
-		Use:          "operator",
-		Short:        "Re-issues the operator with a new identity and re-signs affected accounts",
+		Use: "operator",
+		Short: "Re-issues the operator with a new identity and re-signs affected accounts.\n" +
+			"\tWhen `--private-key` flag is provided with an operator seed, the identity\n" +
+			"\tspecified will be used for the operator and as the issuer for the accounts.\n" +
+			"\tNote use of this command could create a disruption. Please backup your server\n" +
+			"\tand nsc environment prior to use.",
 		Example:      `nsc reissue operator`,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
@@ -115,6 +120,22 @@ func (p *reIssueOperator) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		r.AddError("failed to generate new operator identity: %v", err)
 		return r, err
+	}
+	if KeyPathFlag != "" {
+		if strings.HasPrefix(KeyPathFlag, "O") {
+			KeyPathFlag, err = ctx.StoreCtx().KeyStore.GetSeed(KeyPathFlag)
+			if err != nil {
+				r.AddError("failed to find operator key: %v", err)
+				return r, err
+			}
+		}
+		if strings.HasPrefix(KeyPathFlag, "SO") {
+			opKp, err = nkeys.FromSeed([]byte(KeyPathFlag))
+			if err != nil {
+				r.AddError("failed to load operator key from seed: %v", err)
+				return r, err
+			}
+		}
 	}
 	accountSigningKey := opKp
 	if op.StrictSigningKeyUsage && !p.turnIntoSigningKey {
