@@ -283,8 +283,9 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 	}
 	// get the old validation results
 	var vr jwt.ValidationResults
-	if err = p.claim.Exports.Validate(&vr); err != nil {
-		return err
+	p.claim.Exports.Validate(&vr)
+	if len(vr.Errors()) != 0 {
+		return vr.Errors()[0]
 	}
 
 	// if we have a latency report subject create it
@@ -296,8 +297,9 @@ func (p *AddExportParams) Validate(ctx ActionCtx) error {
 	p.claim.Exports.Add(&p.export)
 
 	var vr2 jwt.ValidationResults
-	if err = p.claim.Exports.Validate(&vr2); err != nil {
-		return err
+	p.claim.Exports.Validate(&vr2)
+	if len(vr2.Errors()) != 0 {
+		return vr2.Errors()[0]
 	}
 
 	// filter out all the old validations

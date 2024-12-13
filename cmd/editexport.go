@@ -349,11 +349,17 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	old := *p.claim.Exports[p.index]
 	// old vr
 	var vr jwt.ValidationResults
-	if err := p.claim.Exports.Validate(&vr); err != nil {
-		return nil, err
+	r := store.NewDetailedReport(false)
+
+	p.claim.Exports.Validate(&vr)
+	if len(vr.Errors()) != 0 {
+		errs := vr.Errors()
+		for _, err := range errs {
+			r.AddFromError(err)
+		}
+		return r, vr.Errors()[0]
 	}
 
-	r := store.NewDetailedReport(false)
 	var export jwt.Export
 	export.Name = p.name
 	if export.Name != old.Name {
@@ -437,9 +443,15 @@ func (p *EditExportParams) Run(ctx ActionCtx) (store.Status, error) {
 	p.claim.Exports[p.index] = &export
 
 	var vr2 jwt.ValidationResults
-	if err := p.claim.Exports.Validate(&vr2); err != nil {
-		return nil, err
+	p.claim.Exports.Validate(&vr2)
+	if len(vr2.Errors()) != 0 {
+		errs := vr2.Errors()
+		for _, err := range errs {
+			r.AddFromError(err)
+		}
+		return r, vr2.Errors()[0]
 	}
+
 	// filter out all the old validations
 	uvr := jwt.CreateValidationResults()
 	if len(vr.Issues) > 0 {
