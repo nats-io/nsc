@@ -31,6 +31,7 @@ func createReissueAccountCmd() *cobra.Command {
 		Example:      `nsc reissue account`,
 		Args:         MaxArgs(0),
 		SilenceUsage: false,
+		Hidden:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := RunMaybeStorelessAction(cmd, args, &params); err != nil {
 				return err
@@ -81,6 +82,18 @@ func (p *reissueAccount) Run(ctx ActionCtx) (store.Status, error) {
 	s := ctx.StoreCtx().Store
 	ks := ctx.StoreCtx().KeyStore
 	accounts, err := s.ListSubContainers(store.Accounts)
+
+	// maybe filter to the account name provided
+	if ctx.CurrentCmd().Flags().Changed("account") {
+		var buf []string
+		name := ctx.StoreCtx().Account.Name
+		for _, n := range accounts {
+			if n == name {
+				buf = append(buf, n)
+			}
+		}
+		accounts = buf
+	}
 
 	if err != nil {
 		return nil, err
