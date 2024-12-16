@@ -3,7 +3,7 @@
 [![License Apache 2](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![ReportCard](https://goreportcard.com/badge/nats-io/nsc)](https://goreportcard.com/report/nats-io/nsc)
 [![Build Status](https://github.com/nats-io/nsc/actions/workflows/pushes.yaml/badge.svg)](https://github.com/nats-io/nsc/actions/workflows/pushes.yaml)
-[![GoDoc](http://godoc.org/github.com/nats-io/nsc?status.svg)](http://godoc.org/github.com/nats-io/nsc)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nats-io/nsc/v2.svg)](https://pkg.go.dev/github.com/nats-io/nsc/v2)
 [![Coverage Status](https://coveralls.io/repos/github/nats-io/nsc/badge.svg?branch=main&service=github)](https://coveralls.io/github/nats-io/nsc?branch=main)
 
 A tool for creating NATS account and user access configurations
@@ -38,7 +38,7 @@ brew untap nats-io/nats-tools
 Direct Download:
 
 Download your platform binary from
-[here.](https://github.com/nats-io/nsc/releases/latest)
+[GitHub releases.](https://github.com/nats-io/nsc/releases/latest)
 
 ## Updates are easy
 
