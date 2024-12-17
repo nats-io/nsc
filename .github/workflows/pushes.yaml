@@ -29,6 +29,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
     continue-on-error: ${{ matrix.experimental || false }}
     strategy:
       # Debugging multi-platform builds, let them all complete (for now)
@@ -98,11 +101,11 @@ jobs:
         run: |
           go run ./ test doc docs
 
-      - name: Auto-commit generated recordings
+      - name: Auto-commit generated docs
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Auto-commit recording
-          file_pattern: docs/**
+          commit_message: Auto-commit docs
+          file_pattern: docs/**/*.md
           
       - name: Bad versions creep defense
         id: go-module-versions
