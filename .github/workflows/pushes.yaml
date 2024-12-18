@@ -129,16 +129,14 @@ jobs:
         if: matrix.canonical
 
       - name: Generate docs
-        shell: 'script -q -e -c "bash {0}"'
-        run: |
-          go run ./ test doc docs
+        run: go run ./ test doc docs
         if: matrix.os == 'ubuntu-latest'
 
       - name: Auto-commit generated docs
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Auto-commit docs
-          file_pattern: docs/**/*.md
+          file_pattern: docs/**
         if: matrix.os == 'ubuntu-latest'
           
       - name: Bad versions creep defense
