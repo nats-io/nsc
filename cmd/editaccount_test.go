@@ -524,3 +524,55 @@ func Test_EnableTierNoOtherFlag(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
 }
+
+func Test_CannotEnableJsInSys(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "SYS")
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	require.NoError(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--js-enable", "1")
+	require.Error(t, err)
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--js-disable")
+	require.NoError(t, err)
+
+	sys, err := ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+
+	require.False(t, sys.Limits.IsJSEnabled())
+}
+
+func Test_AllowSysToDisableJs(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "SYS")
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	require.NoError(t, err)
+
+	sys, err := ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+	require.False(t, sys.Limits.IsJSEnabled())
+
+	sys.Limits.JetStreamTieredLimits = make(map[string]jwt.JetStreamLimits)
+	sys.Limits.JetStreamTieredLimits["R1"] = jwt.JetStreamLimits{DiskStorage: -1, MemoryStorage: -1}
+
+	okp, err := ts.KeyStore.GetKeyPair(ts.GetOperatorPublicKey(t))
+	require.NoError(t, err)
+	token, err := sys.Encode(okp)
+	require.NoError(t, err)
+	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
+
+	sys, err = ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+	require.True(t, sys.Limits.IsJSEnabled())
+
+	_, _, err = ExecuteCmd(createEditAccount(), "--js-disable")
+	require.NoError(t, err)
+
+	sys, err = ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+
+	require.False(t, sys.Limits.IsJSEnabled())
+}
