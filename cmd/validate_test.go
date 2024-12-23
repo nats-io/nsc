@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
 )
@@ -200,4 +201,29 @@ func Test_ValidateInteractive(t *testing.T) {
 	_, stderr, err := ExecuteInteractiveCmd(HoistRootFlags(createValidateCommand()), []interface{}{1}, "--account", "B")
 	require.NoError(t, err)
 	require.Contains(t, stderr, "Account \"B\"")
+}
+
+func Test_ValidateJsSys(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "SYS")
+	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	require.NoError(t, err)
+
+	sys, err := ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+	require.False(t, sys.Limits.IsJSEnabled())
+
+	sys.Limits.JetStreamTieredLimits = make(map[string]jwt.JetStreamLimits)
+	sys.Limits.JetStreamTieredLimits["R1"] = jwt.JetStreamLimits{DiskStorage: -1, MemoryStorage: -1}
+
+	okp, err := ts.KeyStore.GetKeyPair(ts.GetOperatorPublicKey(t))
+	require.NoError(t, err)
+	token, err := sys.Encode(okp)
+	require.NoError(t, err)
+	require.NoError(t, ts.Store.StoreRaw([]byte(token)))
+
+	_, stderr, err := ExecuteInteractiveCmd(HoistRootFlags(createValidateCommand()), []interface{}{1})
+	require.Error(t, err)
+	require.Contains(t, stderr, "JetStream should not be enabled for system account")
 }

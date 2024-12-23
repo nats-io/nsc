@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2024 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -219,6 +219,14 @@ func (p *ValidateCmdParams) validate(ctx ActionCtx) error {
 		aci := p.validateJWT(ac)
 		if aci != nil {
 			p.accountValidations[v] = aci
+		}
+		if oc.SystemAccount == ac.Subject {
+			if ac.Limits.IsJSEnabled() {
+				if p.accountValidations[v] == nil {
+					p.accountValidations[v] = &jwt.ValidationResults{}
+				}
+				p.accountValidations[v].AddError("JetStream should not be enabled for system account")
+			}
 		}
 		if !oc.DidSign(ac) {
 			if p.accountValidations[v] == nil {

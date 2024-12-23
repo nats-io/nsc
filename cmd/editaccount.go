@@ -598,7 +598,12 @@ func (p *EditAccountParams) checkSystemAccount(ctx ActionCtx) error {
 		return nil
 	}
 
-	if p.claim.Limits.JetStreamTieredLimits != nil {
+	// allow the js to be disabled
+	if p.disableJetStream {
+		return nil
+	}
+
+	if p.claim.Limits.JetStreamTieredLimits != nil || p.enableJetStream > -1 {
 		return errors.New("system account cannot have JetStream limits - please rerun with --js-disable")
 	}
 
