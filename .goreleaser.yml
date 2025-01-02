@@ -76,6 +76,17 @@ checksum:
 snapshot:
   version_template: 'dev'
 
+# this package is not used by the self-updater, so we can tag the version
+nfpms:
+  - file_name_template: '{{ .ProjectName }}-v{{ .Version }}-{{ .Arch }}{{ if .Arm
+    }}v{{ .Arm }}{{ end }}'
+    maintainer: nats.io
+    description: nsc cli program
+    vendor: nats-io
+    bindir: /usr/local/bin
+    formats:
+      - deb
+
 signs:
   - id: cosign
     cmd: "./release/sign-cosign"

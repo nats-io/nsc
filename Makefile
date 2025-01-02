@@ -20,7 +20,7 @@ fmt:
 	go mod tidy
 
 compile:
-	goreleaser --snapshot --rm-dist --skip-validate --skip-publish --parallelism 12
+	goreleaser --snapshot --clean --skip=publish,validate --parallelism 12
 
 install: compile build
 	cp $(BUILD_DIR)/nsc_$(BUILD_OS)_$(BUILD_OS_ARCH)/* $(BUILD_OS_GOPATH)/bin
