@@ -29,6 +29,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
     continue-on-error: ${{ matrix.experimental || false }}
     strategy:
       # Debugging multi-platform builds, let them all complete (for now)
@@ -52,6 +55,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -125,6 +129,17 @@ jobs:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: matrix.canonical
 
+      - name: Generate docs
+        run: go run ./ test doc docs
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Auto-commit generated docs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Auto-commit docs
+          file_pattern: docs/**
+        if: matrix.os == 'ubuntu-latest'
+          
       - name: Bad versions creep defense
         id: go-module-versions
         # The go.mod includes tests, and some of our tests explicitly pull in jwtv1, which is unmaintained and has security issues.
