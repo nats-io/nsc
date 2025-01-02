@@ -28,6 +28,9 @@ install: compile build
 cover: test
 	go tool cover -html=./coverage.out
 
+doc:
+	go run ./ test doc docs
+
 # The NSC_*_OPERATOR unset is because those variables pre-define operators which break the interactive tests
 test:
 	go mod vendor
