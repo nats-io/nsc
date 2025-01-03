@@ -13,7 +13,7 @@ require (
 	github.com/nats-io/jsm.go v0.1.2
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats-server/v2 v2.10.18
-	github.com/nats-io/nats.go v1.37.0
+	github.com/nats-io/nats.go v1.38.0
 	github.com/nats-io/nkeys v0.4.9
 	github.com/nats-io/nuid v1.0.1
 	github.com/rhysd/go-github-selfupdate v1.2.3
@@ -26,7 +26,7 @@ require (
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
@@ -46,7 +46,7 @@ require (
 	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.32.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
