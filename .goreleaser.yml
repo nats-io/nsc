@@ -12,7 +12,7 @@ release:
   github:
     owner: nats-io
     name: nsc
-  name_template: '{{.Tag}}'
+  name_template: "{{.Tag}}"
   draft: true
 
 builds:
@@ -71,10 +71,10 @@ archives:
       - none*
 
 checksum:
-  name_template: 'SHA256SUMS-{{ .ProjectName }}.txt'
+  name_template: "SHA256SUMS-{{ .ProjectName }}.txt"
 
 snapshot:
-  version_template: 'dev'
+  version_template: "dev"
 
 signs:
   - id: cosign
@@ -90,7 +90,6 @@ signs:
 #   args: ["${artifact}", "${signature}"]
 #   signature: "${artifact}.ssh.sig"
 #   artifacts: checksum
-
 
 brews:
   - name: nsc
@@ -110,4 +109,3 @@ brews:
       system "#{bin}/nsc --version"
     install: |
       bin.install "nsc"
-
