@@ -110,4 +110,4 @@ brews:
       system "#{bin}/nsc --version"
     install: |
       bin.install "nsc"
-
+      generate_completions_from_executable(bin/"nsc", "completion")
