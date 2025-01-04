@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/nats-io/nkeys"
@@ -98,6 +99,18 @@ func Test_HasOldStructure(t *testing.T) {
 	store.KeyStorePath = old
 }
 
+func Test_NoMigration(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("running in windows - looking at output hangs")
+	}
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, stdErr, err := ExecuteCmd(createMigrateKeysCmd())
+	require.NoError(t, err)
+	require.Contains(t, stdErr, "does not need migration")
+}
+
 func Test_MigrateKeys(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
@@ -125,9 +138,8 @@ func Test_MigrateKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, needsUpdate)
 
-	old, err := store.Migrate()
+	_, _, err = ExecuteCmd(createMigrateKeysCmd())
 	require.NoError(t, err)
-	require.DirExists(t, old)
 
 	// directory for keystore has a "keys" and "creds"
 	keysDir := filepath.Join(ks, "keys")

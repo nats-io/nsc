@@ -18,11 +18,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/nats-io/nkeys"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
@@ -308,4 +310,88 @@ func TestDescribeAccount_Exports(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, out, "| Account Token Position |")
 	require.Contains(t, out, "foo.bar.*.> | 3")
+}
+
+func TestDescribeAccountMore(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("running in windows - looking at output hangs")
+	}
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	ac.Description = "hello"
+	ac.InfoURL = "https://example.com"
+	_, signingKey, _ := CreateAccountKey(t)
+	ac.SigningKeys.Add(signingKey)
+
+	_, issuer, _ := CreateAccountKey(t)
+	scope := jwt.NewUserScope()
+	scope.Key = issuer
+	scope.Role = "nothing"
+	scope.Description = "no permissions"
+	scope.Template = jwt.UserPermissionLimits{
+		Permissions: jwt.Permissions{
+			Sub: jwt.Permission{Deny: []string{">"}},
+			Pub: jwt.Permission{Deny: []string{">"}},
+		},
+	}
+	ac.SigningKeys.AddScopedSigner(scope)
+
+	ac.Limits.JetStreamLimits = jwt.JetStreamLimits{DiskStorage: -1, MemoryStorage: -1}
+	ac.Limits.LeafNodeConn = 1
+
+	_, user, _ := CreateUserKey(t)
+	ac.Revocations = jwt.RevocationList{}
+	ac.Revocations.Revoke(user, time.Now())
+
+	ac.Trace = &jwt.MsgTrace{
+		Destination: "foo",
+		Sampling:    100,
+	}
+
+	ekp, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	a, err := ekp.PublicKey()
+	require.NoError(t, err)
+	ac.Imports.Add(&jwt.Import{
+		Name:         "hello",
+		Subject:      "bar.>",
+		LocalSubject: "fromA.>",
+		Type:         jwt.Stream,
+		AllowTrace:   true,
+		Share:        true,
+		Account:      a,
+	})
+
+	ac.Mappings = make(map[jwt.Subject][]jwt.WeightedMapping)
+	ac.Mappings["mapfoo"] = []jwt.WeightedMapping{jwt.WeightedMapping{Subject: "map.>", Weight: 20, Cluster: "a"}}
+
+	token, err := ac.Encode(ts.OperatorKey)
+	require.NoError(t, err)
+	_, err = ts.Store.StoreClaim([]byte(token))
+	require.NoError(t, err)
+
+	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "-n", "A")
+	require.NoError(t, err)
+
+	out = StripMultipleSpaces(out)
+	t.Log(out)
+	require.Contains(t, out, "| Description | hello")
+	require.Contains(t, out, "| Info Url | https://example.com")
+	// order of the key may be unexpected, just find the key
+	require.Contains(t, out, signingKey)
+	require.Contains(t, out, "| Max Disk Storage | Unlimited")
+	require.Contains(t, out, "| Max Mem Storage | Unlimited")
+	require.Contains(t, out, "| Max Leaf Node Connections | 1")
+	require.Contains(t, out, "| Revocations | 1")
+	require.Contains(t, out, "| Subject | foo")
+	require.Contains(t, out, "| Sampling | 100%")
+	require.Contains(t, out, "| hello | Stream | bar.> | fromA.>")
+	require.Contains(t, out, "| mapfoo | map.> | 20")
+
+	require.Contains(t, out, "| Key | "+issuer)
+	require.Contains(t, out, "| Role | nothing")
+	require.Contains(t, out, "| Description | no permissions")
 }

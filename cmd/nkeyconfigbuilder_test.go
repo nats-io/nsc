@@ -133,8 +133,8 @@ func Test_NkeyResolverMapsImporter(t *testing.T) {
 
 	ts.AddAccount(t, "B")
 
-	ts.AddImport(t, "A", "service.b", "B")
-	ts.AddImport(t, "A", "stream.a", "B")
+	ts.AddImport(t, "A", jwt.Service, "service.b", "B")
+	ts.AddImport(t, "A", jwt.Stream, "stream.a", "B")
 
 	builder := NewNKeyConfigBuilder()
 

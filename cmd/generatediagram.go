@@ -27,17 +27,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var accDetail bool
 var outputFile string
+var users, showKeys, detail bool
 
-func init() {
+func createDiagramCmd() *cobra.Command {
 	diagram := &cobra.Command{
 		Use:          "diagram",
 		Short:        "Generate diagrams for this store",
 		Args:         MaxArgs(0),
 		SilenceUsage: true,
 	}
-	accDetail := false
-	comp := &cobra.Command{
+	return diagram
+}
+
+func createComponentDiagreamCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:          "component",
 		Short:        "Generate a plantuml component diagram for this store",
 		Args:         MaxArgs(0),
@@ -47,10 +52,14 @@ func init() {
 			return componentDiagram(accDetail)
 		},
 	}
-	comp.Flags().BoolVarP(&accDetail, "detail", "", false, "Include account descriptions")
-	diagram.AddCommand(comp)
-	showKeys, detail, users := false, false, false
-	object := &cobra.Command{
+	cmd.Flags().BoolVarP(&accDetail, "detail", "", false, "Include account descriptions")
+	cmd.Flags().StringVarP(&outputFile, "output-file", "o", "--", "output file, '--' is stdout")
+
+	return cmd
+}
+
+func createObjectDiagramCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:          "object",
 		Short:        "Generate a plantuml object diagram for this store",
 		Args:         MaxArgs(0),
@@ -60,12 +69,20 @@ func init() {
 			return objectDiagram(users, showKeys, detail)
 		},
 	}
-	object.Flags().BoolVarP(&showKeys, "show-keys", "", false, "Include keys in diagram")
-	object.Flags().BoolVarP(&users, "users", "", false, "Include User")
-	object.Flags().BoolVarP(&detail, "detail", "", false, "Include empty/unlimited values")
-	diagram.AddCommand(object)
-	diagram.PersistentFlags().StringVarP(&outputFile, "output-file", "o", "--", "output file, '--' is stdout")
+
+	cmd.Flags().BoolVarP(&showKeys, "show-keys", "", false, "Include keys in diagram")
+	cmd.Flags().BoolVarP(&users, "users", "", false, "Include User")
+	cmd.Flags().BoolVarP(&detail, "detail", "", false, "Include empty/unlimited values")
+	cmd.Flags().StringVarP(&outputFile, "output-file", "o", "--", "output file, '--' is stdout")
+
+	return cmd
+}
+
+func init() {
+	diagram := createDiagramCmd()
 	generateCmd.AddCommand(diagram)
+	diagram.AddCommand(createComponentDiagreamCmd())
+	diagram.AddCommand(createObjectDiagramCmd())
 }
 
 const rename = "<&resize-width>"

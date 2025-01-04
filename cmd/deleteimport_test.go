@@ -31,8 +31,8 @@ func Test_DeleteImport(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "bar", 0, false)
 
 	ts.AddAccount(t, "B")
-	ts.AddImport(t, "A", "foo", "B")
-	ts.AddImport(t, "A", "bar", "B")
+	ts.AddImport(t, "A", jwt.Stream, "foo", "B")
+	ts.AddImport(t, "A", jwt.Stream, "bar", "B")
 
 	tests := CmdTests{
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "A"}, nil, []string{"account \"A\" doesn't have imports"}, true},
@@ -51,7 +51,7 @@ func Test_DeleteImportAccountRequired(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foo", 0, false)
 	ts.AddAccount(t, "B")
-	ts.AddImport(t, "A", "foo", "B")
+	ts.AddImport(t, "A", jwt.Stream, "foo", "B")
 
 	GetConfig().SetAccount("")
 	_, _, err := ExecuteCmd(createDeleteImportCmd(), "--subject", "A")
@@ -68,8 +68,8 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "bar", 0, false)
 
 	ts.AddAccount(t, "B")
-	ts.AddImport(t, "A", "foo", "B")
-	ts.AddImport(t, "A", "bar", "B")
+	ts.AddImport(t, "A", jwt.Stream, "foo", "B")
+	ts.AddImport(t, "A", jwt.Stream, "bar", "B")
 
 	input := []interface{}{1, 0, 0}
 	cmd := createDeleteImportCmd()

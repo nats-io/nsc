@@ -17,13 +17,12 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
-	"testing"
-	"time"
-
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
+	"path/filepath"
+	"testing"
+	"time"
 )
 
 func Test_FixRequiresInArg(t *testing.T) {
@@ -62,13 +61,6 @@ func Test_FixBasics(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, Write(filepath.Join(in, "o.jwt"), []byte(otok)))
 
-	// and another with a tag
-	oc.Tags.Add("test")
-	time.Sleep(time.Second)
-	otok2, err := oc.Encode(okp)
-	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "o2.jwt"), []byte(otok2)))
-
 	ask, apk, akp := CreateAccountKey(t)
 	require.NoError(t, Write(filepath.Join(in, "apk.nk"), ask))
 	ac := jwt.NewAccountClaims(apk)
@@ -85,8 +77,35 @@ func Test_FixBasics(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, Write(filepath.Join(in, "u.jwt"), []byte(utok)))
 
+	usk2, upk2, _ := CreateUserKey(t)
+	uc2 := jwt.NewUserClaims(upk2)
+	uc2.Name = "U2"
+	u2tok, err := uc2.Encode(akp)
+	require.NoError(t, err)
+	creds, err := jwt.FormatUserConfig(u2tok, usk2)
+	require.NoError(t, err)
+	require.NoError(t, Write(filepath.Join(in, "u2.creds"), creds))
+
+	// and copy of operator with a tag (and newer date)
+	time.Sleep(time.Second)
+
+	oc.Tags.Add("test")
+	otok2, err := oc.Encode(okp)
+	require.NoError(t, err)
+	require.NoError(t, Write(filepath.Join(in, "o2.jwt"), []byte(otok2)))
+
+	ac.Tags.Add("test")
+	atok, err = ac.Encode(okp)
+	require.NoError(t, err)
+	require.NoError(t, Write(filepath.Join(in, "a2.jwt"), []byte(atok)))
+
+	uc.Tags.Add("test")
+	utok, err = uc.Encode(akp)
+	require.NoError(t, err)
+	require.NoError(t, Write(filepath.Join(in, "u2.jwt"), []byte(utok)))
+
 	ofp := filepath.Join(ts.Dir, "out")
-	_, _, err = ExecuteCmd(createFixCmd(), "--in", in, "--out", ofp)
+	_, _, err = ExecuteCmd(createFixCmd(), "--creds", "--in", in, "--out", ofp)
 	require.NoError(t, err)
 
 	s, err := store.LoadStore(filepath.Join(ofp, "operators", "O"))
@@ -102,11 +121,17 @@ func Test_FixBasics(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, apk, aac.Subject)
 	require.Equal(t, "A", aac.Name)
+	require.True(t, aac.Tags.Contains("test"))
 
 	uuc, err := s.ReadUserClaim("A", "U")
 	require.NoError(t, err)
 	require.Equal(t, upk, uuc.Subject)
 	require.Equal(t, "U", uuc.Name)
+	require.True(t, uuc.Tags.Contains("test"))
+
+	uuc2, err := s.ReadUserClaim("A", "U2")
+	require.NoError(t, err)
+	require.Equal(t, upk2, uuc2.Subject)
 
 	okf := filepath.Join(ofp, "keys", "keys", opk[:1], opk[1:3], fmt.Sprintf("%s.nk", opk))
 	require.FileExists(t, okf)
