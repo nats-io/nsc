@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -35,6 +36,8 @@ var listCmd = &cobra.Command{
 
 func init() {
 	GetRootCmd().AddCommand(listCmd)
+	listCmd.PersistentFlags().BoolVarP(&Json, "json", "J", false, "describe as JSON")
+
 	listCmd.AddCommand(createListOperatorsCmd())
 	listCmd.AddCommand(createListAccountsCmd())
 	listCmd.AddCommand(createListUsersCmd())
@@ -44,6 +47,17 @@ type EntryInfo struct {
 	Name   string
 	Claims jwt.Claims
 	Err    error
+}
+
+func (ei EntryInfo) MarshalJSON() ([]byte, error) {
+	// Customize the JSON output
+	return json.Marshal(struct {
+		Name      string `json:"name"`
+		PublicKey string `json:"public_key"`
+	}{
+		Name:      ei.Name,
+		PublicKey: ei.Claims.Claims().Subject,
+	})
 }
 
 func createListOperatorsCmd() *cobra.Command {
@@ -242,7 +256,18 @@ func createListUsersCmd() *cobra.Command {
 	return cmd
 }
 
+func listEntriesAsJSON(infos []*EntryInfo) string {
+	data, err := json.MarshalIndent(infos, "", " ")
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
 func listEntities(title string, infos []*EntryInfo, current string) string {
+	if Json {
+		return listEntriesAsJSON(infos)
+	}
 	table := tablewriter.CreateTable()
 	table.AddTitle(title)
 	if len(infos) == 0 {
