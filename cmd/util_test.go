@@ -340,8 +340,11 @@ func (ts *TestStore) ImportRequiresToken(t *testing.T, srcAccount string, subjec
 	return false
 }
 
-func (ts *TestStore) AddImport(t *testing.T, srcAccount string, subject string, targetAccountName string) {
+func (ts *TestStore) AddImport(t *testing.T, srcAccount string, kind jwt.ExportType, subject string, targetAccountName string) {
 	flags := []string{"--account", targetAccountName}
+	if kind == jwt.Service {
+		flags = append(flags, "--service")
+	}
 
 	if ts.ImportRequiresToken(t, srcAccount, subject) {
 		token := ts.GenerateActivation(t, srcAccount, subject, targetAccountName)
@@ -452,6 +455,11 @@ func StripTableDecorations(s string) string {
 	}
 	// replace multiple spaces with just one
 	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(s, " ")
+}
+
+func StripMultipleSpaces(s string) string {
+	re := regexp.MustCompile(` +`)
 	return re.ReplaceAllString(s, " ")
 }
 

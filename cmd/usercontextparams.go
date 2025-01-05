@@ -57,9 +57,13 @@ func (p *UserContextParams) SetDefaults(ctx ActionCtx) error {
 }
 
 func (p *UserContextParams) Edit(ctx ActionCtx) error {
-	config := GetConfig()
+	account := ctx.StoreCtx().Account.Name
+	if account == "" {
+		config := GetConfig()
+		account = config.Account
+	}
 	var err error
-	p.Name, err = PickUser(ctx.StoreCtx(), config.Account)
+	p.Name, err = PickUser(ctx.StoreCtx(), account)
 	if err != nil {
 		return err
 	}
