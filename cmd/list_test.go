@@ -58,11 +58,13 @@ func Test_ListAccountsJSON(t *testing.T) {
 	cmd := createListAccountsCmd()
 	cmd.PersistentFlags().BoolVarP(&Json, "json", "J", false, "describe as JSON")
 
+
 	out, err := ExecuteCmd(cmd, "--json")
 	require.NoError(t, err)
 
 	var entries []entryJSON
 	require.NoError(t, json.Unmarshal([]byte(out.Out), &entries))
+
 	assert.Len(t, entries, 2)
 	assert.Equal(t, entries[0].Name, "A")
 	assert.Equal(t, entries[0].PublicKey, ts.GetAccountPublicKey(t, "A"))
