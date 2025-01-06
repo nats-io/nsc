@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The NATS Authors
+ * Copyright 2021-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,11 +16,9 @@
 package cmd
 
 import (
-	"testing"
-
 	"github.com/nats-io/jwt/v2"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func Test_DeleteMapping(t *testing.T) {
@@ -28,13 +26,13 @@ func Test_DeleteMapping(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1", "--to", "to1", "--weight", "50")
+	_, err := ExecuteCmd(createAddMappingCmd(), []string{"--account", "A", "--from", "from1", "--to", "to1", "--weight", "50"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from1", "--to", "to2", "--weight", "50")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--account", "A", "--from", "from1", "--to", "to2", "--weight", "50"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2", "--to", "to1", "--weight", "50")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--account", "A", "--from", "from2", "--to", "to1", "--weight", "50"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--account", "A", "--from", "from2", "--to", "to2", "--weight", "50")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--account", "A", "--from", "from2", "--to", "to2", "--weight", "50"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -45,7 +43,7 @@ func Test_DeleteMapping(t *testing.T) {
 	require.Len(t, ac.Mappings["from2"], 2)
 
 	// remove all mappings for from1
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--account", "A", "--from", "from1")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--account", "A", "--from", "from1"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -54,7 +52,7 @@ func Test_DeleteMapping(t *testing.T) {
 	require.Len(t, ac.Mappings["from2"], 2)
 
 	// remove particular mapping to1 from from2
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--account", "A", "--from", "from2", "--to", "to1")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--account", "A", "--from", "from2", "--to", "to1"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -63,7 +61,7 @@ func Test_DeleteMapping(t *testing.T) {
 	require.Len(t, ac.Mappings["from2"], 1)
 
 	// remove non existing mapping to3 from from2
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--account", "A", "--from", "from2", "--to", "to3")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--account", "A", "--from", "from2", "--to", "to3"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -72,7 +70,7 @@ func Test_DeleteMapping(t *testing.T) {
 	require.Len(t, ac.Mappings["from2"], 1)
 
 	// remove particular mapping to2 from from2
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--account", "A", "--from", "from2", "--to", "to2")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--account", "A", "--from", "from2", "--to", "to2"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -86,11 +84,11 @@ func TestDeleteMappingWithCluster(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	// add a default mapping at a 100, default mapping at max
-	_, _, err := ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	_, err := ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qq", "--weight", "100"}...)
 	require.NoError(t, err)
 
 	// add a mapping that has the same subject, but using a cluster
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100", "--cluster", "A")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qq", "--weight", "100", "--cluster", "A"}...)
 	require.NoError(t, err)
 
 	// verify we have both mappings
@@ -110,7 +108,7 @@ func TestDeleteMappingWithCluster(t *testing.T) {
 		Cluster: "A",
 	}, m[1])
 
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--from", "q", "--to", "qq")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--from", "q", "--to", "qq"}...)
 	require.NoError(t, err)
 
 	// deleted the one without the cluster
@@ -126,10 +124,10 @@ func TestDeleteMappingWithCluster(t *testing.T) {
 	}, m[0])
 
 	// add the default mapping again
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qq", "--weight", "100"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createDeleteMappingCmd(), "--from", "q", "--to", "qq", "--cluster", "A")
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--from", "q", "--to", "qq", "--cluster", "A"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")

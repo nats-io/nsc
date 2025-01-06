@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,11 +31,11 @@ func Test_ExpirationsNone(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	stdout, err := ExecuteCmd(createExpirationsCommand(), "--json")
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(stdout.Out), &expirations)
 	require.NoError(t, err)
 	_, err = time.Parse(time.RFC3339, expirations.ExpirationThreshold)
 	require.NoError(t, err)
@@ -55,11 +55,11 @@ func Test_ExpirationsOperator(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	stdout, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(stdout.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 1)
 	require.True(t, expirations.Report[0].Expired)
@@ -78,11 +78,11 @@ func Test_ExpirationAccount(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	out, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 2)
 	require.False(t, expirations.Report[0].Expired)
@@ -103,11 +103,11 @@ func Test_ExpirationUser(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	out, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 4)
 	require.False(t, expirations.Report[0].Expired)
@@ -130,11 +130,11 @@ func Test_ExpiresSoonOperator(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	out, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 1)
 	require.False(t, expirations.Report[0].Expired)
@@ -154,11 +154,11 @@ func Test_ExpiresSoonAccount(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	out, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 2)
 	require.False(t, expirations.Report[0].Expired)
@@ -185,11 +185,11 @@ func Test_ExpiresSoonUser(t *testing.T) {
 	_, err = ts.KeyStore.MaybeStoreUserCreds("A", "U", creds)
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createExpirationsCommand(), "--json")
+	out, err := ExecuteCmd(createExpirationsCommand(), []string{"--json"}...)
 	require.NoError(t, err)
 
 	var expirations ExpirationReportJSON
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 4)
 	require.False(t, expirations.Report[0].Expired)
@@ -200,9 +200,9 @@ func Test_ExpiresSoonUser(t *testing.T) {
 	require.True(t, expirations.Report[3].ExpiresSoon)
 	require.False(t, expirations.Report[3].Expired)
 
-	stdout, _, err = ExecuteCmd(createExpirationsCommand(), "--skip", "--json")
+	out, err = ExecuteCmd(createExpirationsCommand(), []string{"--skip", "--json"}...)
 	require.NoError(t, err)
-	err = json.Unmarshal([]byte(stdout), &expirations)
+	err = json.Unmarshal([]byte(out.Out), &expirations)
 	require.NoError(t, err)
 	require.Len(t, expirations.Report, 2)
 	require.Equal(t, expirations.Report[0].ID, uc.Subject)
@@ -227,12 +227,12 @@ func Test_ExpirationsTable(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	_, stderr, err := ExecuteCmd(createExpirationsCommand())
+	out, err := ExecuteCmd(createExpirationsCommand())
 	require.NoError(t, err)
 
-	require.Contains(t, stderr, "| O")
-	require.Contains(t, stderr, "| O/A")
-	require.Contains(t, stderr, "| Soon    | O/A/U")
-	require.Contains(t, stderr, "In 59 Minutes |")
-	require.Contains(t, stderr, filepath.FromSlash("creds/O/A/U.creds"))
+	require.Contains(t, out.Out, "| O")
+	require.Contains(t, out.Out, "| O/A")
+	require.Contains(t, out.Out, "| Soon    | O/A/U")
+	require.Contains(t, out.Out, "In 59 Minutes |")
+	require.Contains(t, out.Out, filepath.FromSlash("creds/O/A/U.creds"))
 }

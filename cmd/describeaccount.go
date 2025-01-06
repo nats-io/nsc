@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 )
@@ -44,9 +43,7 @@ func init() {
 
 type DescribeAccountParams struct {
 	AccountContextParams
-	jwt.AccountClaims
-	outputFile string
-	raw        []byte
+	BaseDescribe
 }
 
 func (p *DescribeAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -60,72 +57,24 @@ func (p *DescribeAccountParams) PreInteractive(ctx ActionCtx) error {
 
 func (p *DescribeAccountParams) Load(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
-	if Json || Raw || JsonPath != "" {
-		p.raw, err = ctx.StoreCtx().Store.ReadRawAccountClaim(p.AccountContextParams.Name)
-		if err != nil {
-			return err
-		}
-		if Json || JsonPath != "" {
-			p.raw, err = bodyAsJson(p.raw)
-			if err != nil {
-				return err
-			}
-			if JsonPath != "" {
-				p.raw, err = GetField(p.raw, JsonPath)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	} else {
-		ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
-		if err != nil {
-			return err
-		}
-		p.AccountClaims = *ac
+	p.raw, err = ctx.StoreCtx().Store.ReadRawAccountClaim(p.AccountContextParams.Name)
+	if err != nil {
+		return err
 	}
-
-	return nil
+	return p.Init()
 }
 
-func (p *DescribeAccountParams) Validate(_ ActionCtx) error {
-	return nil
+func (p *DescribeAccountParams) Validate(ctx ActionCtx) error {
+	return p.AccountContextParams.Validate(ctx)
 }
 
 func (p *DescribeAccountParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeAccountParams) Run(_ ActionCtx) (store.Status, error) {
-	if Raw || Json || JsonPath != "" {
-		if !IsStdOut(p.outputFile) && Raw {
-			var err error
-			p.raw, err = jwt.DecorateJWT(string(p.raw))
-			if err != nil {
-				return nil, err
-			}
-		}
-		p.raw = append(p.raw, '\n')
-		if err := Write(p.outputFile, p.raw); err != nil {
-			return nil, err
-		}
-	} else {
-		v := NewAccountDescriber(p.AccountClaims).Describe()
-		if err := Write(p.outputFile, []byte(v)); err != nil {
-			return nil, err
-		}
-	}
-	var s store.Status
-	if !IsStdOut(p.outputFile) {
-		k := "description"
-		if Raw {
-			k = "jwt"
-		}
-		s = store.OKStatus("wrote account %s to %#q", k, AbbrevHomePaths(p.outputFile))
-	}
-	return s, nil
+func (p *DescribeAccountParams) Run(ctx ActionCtx) (store.Status, error) {
+	return p.Describe(ctx)
 }

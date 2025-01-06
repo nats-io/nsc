@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The NATS Authors
+ * Copyright 2020-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,18 +16,16 @@
 package cmd
 
 import (
-	"testing"
-
 	"github.com/nats-io/jwt/v2"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func Test_RenameAccountRequiresOK(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRenameAccountCmd(), "A", "B")
+	_, err := ExecuteCmd(createRenameAccountCmd(), []string{"A", "B"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "required flag \"OK\" not set")
 }
@@ -37,7 +35,7 @@ func Test_RenameAccountNoUsers(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	pk := ts.GetAccountPublicKey(t, "A")
-	_, _, err := ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
+	_, err := ExecuteCmd(createRenameAccountCmd(), []string{"A", "B", "--OK"}...)
 	require.NoError(t, err)
 
 	_, err = ts.Store.ReadAccountClaim("A")
@@ -59,7 +57,7 @@ func Test_RenameAccountUsers(t *testing.T) {
 	require.FileExists(t, ts.KeyStore.CalcUserCredsPath("A", "aa"))
 	require.FileExists(t, ts.KeyStore.CalcUserCredsPath("A", "bb"))
 
-	_, _, err := ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
+	_, err := ExecuteCmd(createRenameAccountCmd(), []string{"A", "B", "--OK"}...)
 	require.NoError(t, err)
 
 	_, err = ts.Store.ReadAccountClaim("A")
@@ -81,7 +79,7 @@ func Test_RenameAccountDuplicate(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
+	_, err := ExecuteCmd(createRenameAccountCmd(), []string{"A", "B", "--OK"}...)
 	require.Error(t, err)
 }
 
@@ -99,7 +97,7 @@ func Test_RenameManagedAccount(t *testing.T) {
 	require.Equal(t, pk, ac.Subject)
 	require.Equal(t, "A", ac.Name)
 
-	_, _, err = ExecuteCmd(createRenameAccountCmd(), "A", "B", "--OK")
+	_, err = ExecuteCmd(createRenameAccountCmd(), []string{"A", "B", "--OK"}...)
 	require.NoError(t, err)
 	bc, err := jwt.DecodeAccountClaims(string(m[pk]))
 	require.NoError(t, err)

@@ -1,18 +1,29 @@
+/*
+ * Copyright 2025-2025 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 )
 
 func Test_RttTool(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("running in windows - looking at output hangs")
-	}
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
@@ -30,7 +41,7 @@ func Test_RttTool(t *testing.T) {
 	ts.AddUser(t, "A", "a")
 
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver", "--config-file", serverconf}...)
 	require.NoError(t, err)
 
 	var opts server.Options
@@ -45,7 +56,7 @@ func Test_RttTool(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	_, stdErr, err := ExecuteCmd(createToolRTTCmd(), "--account", "A", "--user", "a")
+	out, err := ExecuteCmd(createToolRTTCmd(), "--account", "A", "--user", "a")
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "round trip time to [nats://127.0.0.1:4222]")
+	require.Contains(t, out.Out, "round trip time to [nats://127.0.0.1:4222]")
 }

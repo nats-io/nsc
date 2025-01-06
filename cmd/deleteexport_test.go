@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -33,8 +33,8 @@ func Test_DeleteExport(t *testing.T) {
 	tests := CmdTests{
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A"}, nil, []string{"subject is required"}, true},
 		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "a"}, nil, []string{"no export matching \"a\" found"}, true},
-		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "foo"}, nil, []string{"deleted stream export \"foo\""}, false},
-		{createDeleteExportCmd(), []string{"delete", "export", "--account", "B"}, nil, []string{"deleted service export \"bar\""}, false},
+		{createDeleteExportCmd(), []string{"delete", "export", "--account", "A", "--subject", "foo"}, []string{"deleted stream export \"foo\""}, nil, false},
+		{createDeleteExportCmd(), []string{"delete", "export", "--account", "B"}, []string{"deleted service export \"bar\""}, nil, false},
 	}
 
 	tests.Run(t, "root", "delete")
@@ -47,7 +47,7 @@ func Test_DeleteExportAccountRequired(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "foo", 0, true)
 	ts.AddExport(t, "B", jwt.Service, "bar", 0, true)
 	GetConfig().SetAccount("")
-	_, _, err := ExecuteCmd(createDeleteExportCmd(), "--subject", "foo")
+	_, err := ExecuteCmd(createDeleteExportCmd(), []string{"--subject", "foo"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
 }
@@ -67,7 +67,7 @@ func Test_DeleteExportInteractiveManagedStore(t *testing.T) {
 	HoistRootFlags(cmd)
 
 	input := []interface{}{0, 0, 0, ts.GetAccountKeyPath(t, "A")}
-	_, _, err := ExecuteInteractiveCmd(cmd, input)
+	_, err := ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

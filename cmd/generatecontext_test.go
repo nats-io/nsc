@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 The NATS Authors
+ * Copyright 2023-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,7 +35,7 @@ func Test_GenerateContext(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, _, err := ExecuteCmd(createGenerateContext(), "-a", "A", "-u", "U", "--context", "u")
+	_, err := ExecuteCmd(createGenerateContext(), []string{"-a", "A", "-u", "U", "--context", "u"}...)
 	require.NoError(t, err)
 
 	fp := filepath.Join(ts.Dir, "nats", "context", "u.json")

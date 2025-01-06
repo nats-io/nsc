@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,9 +31,9 @@ func Test_ListKeysDefault(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd())
+	out, err := ExecuteCmd(createListKeysCmd())
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -47,9 +47,9 @@ func Test_listKeysOperatorOnly(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "--operator")
+	out, err := ExecuteCmd(createListKeysCmd(), "--operator")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -63,9 +63,9 @@ func Test_listKeysAccountOnly(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "--accounts")
+	out, err := ExecuteCmd(createListKeysCmd(), "--accounts")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -79,9 +79,9 @@ func Test_ListKeysUserOnly(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "--users")
+	out, err := ExecuteCmd(createListKeysCmd(), "--users")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -99,9 +99,9 @@ func Test_ListKeysOther(t *testing.T) {
 	_, err := ts.KeyStore.Store(kp)
 	require.NoError(t, err)
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "--all", "--not-referenced")
+	out, err := ExecuteCmd(createListKeysCmd(), "--all", "--not-referenced")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -118,9 +118,9 @@ func Test_ListKeysFilter(t *testing.T) {
 
 	opk := ts.GetOperatorPublicKey(t)
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "--all", "--filter", opk[:10])
+	out, err := ExecuteCmd(createListKeysCmd(), "--all", "--filter", opk[:10])
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 
 	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "O", opk))
 	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
@@ -132,9 +132,8 @@ func Test_ListKeysNoKeyStore(t *testing.T) {
 	defer ts.Done(t)
 	old := store.KeyStorePath
 	store.KeyStorePath = ts.KeysDir
-	_, _, err := ExecuteCmd(createListKeysCmd())
+	_, err := ExecuteCmd(createListKeysCmd())
 	require.Error(t, err)
-	t.Log(err.Error())
 	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
 	store.KeyStorePath = old
 }
@@ -145,7 +144,7 @@ func Test_listKeysAuthorizationXKey(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, uPK, _ := CreateUserKey(t)
-	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--curve", "generate")
+	_, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--curve", "generate")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -154,21 +153,21 @@ func Test_listKeysAuthorizationXKey(t *testing.T) {
 	xPK := ac.Authorization.XKey
 	require.NotEmpty(t, xPK)
 
-	_, stderr, err := ExecuteCmd(createListKeysCmd(), "-A")
+	out, err := ExecuteCmd(createListKeysCmd(), "-A")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr := StripTableDecorations(out.Out)
 	require.Contains(t, stderr, xPK)
 
-	_, _, err = ExecuteCmd(createEditAuthorizationCallout(), "--rm-curve")
+	_, err = ExecuteCmd(createEditAuthorizationCallout(), "--rm-curve")
 	require.NoError(t, err)
 
-	_, stderr, err = ExecuteCmd(createListKeysCmd(), "-A")
+	out, err = ExecuteCmd(createListKeysCmd(), "-A")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr = StripTableDecorations(out.Out)
 	require.NotContains(t, stderr, xPK)
 
-	_, stderr, err = ExecuteCmd(createListKeysCmd(), "--not-referenced")
+	out, err = ExecuteCmd(createListKeysCmd(), "--not-referenced")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
+	stderr = StripTableDecorations(out.Out)
 	require.Contains(t, stderr, xPK)
 }

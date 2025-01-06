@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,11 +16,9 @@
 package cmd
 
 import (
-	"testing"
-
 	cli "github.com/nats-io/cliprompts/v2"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestRevokeClearUser(t *testing.T) {
@@ -32,7 +30,7 @@ func TestRevokeClearUser(t *testing.T) {
 	ts.AddUser(t, "A", "two")
 	ts.AddUser(t, "A", "three")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -43,7 +41,7 @@ func TestRevokeClearUser(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, ac.Revocations, u.Subject)
 
-	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "--name", "one")
+	_, err = ExecuteCmd(createClearRevokeUserCmd(), []string{"--name", "one"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -51,7 +49,7 @@ func TestRevokeClearUser(t *testing.T) {
 	require.Len(t, ac.Revocations, 0)
 
 	// error if not revoked
-	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "--name", "one")
+	_, err = ExecuteCmd(createClearRevokeUserCmd(), []string{"--name", "one"}...)
 	require.Error(t, err)
 }
 
@@ -66,7 +64,7 @@ func TestRevokeClearUserInteractive(t *testing.T) {
 	ts.AddUser(t, "B", "one")
 	ts.AddUser(t, "B", "two")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one", "--account", "A")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one", "--account", "A"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -82,7 +80,7 @@ func TestRevokeClearUserInteractive(t *testing.T) {
 	cmd := createClearRevokeUserCmd()
 	HoistRootFlags(cmd)
 	cli.LogFn = t.Log
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -94,7 +92,7 @@ func TestClearRevokeUserUserAndKey(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createClearRevokeUserCmd(), "--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O")
+	_, err := ExecuteCmd(createClearRevokeUserCmd(), []string{"--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "user and user-public-key are mutually exclusive")
 }
@@ -104,7 +102,7 @@ func TestClearRevokeUserNotFound(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createClearRevokeUserCmd(), "--name", "uu")
+	_, err := ExecuteCmd(createClearRevokeUserCmd(), []string{"--name", "uu"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not found")
 }
@@ -114,9 +112,9 @@ func TestClearRevokeDefaultUser(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createClearRevokeUserCmd())
+	_, err = ExecuteCmd(createClearRevokeUserCmd(), []string{}...)
 	require.NoError(t, err)
 }
 
@@ -125,9 +123,9 @@ func TestClearRevokeRevocationNotFound(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
+	_, err = ExecuteCmd(createClearRevokeUserCmd(), []string{"-u", "*"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "user with public key * is not revoked")
 }
@@ -136,9 +134,9 @@ func TestClearRevokeAllUsers(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"-u", "*"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createClearRevokeUserCmd(), "-u", "*")
+	_, err = ExecuteCmd(createClearRevokeUserCmd(), []string{"-u", "*"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")

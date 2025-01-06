@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,7 +45,7 @@ func TestListEditorParams(t *testing.T) {
 		return nil
 	}
 	cmd := listEditorCmd(&p)
-	_, _, err := ExecuteCmd(cmd, "--test", "a", "--test", "b")
+	_, err := ExecuteCmd(cmd, []string{"--test", "a", "--test", "b"}...)
 	require.NoError(t, err)
 	require.True(t, validatorCalled)
 	require.Len(t, p.Values, 2)
@@ -61,7 +61,7 @@ func TestListEditorParams_Interactive(t *testing.T) {
 		return nil
 	}
 	cmd := listEditorCmd(&p)
-	_, _, err := ExecuteInteractiveCmd(cmd, []interface{}{true, "x", true, "y", false})
+	_, err := ExecuteInteractiveCmd(cmd, []interface{}{true, "x", true, "y", false})
 	require.NoError(t, err)
 	require.True(t, validatorCalled)
 	require.Len(t, p.Values, 2)
@@ -77,7 +77,7 @@ func TestListEditorParams_InteractiveEdit(t *testing.T) {
 		return nil
 	}
 	cmd := listEditorCmd(p)
-	_, _, err := ExecuteInteractiveCmd(cmd, []interface{}{"aa", "bb", true, "x", true, "y", false}, "--test", "a", "--test", "b")
+	_, err := ExecuteInteractiveCmd(cmd, []interface{}{"aa", "bb", true, "x", true, "y", false}, "--test", "a", "--test", "b")
 	require.NoError(t, err)
 	require.True(t, validatorCalled)
 	require.Len(t, p.Values, 4)

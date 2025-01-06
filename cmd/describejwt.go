@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,10 +18,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/nats-io/nsc/v2/cmd/store"
 
 	cli "github.com/nats-io/cliprompts/v2"
-	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 )
 
@@ -51,10 +50,8 @@ func init() {
 }
 
 type DescribeFile struct {
-	file       string
-	kind       jwt.ClaimType
-	outputFile string
-	token      string
+	file string
+	BaseDescribe
 }
 
 func (p *DescribeFile) SetDefaults(ctx ActionCtx) error {
@@ -68,106 +65,27 @@ func (p *DescribeFile) PreInteractive(ctx ActionCtx) error {
 }
 
 func (p *DescribeFile) Load(ctx ActionCtx) error {
+	var err error
 	if p.file == "" {
 		ctx.CurrentCmd().SilenceErrors = false
 		ctx.CurrentCmd().SilenceUsage = false
 		return errors.New("file is required")
 	}
-	if d, err := LoadFromFileOrURL(p.file); err == nil {
-		p.token, err = jwt.ParseDecoratedJWT(d)
-		if err != nil {
-			return err
-		}
-		gc, err := jwt.DecodeGeneric(p.token)
-		if err != nil {
-			return err
-		}
-		p.kind = gc.ClaimType()
+	p.raw, err = LoadFromFileOrURL(p.file)
+	if err != nil {
+		return err
 	}
+	return p.Init()
+}
+
+func (p *DescribeFile) Validate(_ ActionCtx) error {
 	return nil
 }
 
-func (p *DescribeFile) PostInteractive(ctx ActionCtx) error {
+func (p *DescribeFile) PostInteractive(_ ActionCtx) error {
 	return nil
-}
-
-func (p *DescribeFile) Validate(ctx ActionCtx) error {
-	return nil
-}
-
-func (p *DescribeFile) handleRaw() (store.Status, error) {
-	var err error
-	var raw []byte
-	if Json || JsonPath != "" {
-		raw, err = bodyAsJson([]byte(p.token))
-		if err != nil {
-			return nil, err
-		}
-		if JsonPath != "" {
-			raw, err = GetField(raw, JsonPath)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	raw = append(raw, '\n')
-	if err := Write(p.outputFile, raw); err != nil {
-		return nil, err
-	}
-	var s store.Status
-	if !IsStdOut(p.outputFile) {
-		k := "description"
-		if Raw {
-			k = "jwt"
-		}
-		s = store.OKStatus("wrote jwt %s to %#q", k, AbbrevHomePaths(p.outputFile))
-	}
-	return s, nil
 }
 
 func (p *DescribeFile) Run(ctx ActionCtx) (store.Status, error) {
-	if Json || Raw || JsonPath != "" {
-		return p.handleRaw()
-	}
-
-	var describer Describer
-	switch p.kind {
-	case jwt.AccountClaim:
-		ac, err := jwt.DecodeAccountClaims(p.token)
-		if err != nil {
-			return nil, err
-		}
-		describer = NewAccountDescriber(*ac)
-	case jwt.ActivationClaim:
-		ac, err := jwt.DecodeActivationClaims(p.token)
-		if err != nil {
-			return nil, err
-		}
-		describer = NewActivationDescriber(*ac)
-	case jwt.UserClaim:
-		uc, err := jwt.DecodeUserClaims(p.token)
-		if err != nil {
-			return nil, err
-		}
-		describer = NewUserDescriber(*uc)
-	case jwt.OperatorClaim:
-		oc, err := jwt.DecodeOperatorClaims(p.token)
-		if err != nil {
-			return nil, err
-		}
-		describer = NewOperatorDescriber(*oc)
-	}
-
-	if describer == nil {
-		return nil, fmt.Errorf("describer for %q is not implemented", p.kind)
-	}
-
-	if err := Write(p.outputFile, []byte(describer.Describe())); err != nil {
-		return nil, err
-	}
-	var s store.Status
-	if !IsStdOut(p.outputFile) {
-		s = store.OKStatus("wrote account description to %#q", AbbrevHomePaths(p.outputFile))
-	}
-	return s, nil
+	return p.Describe(ctx)
 }

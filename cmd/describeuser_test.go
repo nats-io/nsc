@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -37,14 +37,14 @@ func TestDescribeUser_Single(t *testing.T) {
 	pub := ts.GetUserPublicKey(t, "A", "a")
 	apub := ts.GetAccountPublicKey(t, "A")
 
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
+	out, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
 	// account A public key
-	require.Contains(t, stdout, apub)
+	require.Contains(t, out.Out, apub)
 	// operator public key
-	require.Contains(t, stdout, pub)
+	require.Contains(t, out.Out, pub)
 	// name for the account
-	require.Contains(t, stdout, " a ")
+	require.Contains(t, out.Out, " a ")
 }
 
 func TestDescribeUserRaw(t *testing.T) {
@@ -55,10 +55,10 @@ func TestDescribeUserRaw(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	Raw = true
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
+	stdout, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
 
-	uc, err := jwt.DecodeUserClaims(stdout)
+	uc, err := jwt.DecodeUserClaims(stdout.Out)
 	require.NoError(t, err)
 
 	require.NotNil(t, uc)
@@ -73,9 +73,9 @@ func TestDescribeUser_Multiple(t *testing.T) {
 	ts.AddUser(t, "A", "a")
 	ts.AddUser(t, "A", "b")
 
-	_, stderr, err := ExecuteCmd(createDescribeUserCmd())
+	stderr, err := ExecuteCmd(createDescribeUserCmd(), []string{}...)
 	require.Error(t, err)
-	require.Contains(t, stderr, "user is required")
+	require.Contains(t, stderr.Err, "user is required")
 }
 
 func TestDescribeUser_MultipleWithContext(t *testing.T) {
@@ -94,11 +94,11 @@ func TestDescribeUser_MultipleWithContext(t *testing.T) {
 
 	pub := ts.GetUserPublicKey(t, "B", "b")
 
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd())
+	out, err := ExecuteCmd(createDescribeUserCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, apub)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, " b ")
+	require.Contains(t, out.Out, apub)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " b ")
 }
 
 func TestDescribeUser_MultipleWithFlag(t *testing.T) {
@@ -110,19 +110,19 @@ func TestDescribeUser_MultipleWithFlag(t *testing.T) {
 	ts.AddUser(t, "B", "b")
 	ts.AddUser(t, "B", "bb")
 
-	_, stderr, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B")
+	out, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B")
 	require.Error(t, err)
-	require.Contains(t, stderr, "user is required")
+	require.Contains(t, out.Err, "user is required")
 
 	apub := ts.GetAccountPublicKey(t, "B")
 
 	pub := ts.GetUserPublicKey(t, "B", "bb")
 
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "bb")
+	out, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "bb")
 	require.NoError(t, err)
-	require.Contains(t, stdout, apub)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, " bb ")
+	require.Contains(t, out.Out, apub)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " bb ")
 }
 
 func TestDescribeUser_MultipleWithBadUser(t *testing.T) {
@@ -133,13 +133,13 @@ func TestDescribeUser_MultipleWithBadUser(t *testing.T) {
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "b")
 
-	_, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A")
+	_, err := ExecuteCmd(createDescribeUserCmd(), []string{"--account", "A"}...)
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "a")
+	_, err = ExecuteCmd(createDescribeUserCmd(), []string{"--account", "B", "--name", "a"}...)
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "B", "--name", "b")
+	_, err = ExecuteCmd(createDescribeUserCmd(), []string{"--account", "B", "--name", "b"}...)
 	require.NoError(t, err)
 }
 
@@ -151,7 +151,7 @@ func TestDescribeUser_Interactive(t *testing.T) {
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "bb")
 
-	_, _, err := ExecuteInteractiveCmd(createDescribeUserCmd(), []interface{}{1, 0})
+	_, err := ExecuteInteractiveCmd(createDescribeUserCmd(), []interface{}{1, 0})
 	require.NoError(t, err)
 }
 
@@ -161,21 +161,21 @@ func TestDescribeUser_Account(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, pub, kp := CreateAccountKey(t)
-	_, _, err := ExecuteCmd(createEditAccount(), "--name", "A", "--sk", pub)
+	_, err := ExecuteCmd(createEditAccount(), "--name", "A", "--sk", pub)
 	require.NoError(t, err)
 
 	// signed with default account key
 	ts.AddUser(t, "A", "aa")
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
+	out, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
 	require.NoError(t, err)
-	require.NotContains(t, stdout, "Issuer Account")
+	require.NotContains(t, out.Out, "Issuer Account")
 
 	// signed with a signing key
 	ts.AddUserWithSigner(t, "A", "bb", kp)
 	require.NoError(t, err)
-	stdout, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
+	out, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
 	require.NoError(t, err)
-	require.Contains(t, stdout, "Issuer Account")
+	require.Contains(t, out.Out, "Issuer Account")
 }
 
 func TestDescribeRawUser(t *testing.T) {
@@ -184,21 +184,21 @@ func TestDescribeRawUser(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, pub, kp := CreateAccountKey(t)
-	_, _, err := ExecuteCmd(createEditAccount(), "--name", "A", "--sk", pub)
+	_, err := ExecuteCmd(createEditAccount(), "--name", "A", "--sk", pub)
 	require.NoError(t, err)
 
 	// signed with default account key
 	ts.AddUser(t, "A", "aa")
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
+	out, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
 	require.NoError(t, err)
-	require.NotContains(t, stdout, "Issuer Account")
+	require.NotContains(t, out.Out, "Issuer Account")
 
 	// signed with a signing key
 	ts.AddUserWithSigner(t, "A", "bb", kp)
 	require.NoError(t, err)
-	stdout, _, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
+	out, err = ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "bb")
 	require.NoError(t, err)
-	require.Contains(t, stdout, "Issuer Account")
+	require.Contains(t, out.Out, "Issuer Account")
 }
 
 func TestDescribeUser_Json(t *testing.T) {
@@ -208,10 +208,10 @@ func TestDescribeUser_Json(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "aa")
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--json")
+	out, err := ExecuteCmd(rootCmd, "describe", "user", "--json")
 	require.NoError(t, err)
 	m := make(map[string]interface{})
-	err = json.Unmarshal([]byte(out), &m)
+	err = json.Unmarshal([]byte(out.Out), &m)
 	require.NoError(t, err)
 	uc, err := ts.Store.ReadUserClaim("A", "aa")
 	require.NoError(t, err)
@@ -226,11 +226,11 @@ func TestDescribeUser_JsonPath(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "aa")
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "user", "--field", "sub")
+	out, err := ExecuteCmd(rootCmd, "describe", "user", "--field", "sub")
 	require.NoError(t, err)
 	uc, err := ts.Store.ReadUserClaim("A", "aa")
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", uc.Subject), out.Out)
 }
 
 func TestDescribeUser_Times(t *testing.T) {
@@ -239,12 +239,12 @@ func TestDescribeUser_Times(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "aa")
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09")
+	_, err := ExecuteCmd(createEditUserCmd(), "--time", "16:04:05-17:04:09")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
+	out, err := ExecuteCmd(createDescribeUserCmd(), "--account", "A", "--name", "aa")
 	require.NoError(t, err)
-	require.Contains(t, stdout, "16:04:05-17:04:09")
+	require.Contains(t, out.Out, "16:04:05-17:04:09")
 }
 
 func TestDescribeUser_Output(t *testing.T) {
@@ -255,7 +255,7 @@ func TestDescribeUser_Output(t *testing.T) {
 	ts.AddUser(t, "A", "aa")
 
 	p := filepath.Join(ts.Dir, "aa.json")
-	_, _, err := ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--json", "--output-file", p)
+	_, err := ExecuteCmd(rootCmd, []string{"describe", "user", "-a", "A", "--json", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err := os.ReadFile(p)
 	require.NoError(t, err)
@@ -264,14 +264,14 @@ func TestDescribeUser_Output(t *testing.T) {
 	require.Equal(t, "aa", uc.Name)
 
 	p = filepath.Join(ts.Dir, "aa.txt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "user", "-a", "A", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)
 	strings.Contains(string(data), "User Details")
 
 	p = filepath.Join(ts.Dir, "aa.jwt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "user", "-a", "A", "--raw", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "user", "-a", "A", "--raw", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)

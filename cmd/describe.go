@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,14 +22,18 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 )
 
-var Raw bool
-var WideFlag bool
-var Wide = noopNameFilter
-var Json bool
-var JsonPath string
+var (
+	Raw      bool
+	WideFlag bool
+	Wide     = noopNameFilter
+	Json     bool
+	JsonPath string
+)
 
 type WideFun = func(a string) string
 
@@ -103,4 +107,112 @@ func bodyAsJson(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error formatting json: %v", err)
 	}
 	return j.Bytes(), nil
+}
+
+type BaseDescribe struct {
+	raw        []byte
+	kind       jwt.ClaimType
+	outputFile string
+}
+
+func (p *BaseDescribe) Init() error {
+	token, err := jwt.ParseDecoratedJWT(p.raw)
+	if err != nil {
+		return err
+	}
+	p.raw = []byte(token)
+	gc, err := jwt.DecodeGeneric(token)
+	if err != nil {
+		return err
+	}
+	p.kind = gc.ClaimType()
+	return nil
+}
+
+func (p *BaseDescribe) Describe(ctx ActionCtx) (store.Status, error) {
+	var out []byte
+	var err error
+
+	if Raw {
+		out, err = p.Raw(!IsStdOut(p.outputFile))
+	} else if Json || JsonPath != "" {
+		out, err = p.JSON(JsonPath)
+	} else {
+		out, err = p.Structured()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if IsStdOut(p.outputFile) {
+		_, err = fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), string(out))
+	} else {
+		err = WriteFile(p.outputFile, out)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !IsStdOut(p.outputFile) {
+		k := "description"
+		if Raw {
+			k = "jwt"
+		}
+		return store.OKStatus("wrote %s %s to %#q", string(p.kind), k, AbbrevHomePaths(p.outputFile)), nil
+	}
+	return nil, err
+}
+
+func (p *BaseDescribe) Structured() ([]byte, error) {
+	var describer Describer
+	switch p.kind {
+	case jwt.AccountClaim:
+		ac, err := jwt.DecodeAccountClaims(string(p.raw))
+		if err != nil {
+			return []byte(""), err
+		}
+		describer = NewAccountDescriber(*ac)
+	case jwt.ActivationClaim:
+		ac, err := jwt.DecodeActivationClaims(string(p.raw))
+		if err != nil {
+			return []byte(""), err
+		}
+		describer = NewActivationDescriber(*ac)
+	case jwt.UserClaim:
+		uc, err := jwt.DecodeUserClaims(string(p.raw))
+		if err != nil {
+			return []byte(""), err
+		}
+		describer = NewUserDescriber(*uc)
+	case jwt.OperatorClaim:
+		oc, err := jwt.DecodeOperatorClaims(string(p.raw))
+		if err != nil {
+			return []byte(""), err
+		}
+		describer = NewOperatorDescriber(*oc)
+	}
+
+	if describer == nil {
+		return []byte(""), fmt.Errorf("describer for %q is not implemented", p.kind)
+	}
+	return []byte(describer.Describe()), nil
+}
+
+func (p *BaseDescribe) Raw(decorate bool) ([]byte, error) {
+	if decorate {
+		return jwt.DecorateJWT(string(p.raw))
+	}
+	return p.raw, nil
+}
+
+func (p *BaseDescribe) JSON(jsonPath string) ([]byte, error) {
+	raw, err := bodyAsJson(p.raw)
+	if err != nil {
+		return nil, err
+	}
+	if jsonPath != "" {
+		raw, err = GetField(raw, JsonPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return raw, nil
 }

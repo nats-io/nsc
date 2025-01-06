@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,9 +16,8 @@
 package cmd
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestSelectAccount(t *testing.T) {
@@ -26,23 +25,23 @@ func TestSelectAccount(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(selectAccountCmd(), "A")
+	_, err := ExecuteCmd(selectAccountCmd(), []string{"A"}...)
 	require.NotNil(err)
 
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err = ExecuteCmd(selectAccountCmd(), "A")
+	_, err = ExecuteCmd(selectAccountCmd(), []string{"A"}...)
 	require.Nil(err)
 	conf := GetConfig()
 	require.Equal(conf.Account, "A")
 
-	_, _, err = ExecuteCmd(selectAccountCmd(), "B")
+	_, err = ExecuteCmd(selectAccountCmd(), []string{"B"}...)
 	require.Nil(err)
 	conf = GetConfig()
 	require.Equal(conf.Account, "B")
 
-	_, _, err = ExecuteCmd(selectAccountCmd(), "NO")
+	_, err = ExecuteCmd(selectAccountCmd(), []string{"NO"}...)
 	require.NotNil(err)
 	require.Contains(err.Error(), "\"NO\" not in accounts for operator")
 
@@ -55,23 +54,23 @@ func TestSelectOperator(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(selectOperatorCmd(), "test")
+	_, err := ExecuteCmd(selectOperatorCmd(), []string{"test"}...)
 	require.Nil(err)
 
 	ts.AddOperator(t, "test2")
 	ts.AddOperator(t, "test3")
 
-	_, _, err = ExecuteCmd(selectOperatorCmd(), "test2")
+	_, err = ExecuteCmd(selectOperatorCmd(), []string{"test2"}...)
 	require.Nil(err)
 	conf := GetConfig()
 	require.Equal(conf.Operator, "test2")
 
-	_, _, err = ExecuteCmd(selectOperatorCmd(), "test3")
+	_, err = ExecuteCmd(selectOperatorCmd(), []string{"test3"}...)
 	require.Nil(err)
 	conf = GetConfig()
 	require.Equal(conf.Operator, "test3")
 
-	_, _, err = ExecuteCmd(selectOperatorCmd(), "NO")
+	_, err = ExecuteCmd(selectOperatorCmd(), []string{"NO"}...)
 	require.NotNil(err)
 	require.Contains(err.Error(), "operator \"NO\" not in")
 

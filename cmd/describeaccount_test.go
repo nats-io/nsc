@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,7 +21,6 @@ import (
 	"github.com/nats-io/nkeys"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -39,14 +38,14 @@ func TestDescribeAccount_Single(t *testing.T) {
 	ts.AddAccount(t, "A")
 	pub := ts.GetAccountPublicKey(t, "A")
 
-	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 	// account A public key
-	require.Contains(t, stdout, pub)
+	require.Contains(t, out.Out, pub)
 	// operator public key
-	require.Contains(t, stdout, opub)
+	require.Contains(t, out.Out, opub)
 	// name for the account
-	require.Contains(t, stdout, " A ")
+	require.Contains(t, out.Out, " A ")
 }
 
 func TestDescribeAccountRaw(t *testing.T) {
@@ -55,10 +54,10 @@ func TestDescribeAccountRaw(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	Raw = true
-	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
 
-	ac, err := jwt.DecodeAccountClaims(stdout)
+	ac, err := jwt.DecodeAccountClaims(out.Out)
 	require.NoError(t, err)
 
 	require.NotNil(t, ac)
@@ -72,10 +71,9 @@ func TestDescribeAccount_Multiple(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	out, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
-	out = StripTableDecorations(out)
-	require.Contains(t, out, "Name B")
+	require.Contains(t, StripTableDecorations(out.Out), "Name B")
 }
 
 func TestDescribeAccount_MultipleAccountRequired(t *testing.T) {
@@ -86,7 +84,7 @@ func TestDescribeAccount_MultipleAccountRequired(t *testing.T) {
 	ts.AddAccount(t, "B")
 	require.NoError(t, GetConfig().SetAccount(""))
 
-	_, _, err := ExecuteCmd(createDescribeAccountCmd())
+	_, err := ExecuteCmd(createDescribeAccountCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
 }
@@ -106,11 +104,11 @@ func TestDescribeAccount_MultipleWithContext(t *testing.T) {
 
 	pub := ts.GetAccountPublicKey(t, "B")
 
-	stdout, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, opub)
-	require.Contains(t, stdout, " B ")
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, opub)
+	require.Contains(t, out.Out, " B ")
 }
 
 func TestDescribeAccount_MultipleWithFlag(t *testing.T) {
@@ -122,10 +120,10 @@ func TestDescribeAccount_MultipleWithFlag(t *testing.T) {
 
 	pub := ts.GetAccountPublicKey(t, "B")
 
-	stdout, _, err := ExecuteCmd(createDescribeAccountCmd(), "--name", "B")
+	out, err := ExecuteCmd(createDescribeAccountCmd(), "--name", "B")
 	require.NoError(t, err)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, " B ")
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " B ")
 }
 
 func TestDescribeAccount_MultipleWithBadAccount(t *testing.T) {
@@ -135,7 +133,7 @@ func TestDescribeAccount_MultipleWithBadAccount(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createDescribeAccountCmd(), "--name", "C")
+	_, err := ExecuteCmd(createDescribeAccountCmd(), []string{"--name", "C"}...)
 	require.Error(t, err)
 }
 
@@ -146,7 +144,7 @@ func TestDescribeAccount_Interactive(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
+	_, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
 	require.NoError(t, err)
 }
 
@@ -164,9 +162,9 @@ func TestDescribeAccount_Latency(t *testing.T) {
 	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
-	out, _, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0})
+	out, err := ExecuteInteractiveCmd(createDescribeAccountCmd(), []interface{}{0}, []string{}...)
 	require.NoError(t, err)
-	require.Contains(t, out, "lat (10%)")
+	require.Contains(t, out.Out, "lat (10%)")
 }
 
 func TestDescribeAccount_Json(t *testing.T) {
@@ -174,10 +172,10 @@ func TestDescribeAccount_Json(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
+	out, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
 	require.NoError(t, err)
 	m := make(map[string]interface{})
-	err = json.Unmarshal([]byte(out), &m)
+	err = json.Unmarshal([]byte(out.Out), &m)
 	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -190,17 +188,14 @@ func TestDescribeAccount_JsonPath(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--field", "sub")
+	out, err := ExecuteCmd(rootCmd, "describe", "account", "--field", "sub")
 	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", ac.Subject), out.Out)
 }
 
 func TestDescribeAccount_JSTiers(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("running in windows - hangs while command works by hand")
-	}
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
@@ -217,13 +212,13 @@ func TestDescribeAccount_JSTiers(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
-	out, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
-	require.Contains(t, out, " | R1")
-	require.Contains(t, out, " | R3")
-	require.Contains(t, out, " | required")
-	require.Contains(t, out, " | optional")
-	require.Contains(t, out, " | 99")
+	require.Contains(t, out.Out, " | R1")
+	require.Contains(t, out.Out, " | R3")
+	require.Contains(t, out.Out, " | required")
+	require.Contains(t, out.Out, " | optional")
+	require.Contains(t, out.Out, " | 99")
 }
 
 func TestDescribeAccount_Callout(t *testing.T) {
@@ -235,17 +230,17 @@ func TestDescribeAccount_Callout(t *testing.T) {
 	_, uPK, _ := CreateUserKey(t)
 	_, aPK, _ := CreateAccountKey(t)
 	_, xPK, _ := CreateCurveKey(t)
-	_, _, err := ExecuteCmd(createEditAuthorizationCallout(),
+	_, err := ExecuteCmd(createEditAuthorizationCallout(),
 		"--auth-user", uPK,
 		"--allowed-account", aPK,
 		"--curve", xPK)
 	require.NoError(t, err)
 
-	out, _, err := ExecuteCmd(createDescribeAccountCmd())
+	out, err := ExecuteCmd(createDescribeAccountCmd())
 	require.NoError(t, err)
-	require.Contains(t, out, fmt.Sprintf(" | %s", uPK))
-	require.Contains(t, out, fmt.Sprintf(" | %s", aPK))
-	require.Contains(t, out, fmt.Sprintf(" | %s", xPK))
+	require.Contains(t, out.Out, fmt.Sprintf(" | %s", uPK))
+	require.Contains(t, out.Out, fmt.Sprintf(" | %s", aPK))
+	require.Contains(t, out.Out, fmt.Sprintf(" | %s", xPK))
 }
 
 func TestDescribeAccount_SubjectEncoding(t *testing.T) {
@@ -255,9 +250,9 @@ func TestDescribeAccount_SubjectEncoding(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foo.>", 0, true)
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
+	out, err := ExecuteCmd(rootCmd, "describe", "account", "--json")
 	require.NoError(t, err)
-	require.Contains(t, out, "foo.>")
+	require.Contains(t, out.Out, "foo.>")
 }
 
 func TestDescribeAccount_Output(t *testing.T) {
@@ -267,7 +262,7 @@ func TestDescribeAccount_Output(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	p := filepath.Join(ts.Dir, "A.json")
-	_, _, err := ExecuteCmd(rootCmd, "describe", "account", "--json", "--output-file", p)
+	_, err := ExecuteCmd(rootCmd, []string{"describe", "account", "--json", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err := os.ReadFile(p)
 	require.NoError(t, err)
@@ -277,14 +272,14 @@ func TestDescribeAccount_Output(t *testing.T) {
 	require.Equal(t, "A", ac.Name)
 
 	p = filepath.Join(ts.Dir, "A.txt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "account", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)
 	strings.Contains(string(data), "Account Details")
 
 	p = filepath.Join(ts.Dir, "A.jwt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "--raw", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "account", "--raw", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)
@@ -298,24 +293,21 @@ func TestDescribeAccount_Exports(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "foo.bar.*.>", 0, true)
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "account")
+	out, err := ExecuteCmd(rootCmd, "describe", "account")
 	require.NoError(t, err)
-	require.Contains(t, out, "| Account Token Position |")
-	require.Contains(t, out, "foo.bar.*.> | -")
+	require.Contains(t, out.Out, "| Account Token Position |")
+	require.Contains(t, out.Out, "foo.bar.*.> | -")
 
 	ts.AddAccount(t, "B")
 	ts.AddExport(t, "B", jwt.Stream, "foo.bar.*.>", 3, true)
 
-	out, _, err = ExecuteCmd(rootCmd, "describe", "account", "-n", "B")
+	out, err = ExecuteCmd(rootCmd, "describe", "account", "-n", "B")
 	require.NoError(t, err)
-	require.Contains(t, out, "| Account Token Position |")
-	require.Contains(t, out, "foo.bar.*.> | 3")
+	require.Contains(t, out.Out, "| Account Token Position |")
+	require.Contains(t, out.Out, "foo.bar.*.> | 3")
 }
 
 func TestDescribeAccountMore(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("running in windows - looking at output hangs")
-	}
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
@@ -366,32 +358,31 @@ func TestDescribeAccountMore(t *testing.T) {
 	})
 
 	ac.Mappings = make(map[jwt.Subject][]jwt.WeightedMapping)
-	ac.Mappings["mapfoo"] = []jwt.WeightedMapping{jwt.WeightedMapping{Subject: "map.>", Weight: 20, Cluster: "a"}}
+	ac.Mappings["mapfoo"] = []jwt.WeightedMapping{{Subject: "map.>", Weight: 20, Cluster: "a"}}
 
 	token, err := ac.Encode(ts.OperatorKey)
 	require.NoError(t, err)
 	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "account", "-n", "A")
+	out, err := ExecuteCmd(rootCmd, "describe", "account", "-n", "A")
 	require.NoError(t, err)
 
-	out = StripMultipleSpaces(out)
-	t.Log(out)
-	require.Contains(t, out, "| Description | hello")
-	require.Contains(t, out, "| Info Url | https://example.com")
+	stdout := StripMultipleSpaces(out.Out)
+	require.Contains(t, stdout, "| Description | hello")
+	require.Contains(t, stdout, "| Info Url | https://example.com")
 	// order of the key may be unexpected, just find the key
-	require.Contains(t, out, signingKey)
-	require.Contains(t, out, "| Max Disk Storage | Unlimited")
-	require.Contains(t, out, "| Max Mem Storage | Unlimited")
-	require.Contains(t, out, "| Max Leaf Node Connections | 1")
-	require.Contains(t, out, "| Revocations | 1")
-	require.Contains(t, out, "| Subject | foo")
-	require.Contains(t, out, "| Sampling | 100%")
-	require.Contains(t, out, "| hello | Stream | bar.> | fromA.>")
-	require.Contains(t, out, "| mapfoo | map.> | 20")
+	require.Contains(t, stdout, signingKey)
+	require.Contains(t, stdout, "| Max Disk Storage | Unlimited")
+	require.Contains(t, stdout, "| Max Mem Storage | Unlimited")
+	require.Contains(t, stdout, "| Max Leaf Node Connections | 1")
+	require.Contains(t, stdout, "| Revocations | 1")
+	require.Contains(t, stdout, "| Subject | foo")
+	require.Contains(t, stdout, "| Sampling | 100%")
+	require.Contains(t, stdout, "| hello | Stream | bar.> | fromA.>")
+	require.Contains(t, stdout, "| mapfoo | map.> | 20")
 
-	require.Contains(t, out, "| Key | "+issuer)
-	require.Contains(t, out, "| Role | nothing")
-	require.Contains(t, out, "| Description | no permissions")
+	require.Contains(t, stdout, "| Key | "+issuer)
+	require.Contains(t, stdout, "| Role | nothing")
+	require.Contains(t, stdout, "| Description | no permissions")
 }

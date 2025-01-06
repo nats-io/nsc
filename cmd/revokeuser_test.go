@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,13 +16,11 @@
 package cmd
 
 import (
+	"github.com/nats-io/jwt/v2"
+	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/nats-io/jwt/v2"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestRevokeUser(t *testing.T) {
@@ -34,7 +32,7 @@ func TestRevokeUser(t *testing.T) {
 	ts.AddUser(t, "A", "two")
 	ts.AddUser(t, "A", "three")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -45,7 +43,7 @@ func TestRevokeUser(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ac.IsClaimRevoked(u))
 
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two")
+	_, err = ExecuteCmd(createRevokeUserCmd(), []string{"--name", "two"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -57,7 +55,7 @@ func TestRevokeUser(t *testing.T) {
 	require.True(t, ac.IsClaimRevoked(u))
 
 	// Double doesn't do anything
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two")
+	_, err = ExecuteCmd(createRevokeUserCmd(), []string{"--name", "two"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -74,7 +72,7 @@ func TestRevokeUserAt(t *testing.T) {
 	ts.AddUser(t, "A", "two")
 	ts.AddUser(t, "A", "three")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one", "--at", "1000")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one", "--at", "1000"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -87,7 +85,7 @@ func TestRevokeUserAt(t *testing.T) {
 	_, ok := ac.Revocations[u.Subject]
 	require.True(t, ok)
 
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two", "--at", strconv.Itoa(int(time.Now().Unix())))
+	_, err = ExecuteCmd(createRevokeUserCmd(), []string{"--name", "two", "--at", strconv.Itoa(int(time.Now().Unix()))}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -111,7 +109,7 @@ func Test_RevokeUserAccountNameRequired(t *testing.T) {
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "one")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -139,7 +137,7 @@ func TestRevokeUserInteractive(t *testing.T) {
 	input := []interface{}{0, true, 0, "0"}
 	cmd := createRevokeUserCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -153,7 +151,7 @@ func TestRevokeUserInteractive(t *testing.T) {
 	cmd = createRevokeUserCmd()
 	HoistRootFlags(cmd)
 	input = []interface{}{0, false, keyToRevoke, "0"}
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -176,9 +174,9 @@ func TestRevokeUserByNkey(t *testing.T) {
 
 	cmd := createRevokeUserCmd()
 	HoistRootFlags(cmd)
-	_, _, err = ExecuteCmd(cmd, "-u", u.Subject)
+	_, err = ExecuteCmd(cmd, []string{"-u", u.Subject}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(cmd, "-u", keyToRevoke)
+	_, err = ExecuteCmd(cmd, []string{"-u", keyToRevoke}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -201,7 +199,7 @@ func TestRevokeUserNameKey(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "a", "--user-public-key", "UAUGJSHSTZY4ESHTL32CYYQNGT6MHXDQY6APMFMVRXWZN76RHE2IRN5O"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "user and user-public-key are mutually exclusive")
 }
@@ -211,11 +209,11 @@ func TestRevokeUserNameNotFound(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "a")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "a"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not found")
 
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "U")
+	_, err = ExecuteCmd(createRevokeUserCmd(), []string{"--name", "U"}...)
 	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -229,7 +227,7 @@ func TestRevokeDefaultUser(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{}...)
 	require.NoError(t, err)
 
 	upk := ts.GetUserPublicKey(t, "A", "U")
@@ -245,7 +243,7 @@ func TestRevokeUserRequired(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 	ts.AddUser(t, "A", "Y")
-	_, _, err := ExecuteCmd(createRevokeUserCmd())
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no default user available")
 }
@@ -254,7 +252,7 @@ func TestRevokeAllUsers(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"-u", "*"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -266,7 +264,7 @@ func TestRevokeBadUnixTime(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*", "--at", "hello")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"-u", "*", "--at", "hello"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid argument")
 }
@@ -276,7 +274,7 @@ func TestRevokeRFC3339Time(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	at := time.Now()
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*", "--at", at.Format(time.RFC3339))
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"-u", "*", "--at", at.Format(time.RFC3339)}...)
 	require.NoError(t, err)
 
 	c, err := ts.Store.ReadAccountClaim("A")
@@ -290,7 +288,7 @@ func TestRevokeBadUnixTimeInteractive(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	input := []interface{}{"*", "hello"}
-	_, _, err := ExecuteInteractiveCmd(createRevokeUserCmd(), input)
+	_, err := ExecuteInteractiveCmd(createRevokeUserCmd(), input)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `provided value "hello" is not`)
 }

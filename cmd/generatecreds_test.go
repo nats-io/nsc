@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,13 +16,11 @@
 package cmd
 
 import (
-	"os"
-	"testing"
-
 	"github.com/nats-io/jwt/v2"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
+	"os"
+	"testing"
 )
 
 func TestGenerateConfig_Default(t *testing.T) {
@@ -38,10 +36,10 @@ func TestGenerateConfig_Default(t *testing.T) {
 	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
+	out, err := ExecuteCmd(createGenerateCredsCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, string(accountJwt))
-	require.Contains(t, stdout, seed)
+	require.Contains(t, out.Out, string(accountJwt))
+	require.Contains(t, out.Out, seed)
 }
 
 func TestGenerateConfig_MultipleAccounts(t *testing.T) {
@@ -59,10 +57,10 @@ func TestGenerateConfig_MultipleAccounts(t *testing.T) {
 	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createGenerateCredsCmd())
+	out, err := ExecuteCmd(createGenerateCredsCmd(), []string{}...)
 	require.NoError(t, err)
-	require.Contains(t, stdout, string(accountJwt))
-	require.Contains(t, stdout, seed)
+	require.Contains(t, out.Out, string(accountJwt))
+	require.Contains(t, out.Out, seed)
 }
 
 func TestGenerateConfig_MultipleAccountsAccountRequired(t *testing.T) {
@@ -75,7 +73,7 @@ func TestGenerateConfig_MultipleAccountsAccountRequired(t *testing.T) {
 	ts.AddUser(t, "B", "u")
 
 	GetConfig().SetAccount("")
-	_, _, err := ExecuteCmd(createGenerateCredsCmd())
+	_, err := ExecuteCmd(createGenerateCredsCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
 }
@@ -94,14 +92,14 @@ func TestGenerateConfig_MultipleUsers(t *testing.T) {
 	seed := ts.GetUserSeedKey(t, "A", "u")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createGenerateCredsCmd())
+	_, err = ExecuteCmd(createGenerateCredsCmd(), []string{}...)
 	require.Error(t, err)
 	require.Equal(t, "user is required", err.Error())
 
-	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A", "--name", "u")
+	stdout, err := ExecuteCmd(createGenerateCredsCmd(), []string{"--account", "A", "--name", "u"}...)
 	require.NoError(t, err)
-	require.Contains(t, stdout, string(accountJwt))
-	require.Contains(t, stdout, seed)
+	require.Contains(t, stdout.Out, string(accountJwt))
+	require.Contains(t, stdout.Out, seed)
 }
 
 func TestGenerateConfig_Interactive(t *testing.T) {
@@ -117,10 +115,10 @@ func TestGenerateConfig_Interactive(t *testing.T) {
 	require.NoError(t, err)
 
 	seed := ts.GetUserSeedKey(t, "A", "u")
-	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), []interface{}{0, 0})
+	stdout, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), []interface{}{0, 0})
 	require.NoError(t, err)
-	require.Contains(t, stdout, string(accountJwt))
-	require.Contains(t, stdout, seed)
+	require.Contains(t, stdout.Out, string(accountJwt))
+	require.Contains(t, stdout.Out, seed)
 }
 
 func TestGenerateConfig_HonorsAccount(t *testing.T) {
@@ -132,18 +130,18 @@ func TestGenerateConfig_HonorsAccount(t *testing.T) {
 	ts.AddAccount(t, "B")
 	ts.AddUser(t, "B", "bu")
 
-	stdout, _, err := ExecuteCmd(createGenerateCredsCmd(), "--account", "A")
+	out, err := ExecuteCmd(createGenerateCredsCmd(), []string{"--account", "A"}...)
 	require.NoError(t, err)
-	userToken, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	userToken, err := jwt.ParseDecoratedJWT([]byte(out.Out))
 	require.NoError(t, err)
 
 	uc, err := jwt.DecodeUserClaims(userToken)
 	require.NoError(t, err)
 	require.Equal(t, "au", uc.Name)
 
-	stdout, _, err = ExecuteCmd(createGenerateCredsCmd(), "--account", "B")
+	out, err = ExecuteCmd(createGenerateCredsCmd(), []string{"--account", "B"}...)
 	require.NoError(t, err)
-	userToken, err = jwt.ParseDecoratedJWT([]byte(stdout))
+	userToken, err = jwt.ParseDecoratedJWT([]byte(out.Out))
 	require.NoError(t, err)
 
 	uc, err = jwt.DecodeUserClaims(userToken)
@@ -163,9 +161,9 @@ func TestGenerateConfig_InteractiveHonorsAccount(t *testing.T) {
 	t.Log(os.Args[0])
 
 	inputs := []interface{}{0}
-	stdout, _, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), inputs)
+	stdout, err := ExecuteInteractiveCmd(createGenerateCredsCmd(), inputs)
 	require.NoError(t, err)
-	userToken, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	userToken, err := jwt.ParseDecoratedJWT([]byte(stdout.Out))
 	require.NoError(t, err)
 
 	uc, err := jwt.DecodeUserClaims(userToken)

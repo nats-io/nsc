@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -268,7 +268,12 @@ func (p *GenerateServerConfigParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := Write(p.outputFile, d); err != nil {
+	if IsStdOut(p.outputFile) {
+		_, err := fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), string(d))
+		return nil, err
+	}
+	err = WriteFile(p.outputFile, d)
+	if err != nil {
 		return nil, err
 	}
 	if !IsStdOut(p.outputFile) {

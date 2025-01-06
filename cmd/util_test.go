@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -37,7 +37,7 @@ import (
 	"github.com/nats-io/jwt/v2"
 	jwt1 "github.com/nats-io/jwt/v2/v1compat"
 	"github.com/nats-io/nats-server/v2/server"
-	nats "github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 
@@ -284,7 +284,7 @@ func (ts *TestStore) GetStoresRoot() string {
 
 func (ts *TestStore) AddAccount(t *testing.T, accountName string) {
 	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
-		_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", accountName)
+		_, err := ExecuteCmd(CreateAddAccountCmd(), []string{"--name", accountName}...)
 		require.NoError(t, err)
 	}
 }
@@ -293,14 +293,14 @@ func (ts *TestStore) AddAccountWithSigner(t *testing.T, accountName string, sk n
 	if !ts.Store.Has(store.Accounts, accountName, store.JwtName(accountName)) {
 		seed, err := sk.Seed()
 		require.NoError(t, err)
-		_, _, err = ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "--name", accountName, "-K", string(seed))
+		_, err = ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), []string{"--name", accountName, "-K", string(seed)}...)
 		require.NoError(t, err)
 	}
 }
 
 func (ts *TestStore) AddUser(t *testing.T, accountName string, userName string) {
 	ts.AddAccount(t, accountName)
-	_, _, err := ExecuteCmd(CreateAddUserCmd(), "--account", accountName, "--name", userName)
+	_, err := ExecuteCmd(CreateAddUserCmd(), []string{"--account", accountName, "--name", userName}...)
 	require.NoError(t, err)
 }
 
@@ -308,7 +308,7 @@ func (ts *TestStore) AddUserWithSigner(t *testing.T, accountName string, userNam
 	ts.AddAccount(t, accountName)
 	seed, err := sk.Seed()
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--account", accountName, "--name", userName, "-K", string(seed))
+	_, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--account", accountName, "--name", userName, "-K", string(seed)}...)
 	require.NoError(t, err)
 }
 
@@ -325,7 +325,7 @@ func (ts *TestStore) AddExport(t *testing.T, accountName string, kind jwt.Export
 	}
 
 	ts.AddAccount(t, accountName)
-	_, _, err := ExecuteCmd(createAddExportCmd(), flags...)
+	_, err := ExecuteCmd(createAddExportCmd(), flags...)
 	require.NoError(t, err)
 }
 
@@ -357,7 +357,7 @@ func (ts *TestStore) AddImport(t *testing.T, srcAccount string, kind jwt.ExportT
 	} else {
 		flags = append(flags, "--src-account", srcAccount, "--remote-subject", subject)
 	}
-	_, _, err := ExecuteCmd(createAddImportCmd(), flags...)
+	_, err := ExecuteCmd(createAddImportCmd(), flags...)
 	require.NoError(t, err)
 }
 
@@ -372,9 +372,9 @@ func (ts *TestStore) GenerateActivation(t *testing.T, srcAccount string, subject
 	}
 
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject}
-	stdout, _, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
+	out, err := ExecuteCmd(createGenerateActivationCmd(), flags...)
 	require.NoError(t, err)
-	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	token, err := jwt.ParseDecoratedJWT([]byte(out.Out))
 	require.NoError(t, err)
 	return token
 }
@@ -385,9 +385,9 @@ func (ts *TestStore) GenerateActivationWithSigner(t *testing.T, srcAccount strin
 	require.NoError(t, err)
 
 	flags := []string{"--account", srcAccount, "--target-account", tpub, "--subject", subject, "-K", string(seed)}
-	stdout, _, err := ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), flags...)
+	out, err := ExecuteCmd(HoistRootFlags(createGenerateActivationCmd()), flags...)
 	require.NoError(t, err)
-	token, err := jwt.ParseDecoratedJWT([]byte(stdout))
+	token, err := jwt.ParseDecoratedJWT([]byte(out.Out))
 	require.NoError(t, err)
 	return token
 }

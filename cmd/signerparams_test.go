@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -148,7 +148,7 @@ func Test_SignerParamsSameDir(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(ts.Dir))
-	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", filepath.Base(dest))
+	_, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), []string{"-K", filepath.Base(dest)}...)
 	require.NoError(t, os.Chdir(cwd))
 	require.NoError(t, err)
 }
@@ -164,7 +164,7 @@ func Test_SignerParamsRelativePath(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(ts.StoreDir))
-	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", filepath.Join("../", filepath.Base(dest)))
+	_, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), []string{"-K", filepath.Join("../", filepath.Base(dest))}...)
 	require.NoError(t, os.Chdir(cwd))
 	require.NoError(t, err)
 }
@@ -174,7 +174,7 @@ func Test_SignerParamsPathNotFound(t *testing.T) {
 	defer ts.Done(t)
 
 	require.NoError(t, os.Remove(ts.OperatorKeyPath))
-	_, _, err := ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, nil), "-K", ts.OperatorKeyPath)
+	_, err := ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, nil), []string{"-K", ts.OperatorKeyPath}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unable to resolve any of the following signing keys in the keystore")
 }
@@ -202,7 +202,7 @@ func Test_SignerParamsHomePath(t *testing.T) {
 
 	tfn := AbbrevHomePaths(fn)
 	require.Equal(t, "~", tfn[:1])
-	_, _, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), "-K", tfn)
+	_, err = ExecuteCmd(createSignerCmd(nkeys.PrefixByteOperator, false, ts.OperatorKey), []string{"-K", tfn}...)
 	require.NoError(t, err)
 }
 
@@ -213,13 +213,13 @@ func Test_SignerParamsSeed(t *testing.T) {
 	ts.AddAccount(t, "A")
 	s, pk, _ := CreateAccountKey(t)
 
-	_, stdErr, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "a", "-K", string(s))
+	out, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "a", "-K", string(s)}...)
 	require.Error(t, err)
-	require.Contains(t, stdErr, "is not in the store")
+	require.Contains(t, out.Err, "is not in the store")
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, err = ExecuteCmd(createEditAccount(), []string{"--sk", pk}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), "--name", "a", "-K", string(s))
+	_, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "a", "-K", string(s)}...)
 	require.NoError(t, err)
 }

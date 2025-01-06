@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -58,7 +58,7 @@ func TestActionContextSet(t *testing.T) {
 		},
 	}
 
-	_, _, err := ExecuteCmd(cmd, "hello", "world")
+	_, err := ExecuteCmd(cmd, "hello", "world")
 	require.NoError(t, err)
 }
 
@@ -88,7 +88,7 @@ func TestActionInteractive(t *testing.T) {
 			return nil
 		},
 	}
-	_, _, err := ExecuteInteractiveCmd(cmd, []interface{}{})
+	_, err := ExecuteInteractiveCmd(cmd, []interface{}{})
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
 }
@@ -118,7 +118,7 @@ func TestActionNothingToDoEmpty(t *testing.T) {
 	}
 
 	cmd.Flags().StringVarP(&v, "name", "n", "", "account name")
-	_, _, err := ExecuteCmd(cmd)
+	_, err := ExecuteCmd(cmd)
 	require.NoError(t, err)
 	require.True(t, nothingToDo)
 }
@@ -148,7 +148,7 @@ func TestActionNothingToDoSet(t *testing.T) {
 	}
 
 	cmd.Flags().StringVarP(&v, "name", "n", "", "account name")
-	_, _, err := ExecuteCmd(cmd, "--name", "a")
+	_, err := ExecuteCmd(cmd, "--name", "a")
 	require.NoError(t, err)
 	require.False(t, nothingToDo)
 }
@@ -226,7 +226,7 @@ func TestActionMessage(t *testing.T) {
 		},
 	}
 
-	out, _, err := ExecuteCmd(cmd)
+	out, err := ExecuteCmd(cmd)
 	require.NoError(t, err)
-	require.Contains(t, "This is a test message", out)
+	require.Contains(t, out.Out, "this is a test message")
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -36,8 +36,8 @@ func TestPub(t *testing.T) {
 
 	// create the basic configuration
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", serverconf)
+	_, err := ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", serverconf}...)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
@@ -45,8 +45,7 @@ func TestPub(t *testing.T) {
 
 	// with the captured ports, regenerate the operator jwt
 	// we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
-		"--service-url", strings.Join(ports.Nats, ","))
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--service-url", strings.Join(ports.Nats, ",")}...)
 	require.NoError(t, err)
 
 	// create a conn to the server
@@ -65,7 +64,7 @@ func TestPub(t *testing.T) {
 	require.NoError(t, nc.Flush())
 
 	// pub a message
-	_, _, err = ExecuteCmd(createPubCmd(), v, v)
+	_, err = ExecuteCmd(createPubCmd(), []string{v, v}...)
 	require.NoError(t, err)
 
 	control := <-c
@@ -83,13 +82,13 @@ func TestPubPermissionViolation(t *testing.T) {
 	v := nuid.Next()
 
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-pub", v)
+	_, err := ExecuteCmd(createEditUserCmd(), []string{"--deny-pub", v}...)
 	require.NoError(t, err)
 
 	// create the basic configuration
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", serverconf}...)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
@@ -97,8 +96,7 @@ func TestPubPermissionViolation(t *testing.T) {
 
 	// with the captured ports, regenerate the operator jwt
 	// we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
-		"--service-url", strings.Join(ports.Nats, ","))
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--service-url", strings.Join(ports.Nats, ",")}...)
 	require.NoError(t, err)
 
 	// create a conn to the server
@@ -108,7 +106,7 @@ func TestPubPermissionViolation(t *testing.T) {
 	defer nc.Close()
 
 	// pub a message
-	_, _, err = ExecuteCmd(createPubCmd(), v, v)
+	_, err = ExecuteCmd(createPubCmd(), []string{v, v}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Permissions Violation")
 }
@@ -121,7 +119,7 @@ func TestSub(t *testing.T) {
 
 	// create the basic configuration
 	conf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+	_, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
 		"--config-file", conf)
 	require.NoError(t, err)
 
@@ -129,7 +127,7 @@ func TestSub(t *testing.T) {
 	ports := ts.RunServerWithConfig(t, conf)
 
 	// with the captured ports, regenerate the operator jwt - we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
+	_, err = ExecuteCmd(createEditOperatorCmd(),
 		"--service-url", strings.Join(ports.Nats, ","))
 	require.NoError(t, err)
 
@@ -139,14 +137,13 @@ func TestSub(t *testing.T) {
 	log.SetFlags(log.LstdFlags)
 	// subscribe a message
 	type po struct {
-		stdout string
-		stderr string
-		err    error
+		CmdOutput
+		err error
 	}
 	c := make(chan po)
 	go func() {
 		var r po
-		r.stdout, r.stderr, r.err = ExecuteCmd(createSubCmd(), "--max-messages", "1", v)
+		r.CmdOutput, r.err = ExecuteCmd(createSubCmd(), "--max-messages", "1", v)
 		c <- r
 	}()
 
@@ -163,11 +160,8 @@ func TestSub(t *testing.T) {
 
 	select {
 	case r := <-c:
-		t.Log(r.stdout)
-		t.Log(r.stderr)
-		t.Log(r.err)
 		require.NoError(t, r.err)
-		require.Contains(t, r.stderr, fmt.Sprintf("received on [%s]: '%s'", v, v))
+		require.Contains(t, r.Out, fmt.Sprintf("received on [%s]: '%s'", v, v))
 	case <-time.After(25 * time.Second):
 		t.Fatal("timed out")
 	}
@@ -182,26 +176,25 @@ func TestSubPermissionViolation(t *testing.T) {
 	v := nuid.Next()
 
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-sub", v)
+	_, err := ExecuteCmd(createEditUserCmd(), []string{"--deny-sub", v}...)
 	require.NoError(t, err)
 
 	// create the basic configuration
 	conf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", conf}...)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
 	ports := ts.RunServerWithConfig(t, conf)
 
 	// with the captured ports, regenerate the operator jwt - we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
-		"--service-url", strings.Join(ports.Nats, ","))
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--service-url", strings.Join(ports.Nats, ",")}...)
 	require.NoError(t, err)
 
 	log.SetFlags(log.LstdFlags)
 
-	_, _, err = ExecuteCmd(createSubCmd(), "--max-messages", "1", v)
+	_, err = ExecuteCmd(createSubCmd(), []string{"--max-messages", "1", v}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Permissions Violation")
 }
@@ -215,7 +208,7 @@ func TestReq(t *testing.T) {
 	// create the basic configuration
 	conf := filepath.Join(ts.Dir, "server.conf")
 
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+	_, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
 		"--config-file", conf)
 	require.NoError(t, err)
 
@@ -223,7 +216,7 @@ func TestReq(t *testing.T) {
 	ports := ts.RunServerWithConfig(t, conf)
 
 	// with the captured ports, regenerate the operator jwt - we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
+	_, err = ExecuteCmd(createEditOperatorCmd(),
 		"--service-url", strings.Join(ports.Nats, ","))
 	require.NoError(t, err)
 
@@ -243,9 +236,9 @@ func TestReq(t *testing.T) {
 	require.NoError(t, sub.AutoUnsubscribe(1))
 	require.NoError(t, nc.Flush())
 
-	_, stderr, err := ExecuteCmd(createToolReqCmd(), v, v)
+	out, err := ExecuteCmd(createToolReqCmd(), v, v)
 	require.NoError(t, err)
-	require.Contains(t, stderr, strings.ToUpper(v))
+	require.Contains(t, out.Out, strings.ToUpper(v))
 }
 
 func TestReply(t *testing.T) {
@@ -256,16 +249,15 @@ func TestReply(t *testing.T) {
 
 	// create the basic configuration
 	conf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf)
+	_, err := ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", conf}...)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
 	ports := ts.RunServerWithConfig(t, conf)
 
 	// with the captured ports, regenerate the operator jwt - we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
-		"--service-url", strings.Join(ports.Nats, ","))
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--service-url", strings.Join(ports.Nats, ",")}...)
 	require.NoError(t, err)
 
 	// generate a random subject/payload
@@ -273,14 +265,13 @@ func TestReply(t *testing.T) {
 
 	// subscribe a message
 	type po struct {
-		stdout string
-		stderr string
-		err    error
+		CmdOutput
+		err error
 	}
 	c := make(chan po)
 	go func() {
 		var r po
-		r.stdout, r.stderr, r.err = ExecuteCmd(createReplyCmd(), "--max-messages", "1", v)
+		r.CmdOutput, r.err = ExecuteCmd(createReplyCmd(), []string{"--max-messages", "1", v}...)
 		c <- r
 	}()
 
@@ -306,24 +297,23 @@ func TestReplyPermissionViolation(t *testing.T) {
 	v := nuid.Next()
 
 	ts.AddUser(t, "A", "U")
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--deny-sub", v)
+	_, err := ExecuteCmd(createEditUserCmd(), []string{"--deny-sub", v}...)
 	require.NoError(t, err)
 
 	// create the basic configuration
 	conf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", conf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", conf}...)
 	require.NoError(t, err)
 
 	// start a server with the config at a random port
 	ports := ts.RunServerWithConfig(t, conf)
 
 	// with the captured ports, regenerate the operator jwt - we only need the client to update
-	_, _, err = ExecuteCmd(createEditOperatorCmd(),
-		"--service-url", strings.Join(ports.Nats, ","))
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--service-url", strings.Join(ports.Nats, ",")}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createReplyCmd(), "--max-messages", "1", v)
+	_, err = ExecuteCmd(createReplyCmd(), []string{"--max-messages", "1", v}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Permissions Violation")
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,15 +18,14 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"github.com/nats-io/jwt/v2"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/nats-io/jwt/v2"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_SyncOK(t *testing.T) {
@@ -40,11 +39,11 @@ func Test_SyncOK(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// edit the jwt
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--tag", "A"}...)
 	require.NoError(t, err)
 
 	// sync the store
-	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
+	_, err = ExecuteCmd(createPushCmd(), []string{"--account", "A"}...)
 	require.NoError(t, err)
 
 	// verify the tag was stored
@@ -68,7 +67,7 @@ func Test_SyncNoURL(t *testing.T) {
 	require.NoError(t, err)
 	ts.Store.StoreClaim([]byte(token))
 
-	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A")
+	_, err = ExecuteCmd(createPushCmd(), []string{"--account", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no account server url or nats-server url was provided by the operator jwt")
 }
@@ -79,12 +78,13 @@ func Test_SyncNoServer(t *testing.T) {
 	ts.AddAccount(t, "A")
 	as.Close()
 
-	_, stderr, err := ExecuteCmd(createPushCmd(), "--account", "A")
+	out, err := ExecuteCmd(createPushCmd(), "--account", "A")
 	require.Error(t, err)
 	if runtime.GOOS == "windows" {
-		require.Contains(t, stderr, "connectex: No connection")
+		// connectex is the actual name
+		require.Contains(t, out.Err, "connectex: No connection")
 	} else {
-		require.Contains(t, stderr, "connect: connection refused")
+		require.Contains(t, out.Err, "connect: connection refused")
 	}
 }
 
@@ -120,11 +120,11 @@ func Test_SyncManualServer(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// edit the jwt
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--tag", "A"}...)
 	require.NoError(t, err)
 
 	// sync the store
-	_, _, err = ExecuteCmd(createPushCmd(), "--account", "A", "--account-jwt-server-url", as.URL)
+	_, err = ExecuteCmd(createPushCmd(), []string{"--account", "A", "--account-jwt-server-url", as.URL}...)
 	require.NoError(t, err)
 
 	// verify the tag was stored
@@ -141,11 +141,11 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	ts.AddAccount(t, "AC1")
 	ts.AddAccount(t, "AC2")
 
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
 	require.NoError(t, err)
 
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
 	require.NoError(t, err)
 
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
@@ -160,18 +160,18 @@ func deleteSetup(t *testing.T, del bool) (string, []string, *TestStore) {
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
 	// only after server start as ports are not yet known in tests
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	_, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createPushCmd(), "--all")
+	_, err = ExecuteCmd(createPushCmd(), "--all")
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
 	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, len(filesPre), 3)
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "--name", "AC2")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), "--name", "AC2")
 	require.NoError(t, err)
 	// exists as nsc has a bad default account now (is not pushed, hence not in file counts)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC3")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC3")
 	require.NoError(t, err)
 	return dir, filesPre, ts
 }
@@ -184,8 +184,8 @@ func Test_SyncNatsResolverDeleteNoOperatorKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, ts.KeyStore.Remove(opk))
 
-	_, stderr, err := ExecuteCmd(createPushCmd(), "--prune")
-	t.Log(stderr)
+	out, err := ExecuteCmd(createPushCmd(), []string{"--prune"}...)
+	t.Log(out.Err)
 	require.Error(t, err)
 }
 
@@ -203,7 +203,7 @@ func Test_SyncNatsResolverDeleteOperatorKeyInFlag(t *testing.T) {
 
 	cmd := createPushCmd()
 	HoistRootFlags(cmd)
-	_, _, err = ExecuteCmd(cmd, "--prune", "-K", string(seed))
+	_, err = ExecuteCmd(cmd, []string{"--prune", "-K", string(seed)}...)
 	require.NoError(t, err)
 }
 
@@ -211,7 +211,7 @@ func Test_SyncNatsResolverDelete(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, true)
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
+	_, err := ExecuteCmd(createPushCmd(), []string{"--prune"}...)
 	require.NoError(t, err)
 	// test to assure AC1/SYS where pushed/pruned
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
@@ -237,7 +237,7 @@ func Test_SyncNatsResolverExplicitDelete(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, true)
 	defer os.Remove(dir)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createPushCmd(), "--account-removal", "AC1")
+	_, err := ExecuteCmd(createPushCmd(), []string{"--account-removal", "AC1"}...)
 	require.NoError(t, err)
 	// test to assure AC1/SYS where pushed/pruned
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
@@ -263,39 +263,39 @@ func Test_SyncNatsResolverDiff(t *testing.T) {
 	dir, _, ts := deleteSetup(t, true)
 	defer os.Remove(dir)
 	defer ts.Done(t)
-	_, stdErr, err := ExecuteCmd(createPushCmd(), "--diff")
+	out, err := ExecuteCmd(createPushCmd(), "--diff")
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "only exists in server")
-	require.Contains(t, stdErr, "named AC1 exists")
-	require.Contains(t, stdErr, "named SYS exists")
+	require.Contains(t, out.Out, "only exists in server")
+	require.Contains(t, out.Out, "named AC1 exists")
+	require.Contains(t, out.Out, "named SYS exists")
 
 	re := regexp.MustCompile("[A-Z0-9]* named AC1 exists")
-	line := re.FindString(stdErr)
+	line := re.FindString(out.Out)
 	accId := strings.TrimSuffix(line, " named AC1 exists")
 
-	_, _, err = ExecuteCmd(createPushCmd(), "--account-removal", accId)
+	out, err = ExecuteCmd(createPushCmd(), "--account-removal", accId)
 	require.NoError(t, err)
 	filesDeleted, err := filepath.Glob(dir + string(os.PathSeparator) + accId + ".jwt.deleted")
 	require.NoError(t, err)
 	require.Equal(t, 1, len(filesDeleted))
-	_, stdErr, err = ExecuteCmd(createPushCmd(), "--diff")
+	out, err = ExecuteCmd(createPushCmd(), "--diff")
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "only exists in server")
-	require.NotContains(t, stdErr, "named AC1 exists")
-	require.Contains(t, stdErr, "named SYS exists")
+	require.Contains(t, out.Out, "only exists in server")
+	require.NotContains(t, out.Out, "named AC1 exists")
+	require.Contains(t, out.Out, "named SYS exists")
 }
 
 func Test_SyncNatsResolverDeleteSYS(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, true)
 	defer os.Remove(dir)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createDeleteAccountCmd(), "--name", "SYS")
+	_, err := ExecuteCmd(createDeleteAccountCmd(), []string{"--name", "SYS"}...)
 	require.NoError(t, err)
 	// exists as nsc has a bad default account now (is not pushed, hence not in file counts)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC4")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), []string{"--name", "AC4"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createPushCmd(), "--prune") // will fail as system acc can't be deleted
-	require.Error(t, err)                              // this will actually not hit the server as the system account is already deleted
+	_, err = ExecuteCmd(createPushCmd(), []string{"--prune"}...) // will fail as system acc can't be deleted
+	require.Error(t, err)                                        // this will actually not hit the server as the system account is already deleted
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
 	require.NoError(t, err)
 	require.Equal(t, 3, len(filesPost))
@@ -306,7 +306,7 @@ func Test_SyncNatsResolverNoDelete(t *testing.T) {
 	dir, filesPre, ts := deleteSetup(t, false)
 	defer os.Remove(dir)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createPushCmd(), "--prune")
+	_, err := ExecuteCmd(createPushCmd(), []string{"--prune"}...)
 	require.Error(t, err)
 	// test to assure that pruning did not happen
 	filesPost, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
@@ -318,12 +318,12 @@ func Test_SyncNatsResolverNoDelete(t *testing.T) {
 func Test_SyncBadUrl(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	_, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
 	require.NoError(t, err)
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
 	data, err := os.ReadFile(serverconf)
@@ -336,17 +336,17 @@ func Test_SyncBadUrl(t *testing.T) {
 	require.NotNil(t, ports)
 	// deliberately test if http push to a nats server kills it or not
 	badUrl := strings.ReplaceAll(ports.Nats[0], "nats://", "http://")
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", badUrl)
+	_, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", badUrl)
 	require.NoError(t, err)
-	_, errOut, err := ExecuteCmd(createPushCmd(), "--all")
+	out, err := ExecuteCmd(createPushCmd(), "--all")
 	require.Error(t, err)
-	require.Contains(t, errOut, `Post "`+badUrl)
+	require.Contains(t, out.Err, `Post "`+badUrl)
 	// Fix bad url
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	_, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
 	require.NoError(t, err)
 	// Try again, thus also testing if the server is still around
 	// Provide explicit system account user to connect
-	_, _, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	_, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
 	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")
@@ -357,12 +357,12 @@ func Test_SyncBadUrl(t *testing.T) {
 func Test_SyncWs(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)
 	require.NoError(t, err)
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--nats-resolver", "--config-file", serverconf}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), []string{"--name", "AC1"}...)
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
 	data, err := os.ReadFile(serverconf)
@@ -379,11 +379,11 @@ func Test_SyncWs(t *testing.T) {
 	require.NoError(t, err)
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.WebSocket[0])
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--account-jwt-server-url", ports.WebSocket[0]}...)
 	require.NoError(t, err)
 	// Try again, thus also testing if the server is still around
 	// Provide explicit system account user to connect
-	_, _, err = ExecuteCmd(createPushCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	_, err = ExecuteCmd(createPushCmd(), []string{"--all", "--system-account", "SYS", "--system-user", "sys"}...)
 	require.NoError(t, err)
 	// test to assure AC1/AC2/SYS where pushed
 	filesPre, err := filepath.Glob(dir + string(os.PathSeparator) + "*.jwt")

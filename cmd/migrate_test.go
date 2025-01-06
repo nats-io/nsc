@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -34,7 +34,7 @@ func Test_Migrate(t *testing.T) {
 	ts.AddUser(t, "B", "b")
 
 	ts.AddOperator(t, "OO")
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--url", filepath.Join(ts.GetStoresRoot(), "O", "accounts", "A", "A.jwt"))
+	_, err := ExecuteCmd(createMigrateCmd(), []string{"--url", filepath.Join(ts.GetStoresRoot(), "O", "accounts", "A", "A.jwt")}...)
 	require.NoError(t, err)
 
 	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
@@ -55,7 +55,7 @@ func Test_MigrateMany(t *testing.T) {
 	ts.AddUser(t, "B", "b")
 
 	ts.AddOperator(t, "OO")
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.GetStoresRoot(), "O"))
+	_, err := ExecuteCmd(createMigrateCmd(), []string{"--operator-dir", filepath.Join(ts.GetStoresRoot(), "O")}...)
 	require.NoError(t, err)
 
 	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
@@ -81,7 +81,7 @@ func Test_MigrateSingleInteractive(t *testing.T) {
 	ts.AddOperator(t, "OO")
 
 	args := []interface{}{false, filepath.Join(ts.GetStoresRoot(), "O", store.Accounts, "A", "A.jwt")}
-	_, _, err := ExecuteInteractiveCmd(createMigrateCmd(), args)
+	_, err := ExecuteInteractiveCmd(createMigrateCmd(), args)
 	require.NoError(t, err)
 
 	oos, err := store.LoadStore(filepath.Join(ts.GetStoresRoot(), "OO"))
@@ -111,7 +111,7 @@ func Test_MigrateManaged(t *testing.T) {
 	ts.SwitchOperator(t, "T")
 
 	// migrate the local operator
-	_, _, err := ExecuteCmd(createMigrateCmd(), "--operator-dir", filepath.Join(ts.StoreDir, "O"))
+	_, err := ExecuteCmd(createMigrateCmd(), []string{"--operator-dir", filepath.Join(ts.StoreDir, "O")}...)
 	require.NoError(t, err)
 	require.NotNil(t, m[apk])
 

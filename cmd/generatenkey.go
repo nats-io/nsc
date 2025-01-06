@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -82,9 +82,6 @@ func (e *KP) kind() string {
 func (e *KP) Generate() error {
 	var err error
 	e.kp, err = nkeys.CreatePair(e.prefix)
-	if err != nil {
-		panic(err)
-	}
 	return err
 }
 
@@ -152,7 +149,7 @@ func (p *GenerateNKeysParam) Run(ctx ActionCtx) (store.Status, error) {
 					return nil, err
 				}
 			}
-			ctx.CurrentCmd().Println(j.String(p.store))
+			_, _ = fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), j.String(p.store))
 		}
 	}
 	return nil, nil

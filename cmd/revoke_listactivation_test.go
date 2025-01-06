@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,12 +16,11 @@
 package cmd
 
 import (
+	"github.com/nats-io/jwt/v2"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/nats-io/jwt/v2"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRevokeListActivation(t *testing.T) {
@@ -35,41 +34,41 @@ func TestRevokeListActivation(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--subject", "foo.bar", "--target-account", pub)
+	_, err := ExecuteCmd(createRevokeActivationCmd(), "--subject", "foo.bar", "--target-account", pub)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "bar", "--target-account", pub, "--service", "--at", "1001")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "bar", "--target-account", pub, "--service", "--at", "1001")
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "public", "--target-account", pub, "--service", "--at", "2001")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "public", "--target-account", pub, "--service", "--at", "2001")
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createRevokeListActivationCmd(), "--subject", "foo.bar")
+	stdout, err := ExecuteCmd(createRevokeListActivationCmd(), "--subject", "foo.bar")
 	require.NoError(t, err)
 
-	require.True(t, strings.Contains(stdout, pub))
-	require.False(t, strings.Contains(stdout, time.Unix(1001, 0).Format(time.RFC1123)))
-	require.False(t, strings.Contains(stdout, time.Unix(2001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(stdout.Out, pub))
+	require.False(t, strings.Contains(stdout.Out, time.Unix(1001, 0).Format(time.RFC1123)))
+	require.False(t, strings.Contains(stdout.Out, time.Unix(2001, 0).Format(time.RFC1123)))
 
-	stdout, _, err = ExecuteCmd(createRevokeListActivationCmd(), "--subject", "bar", "--service")
+	stdout, err = ExecuteCmd(createRevokeListActivationCmd(), "--subject", "bar", "--service")
 	require.NoError(t, err)
 
-	require.True(t, strings.Contains(stdout, pub))
-	require.True(t, strings.Contains(stdout, time.Unix(1001, 0).Format(time.RFC1123)))
-	require.False(t, strings.Contains(stdout, time.Unix(2001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(stdout.Out, pub))
+	require.True(t, strings.Contains(stdout.Out, time.Unix(1001, 0).Format(time.RFC1123)))
+	require.False(t, strings.Contains(stdout.Out, time.Unix(2001, 0).Format(time.RFC1123)))
 
-	stdout, _, err = ExecuteCmd(createRevokeListActivationCmd(), "--subject", "public", "--service")
+	stdout, err = ExecuteCmd(createRevokeListActivationCmd(), "--subject", "public", "--service")
 	require.NoError(t, err)
 
-	require.True(t, strings.Contains(stdout, pub))
-	require.False(t, strings.Contains(stdout, time.Unix(1001, 0).Format(time.RFC1123)))
-	require.True(t, strings.Contains(stdout, time.Unix(2001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(stdout.Out, pub))
+	require.False(t, strings.Contains(stdout.Out, time.Unix(1001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(stdout.Out, time.Unix(2001, 0).Format(time.RFC1123)))
 }
 
 func TestRevokeListActivationNoAccount(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
-	_, _, err := ExecuteInteractiveCmd(createRevokeListActivationCmd(), []interface{}{})
+	_, err := ExecuteInteractiveCmd(createRevokeListActivationCmd(), []interface{}{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no accounts defined")
 }
@@ -77,7 +76,7 @@ func TestRevokeListActivationNoAccount(t *testing.T) {
 func TestRevokeListActivationNoAccountInteractive(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createRevokeListActivationCmd())
+	_, err := ExecuteCmd(createRevokeListActivationCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "an account is required")
 }
@@ -86,7 +85,7 @@ func TestRevokeListActivationNoExport(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeListActivationCmd(), "--service")
+	_, err := ExecuteCmd(createRevokeListActivationCmd(), []string{"--service"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have exports")
 }
@@ -96,7 +95,7 @@ func TestRevokeListActivationNoServiceExport(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "s", 0, false)
-	_, _, err := ExecuteCmd(createRevokeListActivationCmd(), "--service")
+	_, err := ExecuteCmd(createRevokeListActivationCmd(), []string{"--service"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have service exports")
 }
@@ -106,7 +105,7 @@ func TestRevokeListActivationNoStreamExport(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
-	_, _, err := ExecuteCmd(createRevokeListActivationCmd())
+	_, err := ExecuteCmd(createRevokeListActivationCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have stream exports")
 }
@@ -116,9 +115,9 @@ func TestRevokeListActivationDefaultExport(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--service", "--target-account", "*")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--target-account", "*"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createRevokeListActivationCmd(), "--service")
+	_, err = ExecuteCmd(createRevokeListActivationCmd(), []string{"--service"}...)
 	require.NoError(t, err)
 }
 
@@ -128,11 +127,11 @@ func TestRevokeListActivationNoDefaultExport(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
 	ts.AddExport(t, "A", jwt.Service, "r", 0, false)
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--service", "--target-account", "*", "--subject", "s")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--target-account", "*", "--subject", "s"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--service", "--target-account", "*", "--subject", "r")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--target-account", "*", "--subject", "r"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createRevokeListActivationCmd(), "--service")
+	_, err = ExecuteCmd(createRevokeListActivationCmd(), []string{"--service"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "a subject is required")
 }
@@ -143,11 +142,11 @@ func TestRevokeListActivationExportNotFound(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
 	ts.AddExport(t, "A", jwt.Service, "r", 0, false)
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--service", "--target-account", "*", "--subject", "s")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--target-account", "*", "--subject", "s"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--service", "--target-account", "*", "--subject", "r")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--target-account", "*", "--subject", "r"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createRevokeListActivationCmd(), "--service", "--subject", "x")
+	_, err = ExecuteCmd(createRevokeListActivationCmd(), []string{"--service", "--subject", "x"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unable to locate export")
 }
@@ -157,7 +156,7 @@ func TestRevokeListActivationHasNoRevocations(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
-	_, _, err := ExecuteCmd(createRevokeListActivationCmd(), "--service", "--subject", "s")
+	_, err := ExecuteCmd(createRevokeListActivationCmd(), []string{"--service", "--subject", "s"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "service s has no revocations")
 }
@@ -167,9 +166,9 @@ func TestRevokeListActivationInteractive(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "s", 0, false)
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--service", "--subject", "s", "--target-account", "*")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--service", "--subject", "s", "--target-account", "*"}...)
 	require.NoError(t, err)
 	args := []interface{}{true, 0}
-	_, _, err = ExecuteInteractiveCmd(createRevokeListActivationCmd(), args)
+	_, err = ExecuteInteractiveCmd(createRevokeListActivationCmd(), args)
 	require.NoError(t, err)
 }

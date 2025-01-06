@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -143,7 +143,19 @@ func run(ctx ActionCtx, action interface{}) error {
 
 	rs, err := e.Run(ctx)
 	if rs != nil {
-		ctx.CurrentCmd().Println(rs.Message())
+		// if we have an error or the reports has an error, send to stderr
+		// so they can see it
+		stream := ctx.CurrentCmd().OutOrStdout()
+		if err != nil {
+			stream = ctx.CurrentCmd().ErrOrStderr()
+		} else if store.IsReport(rs) {
+			r := store.ToReport(rs)
+			if r.HasErrors() {
+				stream = ctx.CurrentCmd().ErrOrStderr()
+			}
+		}
+
+		_, _ = fmt.Fprintln(stream, rs.Message())
 		sum, ok := rs.(store.Summarizer)
 		if ok {
 			m, err := sum.Summary()
@@ -151,7 +163,7 @@ func run(ctx ActionCtx, action interface{}) error {
 				return err
 			}
 			if m != "" {
-				ctx.CurrentCmd().Println(strings.TrimSuffix(m, "\n"))
+				_, _ = fmt.Fprintln(stream, strings.TrimSuffix(m, "\n"))
 			}
 		}
 	}

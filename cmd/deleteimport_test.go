@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -38,7 +38,7 @@ func Test_DeleteImport(t *testing.T) {
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "A"}, nil, []string{"account \"A\" doesn't have imports"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B"}, nil, []string{"subject is required"}, true},
 		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "baz"}, nil, []string{"no import matching \"baz\" found"}, true},
-		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "foo"}, nil, []string{"deleted stream import \"foo\""}, false},
+		{createDeleteImportCmd(), []string{"delete", "import", "--account", "B", "--subject", "foo"}, []string{"deleted stream import \"foo\""}, nil, false},
 	}
 
 	tests.Run(t, "root", "delete")
@@ -54,7 +54,7 @@ func Test_DeleteImportAccountRequired(t *testing.T) {
 	ts.AddImport(t, "A", jwt.Stream, "foo", "B")
 
 	GetConfig().SetAccount("")
-	_, _, err := ExecuteCmd(createDeleteImportCmd(), "--subject", "A")
+	_, err := ExecuteCmd(createDeleteImportCmd(), []string{"--subject", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "account is required")
 }
@@ -74,7 +74,7 @@ func Test_DeleteImportInteractive(t *testing.T) {
 	input := []interface{}{1, 0, 0}
 	cmd := createDeleteImportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input)
+	_, err := ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -107,15 +107,15 @@ func Test_DeleteAmbiguousImport(t *testing.T) {
 	require.NoError(t, err)
 
 	// fail because there are two with 'x'
-	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x")
+	_, err = ExecuteCmd(createDeleteImportCmd(), []string{"--subject", "x"}...)
 	require.Error(t, err)
 
 	// fail because no import for x from the specified account
-	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x", "--src-account", cpk)
+	_, err = ExecuteCmd(createDeleteImportCmd(), []string{"--subject", "x", "--src-account", cpk}...)
 	require.Error(t, err)
 
 	// finally the right args
-	_, _, err = ExecuteCmd(createDeleteImportCmd(), "--subject", "x", "--src-account", apk)
+	_, err = ExecuteCmd(createDeleteImportCmd(), []string{"--subject", "x", "--src-account", apk}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")

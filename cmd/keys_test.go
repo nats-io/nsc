@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,18 +17,15 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
-
-	"github.com/nats-io/nkeys"
-	"github.com/stretchr/testify/require"
-
-	"github.com/nats-io/nsc/v2/cmd/store"
 )
 
-func storeOldCreds(ts *TestStore, operator string, account string, user string, data []byte) error {
+func storeOldCreds(ts *TestStore, operator string, account string, user string, _data []byte) error {
 	ks := filepath.Join(ts.Dir, "keys")
 	target := filepath.Join(ks, operator, "accounts", account, "users", fmt.Sprintf("%s.creds", user))
 	return os.WriteFile(target, []byte(user), 0700)
@@ -100,15 +97,12 @@ func Test_HasOldStructure(t *testing.T) {
 }
 
 func Test_NoMigration(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("running in windows - looking at output hangs")
-	}
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, stdErr, err := ExecuteCmd(createMigrateKeysCmd())
+	out, err := ExecuteCmd(createMigrateKeysCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "does not need migration")
+	require.Contains(t, out.Out, "does not need migration")
 }
 
 func Test_MigrateKeys(t *testing.T) {
@@ -138,7 +132,7 @@ func Test_MigrateKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, needsUpdate)
 
-	_, _, err = ExecuteCmd(createMigrateKeysCmd())
+	_, err = ExecuteCmd(createMigrateKeysCmd(), []string{}...)
 	require.NoError(t, err)
 
 	// directory for keystore has a "keys" and "creds"

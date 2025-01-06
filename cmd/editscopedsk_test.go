@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,10 +30,10 @@ func Test_EditScopedSk_NotFound(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditSkopedSkCmd(), "--account", "not there")
+	_, err := ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "not there"}...)
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", "not there")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A", "--sk", "not there"}...)
 	require.Error(t, err)
 }
 
@@ -48,7 +48,7 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	_, pk, _ := CreateAccountKey(t)
 	s, pk2, kp := CreateAccountKey(t)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk, "--sk", pk2)
+	_, err = ExecuteCmd(createEditAccount(), []string{"--sk", pk, "--sk", pk2}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -80,12 +80,12 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 		require.Equal(t, us.Role, "foo")
 	}
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", pk2, "--subs", "5", "--role", "foo",
-		"--allow-pub", "foo", "--allow-sub", "foo", "--deny-sub", "bar", "--conn-type", "LEAFNODE", "--data", "5kib", "--bearer")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A", "--sk", pk2, "--subs", "5", "--role", "foo",
+		"--allow-pub", "foo", "--allow-sub", "foo", "--deny-sub", "bar", "--conn-type", "LEAFNODE", "--data", "5kib", "--bearer"}...)
 	require.NoError(t, err)
 	checkAcc(5)
 	// update using role name, with key that can't be found
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", "foo", "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A", "--sk", "foo", "--subs", "10"}...)
 	require.Error(t, err)
 
 	// store seed in temporary file and keystore so it can be found
@@ -97,7 +97,7 @@ func Test_EditScopedSk_Subs(t *testing.T) {
 	_, err = ts.KeyStore.Store(kp)
 	require.NoError(t, err)
 	// update using role name
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A", "--sk", "foo", "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A", "--sk", "foo", "--subs", "10"}...)
 	require.NoError(t, err)
 
 }
@@ -115,7 +115,7 @@ func Test_EditScopedSk_ResolveAny(t *testing.T) {
 	fp, err := ts.KeyStore.Store(kp)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, err = ExecuteCmd(createEditAccount(), []string{"--sk", pk}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -123,20 +123,20 @@ func Test_EditScopedSk_ResolveAny(t *testing.T) {
 	require.Contains(t, ac.SigningKeys, pk)
 	require.Equal(t, ac.Issuer, oc.Subject)
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
-		"--sk", string(s), "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A",
+		"--sk", string(s), "--subs", "10"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
-		"--sk", pk, "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A",
+		"--sk", pk, "--subs", "10"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
-		"--sk", fp, "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A",
+		"--sk", fp, "--subs", "10"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--account", "A",
-		"--sk", "foo", "--subs", "10")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--account", "A",
+		"--sk", "foo", "--subs", "10"}...)
 	require.Error(t, err)
 }
 
@@ -150,7 +150,7 @@ func Test_EditScopedSkAddGenerates(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// add the scope with a generate
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "generate"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -164,7 +164,7 @@ func Test_EditScopedSkAddGenerates(t *testing.T) {
 	require.NotNil(t, us)
 
 	// get the scope with the key
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", pk, "--role", "foo", "--description", "hello")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", pk, "--role", "foo", "--description", "hello"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -189,11 +189,11 @@ func Test_EditScopedSkByRole(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// add the scope with a generate
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "generate", "--role", "foo"}...)
 	require.NoError(t, err)
 
 	// get the scope by saying that the key is the role
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--allow-pub", ">")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "foo", "--allow-pub", ">"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -208,7 +208,7 @@ func Test_EditScopedSkByRole(t *testing.T) {
 	require.Len(t, us.Template.Pub.Allow, 1)
 
 	// get the scope by just specifying the role
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--role", "foo", "--allow-sub", ">")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--role", "foo", "--allow-sub", ">"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -233,11 +233,11 @@ func Test_EditScopedSkConnType(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// add the scope with a generate
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "generate", "--role", "foo"}...)
 	require.NoError(t, err)
 
 	// try to add invalid conn type
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--conn-type", "bar")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "foo", "--conn-type", "bar"}...)
 	require.Error(t, err)
 
 	// add lower case conn type - this is prevented now, but worked in the past
@@ -263,7 +263,7 @@ func Test_EditScopedSkConnType(t *testing.T) {
 	require.Equal(t, strings.ToLower(jwt.ConnectionTypeStandard), us.Template.AllowedConnectionTypes[0])
 
 	// add lower case conn type - should be transformed upper case
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--conn-type", strings.ToLower(jwt.ConnectionTypeMqtt))
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "foo", "--conn-type", strings.ToLower(jwt.ConnectionTypeMqtt)}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func Test_EditScopedSkRmConnType(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// add the scope with a generate
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "generate", "--role", "foo")
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "generate", "--role", "foo"}...)
 	require.NoError(t, err)
 
 	// add lower case conn types - this is prevented now, but worked in the past
@@ -318,7 +318,7 @@ func Test_EditScopedSkRmConnType(t *testing.T) {
 	require.Equal(t, strings.ToLower(jwt.ConnectionTypeWebsocket), us.Template.AllowedConnectionTypes[1])
 
 	// remove first conn type via lower cased input
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--rm-conn-type", strings.ToLower(jwt.ConnectionTypeStandard))
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "foo", "--rm-conn-type", strings.ToLower(jwt.ConnectionTypeStandard)}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -330,7 +330,7 @@ func Test_EditScopedSkRmConnType(t *testing.T) {
 	require.NotNil(t, us)
 	require.Len(t, us.Template.AllowedConnectionTypes, 1)
 	// remove second conn type via upper cased input
-	_, _, err = ExecuteCmd(createEditSkopedSkCmd(), "--sk", "foo", "--rm-conn-type", jwt.ConnectionTypeWebsocket)
+	_, err = ExecuteCmd(createEditSkopedSkCmd(), []string{"--sk", "foo", "--rm-conn-type", jwt.ConnectionTypeWebsocket}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)

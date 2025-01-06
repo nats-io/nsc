@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -102,11 +102,9 @@ func createUpdateCommand() *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("Successfully updated to version %s\n", nvs.Version.String())
-			cmd.Println()
-			cmd.Println("Release Notes:")
-			cmd.Println()
-			cmd.Println(cli.Wrap(80, nvs.ReleaseNotes))
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "Updating to version %s\n\n", nvs.Version.String())
+			fmt.Fprintf(out, "Release Notes:\n\n%s\n", cli.Wrap(80, nvs.ReleaseNotes))
 
 			return nil
 		},

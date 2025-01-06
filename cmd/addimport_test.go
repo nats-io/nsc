@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -38,11 +38,11 @@ func Test_AddImport(t *testing.T) {
 
 	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 	fp := filepath.Join(ts.Dir, "token.jwt")
-	require.NoError(t, Write(fp, []byte(token)))
+	require.NoError(t, WriteFile(fp, []byte(token)))
 
 	tests := CmdTests{
 		//{createAddImportCmd(), []string{"add", "import", "--account", "B"}, nil, []string{"token is required"}, true},
-		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", fp}, nil, []string{"added stream import"}, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", fp}, []string{"added stream import"}, nil, false},
 	}
 
 	tests.Run(t, "root", "add")
@@ -65,9 +65,9 @@ func Test_AddImportSelfImportsRejected(t *testing.T) {
 
 	token := ts.GenerateActivation(t, "A", "foobar.>", "A")
 	fp := filepath.Join(ts.Dir, "token.jwt")
-	require.NoError(t, Write(fp, []byte(token)))
+	require.NoError(t, WriteFile(fp, []byte(token)))
 
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--token", fp)
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--token", fp}...)
 	require.Error(t, err)
 	require.Equal(t, "export issuer is this account", err.Error())
 }
@@ -88,7 +88,7 @@ func Test_AddImportFromURL(t *testing.T) {
 	}))
 	defer ht.Close()
 
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ht.URL)
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--token", ht.URL}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -113,13 +113,13 @@ func Test_AddImportInteractive(t *testing.T) {
 
 	token := ts.GenerateActivation(t, "A", "foobar.>", "B")
 	fp := filepath.Join(ts.Dir, "token.jwt")
-	require.NoError(t, Write(fp, []byte(token)))
+	require.NoError(t, WriteFile(fp, []byte(token)))
 
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 
 	input := []interface{}{1, false, false, fp, "my import", "barfoo.>", false, 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -148,7 +148,7 @@ func Test_AddImportGeneratingTokenInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	input := []interface{}{1, true, 1, "my import", "barfoo.>", true, 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -178,7 +178,7 @@ func Test_AddServiceImportGeneratingTokenInteractive(t *testing.T) {
 	cmd := createAddImportCmd()
 	HoistRootFlags(cmd)
 	input := []interface{}{1, true, 1, "barfoo.>", true, "my import", "foobar.>"}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -199,7 +199,7 @@ func Test_AddPublicImport(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, true)
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "B", "--src-account", "A", "--remote-subject", "foobar.>")
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--src-account", "A", "--remote-subject", "foobar.>"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -212,7 +212,7 @@ func Test_AddImport_TokenAndPublic(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--token", "/foo", "--remote-subject", "foobar.>")
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--token", "/foo", "--remote-subject", "foobar.>"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "private imports require src-account")
 }
@@ -222,7 +222,7 @@ func Test_AddImport_MoreForPublic(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--remote-subject", "foobar.>")
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--remote-subject", "foobar.>"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "public imports require src-account, remote-subject")
 }
@@ -245,7 +245,7 @@ func Test_AddImport_PublicInteractive(t *testing.T) {
 	HoistRootFlags(cmd)
 	//   B, public, A's pubkey, local sub, service, name test, remote subj "test.foobar.alberto, key
 	input := []interface{}{1, false, true, apub, "foobar.x.*", true, "test", "test.foobar.alberto.*", 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err = ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -278,7 +278,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 	HoistRootFlags(cmd)
 	// B, don't pick, public, A's pubkey, remote sub, stream, name, local subj "test.foobar.>, allow-tracing, key
 	input := []interface{}{1, false, true, apub, "foobar.>", false, "test", "test.foobar.>", true, 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -293,7 +293,7 @@ func Test_AddImport_PublicImportsInteractive(t *testing.T) {
 
 	// B, don't pick, public, A's pubkey, remote sub, service, name test, local subj "test.foobar.>, key
 	input = []interface{}{1, false, true, apub, "q.*", true, "q", "qq.*", 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("B")
@@ -312,14 +312,14 @@ func Test_AddImportWithSigningKeyToken(t *testing.T) {
 
 	_, pk, sk := CreateAccountKey(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, err := ExecuteCmd(createEditAccount(), []string{"--sk", pk}...)
 	require.NoError(t, err)
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
 	ts.AddAccount(t, "B")
 	token := ts.GenerateActivationWithSigner(t, "A", "foobar.>", "B", sk)
 	tp := filepath.Join(ts.Dir, "token.jwt")
-	require.NoError(t, Write(tp, []byte(token)))
+	require.NoError(t, WriteFile(tp, []byte(token)))
 	bc, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
 
@@ -335,7 +335,7 @@ func Test_AddImportWithSigningKeyToken(t *testing.T) {
 	// account to import is B
 	require.Equal(t, acc.Subject, bc.Subject)
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", tp)
+	_, err = ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--token", tp}...)
 	require.NoError(t, err)
 	acb, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
@@ -349,7 +349,7 @@ func Test_AddDecoratedToken(t *testing.T) {
 
 	_, pk, sk := CreateAccountKey(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, err := ExecuteCmd(createEditAccount(), []string{"--sk", pk}...)
 	require.NoError(t, err)
 	ts.AddExport(t, "A", jwt.Stream, "foobar.>", 0, false)
 
@@ -359,9 +359,9 @@ func Test_AddDecoratedToken(t *testing.T) {
 	require.NoError(t, err)
 	token = string(d)
 	tp := filepath.Join(ts.Dir, "token.jwt")
-	require.NoError(t, Write(tp, []byte(token)))
+	require.NoError(t, WriteFile(tp, []byte(token)))
 
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", tp)
+	_, err = ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--token", tp}...)
 	require.NoError(t, err)
 	acb, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
@@ -389,7 +389,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 
 	// B, pick, stream foobar, name test, local subj "test.foobar.>, key
 	input := []interface{}{1, true, 1, "test", "test.foobar.>", true}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -405,7 +405,7 @@ func Test_AddImport_LocalImportsInteractive(t *testing.T) {
 
 	// B, pick, service q, name q service, local subj qq
 	input = []interface{}{1, true, 2, true, "q service", "qq", 0}
-	_, _, err = ExecuteInteractiveCmd(cmd, input)
+	_, err = ExecuteInteractiveCmd(cmd, input)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("B")
@@ -433,8 +433,8 @@ func Test_ImportStreamHandlesDecorations(t *testing.T) {
 	require.NoError(t, err)
 
 	ap := filepath.Join(ts.Dir, "activation.jwt")
-	Write(ap, d)
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ap)
+	require.NoError(t, WriteFile(ap, d))
+	_, err = ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--token", ap}...)
 	require.NoError(t, err)
 
 	bc, err := ts.Store.ReadAccountClaim("B")
@@ -457,8 +457,8 @@ func Test_ImportServiceHandlesDecorations(t *testing.T) {
 	require.NoError(t, err)
 
 	ap := filepath.Join(ts.Dir, "activation.jwt")
-	Write(ap, d)
-	_, _, err = ExecuteCmd(createAddImportCmd(), "--account", "B", "--token", ap)
+	require.NoError(t, WriteFile(ap, d))
+	_, err = ExecuteCmd(createAddImportCmd(), []string{"--account", "B", "--token", ap}...)
 	require.NoError(t, err)
 
 	bc, err := ts.Store.ReadAccountClaim("B")
@@ -476,7 +476,7 @@ func Test_AddImportToAccount(t *testing.T) {
 
 	bpk := ts.GetAccountPublicKey(t, "B")
 
-	_, _, err := ExecuteCmd(createAddImportCmd(), "--account", "A", "--src-account", bpk, "--remote-subject", "s.>")
+	_, err := ExecuteCmd(createAddImportCmd(), []string{"--account", "A", "--src-account", bpk, "--remote-subject", "s.>"}...)
 	require.NoError(t, err)
 
 	bc, err := ts.Store.ReadAccountClaim("A")
@@ -499,23 +499,23 @@ func Test_AddWilcdardImport(t *testing.T) {
 
 	srvcToken := ts.GenerateActivation(t, "A", "priv-srvc.>", "B")
 	srvcFp := filepath.Join(ts.Dir, "srvc-token.jwt")
-	require.NoError(t, Write(srvcFp, []byte(srvcToken)))
+	require.NoError(t, WriteFile(srvcFp, []byte(srvcToken)))
 	defer os.Remove(srvcFp)
 
 	strmToken := ts.GenerateActivation(t, "A", "priv-strm.>", "B")
 	strmFp := filepath.Join(ts.Dir, "strm-token.jwt")
-	require.NoError(t, Write(strmFp, []byte(strmToken)))
+	require.NoError(t, WriteFile(strmFp, []byte(strmToken)))
 	defer os.Remove(strmFp)
 
 	tests := CmdTests{
-		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", srvcFp}, nil,
-			[]string{"added service import"}, false},
-		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", strmFp}, nil,
-			[]string{"added stream import"}, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", srvcFp},
+			[]string{"added service import"}, nil, false},
+		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--token", strmFp},
+			[]string{"added stream import"}, nil, false},
 		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--src-account", aPub, "--service",
-			"--remote-subject", "pub-srvc.>"}, nil, []string{"added service import"}, false},
+			"--remote-subject", "pub-srvc.>"}, []string{"added service import"}, nil, false},
 		{createAddImportCmd(), []string{"add", "import", "--account", "B", "--src-account", aPub,
-			"--remote-subject", "pub-strm.>"}, nil, []string{"added stream import"}, false},
+			"--remote-subject", "pub-strm.>"}, []string{"added stream import"}, nil, false},
 	}
 
 	tests.Run(t, "root", "add")
@@ -534,7 +534,7 @@ func TestAddImport_SameName(t *testing.T) {
 	// account, locally available, name, local subj,
 	// database, true, A: -> stream.database, "stream.database", "ingest
 	input := []interface{}{2, true, 1, "ingest.a", "ingest.a", true}
-	_, _, err := ExecuteInteractiveCmd(createAddImportCmd(), input)
+	_, err := ExecuteInteractiveCmd(createAddImportCmd(), input)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("database")
@@ -547,7 +547,7 @@ func TestAddImport_SameName(t *testing.T) {
 	require.Equal(t, ts.GetAccountPublicKey(t, "A"), ac.Imports[0].Account)
 
 	input = []interface{}{2, true, 3, "ingest.b", "ingest.b", true}
-	_, _, err = ExecuteInteractiveCmd(createAddImportCmd(), input)
+	_, err = ExecuteInteractiveCmd(createAddImportCmd(), input)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("database")
