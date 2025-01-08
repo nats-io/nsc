@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -47,7 +47,7 @@ func numberEditorCmd(params *NumberParams) *cobra.Command {
 func TestNumberParams_BindFlags(t *testing.T) {
 	var p NumberParams
 	cmd := numberEditorCmd(&p)
-	_, _, err := ExecuteCmd(cmd, "--number", "10")
+	_, err := ExecuteCmd(cmd, []string{"--number", "10"}...)
 	require.NoError(t, err)
 
 	require.Equal(t, NumberParams(10), p)
@@ -56,7 +56,7 @@ func TestNumberParams_BindFlags(t *testing.T) {
 func TestNumberParams_Edit(t *testing.T) {
 	var p NumberParams
 	cmd := numberEditorCmd(&p)
-	_, _, err := ExecuteInteractiveCmd(cmd, []interface{}{"404"})
+	_, err := ExecuteInteractiveCmd(cmd, []interface{}{"404"})
 	require.NoError(t, err)
 
 	require.Equal(t, NumberParams(404), p)

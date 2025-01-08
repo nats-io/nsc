@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,21 +18,20 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/nats-io/nats-server/v2/server"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_NatsResolverServerParse(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)
 	require.NoError(t, err)
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--nats-resolver", "--config-file", serverconf}...)
 	require.NoError(t, err)
 	// modify the generated file so the jwt directory does not get created where the test is running
 	data, err := os.ReadFile(serverconf)

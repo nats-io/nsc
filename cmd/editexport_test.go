@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2024 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,7 +30,7 @@ func Test_EditExport_Private(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
-	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--private", "--response-type", jwt.ResponseTypeChunked)
+	_, err := ExecuteCmd(createEditExportCmd(), []string{"--subject", "a", "--private", "--response-type", jwt.ResponseTypeChunked}...)
 	require.NoError(t, err)
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func Test_EditExport_Latency(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, ac.Exports[0].Latency)
 
-	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "100", "--latency", "lat", "--response-threshold", "1s")
+	_, err = ExecuteCmd(createEditExportCmd(), []string{"--subject", "a", "--sampling", "100", "--latency", "lat", "--response-threshold", "1s"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -69,7 +69,7 @@ func Test_EditExportInteractive(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "b", 0, true)
 
 	link := "http://foo/bar"
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "1s", "desc", link})
+	_, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{1, 1, "c", "c", false, false, 1, "1s", "desc", link})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -89,7 +89,7 @@ func Test_EditExportInteractiveLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
-	_, _, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", "", ""})
+	_, err := ExecuteInteractiveCmd(createEditExportCmd(), []interface{}{0, 1, "c", "c", false, true, "header", "lat", 2, "", "", ""})
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -109,7 +109,7 @@ func Test_EditExportRmLatencySampling(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "a", 0, true)
 
-	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a", "--sampling", "header", "--latency", "metrics.a")
+	_, err := ExecuteCmd(createEditExportCmd(), []string{"--subject", "a", "--sampling", "header", "--latency", "metrics.a"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -117,7 +117,7 @@ func Test_EditExportRmLatencySampling(t *testing.T) {
 	require.NotNil(t, ac.Exports[0].Latency)
 	require.Equal(t, jwt.Headers, ac.Exports[0].Latency.Sampling)
 
-	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "a", "--rm-latency-sampling")
+	_, err = ExecuteCmd(createEditExportCmd(), []string{"--subject", "a", "--rm-latency-sampling"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -129,7 +129,7 @@ func Test_EditExportNoExports(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditExportCmd(), "--subject", "a")
+	_, err := ExecuteCmd(createEditExportCmd(), []string{"--subject", "a"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have exports")
 }
@@ -139,14 +139,14 @@ func TestEditServiceExportWTracing(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--service", "--subject", "q", "--allow-trace")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--service", "--subject", "q", "--allow-trace"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.True(t, ac.Exports[0].AllowTrace)
 
-	_, _, err = ExecuteCmd(createEditExportCmd(), "--service", "--subject", "q", "--allow-trace=false")
+	_, err = ExecuteCmd(createEditExportCmd(), []string{"--service", "--subject", "q", "--allow-trace=false"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -159,9 +159,9 @@ func TestEditStreamExportWTracing(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "q")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--subject", "q"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditExportCmd(), "--subject", "q", "--allow-trace")
+	_, err = ExecuteCmd(createEditExportCmd(), []string{"--subject", "q", "--allow-trace"}...)
 	require.Error(t, err)
 }

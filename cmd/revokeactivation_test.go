@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,11 +16,10 @@
 package cmd
 
 import (
-	"testing"
-	"time"
-
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
+	"testing"
+	"time"
 )
 
 func TestRevokeActivation(t *testing.T) {
@@ -34,13 +33,13 @@ func TestRevokeActivation(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--subject", "foo.bar", "--target-account", pub)
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--subject", "foo.bar", "--target-account", pub}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "bar", "--target-account", pub, "--service")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), []string{"--subject", "bar", "--target-account", pub, "--service"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "public", "--target-account", pub, "--service")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), []string{"--subject", "public", "--target-account", pub, "--service"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -62,10 +61,10 @@ func TestRevokeActivationAt(t *testing.T) {
 
 	_, pub, _ := CreateAccountKey(t)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "--subject", "foo.bar", "--target-account", pub, "--at", "1000")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"--subject", "foo.bar", "--target-account", pub, "--at", "1000"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeActivationCmd(), "--subject", "bar", "--target-account", pub, "--service", "--at", "1000")
+	_, err = ExecuteCmd(createRevokeActivationCmd(), []string{"--subject", "bar", "--target-account", pub, "--service", "--at", "1000"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -94,7 +93,7 @@ func TestRevokeActivationForStreamInteractive(t *testing.T) {
 	input := []interface{}{1, false, 0, pub, "1000"} // second account "B"
 	cmd := createRevokeActivationCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -134,7 +133,7 @@ func TestRevokeActivationForServiceInteractive(t *testing.T) {
 	input := []interface{}{1, true, 0, pub, "1000"} // second account "B"
 	cmd := createRevokeActivationCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -162,7 +161,7 @@ func TestRevokeActivationNoExports(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have exports")
 }
@@ -173,7 +172,7 @@ func TestRevokeActivationServiceNoExports(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have stream exports")
 }
@@ -184,7 +183,7 @@ func TestRevokeActivationStreamNoExports(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Stream, "q", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*", "--service"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "doesn't have service exports")
 }
@@ -196,7 +195,7 @@ func TestRevokeActivationSubjectRequired(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 	ts.AddExport(t, "A", jwt.Service, "qq", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*", "--service"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "a subject is required")
 }
@@ -207,7 +206,7 @@ func TestRevokeActivationExportNotFound(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "foo")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*", "--service", "--subject", "foo"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unable to locate export")
 }
@@ -218,7 +217,7 @@ func TestRevokeActivationDefaultSubject(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*", "--service"}...)
 	require.NoError(t, err)
 }
 
@@ -228,7 +227,7 @@ func TestRevokeActivationAll(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
-	_, _, err := ExecuteCmd(createRevokeActivationCmd(), "-t", "*", "--service", "--subject", "q")
+	_, err := ExecuteCmd(createRevokeActivationCmd(), []string{"-t", "*", "--service", "--subject", "q"}...)
 	require.NoError(t, err)
 }
 
@@ -239,7 +238,7 @@ func TestRevokeActivationBadInteractiveAt(t *testing.T) {
 	ts.AddExport(t, "A", jwt.Service, "q", 0, false)
 
 	input := []interface{}{true, 0, "*", "hello"}
-	_, _, err := ExecuteInteractiveCmd(createRevokeActivationCmd(), input)
+	_, err := ExecuteInteractiveCmd(createRevokeActivationCmd(), input)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `provided value "hello" is not`)
 }

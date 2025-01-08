@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,13 +16,12 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
-	"testing"
-
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
 func Test_ImportAccountSelfSigned(t *testing.T) {
@@ -47,12 +46,12 @@ func Test_ImportAccountSelfSigned(t *testing.T) {
 	file := filepath.Join(ts.Dir, "account-selfsigned.jwt")
 	err = os.WriteFile(file, []byte(theJWT), 0666)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
+	_, err = ExecuteCmd(createImportAccountCmd(), []string{"--file", file}...)
 	require.NoError(t, err)
 	check()
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
+	_, err = ExecuteCmd(createImportAccountCmd(), []string{"--file", file}...)
 	require.Error(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file, "--overwrite")
+	_, err = ExecuteCmd(createImportAccountCmd(), []string{"--file", file, "--overwrite"}...)
 	require.NoError(t, err)
 	check()
 }
@@ -73,10 +72,10 @@ func Test_ImportAccountOtherOperator(t *testing.T) {
 		err = os.WriteFile(file, []byte(theJWT), 0666)
 		require.NoError(t, err)
 		if force {
-			_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file, "--force")
+			_, err = ExecuteCmd(createImportAccountCmd(), []string{"--file", file, "--force"}...)
 			require.NoError(t, err)
 		} else {
-			_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", file)
+			_, err = ExecuteCmd(createImportAccountCmd(), []string{"--file", file}...)
 			require.Error(t, err)
 		}
 	}
@@ -94,31 +93,31 @@ func Test_ImportDecoratedAccount(t *testing.T) {
 	a, err := ts.Store.ReadRawAccountClaim("A")
 	require.NoError(t, err)
 	normal := filepath.Join(ts.Dir, "a.jwt")
-	err = Write(normal, a)
+	err = WriteFile(normal, a)
 	require.NoError(t, err)
 
 	// save a decorated jwt
 	decorated := filepath.Join(ts.Dir, "decorated_a.jwt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "account", "A", "--raw", "--output-file", decorated)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "account", "A", "--raw", "--output-file", decorated}...)
 
 	// delete the account
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--force")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), []string{"A", "--force"}...)
 	require.NoError(t, err)
 	_, err = ts.Store.ReadAccountClaim("A")
 	require.Error(t, err)
 	require.Equal(t, "account A does not exist in the current operator", err.Error())
 
 	// import the naked jwt
-	_, _, err = ExecuteCmd(rootCmd, "import", "account", "--file", normal)
+	_, err = ExecuteCmd(rootCmd, []string{"import", "account", "--file", normal}...)
 	require.NoError(t, err)
 	_, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--force")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), []string{"A", "--force"}...)
 	require.NoError(t, err)
 
 	// import the decorated jwt
-	_, _, err = ExecuteCmd(rootCmd, "import", "account", "--file", decorated)
+	_, err = ExecuteCmd(rootCmd, []string{"import", "account", "--file", decorated}...)
 	require.NoError(t, err)
 }
 
@@ -132,22 +131,22 @@ func Test_ImportAccountFromDescribe(t *testing.T) {
 	fp := filepath.Join(ts.Dir, "A.jwt")
 
 	// generate a jwt with describe, and import it
-	_, _, err := ExecuteCmd(cmd, "--raw", "--output-file", fp)
+	_, err := ExecuteCmd(cmd, "--raw", "--output-file", fp)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), "A")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", fp)
+	_, err = ExecuteCmd(createImportAccountCmd(), "--file", fp)
 	require.NoError(t, err)
 	require.NoError(t, os.Remove(fp))
 
 	// generate a jwt with describe that is not armored, and import it
 	cmd = createDescribeAccountCmd()
 	cmd.Flags().BoolVarP(&Raw, "raw", "R", false, "output the raw JWT (exclusive of long-ids)")
-	stdout, _, err := ExecuteCmd(cmd, "--raw")
+	stdout, err := ExecuteCmd(cmd, "--raw")
 	require.NoError(t, err)
-	require.NoError(t, Write(fp, []byte(stdout)))
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A")
+	require.NoError(t, WriteFile(fp, []byte(stdout.Out)))
+	_, err = ExecuteCmd(createDeleteAccountCmd(), "A")
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createImportAccountCmd(), "--file", fp)
+	_, err = ExecuteCmd(createImportAccountCmd(), "--file", fp)
 	require.NoError(t, err)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,9 +23,8 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/stretchr/testify/require"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_AddAccount(t *testing.T) {
@@ -41,11 +40,11 @@ func Test_AddAccount(t *testing.T) {
 
 	tests := CmdTests{
 		{CreateAddAccountCmd(), []string{"add", "account"}, nil, []string{"account name is required"}, true},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"generated and stored account key", "added account"}, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, []string{"generated and stored account key", "added account"}, nil, false},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "A"}, nil, []string{"the account \"A\" already exists"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "B", "--public-key", bar}, nil, nil, false},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, nil, []string{"generated and stored account key", "added account"}, false},
-		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, nil, []string{"generated and stored account key", "added account"}, false}, // should make a new name
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, []string{"generated and stored account key", "added account"}, nil, false},
+		{CreateAddAccountCmd(), []string{"add", "account", "--name", "*"}, []string{"generated and stored account key", "added account"}, nil, false}, // should make a new name
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "X", "--public-key", cpk}, nil, []string{"specified key is not a valid account nkey"}, true},
 		{CreateAddAccountCmd(), []string{"add", "account", "--name", "badexp", "--expiry", "30d"}, nil, nil, false},
 	}
@@ -56,7 +55,7 @@ func Test_AddAccount(t *testing.T) {
 func Test_AddAccountNoStore(t *testing.T) {
 	// reset the store
 	require.NoError(t, ForceStoreRoot(t, ""))
-	_, _, err := ExecuteCmd(CreateAddAccountCmd())
+	_, err := ExecuteCmd(CreateAddAccountCmd())
 	require.NotNil(t, err)
 	require.Equal(t, "no stores available", err.Error())
 }
@@ -65,7 +64,7 @@ func Test_AddAccountValidateOutput(t *testing.T) {
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
 	ts.List(t)
@@ -79,7 +78,7 @@ func Test_AddAccountInteractive(t *testing.T) {
 
 	cmd := CreateAddAccountCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, inputs)
+	_, err := ExecuteInteractiveCmd(cmd, inputs)
 	require.NoError(t, err)
 	validateAddAccountClaims(t, ts)
 }
@@ -124,7 +123,7 @@ func Test_AddAccountManagedStore(t *testing.T) {
 	ts := NewTestStoreWithOperatorJWT(t, string(m["operator"]))
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, err := ExecuteCmd(CreateAddAccountCmd(), "--name", "A", "--start", "2018-01-01", "--expiry", "2050-01-01")
 	require.NoError(t, err)
 }
 
@@ -140,13 +139,13 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	token, err := oc.Encode(kp)
 	require.NoError(t, err)
 	tf := filepath.Join(ts.Dir, "O.jwt")
-	err = Write(tf, []byte(token))
+	err = WriteFile(tf, []byte(token))
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
+	_, err = ExecuteCmd(createAddOperatorCmd(), "--url", tf)
 	require.NoError(t, err)
 	// sign with the signing key
 	inputs := []interface{}{"A", true, "0", "0", 0, string(s1)}
-	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	_, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
 	accJWT, err := os.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "A", "A.jwt"))
 	require.NoError(t, err)
@@ -157,7 +156,7 @@ func Test_AddAccountManagedStoreWithSigningKey(t *testing.T) {
 	require.True(t, oc.DidSign(ac))
 	// sign with the account key
 	inputs = []interface{}{"B", true, "0", "0", 1, string(s1)}
-	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	_, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
 	require.NoError(t, err)
 	accJWT, err = os.ReadFile(filepath.Join(ts.StoreDir, "O", "accounts", "B", "B.jwt"))
 	require.NoError(t, err)
@@ -172,12 +171,12 @@ func Test_AddAccountInteractiveSigningKey(t *testing.T) {
 	defer ts.Done(t)
 
 	s1, pk1, _ := CreateOperatorKey(t)
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1)
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--sk", pk1)
 	require.NoError(t, err)
 
 	// sign with the custom key
 	inputs := []interface{}{"A", true, "0", "0", 1, string(s1)}
-	_, _, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs)
+	_, err = ExecuteInteractiveCmd(HoistRootFlags(CreateAddAccountCmd()), inputs, []string{}...)
 	require.NoError(t, err)
 
 	d, err := ts.Store.Read(store.JwtName("O"))
@@ -196,7 +195,7 @@ func Test_AddAccountNameArg(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "A")
+	_, err := ExecuteCmd(HoistRootFlags(CreateAddAccountCmd()), "A")
 	require.NoError(t, err)
 
 	_, err = ts.Store.ReadAccountClaim("A")
@@ -214,7 +213,7 @@ func Test_AddAccountWithExistingKey(t *testing.T) {
 	pk, err := kp.PublicKey()
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
+	_, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
 	require.NoError(t, err)
 }
 
@@ -232,7 +231,7 @@ func Test_AddManagedAccountWithExistingKey(t *testing.T) {
 	pk, err := kp.PublicKey()
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
+	_, err = ExecuteCmd(CreateAddAccountCmd(), "A", "--public-key", pk)
 	require.NoError(t, err)
 
 	// inspect the pushed JWT before it was resigned
@@ -254,7 +253,7 @@ func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ts.KeyStore.HasPrivateKey(pk))
 
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pk)
+	_, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pk)
 	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
@@ -262,7 +261,7 @@ func Test_AddAccountWithSigningKeyOnly(t *testing.T) {
 	require.NoError(t, ts.KeyStore.Remove(oc.Subject))
 	require.False(t, ts.KeyStore.HasPrivateKey(oc.Subject))
 
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "A")
 	require.NoError(t, err)
 
 	_, err = ts.Store.ReadAccountClaim("A")
@@ -273,7 +272,7 @@ func Test_AddAccount_Pubs(t *testing.T) {
 	ts := NewTestStore(t, "edit user")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A", "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	_, err := ExecuteCmd(CreateAddAccountCmd(), "-n", "A", "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
 	require.NoError(t, err)
 
 	cc, err := ts.Store.ReadAccountClaim("A")
@@ -289,7 +288,7 @@ func Test_AddAccountBadName(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(CreateAddAccountCmd(), "A/B")
+	_, err := ExecuteCmd(CreateAddAccountCmd(), "A/B")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
 }

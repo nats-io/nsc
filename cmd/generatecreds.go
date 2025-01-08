@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -144,7 +144,12 @@ func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := Write(p.out, d); err != nil {
+	if IsStdOut(p.out) {
+		_, err = fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), string(d))
+	} else {
+		err = WriteFile(p.out, d)
+	}
+	if err != nil {
 		return nil, err
 	}
 	var s store.Status

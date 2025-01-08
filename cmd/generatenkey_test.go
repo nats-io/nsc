@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,9 +28,9 @@ func Test_GenerateOperatorNKey(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator")
+	out, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator")
 	require.NoError(t, err)
-	lines := strings.Split(stderr, "\n")
+	lines := strings.Split(out.Out, "\n")
 	require.True(t, len(lines) >= 2)
 
 	// seed
@@ -52,9 +52,9 @@ func Test_GenerateNKeyAndStoreDoesntPrint(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--store")
+	out, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--store")
 	require.NoError(t, err)
-	lines := strings.Split(stderr, "\n")
+	lines := strings.Split(out.Out, "\n")
 	require.True(t, len(lines) == 4)
 	require.Equal(t, lines[2], "")
 	require.Equal(t, lines[3], "")
@@ -102,9 +102,9 @@ func Test_GenerateAccountNKey(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--account")
+	out, err := ExecuteCmd(createGenerateNKeyCmd(), "--account")
 	require.NoError(t, err)
-	lines := strings.Split(stderr, "\n")
+	lines := strings.Split(out.Out, "\n")
 	require.True(t, len(lines) >= 2)
 
 	// seed
@@ -126,9 +126,9 @@ func Test_GenerateUserNKey(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--user")
+	out, err := ExecuteCmd(createGenerateNKeyCmd(), "--user")
 	require.NoError(t, err)
-	lines := strings.Split(stderr, "\n")
+	lines := strings.Split(out.Out, "\n")
 	require.True(t, len(lines) >= 2)
 
 	// seed
@@ -150,9 +150,9 @@ func Test_GenerateAllNKeys(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--account", "--user")
+	out, err := ExecuteCmd(createGenerateNKeyCmd(), "--operator", "--account", "--user")
 	require.NoError(t, err)
-	lines := strings.Split(stderr, "\n")
+	lines := strings.Split(out.Out, "\n")
 	require.True(t, len(lines) > 9)
 
 	kp, err := nkeys.FromSeed([]byte(lines[0]))

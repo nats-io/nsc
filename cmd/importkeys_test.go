@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,23 +17,22 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
-	"testing"
-
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
+	"path/filepath"
+	"testing"
 )
 
 func storeKeys(t *testing.T, dir string) []nkeys.KeyPair {
 	require.NoError(t, MaybeMakeDir(dir))
 	os, opk, okp := CreateOperatorKey(t)
-	err := Write(filepath.Join(dir, fmt.Sprintf("%s.nk", opk)), os)
+	err := WriteFile(filepath.Join(dir, fmt.Sprintf("%s.nk", opk)), os)
 	require.NoError(t, err)
 	as, apk, akp := CreateAccountKey(t)
-	err = Write(filepath.Join(dir, fmt.Sprintf("%s.nk", apk)), as)
+	err = WriteFile(filepath.Join(dir, fmt.Sprintf("%s.nk", apk)), as)
 	require.NoError(t, err)
 	us, upk, ukp := CreateUserKey(t)
-	err = Write(filepath.Join(dir, fmt.Sprintf("%s.nk", upk)), us)
+	err = WriteFile(filepath.Join(dir, fmt.Sprintf("%s.nk", upk)), us)
 	require.NoError(t, err)
 
 	return []nkeys.KeyPair{okp, akp, ukp}
@@ -47,7 +46,7 @@ func Test_ImportKeys(t *testing.T) {
 	keys := storeKeys(t, dir)
 	require.True(t, len(keys) > 0)
 
-	_, _, err := ExecuteCmd(createImportKeysCmd(), "--dir", dir)
+	_, err := ExecuteCmd(createImportKeysCmd(), []string{"--dir", dir}...)
 	require.NoError(t, err)
 	for _, kp := range keys {
 		pk, err := kp.PublicKey()
@@ -69,7 +68,7 @@ func Test_ImportKeysNotRecursive(t *testing.T) {
 	keys2 := storeKeys(t, dir2)
 	require.True(t, len(keys2) > 0)
 
-	_, _, err := ExecuteCmd(createImportKeysCmd(), "--dir", dir)
+	_, err := ExecuteCmd(createImportKeysCmd(), []string{"--dir", dir}...)
 	require.NoError(t, err)
 	for _, kp := range keys {
 		pk, err := kp.PublicKey()
@@ -98,7 +97,7 @@ func Test_ImportKeyRecursive(t *testing.T) {
 	keys2 := storeKeys(t, dir2)
 	require.True(t, len(keys2) > 0)
 
-	_, _, err := ExecuteCmd(createImportKeysCmd(), "--dir", dir, "--recurse")
+	_, err := ExecuteCmd(createImportKeysCmd(), []string{"--dir", dir, "--recurse"}...)
 	require.NoError(t, err)
 	keys = append(keys, keys2...)
 	for _, kp := range keys {

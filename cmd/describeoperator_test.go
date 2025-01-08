@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -33,10 +33,10 @@ func TestDescribeOperator_Single(t *testing.T) {
 	defer ts.Done(t)
 
 	pub := ts.GetOperatorPublicKey(t)
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	out, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, " operator ")
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " operator ")
 }
 
 func TestDescribeOperator_Raw(t *testing.T) {
@@ -48,10 +48,10 @@ func TestDescribeOperator_Raw(t *testing.T) {
 		Raw = oldRaw
 	}()
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	stdout, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
 
-	oc, err := jwt.DecodeOperatorClaims(stdout)
+	oc, err := jwt.DecodeOperatorClaims(stdout.Out)
 	require.NoError(t, err)
 
 	require.NotNil(t, oc)
@@ -64,7 +64,7 @@ func TestDescribeOperator_Multiple(t *testing.T) {
 
 	ts.AddOperator(t, "A")
 
-	_, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	_, err := ExecuteCmd(createDescribeOperatorCmd(), []string{}...)
 	require.NoError(t, err)
 }
 
@@ -80,10 +80,10 @@ func TestDescribeOperator_MultipleWithContext(t *testing.T) {
 
 	pub := ts.GetOperatorPublicKey(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd())
+	stdout, err := ExecuteCmd(createDescribeOperatorCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, pub)
-	require.Contains(t, stdout, " B ")
+	require.Contains(t, stdout.Out, pub)
+	require.Contains(t, stdout.Out, " B ")
 }
 
 func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
@@ -95,17 +95,17 @@ func TestDescribeOperator_MultipleWithFlag(t *testing.T) {
 
 	pub := ts.GetOperatorPublicKey(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "B")
+	stdout, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "B")
 	require.NoError(t, err)
-	require.Contains(t, stdout, " B ")
-	require.Contains(t, stdout, pub)
+	require.Contains(t, stdout.Out, " B ")
+	require.Contains(t, stdout.Out, pub)
 }
 
 func TestDescribeOperator_MultipleWithBadOperator(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "C")
+	_, err := ExecuteCmd(createDescribeOperatorCmd(), []string{"--name", "C"}...)
 	require.Error(t, err)
 }
 
@@ -113,9 +113,9 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
+	stdout, err := ExecuteCmd(createDescribeOperatorCmd(), []string{"--name", "O"}...)
 	require.NoError(t, err)
-	require.NotContains(t, stdout, "Account JWT Server")
+	require.NotContains(t, stdout.Out, "Account JWT Server")
 
 	u := "https://asu.com:1234"
 	oc, err := ts.Store.ReadOperatorClaim()
@@ -127,18 +127,18 @@ func TestDescribeOperator_AccountServerURL(t *testing.T) {
 	err = ts.Store.StoreRaw([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
+	stdout, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
-	require.Contains(t, stdout, u)
+	require.Contains(t, stdout.Out, u)
 }
 
 func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	stdout, _, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
+	out, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
-	require.NotContains(t, stdout, "Operator Service URLs")
+	require.NotContains(t, out.Out, "Operator Service URLs")
 
 	urls := []string{"nats://localhost:4222", "tls://localhost:4333"}
 	oc, err := ts.Store.ReadOperatorClaim()
@@ -150,21 +150,21 @@ func TestDescribeOperator_OperatorServiceURLs(t *testing.T) {
 	_, err = ts.Store.StoreClaim([]byte(token))
 	require.NoError(t, err)
 
-	stdout, _, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
+	out, err = ExecuteCmd(createDescribeOperatorCmd(), "--name", "O")
 	require.NoError(t, err)
-	require.Contains(t, stdout, "Operator Service URLs")
-	require.Contains(t, stdout, "nats://localhost:4222")
-	require.Contains(t, stdout, "tls://localhost:4333")
+	require.Contains(t, out.Out, "Operator Service URLs")
+	require.Contains(t, out.Out, "nats://localhost:4222")
+	require.Contains(t, out.Out, "tls://localhost:4333")
 }
 
 func TestDescribeOperator_Json(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--json")
+	out, err := ExecuteCmd(rootCmd, "describe", "operator", "--json")
 	require.NoError(t, err)
 	m := make(map[string]interface{})
-	err = json.Unmarshal([]byte(out), &m)
+	err = json.Unmarshal([]byte(out.Out), &m)
 	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
@@ -176,11 +176,11 @@ func TestDescribeOperator_JsonPath(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	out, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--field", "sub")
+	out, err := ExecuteCmd(rootCmd, "describe", "operator", "--field", "sub")
 	require.NoError(t, err)
 	oc, err := ts.Store.ReadOperatorClaim()
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("\"%s\"\n", oc.Subject), out)
+	require.Equal(t, fmt.Sprintf("\"%s\"\n", oc.Subject), out.Out)
 }
 
 func TestDescribeOperator_Output(t *testing.T) {
@@ -188,7 +188,7 @@ func TestDescribeOperator_Output(t *testing.T) {
 	defer ts.Done(t)
 
 	p := filepath.Join(ts.Dir, "O.json")
-	_, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--json", "--output-file", p)
+	_, err := ExecuteCmd(rootCmd, []string{"describe", "operator", "--json", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err := os.ReadFile(p)
 	require.NoError(t, err)
@@ -198,14 +198,14 @@ func TestDescribeOperator_Output(t *testing.T) {
 	require.Equal(t, "O", oc.Name)
 
 	p = filepath.Join(ts.Dir, "O.txt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "operator", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "operator", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)
 	strings.Contains(string(data), "Operator Details")
 
 	p = filepath.Join(ts.Dir, "O.jwt")
-	_, _, err = ExecuteCmd(rootCmd, "describe", "operator", "--raw", "--output-file", p)
+	_, err = ExecuteCmd(rootCmd, []string{"describe", "operator", "--raw", "--output-file", p}...)
 	require.NoError(t, err)
 	data, err = os.ReadFile(p)
 	require.NoError(t, err)

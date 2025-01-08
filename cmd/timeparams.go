@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -98,7 +98,7 @@ func (p *TimeParams) canParse(s string) error {
 func (p *TimeParams) Edit() error {
 	var err error
 	format := "valid from ('0' is always) - yyyy-mm-dd, #m(inutes), #h(ours), #d(ays), #w(eeks), #M(onths), #y(ears)"
-	p.Start, err = cli.Prompt("valid", p.Start, cli.Val(p.canParse), cli.Help(format))
+	p.Start, err = cli.Prompt("valid from", p.Start, cli.Val(p.canParse), cli.Help(format))
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,18 +16,17 @@
 package cmd
 
 import (
-	"net/url"
-	"testing"
-
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/stretchr/testify/require"
+	"net/url"
+	"testing"
 )
 
 func Test_InitLocal(t *testing.T) {
 	ts := NewTestStore(t, "X")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createInitCmd(), "--name", "O")
+	_, err := ExecuteCmd(createInitCmd(), []string{"--name", "O"}...)
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "O", false)
@@ -41,7 +40,7 @@ func Test_InitExists(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, _, err := ExecuteCmd(createInitCmd(), "--name", "O")
+	_, err := ExecuteCmd(createInitCmd(), []string{"--name", "O"}...)
 	require.Error(t, err)
 }
 
@@ -56,7 +55,7 @@ func Test_InitDeploy(t *testing.T) {
 	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
-	_, _, err = ExecuteCmd(createInitCmd(), "--name", "O", "--url", ourl.String())
+	_, err = ExecuteCmd(createInitCmd(), []string{"--name", "O", "--url", ourl.String()}...)
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -75,7 +74,7 @@ func Test_InitRandomName(t *testing.T) {
 	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
-	_, _, err = ExecuteCmd(createInitCmd(), "--url", ourl.String())
+	_, err = ExecuteCmd(createInitCmd(), []string{"--url", ourl.String()}...)
 	require.NoError(t, err)
 
 	name := GetLastRandomName()
@@ -96,7 +95,7 @@ func Test_InitStarName(t *testing.T) {
 	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
-	_, _, err = ExecuteCmd(createInitCmd(), "--url", ourl.String(), "-n", "*")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--url", ourl.String(), "-n", "*"}...)
 	require.NoError(t, err)
 
 	name := GetLastRandomName()
@@ -131,7 +130,7 @@ func Test_InitWellKnown(t *testing.T) {
 	wkops = append(wkops, ops...)
 	wellKnownOperators = wkops
 
-	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--remote-operator", "T", "--name", "A"}...)
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -164,11 +163,11 @@ func Test_InitWellKnown2(t *testing.T) {
 	wellKnownOperators = wkops
 
 	// get the managed operator on the first
-	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--remote-operator", "T", "--name", "A"}...)
 	require.NoError(t, err)
 
 	// now add another account
-	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "B")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--remote-operator", "T", "--name", "B"}...)
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -202,7 +201,7 @@ func Test_InitWellKnownV1Operator(t *testing.T) {
 	wkops = append(wkops, ops...)
 	wellKnownOperators = wkops
 
-	_, _, err = ExecuteCmd(createInitCmd(), "--remote-operator", "T", "--name", "A")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--remote-operator", "T", "--name", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "the operator jwt (v1) is incompatible this version of nsc")
 }
@@ -231,7 +230,7 @@ func Test_InitWellKnownInteractive(t *testing.T) {
 	wkops = append(wkops, ops...)
 	wellKnownOperators = wkops
 
-	_, _, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 0, "A"})
+	_, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 0, "A"})
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -244,7 +243,7 @@ func Test_InitLocalInteractive(t *testing.T) {
 	defer ts.Done(t)
 
 	cli.LogFn = t.Log
-	_, _, err := ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 1, "O"})
+	_, err := ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 1, "O"})
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "O", false)
@@ -267,7 +266,7 @@ func Test_InitCustomInteractive(t *testing.T) {
 	require.NoError(t, err)
 	ourl.Path = "/jwt/v1/operator"
 
-	_, _, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 2, ourl.String(), "A"})
+	_, err = ExecuteInteractiveCmd(createInitCmd(), []interface{}{ts.GetStoresRoot(), 2, ourl.String(), "A"})
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -288,7 +287,7 @@ func Test_InitDuplicate(t *testing.T) {
 	u := ourl.String()
 
 	// get the managed operator on the first
-	_, _, err = ExecuteCmd(createInitCmd(), "--url", u, "--name", "A")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--url", u, "--name", "A"}...)
 	require.NoError(t, err)
 
 	ts.VerifyOperator(t, "T", true)
@@ -296,7 +295,7 @@ func Test_InitDuplicate(t *testing.T) {
 	ts.VerifyUser(t, "T", "A", "A", true)
 
 	// try to do it again with the same name
-	_, _, err = ExecuteCmd(createInitCmd(), "--url", u, "--name", "A")
+	_, err = ExecuteCmd(createInitCmd(), []string{"--url", u, "--name", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "an account named \"A\" already exists")
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -93,7 +93,7 @@ type ExpirationReportJSON struct {
 	Report              []*ExpirationReport `json:"report"`
 }
 
-func (p *ExpirationsParams) renderJSON(_ctx ActionCtx) error {
+func (p *ExpirationsParams) renderJSON(ctx ActionCtx) error {
 	r := ExpirationReportJSON{
 		ExpirationThreshold: time.Unix(p.expirationDuration, 0).Format(time.RFC3339),
 		Report:              p.expirationReport,
@@ -102,7 +102,7 @@ func (p *ExpirationsParams) renderJSON(_ctx ActionCtx) error {
 	if err != nil {
 		return err
 	}
-	_, err = os.Stdout.Write(data)
+	_, err = fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), string(data))
 	return err
 }
 

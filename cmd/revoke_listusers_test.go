@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,13 +16,11 @@
 package cmd
 
 import (
+	"github.com/nats-io/jwt/v2"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/nats-io/jwt/v2"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestRevokeListUsers(t *testing.T) {
@@ -34,30 +32,30 @@ func TestRevokeListUsers(t *testing.T) {
 	ts.AddUser(t, "A", "two")
 	ts.AddUser(t, "A", "three")
 
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "--name", "one", "--at", "1001")
+	_, err := ExecuteCmd(createRevokeUserCmd(), []string{"--name", "one", "--at", "1001"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createRevokeUserCmd(), "--name", "two", "--at", "2001")
+	_, err = ExecuteCmd(createRevokeUserCmd(), []string{"--name", "two", "--at", "2001"}...)
 	require.NoError(t, err)
 
-	stdout, _, err := ExecuteCmd(createRevokeListUsersCmd())
+	out, err := ExecuteCmd(createRevokeListUsersCmd())
 	require.NoError(t, err)
 
 	u, err := ts.Store.ReadUserClaim("A", "one")
 	require.NoError(t, err)
-	require.True(t, strings.Contains(stdout, u.Subject))
-	require.True(t, strings.Contains(stdout, time.Unix(1001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(out.Out, u.Subject))
+	require.True(t, strings.Contains(out.Out, time.Unix(1001, 0).Format(time.RFC1123)))
 
 	u, err = ts.Store.ReadUserClaim("A", "two")
 	require.NoError(t, err)
-	require.True(t, strings.Contains(stdout, u.Subject))
-	require.True(t, strings.Contains(stdout, time.Unix(2001, 0).Format(time.RFC1123)))
+	require.True(t, strings.Contains(out.Out, u.Subject))
+	require.True(t, strings.Contains(out.Out, time.Unix(2001, 0).Format(time.RFC1123)))
 }
 
 func TestRevokeListUsersNoAccount(t *testing.T) {
 	ts := NewTestStore(t, "revoke_clear_user")
 	defer ts.Done(t)
-	_, _, err := ExecuteInteractiveCmd(createRevokeListUsersCmd(), []interface{}{})
+	_, err := ExecuteInteractiveCmd(createRevokeListUsersCmd(), []interface{}{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no accounts defined")
 }
@@ -66,7 +64,7 @@ func TestRevokeListUsersNoRevocations(t *testing.T) {
 	ts := NewTestStore(t, "revoke_clear_user")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeListUsersCmd())
+	_, err := ExecuteCmd(createRevokeListUsersCmd(), []string{}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not have revoked users")
 }
@@ -75,14 +73,14 @@ func TestRevokeListUsersAllUsers(t *testing.T) {
 	ts := NewTestStore(t, "revoke_clear_user")
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
+	_, err := ExecuteCmd(createRevokeUserCmd(), "-u", "*")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Contains(t, ac.Revocations, jwt.All)
 
-	stdout, _, err := ExecuteCmd(createRevokeListUsersCmd())
+	out, err := ExecuteCmd(createRevokeListUsersCmd())
 	require.NoError(t, err)
-	require.Contains(t, stdout, "* [All Users]")
+	require.Contains(t, out.Out, "* [All Users]")
 }

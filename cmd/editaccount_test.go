@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2024 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,9 +35,9 @@ func Test_EditAccount(t *testing.T) {
 
 	tests := CmdTests{
 		{createEditAccount(), []string{"edit", "account"}, nil, []string{"specify an edit option"}, true},
-		{createEditAccount(), []string{"edit", "account", "--info-url", "http://foo/bar"}, nil, []string{"changed info url to"}, false},
-		{createEditAccount(), []string{"edit", "account", "--description", "my account is about this"}, nil, []string{"changed description to"}, false},
-		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--name", "A"}, nil, []string{"edited account \"A\""}, false},
+		{createEditAccount(), []string{"edit", "account", "--info-url", "http://foo/bar"}, []string{"changed info url to"}, nil, false},
+		{createEditAccount(), []string{"edit", "account", "--description", "my account is about this"}, []string{"changed description to"}, nil, false},
+		{createEditAccount(), []string{"edit", "account", "--tag", "A", "--name", "A"}, []string{"edited account \"A\""}, nil, false},
 	}
 
 	tests.Run(t, "root", "edit")
@@ -50,7 +50,7 @@ func Test_EditAccountRequired(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 	require.NoError(t, GetConfig().SetAccount(""))
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--tag", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, "an account is required", err.Error())
 }
@@ -60,7 +60,7 @@ func Test_EditAccount_Tag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--tag", "A,B,C"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -75,10 +75,10 @@ func Test_EditAccount_RmTag(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--tag", "A,B,C")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--tag", "A,B,C"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-tag", "A,B")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--rm-tag", "A,B"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -94,7 +94,7 @@ func Test_EditAccount_Times(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--start", "2018-01-01", "--expiry", "2050-01-01")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--start", "2018-01-01", "--expiry", "2050-01-01"}...)
 	require.NoError(t, err)
 
 	start, err := ParseExpiry("2018-01-01")
@@ -114,10 +114,10 @@ func Test_EditAccountLimits(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(), "--conns", "5", "--data", "10mib", "--exports", "15",
+	_, err := ExecuteCmd(createEditAccount(), []string{"--conns", "5", "--data", "10mib", "--exports", "15",
 		"--imports", "20", "--payload", "1Kib", "--subscriptions", "30", "--leaf-conns", "31",
 		"--js-streams", "5", "--js-consumer", "6", "--js-disk-storage", "7", "--js-mem-storage", "8",
-		"--js-max-disk-stream", "9mib", "--js-max-mem-stream", "10", "--js-max-ack-pending", "11", "--js-max-bytes-required")
+		"--js-max-disk-stream", "9mib", "--js-max-mem-stream", "10", "--js-max-ack-pending", "11", "--js-max-bytes-required"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -144,8 +144,7 @@ func Test_EditJsOptionsOnTierDelete(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(),
-		"--js-streams", "5", "--js-consumer", "6", "--js-disk-storage", "7")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--js-streams", "5", "--js-consumer", "6", "--js-disk-storage", "7"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -154,13 +153,11 @@ func Test_EditJsOptionsOnTierDelete(t *testing.T) {
 	require.Equal(t, int64(6), ac.Limits.Consumer)
 	require.Equal(t, int64(7), ac.Limits.DiskStorage)
 
-	_, _, err = ExecuteCmd(createEditAccount(),
-		"--js-streams", "1", "--rm-js-tier", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-streams", "1", "--rm-js-tier", "0"}...)
 	require.Error(t, err)
 	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
 
-	_, _, err = ExecuteCmd(createEditAccount(),
-		"--rm-js-tier", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--rm-js-tier", "0"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -174,16 +171,14 @@ func Test_GlobalPreventsTiered(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(),
-		"--js-streams", "5", "--js-disk-storage", "10")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--js-streams", "5", "--js-disk-storage", "10"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, int64(5), ac.Limits.Streams)
 
-	_, _, err = ExecuteCmd(createEditAccount(),
-		"--js-tier", "1", "--js-disk-storage", "10")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-tier", "1", "--js-disk-storage", "10"}...)
 	require.Error(t, err)
 	require.Equal(t, "cannot set a jetstream tier limit when a configuration has a global limit", err.Error())
 }
@@ -193,16 +188,14 @@ func Test_TieredPreventsGlobal(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(),
-		"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, int64(5), ac.Limits.JetStreamTieredLimits["R2"].Streams)
 
-	_, _, err = ExecuteCmd(createEditAccount(),
-		"--js-disk-storage", "10")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-disk-storage", "10"}...)
 	require.Error(t, err)
 	require.Equal(t, "cannot set a jetstream global limit when a configuration has tiered limits 'R2'", err.Error())
 }
@@ -212,16 +205,14 @@ func Test_TieredDoesntPreventOtherClaims(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createEditAccount(),
-		"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--js-tier", "2", "--js-streams", "5", "--js-disk-storage", "10"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Equal(t, int64(5), ac.Limits.JetStreamTieredLimits["R2"].Streams)
 
-	_, _, err = ExecuteCmd(createEditAccount(),
-		"--sk", "generate")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--sk", "generate"}...)
 	require.NoError(t, err)
 }
 
@@ -233,7 +224,7 @@ func Test_EditAccountSigningKeys(t *testing.T) {
 	_, pk, _ := CreateAccountKey(t)
 	_, pk2, _ := CreateAccountKey(t)
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk, "--sk", pk2)
+	_, err := ExecuteCmd(createEditAccount(), []string{"--sk", pk, "--sk", pk2}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -241,7 +232,7 @@ func Test_EditAccountSigningKeys(t *testing.T) {
 	require.Contains(t, ac.SigningKeys, pk)
 	require.Contains(t, ac.SigningKeys, pk2)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-sk", pk)
+	_, err = ExecuteCmd(createEditAccount(), []string{"--rm-sk", pk}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -255,7 +246,7 @@ func Test_EditAccount_Pubs(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--allow-pub", "a,b", "--allow-pubsub", "c", "--deny-pub", "foo", "--deny-pubsub", "bar"}...)
 	require.NoError(t, err)
 
 	cc, err := ts.Store.ReadAccountClaim("A")
@@ -266,7 +257,7 @@ func Test_EditAccount_Pubs(t *testing.T) {
 	require.ElementsMatch(t, cc.DefaultPermissions.Pub.Deny, []string{"foo", "bar"})
 	require.ElementsMatch(t, cc.DefaultPermissions.Sub.Deny, []string{"bar"})
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm", "c,bar")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--rm", "c,bar"}...)
 	require.NoError(t, err)
 	cc, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -283,7 +274,7 @@ func Test_EditAccountResponsePermissions(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--max-responses", "1000", "--response-ttl", "4ms")
+	_, err := ExecuteCmd(createEditAccount(), []string{"--max-responses", "1000", "--response-ttl", "4ms"}...)
 	require.NoError(t, err)
 
 	uc, err := ts.Store.ReadAccountClaim("A")
@@ -293,7 +284,7 @@ func Test_EditAccountResponsePermissions(t *testing.T) {
 	d, _ := time.ParseDuration("4ms")
 	require.Equal(t, d, uc.DefaultPermissions.Resp.Expires)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--rm-response-perms")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--rm-response-perms"}...)
 	require.NoError(t, err)
 
 	uc, err = ts.Store.ReadAccountClaim("A")
@@ -312,7 +303,7 @@ func Test_EditAccountSk(t *testing.T) {
 	pSk, err := sk.PublicKey()
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--sk", pSk)
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--sk", pSk}...)
 	require.NoError(t, err)
 
 	ts.AddAccountWithSigner(t, "A", sk)
@@ -320,7 +311,7 @@ func Test_EditAccountSk(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ac.Issuer, pSk)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--tag", "foo")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--tag", "foo"}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -333,26 +324,26 @@ func Test_EditOperatorDisallowBearerToken(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, _, err := ExecuteCmd(createEditUserCmd(), "--name", "U", "--bearer")
+	_, err := ExecuteCmd(createEditUserCmd(), []string{"--name", "U", "--bearer"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--disallow-bearer")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--name", "A", "--disallow-bearer"}...)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), `user "U" in account "A" uses bearer token (needs to be deleted/changed first)`)
 
 	// delete offending user
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--account", "A", "--name", "U")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--account", "A", "--name", "U"}...)
 	require.NoError(t, err)
 	// set option
-	_, _, err = ExecuteCmd(createEditAccount(), "--name", "A", "--disallow-bearer")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--name", "A", "--disallow-bearer"}...)
 	require.NoError(t, err)
 	// test user creation
-	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U", "--bearer")
+	_, err = ExecuteCmd(CreateAddUserCmd(), []string{"--account", "A", "--name", "U", "--bearer"}...)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), `account "A" forbids the use of bearer token`)
-	_, _, err = ExecuteCmd(CreateAddUserCmd(), "--account", "A", "--name", "U")
+	_, err = ExecuteCmd(CreateAddUserCmd(), []string{"--account", "A", "--name", "U"}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createEditUserCmd(), "--account", "A", "--name", "U", "--bearer")
+	_, err = ExecuteCmd(createEditUserCmd(), []string{"--account", "A", "--name", "U", "--bearer"}...)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "account disallows bearer token")
 }
@@ -361,7 +352,7 @@ func Test_EditSysAccount(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "SYS")
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	_, err := ExecuteCmd(createEditOperatorCmd(), []string{"--system-account", "SYS"}...)
 	require.NoError(t, err)
 
 	// test setting any flag will generate an error and the flag is reported
@@ -380,17 +371,17 @@ func Test_EditSysAccount(t *testing.T) {
 	for idx, n := range jsOptions {
 		flag := fmt.Sprintf("--%s", n)
 		if idx > 0 {
-			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag, "1")
+			_, err = ExecuteCmd(createEditAccount(), []string{"SYS", "--tag", "A", flag, "1"}...)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), flag)
 		} else {
-			_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A", flag)
+			_, err = ExecuteCmd(createEditAccount(), []string{"SYS", "--tag", "A", flag}...)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), flag)
 		}
 	}
 	// defaults are removed automatically
-	_, _, err = ExecuteCmd(createEditAccount(), "SYS", "--tag", "A")
+	_, err = ExecuteCmd(createEditAccount(), []string{"SYS", "--tag", "A"}...)
 	require.NoError(t, err)
 }
 
@@ -399,7 +390,7 @@ func Test_TierRmAndDisabled(t *testing.T) {
 	defer ts.Done(t)
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditAccount(), "A", "--rm-js-tier", "1", "--js-disable")
+	_, err := ExecuteCmd(createEditAccount(), []string{"A", "--rm-js-tier", "1", "--js-disable"}...)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "js-disable is exclusive of all other js options")
 }
@@ -410,25 +401,25 @@ func Test_TracingSampling(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	// cannot set sampling if no subject
-	_, _, err := ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "50")
+	_, err := ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-sampling", "50"}...)
 	require.Error(t, err)
 	require.Equal(t, "trace-context-sampling requires a subject", err.Error())
 
 	// set a subject
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-subject", "traces"}...)
 	require.NoError(t, err)
 
 	// range checks
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "101")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-sampling", "101"}...)
 	require.Error(t, err)
 	require.Equal(t, "tracing sampling rate must be between 1-100", err.Error())
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "-1")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-sampling", "-1"}...)
 	require.Error(t, err)
 	require.Equal(t, "tracing sampling rate must be between 1-100", err.Error())
 
 	// disable and set
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "50", "--trace-context-subject", "")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-sampling", "50", "--trace-context-subject", ""}...)
 	require.Error(t, err)
 	require.Equal(t, "cannot set context sampling rate when disabling the trace context", err.Error())
 }
@@ -443,15 +434,15 @@ func Test_TracingSubject(t *testing.T) {
 	require.Nil(t, ac.Trace)
 
 	// no op
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-subject", ""}...)
 	require.NoError(t, err)
 
 	// bad subjects are checked by jwt lib, just making sure we are catching
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces.*")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-subject", "traces.*"}...)
 	require.Error(t, err)
 	require.Equal(t, "tracing subjects cannot contain wildcards: \"traces.*\"", err.Error())
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "traces.here")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-subject", "traces.here"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -461,7 +452,7 @@ func Test_TracingSubject(t *testing.T) {
 	require.Equal(t, 0, ac.Trace.Sampling)
 
 	// we have a subject, so set the sampling
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-sampling", "75")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-sampling", "75"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -470,7 +461,7 @@ func Test_TracingSubject(t *testing.T) {
 	require.Equal(t, jwt.Subject("traces.here"), ac.Trace.Destination)
 	require.Equal(t, 75, ac.Trace.Sampling)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--trace-context-subject", "")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--trace-context-subject", ""}...)
 	require.NoError(t, err)
 	ac, err = ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
@@ -486,7 +477,7 @@ func Test_EnableTier(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--js-enable", "0"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -503,10 +494,10 @@ func Test_EnableTierDoesntClobber(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--js-enable", "0"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--js-enable", "0"}...)
 	require.Error(t, err)
 	require.Equal(t, "jetstream tier global is already enabled", err.Error())
 }
@@ -520,7 +511,7 @@ func Test_EnableTierNoOtherFlag(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ac.Limits.JetStreamLimits, jwt.JetStreamLimits{})
 
-	_, _, err = ExecuteCmd(createEditAccount(), "A", "--js-enable", "0", "--rm-js-tier", "0")
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--js-enable", "0", "--rm-js-tier", "0"}...)
 	require.Error(t, err)
 	require.Equal(t, "rm-js-tier is exclusive of all other js options", err.Error())
 }
@@ -529,13 +520,13 @@ func Test_CannotEnableJsInSys(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "SYS")
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	_, err := ExecuteCmd(createEditOperatorCmd(), []string{"--system-account", "SYS"}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--js-enable", "1")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-enable", "1"}...)
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--js-disable")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-disable"}...)
 	require.NoError(t, err)
 
 	sys, err := ts.Store.ReadAccountClaim("SYS")
@@ -548,7 +539,7 @@ func Test_AllowSysToDisableJs(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "SYS")
-	_, _, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	_, err := ExecuteCmd(createEditOperatorCmd(), []string{"--system-account", "SYS"}...)
 	require.NoError(t, err)
 
 	sys, err := ts.Store.ReadAccountClaim("SYS")
@@ -568,7 +559,7 @@ func Test_AllowSysToDisableJs(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, sys.Limits.IsJSEnabled())
 
-	_, _, err = ExecuteCmd(createEditAccount(), "--js-disable")
+	_, err = ExecuteCmd(createEditAccount(), []string{"--js-disable"}...)
 	require.NoError(t, err)
 
 	sys, err = ts.Store.ReadAccountClaim("SYS")

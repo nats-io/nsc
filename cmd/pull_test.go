@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,14 +18,13 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nkeys"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nkeys"
-	"github.com/stretchr/testify/require"
 )
 
 func editAccount(t *testing.T, kp nkeys.KeyPair, d []byte, tag string) []byte {
@@ -53,7 +52,7 @@ func Test_SyncAccount(t *testing.T) {
 	d := editAccount(t, kp, m[pk], "test")
 	m[pk] = d
 
-	_, _, err = ExecuteCmd(createPullCmd())
+	_, err = ExecuteCmd(createPullCmd(), []string{}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -82,7 +81,7 @@ func Test_SyncMultipleAccount(t *testing.T) {
 	d = editAccount(t, kp, m[pk], "test")
 	m[pk] = d
 
-	_, _, err = ExecuteCmd(createPullCmd(), "--all")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--all"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -98,7 +97,7 @@ func Test_SyncNoAccountServer(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createPullCmd())
+	_, err := ExecuteCmd(createPullCmd(), []string{}...)
 	require.Error(t, err)
 }
 
@@ -123,7 +122,7 @@ func Test_SyncNewer(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, ac.Tags, "test")
 
-	_, _, err = ExecuteCmd(createPullCmd())
+	_, err = ExecuteCmd(createPullCmd(), []string{}...)
 	require.Error(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("A")
@@ -131,7 +130,7 @@ func Test_SyncNewer(t *testing.T) {
 	require.Contains(t, ac.Tags, "test")
 
 	// now allow the overwrite
-	_, _, err = ExecuteCmd(createPullCmd(), "--overwrite-newer")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--overwrite-newer"}...)
 	if err != nil {
 		panic(err)
 	}
@@ -144,13 +143,13 @@ func Test_SyncNewer(t *testing.T) {
 func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)
 	require.NoError(t, err)
 	ts.SwitchOperator(t, "OP") // switch the operator so ts is in a usable state to obtain operator key
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--nats-resolver", "--config-file", serverconf}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), []string{"--name", "AC1"}...)
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
 	data, err := os.ReadFile(serverconf)
@@ -177,12 +176,12 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
 	// only after server start as ports are not yet known in tests
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.Nats[0])
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--account-jwt-server-url", ports.Nats[0]}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(createPullCmd(), "--all")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--all"}...)
 	require.NoError(t, err)
 	// again, this time with system account and user specified
-	_, _, err = ExecuteCmd(createPullCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--all", "--system-account", "SYS", "--system-user", "sys"}...)
 	require.NoError(t, err)
 	// claim now exists in nsc store
 	claim2, err := ts.Store.ReadAccountClaim("acc-name")
@@ -194,13 +193,13 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 func Test_SyncNewerFromNatsResolverWs(t *testing.T) {
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
-	_, _, err := ExecuteCmd(createAddOperatorCmd(), "--name", "OP", "--sys")
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)
 	require.NoError(t, err)
 	ts.SwitchOperator(t, "OP") // switch the operator so ts is in a usable state to obtain operator key
 	serverconf := filepath.Join(ts.Dir, "server.conf")
-	_, _, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver", "--config-file", serverconf)
+	_, err = ExecuteCmd(createServerConfigCmd(), []string{"--nats-resolver", "--config-file", serverconf}...)
 	require.NoError(t, err)
-	_, _, err = ExecuteCmd(CreateAddAccountCmd(), "--name", "AC1")
+	_, err = ExecuteCmd(CreateAddAccountCmd(), []string{"--name", "AC1"}...)
 	require.NoError(t, err)
 	// modify the generated file so testing becomes easier by knowing where the jwt directory is
 	data, err := os.ReadFile(serverconf)
@@ -231,13 +230,13 @@ func Test_SyncNewerFromNatsResolverWs(t *testing.T) {
 	ports := ts.RunServerWithConfig(t, serverconf)
 	require.NotNil(t, ports)
 	// only after server start as ports are not yet known in tests
-	_, _, err = ExecuteCmd(createEditOperatorCmd(), "--account-jwt-server-url", ports.WebSocket[0])
+	_, err = ExecuteCmd(createEditOperatorCmd(), []string{"--account-jwt-server-url", ports.WebSocket[0]}...)
 	require.NoError(t, err)
 
-	_, _, err = ExecuteCmd(createPullCmd(), "--all")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--all"}...)
 	require.NoError(t, err)
 	// again, this time with system account and user specified
-	_, _, err = ExecuteCmd(createPullCmd(), "--all", "--system-account", "SYS", "--system-user", "sys")
+	_, err = ExecuteCmd(createPullCmd(), []string{"--all", "--system-account", "SYS", "--system-user", "sys"}...)
 	require.NoError(t, err)
 	// claim now exists in nsc store
 	claim2, err := ts.Store.ReadAccountClaim("acc-name")
@@ -257,7 +256,7 @@ func Test_V2OperatorDoesntFail(t *testing.T) {
 	require.NoError(t, err)
 
 	// edit the jwt
-	_, _, err = ExecuteCmd(createPullCmd(), "-A")
+	_, err = ExecuteCmd(createPullCmd(), []string{"-A"}...)
 	require.NoError(t, err)
 
 	oc, err := ts.Store.ReadOperatorClaim()
@@ -276,9 +275,9 @@ func Test_V1OperatorDoesntFail(t *testing.T) {
 	require.NoError(t, err)
 
 	// edit the jwt
-	stdout, stderr, err := ExecuteCmd(createPullCmd(), "-A")
-	t.Log(stdout)
-	t.Log(stderr)
+	out, err := ExecuteCmd(createPullCmd(), []string{"-A"}...)
+	t.Log(out.Out)
+	t.Log(out.Err)
 	require.NoError(t, err)
 
 	oc, err := ts.Store.ReadOperatorClaim()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2019-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -26,7 +26,7 @@ import (
 )
 
 func Test_FixRequiresInArg(t *testing.T) {
-	_, _, err := ExecuteCmd(createFixCmd())
+	_, err := ExecuteCmd(createFixCmd(), []string{}...)
 	require.Error(t, err)
 }
 
@@ -37,7 +37,7 @@ func Test_NoOperatorsErr(t *testing.T) {
 	fp := filepath.Join(ts.Dir, "in")
 	require.NoError(t, MaybeMakeDir(fp))
 
-	_, _, err := ExecuteCmd(createFixCmd(), "--in", fp)
+	_, err := ExecuteCmd(createFixCmd(), []string{"--in", fp}...)
 	require.Error(t, err)
 }
 
@@ -49,9 +49,9 @@ func Test_FixBasics(t *testing.T) {
 	require.NoError(t, MaybeMakeDir(in))
 
 	osk, opk, okp := CreateOperatorKey(t)
-	require.NoError(t, Write(filepath.Join(in, "opk.nk"), osk))
+	require.NoError(t, WriteFile(filepath.Join(in, "opk.nk"), osk))
 	oss, ospk, _ := CreateOperatorKey(t)
-	require.NoError(t, Write(filepath.Join(in, "ospk.nk"), oss))
+	require.NoError(t, WriteFile(filepath.Join(in, "ospk.nk"), oss))
 
 	// save one version
 	oc := jwt.NewOperatorClaims(opk)
@@ -59,23 +59,23 @@ func Test_FixBasics(t *testing.T) {
 	oc.SigningKeys.Add(ospk)
 	otok, err := oc.Encode(okp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "o.jwt"), []byte(otok)))
+	require.NoError(t, WriteFile(filepath.Join(in, "o.jwt"), []byte(otok)))
 
 	ask, apk, akp := CreateAccountKey(t)
-	require.NoError(t, Write(filepath.Join(in, "apk.nk"), ask))
+	require.NoError(t, WriteFile(filepath.Join(in, "apk.nk"), ask))
 	ac := jwt.NewAccountClaims(apk)
 	ac.Name = "A"
 	atok, err := ac.Encode(okp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "a.jwt"), []byte(atok)))
+	require.NoError(t, WriteFile(filepath.Join(in, "a.jwt"), []byte(atok)))
 
 	usk, upk, _ := CreateUserKey(t)
-	require.NoError(t, Write(filepath.Join(in, "upk.nk"), usk))
+	require.NoError(t, WriteFile(filepath.Join(in, "upk.nk"), usk))
 	uc := jwt.NewUserClaims(upk)
 	uc.Name = "U"
 	utok, err := uc.Encode(akp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "u.jwt"), []byte(utok)))
+	require.NoError(t, WriteFile(filepath.Join(in, "u.jwt"), []byte(utok)))
 
 	usk2, upk2, _ := CreateUserKey(t)
 	uc2 := jwt.NewUserClaims(upk2)
@@ -84,7 +84,7 @@ func Test_FixBasics(t *testing.T) {
 	require.NoError(t, err)
 	creds, err := jwt.FormatUserConfig(u2tok, usk2)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "u2.creds"), creds))
+	require.NoError(t, WriteFile(filepath.Join(in, "u2.creds"), creds))
 
 	// and copy of operator with a tag (and newer date)
 	time.Sleep(time.Second)
@@ -92,20 +92,20 @@ func Test_FixBasics(t *testing.T) {
 	oc.Tags.Add("test")
 	otok2, err := oc.Encode(okp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "o2.jwt"), []byte(otok2)))
+	require.NoError(t, WriteFile(filepath.Join(in, "o2.jwt"), []byte(otok2)))
 
 	ac.Tags.Add("test")
 	atok, err = ac.Encode(okp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "a2.jwt"), []byte(atok)))
+	require.NoError(t, WriteFile(filepath.Join(in, "a2.jwt"), []byte(atok)))
 
 	uc.Tags.Add("test")
 	utok, err = uc.Encode(akp)
 	require.NoError(t, err)
-	require.NoError(t, Write(filepath.Join(in, "u2.jwt"), []byte(utok)))
+	require.NoError(t, WriteFile(filepath.Join(in, "u2.jwt"), []byte(utok)))
 
 	ofp := filepath.Join(ts.Dir, "out")
-	_, _, err = ExecuteCmd(createFixCmd(), "--creds", "--in", in, "--out", ofp)
+	_, err = ExecuteCmd(createFixCmd(), []string{"--creds", "--in", in, "--out", ofp}...)
 	require.NoError(t, err)
 
 	s, err := store.LoadStore(filepath.Join(ofp, "operators", "O"))

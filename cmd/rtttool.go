@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -109,14 +109,11 @@ func (p *RttParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 	defer nc.Close()
 
-	if err != nil {
-		return nil, err
-	}
 	start := time.Now()
 	if err := nc.Flush(); err != nil {
 		return nil, err
 	}
 	rtt := time.Since(start)
-	ctx.CurrentCmd().Printf("round trip time to [%s] = %v\n", nc.ConnectedUrl(), rtt)
-	return nil, nil
+	_, err = fmt.Fprintf(ctx.CurrentCmd().OutOrStdout(), "round trip time to [%s] = %v\n", nc.ConnectedUrl(), rtt)
+	return nil, err
 }

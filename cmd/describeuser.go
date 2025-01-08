@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -48,10 +48,8 @@ func init() {
 
 type DescribeUserParams struct {
 	AccountContextParams
-	jwt.UserClaims
-	user       string
-	outputFile string
-	raw        []byte
+	BaseDescribe
+	user string
 }
 
 func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
@@ -61,7 +59,6 @@ func (p *DescribeUserParams) SetDefaults(ctx ActionCtx) error {
 
 func (p *DescribeUserParams) PreInteractive(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Edit(ctx); err != nil {
 		return err
 	}
@@ -76,7 +73,6 @@ func (p *DescribeUserParams) PreInteractive(ctx ActionCtx) error {
 
 func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 	var err error
-
 	if err = p.AccountContextParams.Validate(ctx); err != nil {
 		return err
 	}
@@ -92,73 +88,56 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
-	if Json || Raw || JsonPath != "" {
-		p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
-		if err != nil {
-			return err
-		}
-		if Json || JsonPath != "" {
-			p.raw, err = bodyAsJson(p.raw)
-			if err != nil {
-				return err
-			}
-			if JsonPath != "" {
-				p.raw, err = GetField(p.raw, JsonPath)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	} else {
-		uc, err := ctx.StoreCtx().Store.ReadUserClaim(p.AccountContextParams.Name, p.user)
-		if err != nil {
-			return err
-		}
-		p.UserClaims = *uc
+	p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
+	if err != nil {
+		return err
 	}
-	return nil
-}
-
-func (p *DescribeUserParams) Validate(_ ActionCtx) error {
-	return nil
+	return p.Init()
 }
 
 func (p *DescribeUserParams) PostInteractive(_ ActionCtx) error {
 	return nil
 }
 
+func (p *DescribeUserParams) Validate(ctx ActionCtx) error {
+	return p.AccountContextParams.Validate(ctx)
+}
+
 func (p *DescribeUserParams) Run(ctx ActionCtx) (store.Status, error) {
 	if Raw || Json || JsonPath != "" {
-		if !IsStdOut(p.outputFile) && Raw {
-			var err error
-			p.raw, err = jwt.DecorateJWT(string(p.raw))
-			if err != nil {
-				return nil, err
-			}
-		}
-		p.raw = append(p.raw, '\n')
-
-		if err := Write(p.outputFile, p.raw); err != nil {
-			return nil, err
-		}
-	} else {
-		v := NewUserDescriber(p.UserClaims).Describe()
-		if aClaim, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name); err == nil {
-			if s, ok := aClaim.SigningKeys.GetScope(p.UserClaims.Issuer); ok && s != nil {
-				v = fmt.Sprintf("%s\n%s", v, NewScopedSkDescriber(s.(*jwt.UserScope)).Describe())
-			}
-		}
-		if err := Write(p.outputFile, []byte(v)); err != nil {
-			return nil, err
-		}
+		return p.Describe(ctx)
 	}
-	var s store.Status
+
+	d, err := p.Raw(false)
+	if err != nil {
+		return nil, err
+	}
+	uc, err := jwt.DecodeUserClaims(string(d))
+	if err != nil {
+		return nil, err
+	}
+	ac, err := ctx.StoreCtx().Store.ReadAccountClaim(p.AccountContextParams.Name)
+	if err != nil {
+		return nil, err
+	}
+	v := NewUserDescriber(*uc).Describe()
+	if s, ok := ac.SigningKeys.GetScope(uc.Issuer); ok && s != nil {
+		v = fmt.Sprintf("%s\n%s", v, NewScopedSkDescriber(s.(*jwt.UserScope)).Describe())
+	}
+	if IsStdOut(p.outputFile) {
+		_, err = fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), v)
+	} else {
+		err = WriteFile(p.outputFile, []byte(v))
+	}
+	if err != nil {
+		return nil, err
+	}
 	if !IsStdOut(p.outputFile) {
 		k := "description"
 		if Raw {
 			k = "jwt"
 		}
-		s = store.OKStatus("wrote user %s to %#q", k, AbbrevHomePaths(p.outputFile))
+		return store.OKStatus("wrote %s %s to %#q", string(p.kind), k, AbbrevHomePaths(p.outputFile)), nil
 	}
-	return s, nil
+	return nil, nil
 }

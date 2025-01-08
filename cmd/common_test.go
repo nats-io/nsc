@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -40,7 +40,7 @@ func TestCommon_ResolvePath(t *testing.T) {
 	v = ResolvePath("bar", "")
 	require.Equal(t, v, "bar", "empty variable")
 
-	os.Setenv("foo", "foobar")
+	require.NoError(t, os.Setenv("foo", "foobar"))
 	v = ResolvePath("bar", "foo")
 	require.Equal(t, v, "foobar", "env set")
 }
@@ -63,7 +63,7 @@ func TestCommon_GetOutput(t *testing.T) {
 	}
 	for _, d := range tests {
 		if d.isDir {
-			os.MkdirAll(d.fp, 0777)
+			require.NoError(t, os.MkdirAll(d.fp, 0777))
 		} else if d.create {
 			os.Create(d.fp)
 		}
@@ -85,7 +85,13 @@ func createWriteCmd(t *testing.T) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "test",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Write(out, []byte("hello"))
+			if IsStdOut(out) {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "hello"); err != nil {
+					return err
+				}
+				return nil
+			}
+			return WriteFile(out, []byte("hello"))
 		},
 	}
 	cmd.Flags().StringVarP(&out, "out", "", "--", "")
@@ -93,12 +99,12 @@ func createWriteCmd(t *testing.T) *cobra.Command {
 }
 
 func Test_WriteDestinations(t *testing.T) {
-	stdout, _, err := ExecuteCmd(createWriteCmd(t), "--out", "--")
+	out, err := ExecuteCmd(createWriteCmd(t), "--out", "--")
 	require.NoError(t, err)
-	require.Contains(t, stdout, "hello")
+	require.Contains(t, out.Out, "hello")
 	dir := MakeTempDir(t)
 	fn := filepath.Join(dir, "test.txt")
-	_, _, err = ExecuteCmd(createWriteCmd(t), "--out", fn)
+	_, err = ExecuteCmd(createWriteCmd(t), "--out", fn)
 	require.NoError(t, err)
 	require.FileExists(t, fn)
 	d, err := os.ReadFile(fn)
@@ -208,8 +214,8 @@ func TestCommon_NKeyValidatorKeyInFile(t *testing.T) {
 	aSeed, _, _ := CreateAccountKey(t)
 	oSeed, _, _ := CreateOperatorKey(t)
 
-	require.NoError(t, Write(filepath.Join(dir, "as.nk"), aSeed))
-	require.NoError(t, Write(filepath.Join(dir, "os.nk"), oSeed))
+	require.NoError(t, WriteFile(filepath.Join(dir, "as.nk"), aSeed))
+	require.NoError(t, WriteFile(filepath.Join(dir, "os.nk"), oSeed))
 
 	fn := NKeyValidator(nkeys.PrefixByteAccount)
 	require.NoError(t, fn(filepath.Join(dir, "as.nk")))
@@ -273,7 +279,7 @@ func TestCommon_MaybeMakeDir(t *testing.T) {
 func TestCommon_MaybeMakeDir_FileExists(t *testing.T) {
 	d := MakeTempDir(t)
 	fp := filepath.Join(d, "foo")
-	err := Write(fp, []byte("hello"))
+	err := WriteFile(fp, []byte("hello"))
 	require.NoError(t, err)
 
 	err = MaybeMakeDir(fp)
@@ -288,7 +294,7 @@ func TestCommon_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	fp := filepath.Join(dir, "..", "..", "foo.txt")
-	err = Write(fp, []byte("hello"))
+	err = WriteFile(fp, []byte("hello"))
 	require.NoError(t, err)
 
 	require.DirExists(t, dir)
@@ -318,7 +324,7 @@ func TestCommon_WriteJSON(t *testing.T) {
 func TestCommon_ReadJSON(t *testing.T) {
 	d := MakeTempDir(t)
 	fp := filepath.Join(d, "foo")
-	err := Write(fp, []byte(`{"name": "test"}`))
+	err := WriteFile(fp, []byte(`{"name": "test"}`))
 	require.NoError(t, err)
 
 	n := struct {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -60,7 +59,8 @@ func createFlagTable() *cobra.Command {
 					cmds.addCmd(v)
 				}
 			}
-			return Write("--", []byte(cmds.render()))
+			cmd.Println(cmds.render())
+			return nil
 		},
 	}
 	return cmd
@@ -92,7 +92,8 @@ func createWhatUsesFlag() *cobra.Command {
 					cmds.addCmd(v)
 				}
 			}
-			cmds.find(args[0])
+			found := cmds.find(args[0])
+			cmd.Println(strings.Join(found, "\n"))
 			return nil
 		},
 	}
@@ -176,15 +177,17 @@ func (t *flagTable) addCmd(cmd *cobra.Command) {
 	t.commands = append(t.commands, c)
 }
 
-func (t *flagTable) find(flag string) {
+func (t *flagTable) find(flag string) []string {
+	var buf []string
 	for _, c := range t.commands {
 		m := c.flagMap
 		for n := range m {
 			if flag == m[n] || n == flag {
-				fmt.Println(c.name)
+				buf = append(buf, c.name)
 			}
 		}
 	}
+	return buf
 }
 
 func (t *flagTable) render() string {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,13 +17,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"testing"
-	"time"
-
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/stretchr/testify/require"
+	"os"
+	"testing"
+	"time"
 )
 
 func TestUpdate_RunDoesntUpdateOrCheck(t *testing.T) {
@@ -112,7 +111,7 @@ func TestUpdate_DoUpdateWithV(t *testing.T) {
 	var updateCalled bool
 	updateCheckFn = func(slug string, wantVer string) (*selfupdate.Release, bool, error) {
 		if wantVer != "" && !semver.MustParse(wantVer).EQ(semver.MustParse("1.0.0")) {
-			return nil, false, fmt.Errorf("Expected request from 1.0.0 but got %s", wantVer)
+			return nil, false, fmt.Errorf("expected request from 1.0.0 but got %s", wantVer)
 		}
 		checkCalled = true
 		return &selfupdate.Release{Version: semver.MustParse("1.0.1"), ReleaseNotes: "f33dfac3"}, true, nil
@@ -127,11 +126,11 @@ func TestUpdate_DoUpdateWithV(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, stderr, err := ExecuteCmd(createUpdateCommand())
+	out, err := ExecuteCmd(createUpdateCommand())
 	require.NoError(t, err)
 	require.True(t, checkCalled)
 	require.True(t, updateCalled)
-	require.Contains(t, stderr, "f33dfac3")
+	require.Contains(t, out.Out, "f33dfac3")
 }
 
 func TestUpdate_DoUpdate(t *testing.T) {
@@ -146,7 +145,7 @@ func TestUpdate_DoUpdate(t *testing.T) {
 	var updateCalled bool
 	updateCheckFn = func(slug string, wantVer string) (*selfupdate.Release, bool, error) {
 		if wantVer != "" && !semver.MustParse(wantVer).EQ(semver.MustParse("1.0.0")) {
-			return nil, false, fmt.Errorf("Expected request from 1.0.0 but got %s", wantVer)
+			return nil, false, fmt.Errorf("expected request from 1.0.0 but got %s", wantVer)
 		}
 		checkCalled = true
 		return &selfupdate.Release{Version: semver.MustParse("1.0.1"), ReleaseNotes: "f33dfac3"}, true, nil
@@ -161,11 +160,11 @@ func TestUpdate_DoUpdate(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, stderr, err := ExecuteCmd(createUpdateCommand())
+	out, err := ExecuteCmd(createUpdateCommand())
 	require.NoError(t, err)
 	require.True(t, checkCalled)
 	require.True(t, updateCalled)
-	require.Contains(t, stderr, "f33dfac3")
+	require.Contains(t, out.Out, "f33dfac3")
 }
 
 func TestUpdate_VerPresent(t *testing.T) {
@@ -180,7 +179,7 @@ func TestUpdate_VerPresent(t *testing.T) {
 	var updateCalled bool
 	updateCheckFn = func(slug string, wantVer string) (*selfupdate.Release, bool, error) {
 		if !semver.MustParse(wantVer).EQ(semver.MustParse("2.0.0")) {
-			return nil, false, fmt.Errorf("Expected request from 2.0.0 but got %s", wantVer)
+			return nil, false, fmt.Errorf("expected request from 2.0.0 but got %s", wantVer)
 		}
 		checkCalled = true
 		return &selfupdate.Release{Version: semver.MustParse("2.0.0"), ReleaseNotes: "f33dfac3"}, true, nil
@@ -195,11 +194,11 @@ func TestUpdate_VerPresent(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, stderr, err := ExecuteCmd(createUpdateCommand(), "--version", "2.0.0")
+	out, err := ExecuteCmd(createUpdateCommand(), "--version", "2.0.0")
 	require.NoError(t, err)
 	require.True(t, checkCalled)
 	require.True(t, updateCalled)
-	require.Contains(t, stderr, "f33dfac3")
+	require.Contains(t, out.Out, "f33dfac3")
 }
 
 func TestUpdate_VerSame(t *testing.T) {
@@ -229,7 +228,7 @@ func TestUpdate_VerSame(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, _, err := ExecuteCmd(createUpdateCommand(), "--version", "1.0.0")
+	_, err := ExecuteCmd(createUpdateCommand(), []string{"--version", "1.0.0"}...)
 	require.NoError(t, err)
 	require.True(t, checkCalled)
 	require.False(t, updateCalled)
@@ -262,9 +261,9 @@ func TestUpdate_VerNotFound(t *testing.T) {
 		updateFn = nil
 	}()
 
-	_, stderr, err := ExecuteCmd(createUpdateCommand(), "--version", "2.0.0")
+	out, err := ExecuteCmd(createUpdateCommand(), []string{"--version", "2.0.0"}...)
 	require.Error(t, err)
 	require.True(t, checkCalled)
 	require.False(t, updateCalled)
-	require.Contains(t, stderr, "version 2.0.0 not found")
+	require.Contains(t, out.Err, "version 2.0.0 not found")
 }

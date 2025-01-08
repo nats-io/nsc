@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2019-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,7 +28,7 @@ func Test_DeleteAccountNotFound(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createDeleteAccountCmd(), "--name", "B")
+	_, err := ExecuteCmd(createDeleteAccountCmd(), []string{"--name", "B"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "\"B\" not in accounts for operator \"O\"")
 }
@@ -48,7 +48,7 @@ func Test_DeleteAccountOnly(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), []string{"A"}...)
 	require.NoError(t, err)
 	require.True(t, ts.KeyStore.HasPrivateKey(apk))
 	require.True(t, ts.KeyStore.HasPrivateKey(upk))
@@ -63,7 +63,7 @@ func Test_DeleteAll(t *testing.T) {
 	ts.KeyStore.Store(kp)
 	ts.AddAccount(t, "A")
 
-	_, _, err := ExecuteCmd(createEditAccount(), "--sk", pk)
+	_, err := ExecuteCmd(createEditAccount(), []string{"--sk", pk}...)
 	require.NoError(t, err)
 
 	ts.AddUser(t, "A", "U")
@@ -76,7 +76,7 @@ func Test_DeleteAll(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--rm-nkey", "--rm-creds")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), []string{"A", "--rm-nkey", "--rm-creds"}...)
 	require.NoError(t, err)
 	require.False(t, ts.KeyStore.HasPrivateKey(apk))
 	require.False(t, ts.KeyStore.HasPrivateKey(pk))
@@ -100,7 +100,7 @@ func Test_DeleteAccountInteractive(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteInteractiveCmd(createDeleteAccountCmd(), []interface{}{false, true, true, true}, "--name", "A")
+	_, err = ExecuteInteractiveCmd(createDeleteAccountCmd(), []interface{}{false, true, true, true}, "--name", "A")
 	require.NoError(t, err)
 
 	uc, err = ts.Store.ReadUserClaim("A", "U")
@@ -123,7 +123,7 @@ func Test_DeleteManagedAccountRequiresForceAndExpires(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, _, err := ExecuteCmd(createDeleteAccountCmd(), "A")
+	_, err := ExecuteCmd(createDeleteAccountCmd(), []string{"A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--force to override")
 
@@ -131,7 +131,7 @@ func Test_DeleteManagedAccountRequiresForceAndExpires(t *testing.T) {
 	ac, err := ts.Store.ReadAccountClaim("A")
 	require.NoError(t, err)
 	require.Zero(t, ac.Expires)
-	_, _, err = ExecuteCmd(createDeleteAccountCmd(), "A", "--force")
+	_, err = ExecuteCmd(createDeleteAccountCmd(), []string{"A", "--force"}...)
 	require.NoError(t, err)
 
 	token := m[ac.Subject]

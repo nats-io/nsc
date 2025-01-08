@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,14 +19,13 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"testing"
-
 	"github.com/nats-io/jwt/v2"
 	jwtv1 "github.com/nats-io/jwt/v2/v1compat"
 	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
 )
@@ -71,7 +70,7 @@ func checkJwtVersion(t *testing.T, ts *TestStore, opName string, version int, to
 
 func executeFailingCmd(t *testing.T, args ...string) {
 	t.Helper()
-	_, _, err := ExecuteCmd(rootCmd, args...) // could be any command
+	_, err := ExecuteCmd(rootCmd, args...) // could be any command
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "This version of nsc only supports jwtV2")
 	require.Contains(t, err.Error(), "upgrade-jwt")
@@ -79,7 +78,7 @@ func executeFailingCmd(t *testing.T, args ...string) {
 
 func executePassingCmd(t *testing.T, args ...string) {
 	t.Helper()
-	_, _, err := ExecuteCmd(rootCmd, args...) // could be any command
+	_, err := ExecuteCmd(rootCmd, args...) // could be any command
 	require.NoError(t, err)
 }
 
@@ -121,12 +120,12 @@ func TestUpgradeNonManaged(t *testing.T) {
 	executeFailingCmd(t, "edit", "operator", "--tag", "foo") // try writing operator
 	executePassingCmd(t, "env")                              // only few exceptions
 
-	stdout, stderr, err := ExecuteInteractiveCmd(rootCmd, []interface{}{false, false}, "upgrade-jwt") // only works in interactive mode
-	t.Log(stdout)
-	t.Log(stderr)
+	out, err := ExecuteInteractiveCmd(rootCmd, []interface{}{false, false}, "upgrade-jwt") // only works in interactive mode
+	t.Log(out.Out)
+	t.Log(out.Err)
 	require.NoError(t, err)
 	checkJwtVersion(t, ts, "O", 1, token)
-	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, true}, "upgrade-jwt")
+	_, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, true}, "upgrade-jwt")
 	require.NoError(t, err)
 
 	checkJwtVersion(t, ts, "O", 2, "")
@@ -149,13 +148,13 @@ func TestUpgradeNoKeyNonManaged(t *testing.T) {
 	executeFailingCmd(t, "edit", "operator", "--tag", "foo") // try writing operator
 	executePassingCmd(t, "env")                              // only few exceptions
 
-	_, stdErr, err := ExecuteInteractiveCmd(rootCmd, []interface{}{}, "upgrade-jwt") // only works in interactive mode
+	stdErr, err := ExecuteInteractiveCmd(rootCmd, []interface{}{}, []string{"upgrade-jwt"}...) // only works in interactive mode
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "Identity Key for Operator")
-	require.Contains(t, stdErr, "you need to restore it for this command to work")
+	require.Contains(t, stdErr.Out, "Identity Key for Operator")
+	require.Contains(t, stdErr.Out, "you need to restore it for this command to work")
 	checkJwtVersion(t, ts, "O", 1, token)
 	storeOperatorKey(t, ts, kp)
-	_, _, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, true}, "upgrade-jwt")
+	_, err = ExecuteInteractiveCmd(rootCmd, []interface{}{false, true}, []string{"upgrade-jwt"}...)
 	require.NoError(t, err)
 
 	checkJwtVersion(t, ts, "O", 2, "")
@@ -174,10 +173,10 @@ func TestUpgradeManaged(t *testing.T) {
 	executeFailingCmd(t, "list", "keys") // could be any command
 	executePassingCmd(t, "env")          // only few exceptions
 
-	_, stdErr, err := ExecuteInteractiveCmd(rootCmd, []interface{}{false}, "upgrade-jwt") // only works in interactive mode
+	out, err := ExecuteInteractiveCmd(rootCmd, []interface{}{false}, []string{"upgrade-jwt"}...) // only works in interactive mode
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "Your store is in managed mode")
-	require.Contains(t, stdErr, "nsc add operator --force --url")
+	require.Contains(t, out.Out, "Your store is in managed mode")
+	require.Contains(t, out.Out, "nsc add operator --force --url")
 	checkJwtVersion(t, ts, "O", 1, tokenV1) // assert nothing was changed
 
 	executePassingCmd(t, "add", "operator", "--force", "--url", tfV2)
@@ -194,7 +193,7 @@ func TestUpgradeBackup(t *testing.T) {
 	makeNonManaged(t, ts, "O", kp)
 	checkJwtVersion(t, ts, "O", 1, token)
 	backup := filepath.Join(ts.Dir, "test.zip")
-	_, _, err := ExecuteInteractiveCmd(rootCmd, []interface{}{true, backup, false}, "upgrade-jwt") // only works in interactive mode
+	_, err := ExecuteInteractiveCmd(rootCmd, []interface{}{true, backup, false}, "upgrade-jwt") // only works in interactive mode
 	require.NoError(t, err)
 	closer, err := zip.OpenReader(backup)
 	require.NoError(t, err)

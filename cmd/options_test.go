@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The NATS Authors
+ * Copyright 2020-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,11 +16,10 @@
 package cmd
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestNoGitIgnore(t *testing.T) {
@@ -43,12 +42,11 @@ func TestCwdOnly(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 
-	_, stderr, err := ExecuteCmd(GetRootCmd(), "env")
+	out, err := ExecuteCmd(GetRootCmd(), "env")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(stderr)
-	require.Contains(t, stderr, "$NSC_CWD_ONLY Yes")
+	require.Contains(t, StripTableDecorations(out.Out), "$NSC_CWD_ONLY Yes")
 
-	_, _, err = ExecuteCmd(createEnvCmd(), "--account", "A")
+	_, err = ExecuteCmd(createEnvCmd(), []string{"--account", "A"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "$NSC_CWD_ONLY is set")
 }

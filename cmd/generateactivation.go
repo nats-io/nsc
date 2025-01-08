@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -259,14 +259,17 @@ func (p *GenerateActivationParams) Run(ctx ActionCtx) (store.Status, error) {
 	// if some command embeds, the output will be blank
 	// in that case don't generate the output
 	if p.out != "" {
-		if err := Write(p.out, d); err != nil {
-			return nil, err
-		}
 		if !IsStdOut(p.out) {
+			if err := WriteFile(p.out, d); err != nil {
+				return nil, err
+			}
 			r.AddOK("wrote activation token to %#q", AbbrevHomePaths(p.out))
+		} else {
+			if _, err := fmt.Fprintln(ctx.CurrentCmd().OutOrStdout(), string(d)); err != nil {
+				return nil, err
+			}
 		}
 	}
-
 	if p.push {
 		oc, err := ctx.StoreCtx().Store.ReadOperatorClaim()
 		if err != nil {

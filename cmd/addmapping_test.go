@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024-2025 The NATS Authors
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cmd
 
 import (
@@ -13,11 +28,11 @@ func Test_AddMappingCannotExceed100(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	// add a default mapping at a 100, default mapping at max
-	_, _, err := ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	_, err := ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qq", "--weight", "100"}...)
 	require.NoError(t, err)
 
 	// default mapping cannot be incremented
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qqq", "--weight", "10")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qqq", "--weight", "10"}...)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "Mapping \"q\" exceeds 100%")
 
@@ -33,14 +48,14 @@ func Test_AddMappingCannotExceed100(t *testing.T) {
 	}, mappings[0])
 
 	// can add another mapping but has to be for cluster
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qa", "--weight", "100", "--cluster", "A")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qa", "--weight", "100", "--cluster", "A"}...)
 	require.NoError(t, err)
 	// and for another cluster
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qb", "--weight", "100", "--cluster", "B")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qb", "--weight", "100", "--cluster", "B"}...)
 	require.NoError(t, err)
 
 	// incrementing one of the above maxed clusters fails
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qaa", "--weight", "10", "--cluster", "A")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qaa", "--weight", "10", "--cluster", "A"}...)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "Mapping \"q\" in cluster \"A\" exceeds 100%")
 }
@@ -51,7 +66,7 @@ func Test_AddMappingCrud(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	// add a default mapping at a 100, default mapping at max
-	_, _, err := ExecuteCmd(createAddMappingCmd(), "--from", "q", "--to", "qq", "--weight", "100")
+	_, err := ExecuteCmd(createAddMappingCmd(), []string{"--from", "q", "--to", "qq", "--weight", "100"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -66,7 +81,7 @@ func Test_AddMappingCrud(t *testing.T) {
 
 	ts.AddAccount(t, "B")
 	// add a default mapping at a 100, default mapping at max
-	_, _, err = ExecuteCmd(createAddMappingCmd(), "--from", "qq", "--to", "rr", "--weight", "100", "--cluster", "B")
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "qq", "--to", "rr", "--weight", "100", "--cluster", "B"}...)
 	require.NoError(t, err)
 
 	ac, err = ts.Store.ReadAccountClaim("B")

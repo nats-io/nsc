@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,9 +22,8 @@ import (
 	"testing"
 
 	"github.com/nats-io/nats-server/v2/server"
-	"github.com/stretchr/testify/require"
-
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_MemResolverContainsStandardProperties(t *testing.T) {
@@ -150,8 +149,8 @@ func Test_MemResolverDir(t *testing.T) {
 	ts.AddAccount(t, "B")
 
 	out := filepath.Join(ts.Dir, "conf")
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--dir", out)
+	_, err := ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--dir", out}...)
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(out, "O.jwt"))
 	require.FileExists(t, filepath.Join(out, "A.jwt"))
@@ -180,8 +179,8 @@ func Test_MemResolverServerParse(t *testing.T) {
 
 	serverconf := filepath.Join(ts.Dir, "server.conf")
 
-	_, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
-		"--config-file", serverconf)
+	_, err := ExecuteCmd(createServerConfigCmd(), []string{"--mem-resolver",
+		"--config-file", serverconf}...)
 
 	require.NoError(t, err)
 
@@ -195,11 +194,11 @@ func Test_MemResolverContainsSysAccount(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddAccount(t, "B")
 
-	stdout, _, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
+	out, err := ExecuteCmd(createServerConfigCmd(), "--mem-resolver",
 		"--sys-account", "B")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
 	require.NoError(t, err)
-	require.Contains(t, stdout, fmt.Sprintf("system_account: %s", ac.Subject))
+	require.Contains(t, out.Out, fmt.Sprintf("system_account: %s", ac.Subject))
 }

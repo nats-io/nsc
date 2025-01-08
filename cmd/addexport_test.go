@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2024 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,16 +31,16 @@ func Test_AddExport(t *testing.T) {
 
 	tests := CmdTests{
 		{createAddExportCmd(), []string{"add", "export"}, nil, []string{"subject is required"}, true},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "foo"}, nil, []string{"added public stream export \"foo\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "bar", "--service"}, nil, []string{"added public service export \"bar\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "bar"}, nil, []string{"added public stream export \"bar\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "foo", "--service"}, nil, []string{"added public service export \"foo\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>"}, nil, []string{"added public stream export \"baz.>\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "ar", "--name", "mar"}, nil, []string{"added public stream export \"mar\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "mar", "--name", "ar", "--service"}, nil, []string{"added public service export \"ar\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "pubstream", "--private"}, nil, []string{"added private stream export \"pubstream\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, nil, []string{"added private service export \"pubservice\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "th.1", "--service", "--response-threshold", "1s"}, nil, []string{"added public service export \"th.1\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "foo"}, []string{"added public stream export \"foo\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "bar", "--service"}, []string{"added public service export \"bar\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "bar"}, []string{"added public stream export \"bar\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "foo", "--service"}, []string{"added public service export \"foo\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "baz.>"}, []string{"added public stream export \"baz.>\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "ar", "--name", "mar"}, []string{"added public stream export \"mar\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "mar", "--name", "ar", "--service"}, []string{"added public service export \"ar\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "pubstream", "--private"}, []string{"added private stream export \"pubstream\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, []string{"added private service export \"pubservice\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "th.1", "--service", "--response-threshold", "1s"}, []string{"added public service export \"th.1\""}, nil, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`time: unknown unit`}, true},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "re", "--response-type", "stream"}, nil, []string{"response type can only be specified in conjunction with service"}, true},
 	}
@@ -54,11 +54,11 @@ func Test_AddPublicExport(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	tests := CmdTests{
-		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "hello"}, nil, []string{"added public stream export \"hello\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "hello"}, []string{"added public stream export \"hello\""}, nil, false},
 		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "hello", "--account-token-position", "1"}, nil, []string{"Account Token Position can only be used with wildcard subjects"}, true},
 		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "2"}, nil, []string{"Account Token Position 2 matches 'hello' but must match a *"}, true},
 		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "3"}, nil, []string{"Account Token Position 3 exceeds length of subject"}, true},
-		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "1"}, nil, []string{" added public stream export \"*.hello\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--private=false", "--subject", "*.hello", "--account-token-position", "1"}, []string{" added public stream export \"*.hello\""}, nil, false},
 	}
 	tests.Run(t, "root", "add")
 }
@@ -70,10 +70,10 @@ func Test_AddExportVerify(t *testing.T) {
 	ts.AddAccount(t, "A")
 
 	tests := CmdTests{
-		{createAddExportCmd(), []string{"add", "export", "--subject", "pubfoo"}, nil, []string{"added public stream export \"pubfoo\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "privfoo", "--private"}, nil, []string{"added private stream export \"privfoo\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "pubbar", "--service"}, nil, []string{"added public service export \"pubbar\""}, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "privbar", "--service", "--private"}, nil, []string{"added private service export \"privbar\""}, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "pubfoo"}, []string{"added public stream export \"pubfoo\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "privfoo", "--private"}, []string{"added private stream export \"privfoo\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "pubbar", "--service"}, []string{"added public service export \"pubbar\""}, nil, false},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "privbar", "--service", "--private"}, []string{"added private service export \"privbar\""}, nil, false},
 	}
 	tests.Run(t, "root", "add")
 	validateAddExports(t, ts)
@@ -122,7 +122,7 @@ func Test_AddExportManagedStore(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "aaaa")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--subject", "aaaa"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -143,7 +143,7 @@ func Test_AddExportAccountNameRequired(t *testing.T) {
 	ts.AddAccount(t, "B")
 	t.Log("B", ts.GetAccountPublicKey(t, "B"))
 
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "bbbb")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--subject", "bbbb"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("B")
@@ -162,7 +162,7 @@ func TestAddStreamExportInteractive(t *testing.T) {
 	input := []interface{}{0, 0, "foo.>", "Foo Stream", false, 0}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -183,7 +183,7 @@ func TestAddServiceExportInteractive(t *testing.T) {
 	input := []interface{}{0, 1, "bar.>", "Bar Stream", true, true, "header", "foo", 0, "1s", true, 0}
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteInteractiveCmd(cmd, input, "-i")
+	_, err := ExecuteInteractiveCmd(cmd, input, "-i")
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -206,7 +206,7 @@ func TestAddExportNonInteractive(t *testing.T) {
 
 	cmd := createAddExportCmd()
 	HoistRootFlags(cmd)
-	_, _, err := ExecuteCmd(cmd, "--service", "--name", "q", "--subject", "q", "--response-type", jwt.ResponseTypeChunked)
+	_, err := ExecuteCmd(cmd, []string{"--service", "--name", "q", "--subject", "q", "--response-type", jwt.ResponseTypeChunked}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -225,7 +225,7 @@ func TestAddServiceLatency(t *testing.T) {
 	ts.AddAccount(t, "A")
 	cmd := createAddExportCmd()
 
-	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--latency", "q.lat", "--sampling", "100", "--response-type", jwt.ResponseTypeStream)
+	_, err := ExecuteCmd(cmd, []string{"--service", "--subject", "q", "--latency", "q.lat", "--sampling", "100", "--response-type", jwt.ResponseTypeStream}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -245,7 +245,7 @@ func Test_AddExportBadResponseType(t *testing.T) {
 	ts.AddAccount(t, "A")
 	cmd := createAddExportCmd()
 
-	_, _, err := ExecuteCmd(cmd, "--service", "--subject", "q", "--response-type", "foo")
+	_, err := ExecuteCmd(cmd, []string{"--service", "--subject", "q", "--response-type", "foo"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid response type")
 }
@@ -259,7 +259,7 @@ func TestAddServiceLatencyInteractive(t *testing.T) {
 
 	// service, subject, name, private, track, freq
 	args := []interface{}{1, "q", "q", false, true, "100", "q.lat", 1, "0", true}
-	_, _, err := ExecuteInteractiveCmd(cmd, args)
+	_, err := ExecuteInteractiveCmd(cmd, args)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -279,7 +279,7 @@ func TestAddServiceExportWTracing(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--service", "--subject", "q", "--allow-trace")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--service", "--subject", "q", "--allow-trace"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -292,6 +292,6 @@ func TestAddStreamExportWTracing(t *testing.T) {
 	defer ts.Done(t)
 
 	ts.AddAccount(t, "A")
-	_, _, err := ExecuteCmd(createAddExportCmd(), "--subject", "q", "--allow-trace")
+	_, err := ExecuteCmd(createAddExportCmd(), []string{"--subject", "q", "--allow-trace"}...)
 	require.Error(t, err)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The NATS Authors
+ * Copyright 2019-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,7 +30,7 @@ func Test_DeleteUserNotFound(t *testing.T) {
 	ts.AddAccount(t, "A")
 	ts.AddUser(t, "A", "U")
 
-	_, _, err := ExecuteCmd(createDeleteUserCmd(), "--name", "X")
+	_, err := ExecuteCmd(createDeleteUserCmd(), []string{"--name", "X"}...)
 	require.Error(t, err)
 	_, ok := err.(*store.ResourceErr)
 	require.True(t, ok)
@@ -47,7 +47,7 @@ func Test_DeleteUserOnly(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--name", "U"}...)
 	require.NoError(t, err)
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.Error(t, err)
@@ -68,7 +68,7 @@ func Test_DeleteUserAll(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--rm-nkey", "--rm-creds")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--name", "U", "--rm-nkey", "--rm-creds"}...)
 	require.NoError(t, err)
 	uc, err = ts.Store.ReadUserClaim("A", "U")
 	require.Error(t, err)
@@ -90,7 +90,7 @@ func Test_DeleteUserInvalidate(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--revoke")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--name", "U", "--revoke"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -109,7 +109,7 @@ func Test_DeleteUserInteractive(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{[]int{0}, true, true, true, true})
+	_, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{[]int{0}, true, true, true, true})
 	require.NoError(t, err)
 
 	uc, err = ts.Store.ReadUserClaim("A", "U")
@@ -129,7 +129,7 @@ func Test_DeleteUserFromDiffAccount(t *testing.T) {
 	ts.AddUser(t, "A", "a")
 	ts.AddAccount(t, "B")
 
-	_, _, err := ExecuteCmd(createDeleteUserCmd(), "a", "-a", "A")
+	_, err := ExecuteCmd(createDeleteUserCmd(), []string{"a", "-a", "A"}...)
 	require.NoError(t, err)
 
 	_, err = ts.Store.ReadUserClaim("A", "a")
@@ -148,7 +148,7 @@ func Test_DeleteUserFromDiffAccountInteractive(t *testing.T) {
 	require.NoError(t, err)
 	upk := uc.Subject
 
-	_, _, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{0, []int{0}, true, true, true, true})
+	_, err = ExecuteInteractiveCmd(createDeleteUserCmd(), []interface{}{0, []int{0}, true, true, true, true})
 	require.NoError(t, err)
 
 	uc, err = ts.Store.ReadUserClaim("A", "a")
@@ -174,9 +174,9 @@ func Test_RevokeUserRequiresOperatorKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, ts.KeyStore.Remove(opk))
 
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U", "--revoke")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--name", "U", "--revoke"}...)
 	require.Error(t, err)
 
-	_, _, err = ExecuteCmd(createDeleteUserCmd(), "--name", "U")
+	_, err = ExecuteCmd(createDeleteUserCmd(), []string{"--name", "U"}...)
 	require.NoError(t, err)
 }

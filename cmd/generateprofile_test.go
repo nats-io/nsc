@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -118,7 +118,7 @@ func Test_ProfileIDs(t *testing.T) {
 	u := ts.GetUserPublicKey(t, "A", "U")
 
 	out := path.Join(ts.Dir, "out.json")
-	_, _, err := ExecuteCmd(createProfileCmd(), "-o", out, "nsc://O/A/U?keys&names")
+	_, err := ExecuteCmd(createProfileCmd(), []string{"-o", out, "nsc://O/A/U?keys&names"}...)
 	require.NoError(t, err)
 
 	r := loadResults(t, out)
@@ -154,7 +154,7 @@ func Test_ProfileSeedIDs(t *testing.T) {
 
 	out := path.Join(ts.Dir, "out.json")
 	nu := fmt.Sprintf("nsc://O/A/U?operatorSeed=%s", opk)
-	_, _, err = ExecuteCmd(createProfileCmd(), "-o", out, nu)
+	_, err = ExecuteCmd(createProfileCmd(), []string{"-o", out, nu}...)
 	require.NoError(t, err)
 
 	r := loadResults(t, out)
@@ -177,19 +177,19 @@ func Test_ProfileStoreAndKeysDir(t *testing.T) {
 	ts2.AddAccount(t, "AA")
 	ts2.AddUser(t, "AA", "UU")
 
-	stdout, _, err := ExecuteCmd(rootCmd, "describe", "operator", "--raw")
+	out, err := ExecuteCmd(rootCmd, "describe", "operator", "--raw")
 	require.NoError(t, err)
-	ojwt, err := jwt.DecodeOperatorClaims(stdout)
+	ojwt, err := jwt.DecodeOperatorClaims(out.Out)
 	require.NoError(t, err)
 	require.Equal(t, "OO", ojwt.Name)
 
-	out := path.Join(ts.Dir, "out.json")
+	fp := path.Join(ts.Dir, "out.json")
 
 	u := fmt.Sprintf("nsc://O/A/U?names&keys&store=%s&keyStore=%s", ts.StoreDir, ts.KeysDir)
 
-	_, _, err = ExecuteCmd(rootCmd, "generate", "profile", "-o", out, u)
+	_, err = ExecuteCmd(rootCmd, "generate", "profile", "-o", fp, u)
 	require.NoError(t, err)
-	r := loadResults(t, out)
+	r := loadResults(t, fp)
 
 	require.Equal(t, "O", r.Operator.Name)
 	require.Equal(t, opk, r.Operator.Key)
@@ -248,7 +248,7 @@ func TestKey_ProfileBasics(t *testing.T) {
 
 		// execute the command
 		out := path.Join(ts.Dir, "out.json")
-		_, _, err = ExecuteCmd(createProfileCmd(), "-o", out, tc.u)
+		_, err = ExecuteCmd(createProfileCmd(), []string{"-o", out, tc.u}...)
 		require.NoError(t, err)
 		r := loadResults(t, out)
 
@@ -314,7 +314,7 @@ func TestGenerateProfile_MultipleOperators(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	out := filepath.Join(ts.Dir, "profile.json")
-	_, _, err := ExecuteCmd(createProfileCmd(), "--output-file", out, "nsc://O/A/U")
+	_, err := ExecuteCmd(createProfileCmd(), []string{"--output-file", out, "nsc://O/A/U"}...)
 	require.NoError(t, err)
 	profile := loadNscEnvProfile(t, out)
 	require.Contains(t, profile.UserCreds, filepath.FromSlash("/O/A/U.creds"))
@@ -327,7 +327,7 @@ func TestGenerateProfile_NamesSeedsKeys(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	out := filepath.Join(ts.Dir, "profile.json")
-	_, _, err := ExecuteCmd(createProfileCmd(), "--output-file", out, "nsc://O/A/U?&names&seeds&keys")
+	_, err := ExecuteCmd(createProfileCmd(), []string{"--output-file", out, "nsc://O/A/U?&names&seeds&keys"}...)
 	require.NoError(t, err)
 
 	profile := loadNscEnvProfile(t, out)

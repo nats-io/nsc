@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2023 The NATS Authors
+ * Copyright 2018-2025 The NATS Authors
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -58,7 +58,7 @@ func Test_ExportContext(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir)
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir}...)
 	require.NoError(t, err)
 
 	opk := ts.GetOperatorPublicKey(t)
@@ -80,7 +80,7 @@ func Test_ExportOnlyContext(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir)
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir}...)
 	require.NoError(t, err)
 
 	opk := ts.GetOperatorPublicKey(t)
@@ -108,7 +108,7 @@ func Test_ExportAllContext(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	upk := ts.GetUserPublicKey(t, "AA", "UU")
-	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--account", "AA", "--auth-user", upk, "--curve", "generate")
+	_, err := ExecuteCmd(createEditAuthorizationCallout(), []string{"--account", "AA", "--auth-user", upk, "--curve", "generate"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("AA")
@@ -117,7 +117,7 @@ func Test_ExportAllContext(t *testing.T) {
 
 	exportDir := filepath.Join(ts.Dir, "export")
 
-	_, _, err = ExecuteCmd(createExportKeysCmd(), "--all", "--dir", exportDir)
+	_, err = ExecuteCmd(createExportKeysCmd(), []string{"--all", "--dir", exportDir}...)
 	require.NoError(t, err)
 
 	opk := ts.GetOperatorPublicKey(t)
@@ -146,7 +146,7 @@ func Test_ExportAccount(t *testing.T) {
 	ts.AddUser(t, "A", "U")
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--account", "AA", "--dir", exportDir)
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--account", "AA", "--dir", exportDir}...)
 	require.NoError(t, err)
 
 	opk := ts.GetOperatorPublicKey(t)
@@ -176,7 +176,7 @@ func Test_ExportRemove(t *testing.T) {
 	upk := ts.GetUserPublicKey(t, "A", "U")
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "--remove")
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir, "--remove"}...)
 	require.NoError(t, err)
 
 	requireExportedKey(t, exportDir, opk)
@@ -193,7 +193,7 @@ func Test_ExportNoKeyStore(t *testing.T) {
 	defer ts.Done(t)
 
 	store.KeyStorePath = ts.KeysDir
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", ts.Dir)
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", ts.Dir}...)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), fmt.Sprintf("keystore `%s` does not exist", ts.KeysDir))
 }
@@ -206,7 +206,7 @@ func Test_ExportXKeyNotReferenced(t *testing.T) {
 
 	_, xPK, kp := CreateCurveKey(t)
 	ts.KeyStore.Store(kp)
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "--curve", xPK, "--not-referenced")
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir, "--curve", xPK, "--not-referenced"}...)
 	require.NoError(t, err)
 	requireExportedKey(t, exportDir, xPK)
 }
@@ -217,7 +217,7 @@ func Test_ExportXKeyInContext(t *testing.T) {
 
 	ts.AddAccount(t, "A")
 	_, uPK, _ := CreateUserKey(t)
-	_, _, err := ExecuteCmd(createEditAuthorizationCallout(), "--auth-user", uPK, "--curve", "generate")
+	_, err := ExecuteCmd(createEditAuthorizationCallout(), []string{"--auth-user", uPK, "--curve", "generate"}...)
 	require.NoError(t, err)
 
 	ac, err := ts.Store.ReadAccountClaim("A")
@@ -226,12 +226,12 @@ func Test_ExportXKeyInContext(t *testing.T) {
 	require.NotEmpty(t, xPK)
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err = ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "--curves")
+	_, err = ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir, "--curves"}...)
 	require.NoError(t, err)
 	requireExportedKey(t, exportDir, xPK)
 
 	exportDir = filepath.Join(ts.Dir, "export2")
-	_, _, err = ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "-A")
+	_, err = ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir, "-A"}...)
 	require.NoError(t, err)
 	requireExportedKey(t, exportDir, xPK)
 }
@@ -248,7 +248,7 @@ func Test_ExportKeyJwt(t *testing.T) {
 	u := ts.GetUserPublicKey(t, "A", "U")
 
 	exportDir := filepath.Join(ts.Dir, "export")
-	_, _, err := ExecuteCmd(createExportKeysCmd(), "--dir", exportDir, "-A", "--include-jwts")
+	_, err := ExecuteCmd(createExportKeysCmd(), []string{"--dir", exportDir, "-A", "--include-jwts"}...)
 	require.NoError(t, err)
 	requireExportedKey(t, exportDir, o)
 	require.FileExists(t, filepath.Join(exportDir, fmt.Sprintf("%s.jwt", o)))
