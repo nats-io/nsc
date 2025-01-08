@@ -155,19 +155,19 @@ func Test_listKeysAuthorizationXKey(t *testing.T) {
 
 	out, err := ExecuteCmd(createListKeysCmd(), "-A")
 	require.NoError(t, err)
-	stderr := StripTableDecorations(out.Out)
-	require.Contains(t, stderr, xPK)
+	stdout := StripTableDecorations(out.Out)
+	require.Contains(t, stdout, xPK)
 
 	_, err = ExecuteCmd(createEditAuthorizationCallout(), "--rm-curve")
 	require.NoError(t, err)
 
 	out, err = ExecuteCmd(createListKeysCmd(), "-A")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(out.Out)
-	require.NotContains(t, stderr, xPK)
+	stdout = StripTableDecorations(out.Out)
+	require.NotContains(t, stdout, xPK)
 
 	out, err = ExecuteCmd(createListKeysCmd(), "--not-referenced")
 	require.NoError(t, err)
-	stderr = StripTableDecorations(out.Out)
-	require.Contains(t, stderr, xPK)
+	stdout = StripTableDecorations(out.Out)
+	require.Contains(t, stdout, xPK)
 }

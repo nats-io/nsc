@@ -150,7 +150,7 @@ func (p *GenerateCredsParams) Run(ctx ActionCtx) (store.Status, error) {
 		err = WriteFile(p.out, d)
 	}
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	var s store.Status
 	if !IsStdOut(p.out) {

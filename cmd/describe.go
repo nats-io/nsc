@@ -158,7 +158,7 @@ func (p *BaseDescribe) Describe(ctx ActionCtx) (store.Status, error) {
 		}
 		return store.OKStatus("wrote %s %s to %#q", string(p.kind), k, AbbrevHomePaths(p.outputFile)), nil
 	}
-	return nil, err
+	return nil, nil
 }
 
 func (p *BaseDescribe) Structured() ([]byte, error) {
