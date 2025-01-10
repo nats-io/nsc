@@ -1,8 +1,6 @@
 module github.com/nats-io/nsc/v2
 
-go 1.22
-
-toolchain go1.22.5
+go 1.22.0
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -10,7 +8,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0
-	github.com/nats-io/jsm.go v0.1.2
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats-server/v2 v2.10.24
 	github.com/nats-io/nats.go v1.38.0
