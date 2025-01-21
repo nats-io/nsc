@@ -49,7 +49,6 @@ func createReissueAccountCmd() *cobra.Command {
 type reissueAccount struct {
 	AccountContextParams
 	turnIntoSigningKey bool
-	name               string
 }
 
 func (p *reissueAccount) SetDefaults(ctx ActionCtx) error {
@@ -117,7 +116,11 @@ func (p *reissueAccount) Run(ctx ActionCtx) (store.Status, error) {
 			return r, err
 		}
 		old := ac.Subject
-		ac.Subject, err = akp.PublicKey()
+		if ac.Subject, err = akp.PublicKey(); err != nil {
+			rr.AddError("failed generate account public key: %v", err)
+			return r, err
+		}
+
 		if p.turnIntoSigningKey {
 			ac.SigningKeys.Add(old)
 		}
