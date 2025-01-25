@@ -21,6 +21,7 @@ import (
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
 	"os"
+	"path/filepath"
 )
 
 func createExportEnvironmentCmd() *cobra.Command {
@@ -62,9 +63,41 @@ func (e *EntityKey) GetKeyPair() nkeys.KeyPair {
 		if err != nil {
 			return nil
 		}
-		e.KeyPair = kp
 		return kp
 	}
+	return nil
+}
+
+func (e *EntityKey) Reissue() error {
+	var pk string
+	var err error
+	kp := e.GetKeyPair()
+	if kp != nil {
+		pk, err = kp.PublicKey()
+		if err != nil {
+			return err
+		}
+		e.Key = pk
+	}
+	var prefix nkeys.PrefixByte = 0
+	switch e.Key[0] {
+	case 'O':
+		prefix = nkeys.PrefixByteOperator
+	case 'A':
+		prefix = nkeys.PrefixByteAccount
+	case 'U':
+		prefix = nkeys.PrefixByteUser
+	case 'X':
+		prefix = nkeys.PrefixByteCurve
+	}
+	if prefix == 0 {
+		return fmt.Errorf("invalid key prefix: %s", e.Key[0])
+	}
+	kp, err = nkeys.CreatePair(prefix)
+	if err != nil {
+		return err
+	}
+	e.KeyPair = kp
 	return nil
 }
 
@@ -103,12 +136,12 @@ func (p *ExportEnvironmentParams) SetDefaults(ctx ActionCtx) error {
 	}
 	if p.name != ctx.StoreCtx().Operator.Name {
 		current := GetConfig()
-		if err := current.SetOperator(p.name); err != nil {
+		fp := filepath.Join(current.StoreRoot, p.name)
+		sto, err := store.LoadStore(fp)
+		if err != nil {
 			return err
 		}
-		if err := current.Save(); err != nil {
-			return err
-		}
+		ctx.StoreCtx().Store = sto
 	}
 	return nil
 }
@@ -139,7 +172,7 @@ func (p *ExportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	root := &Entity{Name: ctx.StoreCtx().Operator.Name, Jwt: string(token)}
+	root := &Entity{Name: s.Info.Name, Jwt: string(token)}
 	oKeys, err := ctx.StoreCtx().GetOperatorKeys()
 	if err != nil {
 		return nil, err
@@ -148,6 +181,11 @@ func (p *ExportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		kp, err := ks.GetKeyPair(k)
 		if err != nil {
 			r.AddWarning("unable to read operator key %s: %v", k, err.Error())
+			root.Keys = append(root.Keys, &EntityKey{Key: k})
+			continue
+		}
+		if kp == nil {
+			r.AddWarning("unable operator key %s not found", k)
 			root.Keys = append(root.Keys, &EntityKey{Key: k})
 			continue
 		}
@@ -160,7 +198,7 @@ func (p *ExportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		root.Keys = append(root.Keys, &EntityKey{Seed: string(seed), Key: k})
 	}
 
-	accounts, err := config.ListAccounts()
+	accounts, err := ctx.StoreCtx().Store.ListSubContainers(store.Accounts)
 	if err != nil {
 		r.AddError("error listing accounts: %v", err.Error())
 		return r, err
@@ -190,6 +228,11 @@ func (p *ExportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 			kp, err := ks.GetKeyPair(k)
 			if err != nil {
 				r.AddWarning("unable to read account key %s: %v", k, err.Error())
+				account.Keys = append(account.Keys, &EntityKey{Key: k})
+				continue
+			}
+			if kp == nil {
+				r.AddWarning("unable account key %s not found", k)
 				account.Keys = append(account.Keys, &EntityKey{Key: k})
 				continue
 			}
@@ -259,9 +302,11 @@ func (p *ExportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 }
 
 type ImportEnvironmentParams struct {
-	in     string
-	force  bool
-	entity Entity
+	in      string
+	force   bool
+	entity  Entity
+	rename  string
+	reissue bool
 }
 
 func createImportEnvironment() *cobra.Command {
@@ -277,6 +322,8 @@ func createImportEnvironment() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&params.in, "in", "", "", "input file")
 	cmd.Flags().BoolVarP(&params.force, "force", "", false, "overwrite existing operator")
+	cmd.Flags().StringVarP(&params.rename, "rename", "", "", "rename operator")
+	cmd.Flags().BoolVarP(&params.reissue, "reissue", "", false, "regenerate all keys")
 	return cmd
 }
 
@@ -290,6 +337,13 @@ func (p *ImportEnvironmentParams) SetDefaults(_ ActionCtx) error {
 
 func (p *ImportEnvironmentParams) PreInteractive(_ ActionCtx) error {
 	return nil
+}
+
+func (p *ImportEnvironmentParams) operatorName() string {
+	if p.rename != "" {
+		return p.rename
+	}
+	return p.entity.Name
 }
 
 func (p *ImportEnvironmentParams) Load(ctx ActionCtx) error {
@@ -306,10 +360,12 @@ func (p *ImportEnvironmentParams) Load(ctx ActionCtx) error {
 	if p.entity.Name == "" || p.entity.Jwt == "" {
 		return fmt.Errorf("invalid input file, operator name/jwt required")
 	}
+
+	opName := p.operatorName()
 	operators := config.ListOperators()
 	found := false
 	for _, o := range operators {
-		if o == p.entity.Name {
+		if o == opName {
 			found = true
 			break
 		}
@@ -337,8 +393,12 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		return op, err
 	}
 
-	var okp nkeys.KeyPair
+	theStore, err := GetConfig().LoadStore(p.operatorName())
+	if err == nil && theStore != nil && !p.force {
+		op.AddError("operator %s already exist, '--force' to overwrite after creating a backup", p.entity.Name)
+	}
 
+	var okp nkeys.KeyPair
 	for _, k := range p.entity.Keys {
 		kp := k.GetKeyPair()
 		if k.Key == oc.Subject {
@@ -346,17 +406,8 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 	}
 
-	if okp == nil {
-		op.AddError("unable to find operator key")
-		return op, nil
-	}
-
-	theStore, err := GetConfig().LoadStore(p.entity.Name)
-	if err == nil && theStore != nil && !p.force {
-		op.AddError("operator %s already exist, '--force' to overwrite after creating a backup", p.entity.Name)
-	}
 	if theStore == nil {
-		nk := store.NamedKey{Name: p.entity.Name, KP: okp}
+		nk := store.NamedKey{Name: p.operatorName(), KP: okp}
 		theStore, err = store.CreateStore(p.entity.Name, GetConfig().StoreRoot, &nk)
 	}
 	if theStore == nil {
@@ -370,15 +421,17 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 
 	op.AddOK("imported operator %q", p.entity.Name)
 
-	for idx, k := range p.entity.Keys {
+	for _, k := range p.entity.Keys {
+		pk := k.Key
 		kp := k.GetKeyPair()
-		if kp != nil {
-			op.AddError("unable to store operator key %q: %v", p.entity.Keys[idx], err)
+		if kp == nil {
+			op.AddError("operator key %q is not available", pk)
+			continue
 		}
 		if _, err := ctx.StoreCtx().KeyStore.Store(kp); err != nil {
-			op.AddError("unable to store operator key %q: %v", p.entity.Keys[idx], err)
+			op.AddError("unable to store operator key %q: %v", pk, err)
 		}
-		op.AddOK(" imported key %s", k.Seed)
+		op.AddOK("imported key %s", k.Seed)
 	}
 
 	for _, a := range p.entity.Children {
@@ -393,11 +446,12 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 
 		for _, k := range a.Keys {
 			kp := k.GetKeyPair()
+			pk := k.Key
 			if kp == nil {
-				ra.AddError("account key %q not available", k.Key)
-			}
-			if _, err := ctx.StoreCtx().KeyStore.Store(kp); err != nil {
-				ra.AddError("unable to store key %q: %v", k, err)
+				ra.AddError("account key %q not available", pk)
+				continue
+			} else if _, err := ctx.StoreCtx().KeyStore.Store(kp); err != nil {
+				ra.AddError("unable to store key %q: %v", pk, err)
 				continue
 			}
 			ra.AddOK("imported key %q", k.Seed)
