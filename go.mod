@@ -1,6 +1,7 @@
 module github.com/nats-io/nsc/v2
 
 go 1.22.0
+toolchain go1.24.1
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -10,7 +11,7 @@ require (
 	github.com/nats-io/cliprompts/v2 v2.0.0
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats-server/v2 v2.10.25
-	github.com/nats-io/nats.go v1.39.1
+	github.com/nats-io/nats.go v1.40.0
 	github.com/nats-io/nkeys v0.4.10
 	github.com/nats-io/nuid v1.0.1
 	github.com/rhysd/go-github-selfupdate v1.2.3
@@ -18,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
-	golang.org/x/text v0.22.0
+	golang.org/x/text v0.23.0
 )
 
 require (
@@ -31,7 +32,7 @@ require (
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
