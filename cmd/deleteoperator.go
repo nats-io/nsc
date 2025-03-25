@@ -16,10 +16,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/nats-io/nsc/v2/cmd/store"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+
+	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/spf13/cobra"
 )
 
 func createDeleteOperatorCmd() *cobra.Command {

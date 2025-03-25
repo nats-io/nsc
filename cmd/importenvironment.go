@@ -46,7 +46,7 @@ func createImportEnvironment() *cobra.Command {
 	cmd.Flags().StringVarP(&params.in, "in", "", "", "input file")
 	cmd.Flags().BoolVarP(&params.force, "force", "", false, "overwrite existing operator, possibly merging (not recommended)")
 	cmd.Flags().StringVarP(&params.rename, "rename", "", "", "rename operator")
-	cmd.Flags().BoolVarP(&params.reissue, "reissue", "", false, "regenerate all keys")
+	cmd.Flags().BoolVarP(&params.reissue, "reissue", "", false, "reissue identities")
 	return cmd
 }
 
@@ -89,6 +89,17 @@ func (p *ImportEnvironmentParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("invalid input file, operator name/jwt required")
 	}
 
+	if p.reissue {
+		if err := p.operator.Reissue(); err != nil {
+			return err
+		}
+	}
+	if p.rename != "" {
+		if err := p.operator.Rename(p.rename); err != nil {
+			return err
+		}
+	}
+
 	operators := config.ListOperators()
 	found := false
 	for _, o := range operators {
@@ -97,9 +108,10 @@ func (p *ImportEnvironmentParams) Load(ctx ActionCtx) error {
 			break
 		}
 	}
-	if found && (!p.force && p.rename == "") {
-		return fmt.Errorf("operator %s already exist, '--force' to overwrite after creating a backup or '--rename", p.operator.Name)
+	if found && !p.force {
+		return fmt.Errorf("operator %s already exists, '--force' to overwrite after creating a backup", p.operator.Name)
 	}
+
 	return nil
 }
 
@@ -120,14 +132,10 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		return r, err
 	}
 
-	if p.rename != "" {
-		r.AddOK("renaming operator %q to %q", oc.Name, p.rename)
-		oc.Name = p.rename
-	}
-
 	theStore, err := GetConfig().LoadStore(p.operator.Name)
 	if err == nil && theStore != nil && !p.force && p.rename == "" {
-		r.AddError("operator %s already exist, '--force' to overwrite after creating a backup", p.operator.Name)
+		r.AddError("operator %s already exists, '--force' to overwrite after creating a backup", p.operator.Name)
+		return r, err
 	}
 
 	if theStore == nil {
@@ -139,7 +147,11 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		theStore, err = store.CreateStore(n, GetConfig().StoreRoot, &nk)
 	}
 	if theStore == nil {
-		r.AddError("unable to create a store")
+		if err != nil {
+			r.AddError("unable to create a store: %s", err.Error())
+		} else {
+			r.AddError("unable to create a store")
+		}
 		return r, err
 	}
 
@@ -148,7 +160,7 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		return r, err
 	}
 
-	r.AddOK("stored operator %s", oc.Name)
+	r.AddOK("stored operator %s (%s)", oc.Name, oc.Subject)
 	kr := store.NewReport(store.OK, "Keys")
 	r.Add(kr)
 
@@ -194,7 +206,7 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 			ar.AddError("unable to store account %q: %v", a.Name, err.Error())
 			continue
 		}
-		ar.AddOK("imported account %q", a.Name)
+		ar.AddOK("imported account %q (%s)", a.Name, a.Key.Key)
 
 		keys = make(map[string]nkeys.KeyPair)
 		keys[ac.Subject] = a.Key.KeyPair
@@ -228,7 +240,7 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 
 		for _, u := range a.Users {
-			ur := store.NewReport(store.OK, "User %s", u.Name)
+			ur := store.NewReport(store.OK, "imported user %s, (%s)", u.Name, u.Key.Key)
 			ar.Add(ur)
 
 			uc, err := jwt.DecodeUserClaims(u.Jwt)
@@ -242,14 +254,13 @@ func (p *ImportEnvironmentParams) Run(ctx ActionCtx) (store.Status, error) {
 				continue
 			}
 
-			ur.AddOK("imported user %q", u.Name)
 			if u.Key.KeyPair == nil {
-				ar.AddWarning("key not exported")
+				ur.AddWarning("key not exported")
 			} else {
 				if _, err := ctx.StoreCtx().KeyStore.Store(u.Key.KeyPair); err != nil {
-					kr.AddError("unable to store %q: %v", uc.Subject, err)
+					ur.AddError("unable to store %q: %v", uc.Subject, err)
 				} else {
-					kr.AddOK("stored %q", uc.Subject)
+					ur.AddOK("stored %q", uc.Subject)
 				}
 			}
 		}

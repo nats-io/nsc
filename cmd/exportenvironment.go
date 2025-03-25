@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nats-io/jwt/v2"
+
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
@@ -48,6 +50,15 @@ type Environment struct {
 	Operators []*Operator `json:"operators"`
 }
 
+func (e *Environment) Reissue() error {
+	for _, o := range e.Operators {
+		if err := o.Reissue(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Base struct {
 	Name        string      `json:"name"`
 	Key         EntityKey   `json:"key,omitempty"`
@@ -60,19 +71,208 @@ type Operator struct {
 	Accounts []*Account `json:"accounts,omitempty"`
 }
 
+func (o *Operator) Reissue() error {
+	var err error
+	okeys := make(map[string]nkeys.KeyPair)
+	oc, err := jwt.DecodeOperatorClaims(o.Jwt)
+	if err != nil {
+		return err
+	}
+	if o.Key.KeyPair == nil {
+		o.Key, err = NewEntityKey(nkeys.PrefixByteOperator)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := o.Key.Reissue(); err != nil {
+			return err
+		}
+	}
+	okeys[oc.Subject] = o.Key.KeyPair
+	oc.Subject = o.Key.Key
+
+	// we don't care about the old keys - since we are reissuing
+	o.SigningKeys = nil
+	for idx, sk := range oc.SigningKeys {
+		nk, err := NewEntityKey(nkeys.PrefixByteOperator)
+		if err != nil {
+			return err
+		}
+		okeys[sk] = nk.KeyPair
+		oc.SigningKeys[idx] = nk.Key
+		o.SigningKeys = append(o.SigningKeys, nk)
+	}
+
+	token, err := oc.Encode(o.Key.KeyPair)
+	if err != nil {
+		return err
+	}
+	o.Jwt = token
+
+	for _, a := range o.Accounts {
+		if err := a.Reissue(okeys); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *Operator) Rename(name string) error {
+	if o.Key.KeyPair == nil {
+		return fmt.Errorf("operator key was not exported")
+	}
+	o.Name = name
+	oc, err := jwt.DecodeOperatorClaims(o.Jwt)
+	if err != nil {
+		return err
+	}
+	oc.Name = name
+	token, err := oc.Encode(o.Key.KeyPair)
+	if err != nil {
+		return err
+	}
+	var vr jwt.ValidationResults
+	oc.Validate(&vr)
+	errs := vr.Errors()
+	if errs != nil {
+		return errs[0]
+	}
+	o.Jwt = token
+	return nil
+}
+
 type Account struct {
 	Base
 	Users []*User `json:"users,omitempty"`
+}
+
+func (a *Account) Reissue(operatorKeys map[string]nkeys.KeyPair) error {
+	akeys := make(map[string]nkeys.KeyPair)
+	ac, err := jwt.DecodeAccountClaims(a.Jwt)
+	if err != nil {
+		return err
+	}
+
+	if a.Key.KeyPair == nil {
+		a.Key, err = NewEntityKey(nkeys.PrefixByteAccount)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := a.Key.Reissue(); err != nil {
+			return err
+		}
+	}
+	akeys[ac.Subject] = a.Key.KeyPair
+	ac.Subject = a.Key.Key
+
+	var sks = make(jwt.SigningKeys)
+	a.SigningKeys = nil
+	for k := range ac.SigningKeys {
+		nk, err := NewEntityKey(nkeys.PrefixByteAccount)
+		if err != nil {
+			return err
+		}
+		a.SigningKeys = append(a.SigningKeys, nk)
+
+		scope, _ := ac.SigningKeys.GetScope(k)
+		delete(ac.SigningKeys, k)
+		akeys[k] = nk.KeyPair
+
+		if scope != nil {
+			us, ok := scope.(jwt.UserScope)
+			if !ok {
+				return fmt.Errorf("unable to process scope: %v", k)
+			}
+			us.Key = nk.Key
+			sks.AddScopedSigner(us)
+		} else {
+			sks.Add(nk.Key)
+		}
+	}
+	ac.SigningKeys = sks
+
+	sk, ok := operatorKeys[ac.Issuer]
+	if !ok {
+		return fmt.Errorf("operator issuer %q not found", ac.Issuer)
+	}
+	token, err := ac.Encode(sk)
+	if err != nil {
+		return err
+	}
+	a.Jwt = token
+
+	for _, u := range a.Users {
+		if err := u.Reissue(akeys); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type User struct {
 	Base
 }
 
+func (u *User) Reissue(accountKeys map[string]nkeys.KeyPair) error {
+	var err error
+	if u.Key.KeyPair == nil {
+		u.Key, err = NewEntityKey(nkeys.PrefixByteUser)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := u.Key.Reissue(); err != nil {
+			return err
+		}
+	}
+
+	uc, err := jwt.DecodeUserClaims(u.Jwt)
+	if err != nil {
+		return err
+	}
+	uc.Subject = u.Key.Key
+	if uc.IssuerAccount != "" {
+		akp, ok := accountKeys[uc.IssuerAccount]
+		if !ok {
+			return fmt.Errorf("account issuer %q not found", uc.IssuerAccount)
+		}
+		apk, err := akp.PublicKey()
+		if err != nil {
+			return err
+		}
+		uc.IssuerAccount = apk
+	}
+
+	ask, ok := accountKeys[uc.Issuer]
+	if !ok {
+		return fmt.Errorf("account issuer %q not found", uc.Issuer)
+	}
+	u.Jwt, err = uc.Encode(ask)
+	return err
+}
+
 type EntityKey struct {
 	Key     string
 	Seed    string
 	KeyPair nkeys.KeyPair
+}
+
+func NewEntityKey(pre nkeys.PrefixByte) (EntityKey, error) {
+	var ek EntityKey
+	kp, err := nkeys.CreatePair(pre)
+	if err != nil {
+		return ek, err
+	}
+	pk, err := kp.PublicKey()
+	if err != nil {
+		return ek, err
+	}
+	seed, err := kp.Seed()
+	if err != nil {
+		return ek, err
+	}
+	return EntityKey{KeyPair: kp, Key: pk, Seed: string(seed)}, nil
 }
 
 func (e *EntityKey) MarshalJSON() ([]byte, error) {
@@ -132,7 +332,7 @@ func (e *EntityKey) Reissue() error {
 		}
 		e.Key = pk
 	}
-	var prefix nkeys.PrefixByte = 0
+	prefix := nkeys.PrefixByteUnknown
 	switch e.Key[0] {
 	case 'O':
 		prefix = nkeys.PrefixByteOperator
@@ -143,14 +343,25 @@ func (e *EntityKey) Reissue() error {
 	case 'X':
 		prefix = nkeys.PrefixByteCurve
 	}
-	if prefix == 0 {
+	if prefix == nkeys.PrefixByteUnknown {
 		return fmt.Errorf("invalid key prefix: %v", e.Key[0])
 	}
 	kp, err = nkeys.CreatePair(prefix)
 	if err != nil {
 		return err
 	}
+	seed, err := kp.Seed()
+	if err != nil {
+		return err
+	}
+	pk, err = kp.PublicKey()
+	if err != nil {
+		return err
+	}
+	e.Seed = string(seed)
+	e.Key = pk
 	e.KeyPair = kp
+
 	return nil
 }
 
@@ -228,7 +439,7 @@ func ExportEnvironment(ctx ActionCtx, outFile string) (store.Status, error) {
 			continue
 		}
 		if kp == nil {
-			kr.AddWarning("unable operator key %s not found", k)
+			kr.AddWarning("operator key %s not found", k)
 			continue
 		}
 		if idx == 0 {
