@@ -10,6 +10,11 @@ A tool for creating NATS account and user access configurations
 
 ## Install
 
+This script downloads the latest released binary to the current working directory:
+```
+curl -sf https://binaries.nats.dev/nats-io/nsc/v2@latest | sh
+```
+
 With Python:
 
 ```bash
@@ -48,11 +53,6 @@ using Homebrew, `brew update` will update.
 ## Documentation
 
 [Documentation is here.](https://nats-io.github.io/nsc/)
-
-## Building
-
-NSC uses go modules. If your project source is in `$GOPATH`, you must define set
-the environment variable `GO111MODULE` to `on`.
 
 ## Running with Docker
 
