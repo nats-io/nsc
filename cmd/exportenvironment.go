@@ -71,6 +71,26 @@ type Operator struct {
 	Accounts []*Account `json:"accounts,omitempty"`
 }
 
+func (o *Operator) Decode() (*jwt.OperatorClaims, error) {
+	if o.Jwt == "" {
+		return nil, fmt.Errorf("no token")
+	}
+	return jwt.DecodeOperatorClaims(o.Jwt)
+}
+
+func (o *Operator) Update(oc *jwt.OperatorClaims) error {
+	iss := oc.Issuer
+	if o.Key.KeyPair != nil {
+		token, err := oc.Encode(o.Key.KeyPair)
+		if err != nil {
+			return err
+		}
+		o.Jwt = token
+		return nil
+	}
+	return fmt.Errorf("unable to find key for %q", iss)
+}
+
 func (o *Operator) Reissue() error {
 	var err error
 	okeys := make(map[string]nkeys.KeyPair)
@@ -89,6 +109,7 @@ func (o *Operator) Reissue() error {
 		}
 	}
 	okeys[oc.Subject] = o.Key.KeyPair
+	okeys[o.Key.Key] = o.Key.KeyPair
 	oc.Subject = o.Key.Key
 
 	// we don't care about the old keys - since we are reissuing
@@ -103,17 +124,44 @@ func (o *Operator) Reissue() error {
 		o.SigningKeys = append(o.SigningKeys, nk)
 	}
 
-	token, err := oc.Encode(o.Key.KeyPair)
-	if err != nil {
+	if err := o.Update(oc); err != nil {
 		return err
 	}
-	o.Jwt = token
 
+	accounts := make(map[string]string)
 	for _, a := range o.Accounts {
+		oldID := a.Key.Key
 		if err := a.Reissue(okeys); err != nil {
 			return err
 		}
+		accounts[oldID] = a.Key.Key
 	}
+
+	for _, a := range o.Accounts {
+		ac, err := a.Decode()
+		if err != nil {
+			return err
+		}
+		if ac.HasExternalAuthorization() {
+			for idx, k := range ac.Authorization.AllowedAccounts {
+				if k == "*" {
+					continue
+				}
+				newID, ok := accounts[k]
+				if ok {
+					ac.Authorization.AllowedAccounts[idx] = newID
+				}
+				kp, ok := okeys[ac.Issuer]
+				if ok {
+					a.Jwt, err = ac.Encode(kp)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -122,7 +170,7 @@ func (o *Operator) Rename(name string) error {
 		return fmt.Errorf("operator key was not exported")
 	}
 	o.Name = name
-	oc, err := jwt.DecodeOperatorClaims(o.Jwt)
+	oc, err := o.Decode()
 	if err != nil {
 		return err
 	}
@@ -143,12 +191,32 @@ func (o *Operator) Rename(name string) error {
 
 type Account struct {
 	Base
-	Users []*User `json:"users,omitempty"`
+	Callout EntityKey `json:"callout,omitempty"`
+	Users   []*User   `json:"users,omitempty"`
+}
+
+func (a *Account) Update(ac *jwt.AccountClaims, okp nkeys.KeyPair) error {
+	if okp == nil {
+		return fmt.Errorf("cannot encode without operator key")
+	}
+	token, err := ac.Encode(okp)
+	if err != nil {
+		return err
+	}
+	a.Jwt = token
+	return nil
+}
+
+func (a *Account) Decode() (*jwt.AccountClaims, error) {
+	if a.Jwt == "" {
+		return nil, fmt.Errorf("no token")
+	}
+	return jwt.DecodeAccountClaims(a.Jwt)
 }
 
 func (a *Account) Reissue(operatorKeys map[string]nkeys.KeyPair) error {
 	akeys := make(map[string]nkeys.KeyPair)
-	ac, err := jwt.DecodeAccountClaims(a.Jwt)
+	ac, err := a.Decode()
 	if err != nil {
 		return err
 	}
@@ -163,8 +231,17 @@ func (a *Account) Reissue(operatorKeys map[string]nkeys.KeyPair) error {
 			return err
 		}
 	}
+
 	akeys[ac.Subject] = a.Key.KeyPair
 	ac.Subject = a.Key.Key
+
+	if a.Callout.KeyPair != nil {
+		old := a.Callout.Seed
+		if err := a.Callout.Reissue(); err != nil {
+			return err
+		}
+		akeys[old] = a.Callout.KeyPair
+	}
 
 	var sks = make(jwt.SigningKeys)
 	a.SigningKeys = nil
@@ -192,26 +269,51 @@ func (a *Account) Reissue(operatorKeys map[string]nkeys.KeyPair) error {
 	}
 	ac.SigningKeys = sks
 
+	users := make(map[string]string)
+	for _, u := range a.Users {
+		old := u.Key.Key
+		if err := u.Reissue(akeys); err != nil {
+			return err
+		}
+		users[old] = u.Key.Key
+	}
+	if ac.HasExternalAuthorization() {
+		for idx, k := range ac.Authorization.AuthUsers {
+			nk, ok := users[k]
+			if ok {
+				ac.Authorization.AuthUsers[idx] = nk
+			}
+		}
+	}
+
 	sk, ok := operatorKeys[ac.Issuer]
 	if !ok {
 		return fmt.Errorf("operator issuer %q not found", ac.Issuer)
 	}
-	token, err := ac.Encode(sk)
-	if err != nil {
-		return err
-	}
-	a.Jwt = token
-
-	for _, u := range a.Users {
-		if err := u.Reissue(akeys); err != nil {
-			return err
-		}
-	}
-	return nil
+	return a.Update(ac, sk)
 }
 
 type User struct {
 	Base
+}
+
+func (u *User) Decode() (*jwt.UserClaims, error) {
+	if u.Jwt == "" {
+		return nil, fmt.Errorf("no token")
+	}
+	return jwt.DecodeUserClaims(u.Jwt)
+}
+
+func (u *User) Update(uc *jwt.UserClaims, akp nkeys.KeyPair) error {
+	if akp == nil {
+		return fmt.Errorf("cannot encode without account key")
+	}
+	token, err := uc.Encode(akp)
+	if err != nil {
+		return err
+	}
+	u.Jwt = token
+	return nil
 }
 
 func (u *User) Reissue(accountKeys map[string]nkeys.KeyPair) error {
@@ -227,7 +329,7 @@ func (u *User) Reissue(accountKeys map[string]nkeys.KeyPair) error {
 		}
 	}
 
-	uc, err := jwt.DecodeUserClaims(u.Jwt)
+	uc, err := u.Decode()
 	if err != nil {
 		return err
 	}
@@ -248,8 +350,7 @@ func (u *User) Reissue(accountKeys map[string]nkeys.KeyPair) error {
 	if !ok {
 		return fmt.Errorf("account issuer %q not found", uc.Issuer)
 	}
-	u.Jwt, err = uc.Encode(ask)
-	return err
+	return u.Update(uc, ask)
 }
 
 type EntityKey struct {
@@ -508,7 +609,17 @@ func ExportEnvironment(ctx ActionCtx, outFile string) (store.Status, error) {
 				ak.AddOK("exported account signing key %s", k)
 			}
 		}
-
+		if ac.HasExternalAuthorization() && ac.Authorization.XKey != "" {
+			kp, err := ks.GetKeyPair(ac.Authorization.XKey)
+			if err != nil {
+				ak.AddWarning("unable to load account key %s: %v", ac.Authorization.XKey, err.Error())
+			} else if kp == nil {
+				ak.AddWarning("xkey %s not found", ac.Authorization.XKey)
+			} else {
+				account.Callout = EntityKey{KeyPair: kp}
+				ak.AddOK("exported account callout key %s", ac.Authorization.XKey)
+			}
+		}
 		users, err := s.ListEntries(store.Accounts, a, store.Users)
 		if err != nil {
 			r.AddError("error listing users for account %s: %v", a, err.Error())

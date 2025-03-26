@@ -428,3 +428,69 @@ func Test_ImportOperatorSigningKeyTransformation(t *testing.T) {
 	require.Equal(t, b.Operators[0].Accounts[0].Key.Key, uc.IssuerAccount)
 	require.Equal(t, b.Operators[0].Accounts[0].SigningKeys[0].Key, uc.Issuer)
 }
+
+func Test_ImportOperatorTransformationCallout(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "u")
+
+	ts.AddAccount(t, "callout")
+	ts.AddUser(t, "callout", "service")
+
+	_, err := ExecuteCmd(HoistRootFlags(createEditAuthorizationCallout()), "--account", "callout", "--curve", "generate",
+		"--allowed-account", ts.GetAccountPublicKey(t, "A"),
+		"--auth-user", ts.GetUserPublicKey(t, "callout", "service"))
+	require.NoError(t, err)
+
+	exportFile := filepath.Join(ts.Dir, "o.json")
+	_, err = ExecuteCmd(createExportEnvironmentCmd(), "--name", "O", "--out", exportFile)
+	require.NoError(t, err)
+
+	var a Environment
+	d, err := os.ReadFile(exportFile)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(d, &a))
+
+	findAccount := func(env Environment, name string) *Account {
+		for _, o := range env.Operators {
+			for _, a := range o.Accounts {
+				if a.Name == name {
+					return a
+				}
+			}
+		}
+		return nil
+	}
+
+	var b Environment
+	require.NoError(t, json.Unmarshal(d, &b))
+	require.NoError(t, b.Reissue())
+
+	a1 := findAccount(a, "A")
+	a2 := findAccount(b, "A")
+	require.NotEqual(t, a1.Key.Key, a2.Key.Key)
+	require.NotEqual(t, a1.Key.Key, a2.Key.Key)
+
+	ca := findAccount(a, "callout")
+	require.NotNil(t, ca)
+	require.NotNil(t, ca.Callout.KeyPair)
+
+	cb := findAccount(b, "callout")
+	require.NotNil(t, cb)
+	require.NotNil(t, ca.Callout.KeyPair)
+	require.NotEqual(t, ca.Callout.Key, cb.Callout.Key)
+
+	// check the account ids were remapped in the callout
+	ac, err := cb.Decode()
+	require.NoError(t, err)
+	// account name was mapped
+	require.Contains(t, ac.Authorization.AllowedAccounts, a2.Key.Key)
+
+	// check that the service user was remapped in the callout
+	require.Contains(t, ac.Authorization.AuthUsers, cb.Users[0].Key.Key)
+	uc, err := cb.Users[0].Decode()
+	require.NoError(t, err)
+	require.Equal(t, uc.Issuer, cb.Key.Key)
+}
