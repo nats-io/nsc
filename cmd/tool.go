@@ -31,7 +31,7 @@ import (
 
 var toolCmd = &cobra.Command{
 	Use:   "tool",
-	Short: "NATS tools: pub, sub, req, rep, rtt",
+	Short: "NATS tools: pub, sub, req, reply, rtt",
 }
 
 var natsURLFlag = ""
