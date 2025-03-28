@@ -317,7 +317,7 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 			sub.AddFromError(j.Err)
 			continue
 		}
-		if j.PullStatus.OK() {
+		if j.PullStatus != nil && j.PullStatus.OK() {
 			token, _ := j.Token()
 			p.maybeStoreJWT(ctx, sub, token)
 		}
