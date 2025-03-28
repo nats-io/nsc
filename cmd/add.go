@@ -20,7 +20,7 @@ import (
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:     "add",
-	Short:   "Add assets such as accounts, imports, users",
+	Short:   "Add assets such as operators, accounts, imports/exports, users, mappings",
 	Aliases: []string{"create"},
 }
 

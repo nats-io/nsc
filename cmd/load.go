@@ -32,7 +32,7 @@ func createLoadCmd() *cobra.Command {
 	var params LoadParams
 	cmd := &cobra.Command{
 		Use:   "load",
-		Short: "install entities for an operator, account and key",
+		Short: "load entities for an operator, account and keys",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Note: Need to initialize the operator and environment
 			// before the RunAction command since that is dependent

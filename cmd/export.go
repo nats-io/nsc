@@ -22,7 +22,7 @@ var exportCmd = &cobra.Command{
 
 var importCmd = &cobra.Command{
 	Use:   "import",
-	Short: "Import assets such as nkeys",
+	Short: "Import accounts, users or nkeys",
 }
 
 func init() {

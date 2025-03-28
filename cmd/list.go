@@ -29,7 +29,7 @@ import (
 // addCmd represents the add command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List assets such as accounts, imports, users",
+	Short: "List assets such as operators, accounts, users and keys",
 }
 
 func init() {
