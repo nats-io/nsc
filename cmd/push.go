@@ -124,6 +124,7 @@ func getSystemAccountUser(ctx ActionCtx, sysAccName, sysAccUserName, allowSub st
 			return "", nil, fmt.Errorf(`system account "%s" not found`, op.SystemAccount)
 		}
 	}
+
 	getOpt := func(theJWT string, kp nkeys.KeyPair) nats.Option {
 		return nats.UserJWT(
 			func() (string, error) {
@@ -137,10 +138,26 @@ func getSystemAccountUser(ctx ActionCtx, sysAccName, sysAccUserName, allowSub st
 		if keys, err := ctx.StoreCtx().GetAccountKeys(sysAccName); err == nil && len(keys) > 0 {
 			key := ""
 			if op.StrictSigningKeyUsage {
-				if len(keys) > 1 {
-					key = keys[1]
+				// first key is the account key
+				keys := keys[1:]
+				if len(keys) > 0 {
+					ac, err := ctx.StoreCtx().Store.ReadAccountClaim(sysAccName)
+					if err != nil {
+						return "", nil, err
+					}
+					for _, k := range keys {
+						scope, ok := ac.SigningKeys.GetScope(k)
+						// try to find a key that doesn't have a scope
+						if scope == nil && ok {
+							key = k
+							break
+						}
+					}
+					if key == "" {
+						return "", nil, fmt.Errorf(`system account %q only has scoped signing keys, specify --system-user`, sysAccName)
+					}
 				} else {
-					key = ""
+					return "", nil, fmt.Errorf(`operator requires signing keys, system account %q doesn't have signing keys'`, sysAccName)
 				}
 			} else {
 				key = keys[0]

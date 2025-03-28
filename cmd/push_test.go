@@ -388,3 +388,184 @@ func Test_SyncWs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(filesPre), 2)
 }
+
+func Test_PushPullSigningKeysRequired(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--sk", "generate")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Len(t, oc.SigningKeys, 1)
+	osk := oc.SigningKeys[0]
+
+	okp, err := ts.KeyStore.GetKeyPair(osk)
+	require.NoError(t, err)
+	require.NotNil(t, okp)
+
+	ts.AddAccountWithSigner(t, "SYS", okp)
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--system-account", "SYS",
+		"--require-signing-keys")
+	require.NoError(t, err)
+
+	serverConf := filepath.Join(ts.Dir, "server.conf")
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
+		"--config-file", serverConf)
+	require.NoError(t, err)
+
+	ports := ts.RunServerWithConfig(t, serverConf)
+	defer ts.Server.Shutdown()
+
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--account-jwt-server-url", ports.Nats[0],
+		"--service-url", ports.Nats[0])
+	require.NoError(t, err)
+
+	out, err := ExecuteCmd(createPushCmd())
+	require.Error(t, err)
+	require.Contains(t, out.Err, "operator requires signing keys, system account \"SYS\" doesn't have signing keys")
+
+	out, err = ExecuteCmd(createPullCmd(), "--all")
+	require.Error(t, err)
+	require.Contains(t, out.Err, "operator requires signing keys, system account \"SYS\" doesn't have signing keys")
+}
+
+func Test_PushPullScopedOnly(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--sk", "generate")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Len(t, oc.SigningKeys, 1)
+	osk := oc.SigningKeys[0]
+
+	okp, err := ts.KeyStore.GetKeyPair(osk)
+	require.NoError(t, err)
+	require.NotNil(t, okp)
+
+	ts.AddAccountWithSigner(t, "SYS", okp)
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--system-account", "SYS",
+		"--require-signing-keys")
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(HoistRootFlags(createEditSkopedSkCmd()), "--account", "SYS", "--sk", "generate", "--role", "test", "--allow-pubsub", ">", "-K", osk)
+	require.NoError(t, err)
+
+	ac, err := ts.Store.ReadAccountClaim("SYS")
+	require.NoError(t, err)
+	require.Len(t, ac.SigningKeys, 1)
+	sysKP, err := ts.KeyStore.GetKeyPair(ac.SigningKeys.Keys()[0])
+	require.NoError(t, err)
+	ts.AddUserWithSigner(t, "SYS", "sys", sysKP)
+
+	serverConf := filepath.Join(ts.Dir, "server.conf")
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
+		"--config-file", serverConf)
+	require.NoError(t, err)
+
+	ports := ts.RunServerWithConfig(t, serverConf)
+	defer ts.Server.Shutdown()
+
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--account-jwt-server-url", ports.Nats[0],
+		"--service-url", ports.Nats[0])
+	require.NoError(t, err)
+
+	out, err := ExecuteCmd(createPushCmd())
+	require.Error(t, err)
+	require.Contains(t, out.Err, "system account \"SYS\" only has scoped signing keys, specify --system-user")
+
+	_, err = ExecuteCmd(createPullCmd(), "--all")
+	require.Error(t, err)
+	require.Contains(t, out.Err, "system account \"SYS\" only has scoped signing keys, specify --system-user")
+
+	_, err = ExecuteCmd(createPushCmd(), "--system-user", "sys")
+	require.NoError(t, err)
+
+	out, err = ExecuteCmd(createPullCmd(), "--all", "--overwrite-newer", "--system-user", "sys")
+	require.NoError(t, err)
+}
+
+func Test_PushPullScopedAndNormalOnly(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--sk", "generate")
+	require.NoError(t, err)
+
+	oc, err := ts.Store.ReadOperatorClaim()
+	require.NoError(t, err)
+	require.Len(t, oc.SigningKeys, 1)
+	osk := oc.SigningKeys[0]
+
+	okp, err := ts.KeyStore.GetKeyPair(osk)
+	require.NoError(t, err)
+	require.NotNil(t, okp)
+
+	ts.AddAccountWithSigner(t, "SYS", okp)
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--system-account", "SYS",
+		"--require-signing-keys")
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(HoistRootFlags(createEditSkopedSkCmd()), "--account", "SYS", "--sk", "generate", "--role", "test", "--allow-pubsub", "foo", "-K", osk)
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(HoistRootFlags(createEditAccount()), "--name", "SYS", "--sk", "generate", "-K", osk)
+	require.NoError(t, err)
+
+	serverConf := filepath.Join(ts.Dir, "server.conf")
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
+		"--config-file", serverConf)
+	require.NoError(t, err)
+
+	ports := ts.RunServerWithConfig(t, serverConf)
+	defer ts.Server.Shutdown()
+
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--account-jwt-server-url", ports.Nats[0],
+		"--service-url", ports.Nats[0])
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(createPushCmd())
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(createPullCmd(), "--all", "--overwrite-newer")
+	require.NoError(t, err)
+}
+
+func Test_PushPullNormalOnly(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "SYS")
+
+	_, err := ExecuteCmd(createEditOperatorCmd(), "--system-account", "SYS")
+	require.NoError(t, err)
+
+	serverConf := filepath.Join(ts.Dir, "server.conf")
+	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
+		"--config-file", serverConf)
+	require.NoError(t, err)
+
+	ports := ts.RunServerWithConfig(t, serverConf)
+	defer ts.Server.Shutdown()
+
+	_, err = ExecuteCmd(createEditOperatorCmd(),
+		"--account-jwt-server-url", ports.Nats[0],
+		"--service-url", ports.Nats[0])
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(createPushCmd())
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(createPullCmd(), "--all", "--overwrite-newer")
+	require.NoError(t, err)
+}
