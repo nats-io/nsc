@@ -108,13 +108,6 @@ jobs:
             exit 1
           fi
 
-      - name: Auto-commit generated docs
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: Auto-commit docs
-          file_pattern: docs/**
-        if: matrix.os == 'ubuntu-latest'
-
       - name: Bad versions creep defense
         id: go-module-versions
         # The go.mod includes tests, and some of our tests explicitly pull in jwtv1, which is unmaintained and has security issues.
