@@ -99,6 +99,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
 
       - name: Check for uncommitted changes
+        if: matrix.os == 'ubuntu-latest'
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "❌ Repository has uncommitted changes after doc generation:"
