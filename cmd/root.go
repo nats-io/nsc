@@ -251,6 +251,7 @@ func init() {
 	SetEnvOptions()
 	root := GetRootCmd()
 	root.Flags().BoolP("version", "v", false, "version for nsc")
+	root.DisableAutoGenTag = true
 	HoistRootFlags(root)
 }
 
