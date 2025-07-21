@@ -15,7 +15,7 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/rhysd/go-github-selfupdate v1.2.3
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.10.0
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
 	golang.org/x/text v0.25.0
