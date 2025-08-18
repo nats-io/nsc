@@ -124,6 +124,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().StringVarP(&params.traceContextSubject, "trace-context-subject", "", "trace.messages", "sets the subject where w3c trace context information is sent. Set to \"\" to disable")
 	cmd.Flags().VarP(&params.traceContextSampling, "trace-context-sampling", "", "set the trace context sampling rate (1-100) - 0 default is 100")
 
+	cmd.Flags().BoolVarP(&params.routeSelfClusterTraffic, "host-cluster-traffic", "", false, "route JetStream cluster traffic via the account instead of system")
 	return cmd
 }
 
@@ -151,25 +152,26 @@ type EditAccountParams struct {
 	GenericClaimsParams
 	PermissionsParams
 	JetStreamLimitParams
-	claim                *jwt.AccountClaims
-	token                string
-	infoUrl              string
-	description          string
-	conns                NumberParams
-	leafConns            NumberParams
-	exports              NumberParams
-	disallowBearer       bool
-	exportsWc            bool
-	imports              NumberParams
-	subscriptions        NumberParams
-	payload              NumberParams
-	data                 NumberParams
-	signingKeys          SigningKeysParams
-	rmSigningKeys        []string
-	disableJetStream     bool
-	enableJetStream      int
-	traceContextSubject  string
-	traceContextSampling NumberParams
+	claim                   *jwt.AccountClaims
+	token                   string
+	infoUrl                 string
+	description             string
+	conns                   NumberParams
+	leafConns               NumberParams
+	exports                 NumberParams
+	disallowBearer          bool
+	exportsWc               bool
+	imports                 NumberParams
+	subscriptions           NumberParams
+	payload                 NumberParams
+	data                    NumberParams
+	signingKeys             SigningKeysParams
+	rmSigningKeys           []string
+	disableJetStream        bool
+	enableJetStream         int
+	traceContextSubject     string
+	traceContextSampling    NumberParams
+	routeSelfClusterTraffic bool
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -240,6 +242,7 @@ func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
 		"js-enable",
 		"trace-context-subject",
 		"trace-context-sampling",
+		"host-cluster-traffic",
 	) {
 		ctx.CurrentCmd().SilenceUsage = false
 		return fmt.Errorf("specify an edit option")
@@ -977,6 +980,16 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 		// we already validated that the subject is there either existing or new
 		p.claim.Trace.Sampling = int(p.traceContextSampling.Int64())
 		r.AddOK("changed trace context sampling to %d%%", p.claim.Trace.Sampling)
+	}
+
+	if flags.Changed("host-cluster-traffic") {
+		if p.routeSelfClusterTraffic {
+			p.claim.ClusterTraffic = jwt.ClusterTrafficOwner
+			r.AddOK("enabled routing of JetStream cluster traffic through this account")
+		} else {
+			p.claim.ClusterTraffic = ""
+			r.AddOK("disabled routing of JetStream cluster traffic through this account")
+		}
 	}
 
 	p.token, err = p.claim.Encode(p.signerKP)
