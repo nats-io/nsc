@@ -565,3 +565,26 @@ func Test_AllowSysToDisableJs(t *testing.T) {
 
 	require.False(t, sys.Limits.IsJSEnabled())
 }
+
+func Test_RouteSelfClusterTraffic(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+
+	ac, err := ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, jwt.ClusterTraffic(""), ac.ClusterTraffic)
+
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--host-cluster-traffic"}...)
+	require.NoError(t, err)
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, jwt.ClusterTraffic(jwt.ClusterTrafficOwner), ac.ClusterTraffic)
+
+	_, err = ExecuteCmd(createEditAccount(), []string{"A", "--host-cluster-traffic=false"}...)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("A")
+	require.NoError(t, err)
+	require.Equal(t, jwt.ClusterTraffic(""), ac.ClusterTraffic)
+}
