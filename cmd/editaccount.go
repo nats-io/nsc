@@ -124,7 +124,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().StringVarP(&params.traceContextSubject, "trace-context-subject", "", "trace.messages", "sets the subject where w3c trace context information is sent. Set to \"\" to disable")
 	cmd.Flags().VarP(&params.traceContextSampling, "trace-context-sampling", "", "set the trace context sampling rate (1-100) - 0 default is 100")
 
-	cmd.Flags().BoolVarP(&params.routeSelfClusterTraffic, "host-cluster-traffic", "", false, "route JetStream cluster traffic via the account instead of system")
+	cmd.Flags().BoolVarP(&params.hostClusterTraffic, "host-cluster-traffic", "", false, "route JetStream cluster traffic via the account instead of system")
 	cmd.Flags().MarkHidden("host-cluster-traffic")
 	return cmd
 }
@@ -153,26 +153,26 @@ type EditAccountParams struct {
 	GenericClaimsParams
 	PermissionsParams
 	JetStreamLimitParams
-	claim                   *jwt.AccountClaims
-	token                   string
-	infoUrl                 string
-	description             string
-	conns                   NumberParams
-	leafConns               NumberParams
-	exports                 NumberParams
-	disallowBearer          bool
-	exportsWc               bool
-	imports                 NumberParams
-	subscriptions           NumberParams
-	payload                 NumberParams
-	data                    NumberParams
-	signingKeys             SigningKeysParams
-	rmSigningKeys           []string
-	disableJetStream        bool
-	enableJetStream         int
-	traceContextSubject     string
-	traceContextSampling    NumberParams
-	routeSelfClusterTraffic bool
+	claim                *jwt.AccountClaims
+	token                string
+	infoUrl              string
+	description          string
+	conns                NumberParams
+	leafConns            NumberParams
+	exports              NumberParams
+	disallowBearer       bool
+	exportsWc            bool
+	imports              NumberParams
+	subscriptions        NumberParams
+	payload              NumberParams
+	data                 NumberParams
+	signingKeys          SigningKeysParams
+	rmSigningKeys        []string
+	disableJetStream     bool
+	enableJetStream      int
+	traceContextSubject  string
+	traceContextSampling NumberParams
+	hostClusterTraffic   bool
 }
 
 func (p *EditAccountParams) SetDefaults(ctx ActionCtx) error {
@@ -984,7 +984,7 @@ func (p *EditAccountParams) Run(ctx ActionCtx) (store.Status, error) {
 	}
 
 	if flags.Changed("host-cluster-traffic") {
-		if p.routeSelfClusterTraffic {
+		if p.hostClusterTraffic {
 			p.claim.ClusterTraffic = jwt.ClusterTrafficOwner
 			r.AddOK("enabled routing of JetStream cluster traffic through this account")
 		} else {
