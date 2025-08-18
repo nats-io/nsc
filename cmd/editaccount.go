@@ -125,6 +125,7 @@ func createEditAccount() *cobra.Command {
 	cmd.Flags().VarP(&params.traceContextSampling, "trace-context-sampling", "", "set the trace context sampling rate (1-100) - 0 default is 100")
 
 	cmd.Flags().BoolVarP(&params.routeSelfClusterTraffic, "host-cluster-traffic", "", false, "route JetStream cluster traffic via the account instead of system")
+	cmd.Flags().MarkHidden("host-cluster-traffic")
 	return cmd
 }
 
