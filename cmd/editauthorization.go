@@ -264,24 +264,24 @@ func (p *EditAccountCalloutParams) Run(ctx ActionCtx) (store.Status, error) {
 	StoreAccountAndUpdateStatus(ctx, token, r)
 	if r.HasNoErrors() {
 		for _, v := range userReport {
-			r.AddOK(v)
+			r.AddSimpleStatus(store.OK, v)
 		}
 		for _, v := range userRmReport {
-			r.AddOK(v)
+			r.AddSimpleStatus(store.OK, v)
 		}
 		for _, v := range accountReport {
-			r.AddOK(v)
+			r.AddSimpleStatus(store.OK, v)
 		}
 		for _, v := range accountRmReport {
-			r.AddOK(v)
+			r.AddSimpleStatus(store.OK, v)
 		}
 
 		for _, v := range curveReport {
-			r.AddOK(v)
+			r.AddSimpleStatus(store.OK, v)
 		}
 
 		if p.disable {
-			r.AddOK("removed external authorization configuration")
+			r.AddSimpleStatus(store.OK, "removed external authorization configuration")
 		}
 	}
 	return r, err

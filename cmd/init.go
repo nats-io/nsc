@@ -520,7 +520,7 @@ func (p *InitCmdParams) Run(ctx ActionCtx) (store.Status, error) {
   nsc generate config --mem-resolver --config-file <path/server.conf>
 then start a nats-server using the generated config:
   nats-server -c <path/server.conf>`
-		r.Add(store.NewServerMessage(local))
+		r.Add(store.NewSimpleServerMessage(local))
 	}
 	if len(p.ServiceURLs) > 0 {
 		var buf bytes.Buffer
@@ -533,7 +533,7 @@ then start a nats-server using the generated config:
 		buf.WriteString("> nsc tools sub \">\"\n")
 		buf.WriteString("\nTo publish your first message enter:\n")
 		buf.WriteString("> nsc tools pub hello \"Hello World\"\n")
-		r.Add(store.NewServerMessage(buf.String()))
+		r.Add(store.NewSimpleServerMessage(buf.String()))
 	}
 	return r, nil
 }
