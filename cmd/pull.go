@@ -41,6 +41,12 @@ func createPullCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&params.Overwrite, "overwrite-newer", "F", false, "overwrite local JWTs that are newer than remote")
 	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server. (Default is system account specified by operator)")
 	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
+
+	cmd.Flags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
+	cmd.Flags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
+	cmd.Flags().StringVarP(&clienttls.ca, "client-cert", "", "", "client certificate file for tls connections")
+	cmd.Flags().StringVarP(&clienttls.ca, "client-key", "", "", "client key file for tls connections")
+
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
 }
