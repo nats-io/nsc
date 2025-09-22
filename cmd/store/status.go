@@ -79,7 +79,11 @@ func ToReport(s Status) *Report {
 }
 
 func NewReport(code StatusCode, format string, args ...interface{}) *Report {
-	return &Report{StatusCode: code, Label: fmt.Sprintf(format, args...)}
+	return &Report{StatusCode: code, Label: formatLabel(format, args...)}
+}
+
+func NewSimpleReport(code StatusCode, message string) *Report {
+	return &Report{StatusCode: code, Label: message}
 }
 
 func NewDetailedReport(summary bool) *Report {
@@ -90,16 +94,29 @@ func FromError(err error) Status {
 	return &Report{StatusCode: ERR, Label: err.Error()}
 }
 
+func formatLabel(format string, args ...interface{}) string {
+	if len(args) == 0 {
+		return format
+	}
+	return fmt.Sprintf(format, args...)
+}
+
 func OKStatus(format string, args ...interface{}) Status {
-	return &Report{StatusCode: OK, Label: fmt.Sprintf(format, args...)}
+	return &Report{StatusCode: OK, Label: formatLabel(format, args...)}
 }
 
 func WarningStatus(format string, args ...interface{}) Status {
-	return &Report{StatusCode: WARN, Label: fmt.Sprintf(format, args...)}
+	return &Report{StatusCode: WARN, Label: formatLabel(format, args...)}
 }
 
 func ErrorStatus(format string, args ...interface{}) Status {
-	return &Report{StatusCode: ERR, Label: fmt.Sprintf(format, args...)}
+	return &Report{StatusCode: ERR, Label: formatLabel(format, args...)}
+}
+
+func (r *Report) AddSimpleStatus(code StatusCode, message string) *Report {
+	c := NewSimpleReport(code, message)
+	r.Add(c)
+	return c
 }
 
 func (r *Report) AddStatus(code StatusCode, format string, args ...interface{}) *Report {
@@ -331,8 +348,12 @@ type ServerMessage struct {
 	SrvMessage string
 }
 
+func NewSimpleServerMessage(message string) Status {
+	return &ServerMessage{SrvMessage: strings.TrimSpace(message)}
+}
+
 func NewServerMessage(format string, args ...interface{}) Status {
-	m := fmt.Sprintf(format, args...)
+	m := formatLabel(format, args...)
 	m = strings.TrimSpace(m)
 	return &ServerMessage{SrvMessage: m}
 }
@@ -389,9 +410,9 @@ func PushReport(code int, data []byte) Status {
 	case WARN:
 		m = "pushed account jwt was accepted by the account server"
 	}
-	r.AddStatus(sc, m)
+	r.AddSimpleStatus(sc, m)
 	if len(data) > 0 {
-		r.Add(NewServerMessage(string(data)))
+		r.Add(NewSimpleServerMessage(string(data)))
 	}
 	return r
 }
@@ -408,7 +429,7 @@ func PullReport(code int, data []byte) Status {
 	default:
 		// nothing - didn't get this far
 	}
-	r.AddStatus(sc, m)
+	r.AddSimpleStatus(sc, m)
 	r.Data = data
 	return r
 }

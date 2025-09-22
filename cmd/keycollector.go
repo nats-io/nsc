@@ -14,7 +14,6 @@
 package cmd
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -127,7 +126,7 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 	}
 	if ac.Authorization.XKey != "" {
 		var ask Key
-		ask.Name = fmt.Sprintf(ac.Name)
+		ask.Name = ac.Name
 		ask.Pub = ac.Authorization.XKey
 		ask.Curve = true
 		ask.Resolve(ks)
