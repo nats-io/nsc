@@ -34,11 +34,23 @@ var toolCmd = &cobra.Command{
 	Short: "NATS tools: pub, sub, req, reply, rtt",
 }
 
+type tlsConfig struct {
+	tlsFirst bool
+	ca       string
+	cert     string
+	key      string
+}
+
 var natsURLFlag = ""
 var encryptFlag bool
+var clienttls tlsConfig
 
 func init() {
 	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
+	toolCmd.PersistentFlags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
+	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
+	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "client-cert", "", "", "client certificate file for tls connections")
+	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "client-key", "", "", "client key file for tls connections")
 	GetRootCmd().AddCommand(toolCmd)
 }
 
@@ -72,6 +84,15 @@ func createDefaultToolOptions(name string, ctx ActionCtx, o ...nats.Option) []na
 		}
 		ctx.CurrentCmd().Printf("Exiting, no servers available, or connection closed")
 	}))
+	if clienttls.tlsFirst {
+		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+	if clienttls.ca != "" {
+		opts = append(opts, nats.RootCAs(clienttls.ca))
+	}
+	if clienttls.cert != "" || clienttls.key != "" {
+		opts = append(opts, nats.ClientCert(clienttls.cert, clienttls.key))
+	}
 	opts = append(opts, o...)
 	return opts
 }
