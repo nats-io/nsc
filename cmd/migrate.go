@@ -199,19 +199,19 @@ func (j *MigrateJob) Load(ctx ActionCtx) {
 	}
 	data, err := LoadFromFileOrURL(j.url)
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("error loading from %#q: %v", j.url, err))
+		j.status = store.ErrorStatus("error loading from %#q: %v", j.url, err)
 		return
 	}
 	j.isFileImport = !IsURL(j.url)
 
 	j.accountToken, err = jwt.ParseDecoratedJWT(data)
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("error parsing JWT: %v", err))
+		j.status = store.ErrorStatus("error parsing JWT: %v", err)
 		return
 	}
 	j.claim, err = jwt.DecodeAccountClaims(j.accountToken)
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("error decoding JWT: %v", err))
+		j.status = store.ErrorStatus("error decoding JWT: %v", err)
 		return
 	}
 }
@@ -221,14 +221,14 @@ func (j *MigrateJob) PostInteractive(ctx ActionCtx) {
 		aac, err := ctx.StoreCtx().Store.ReadAccountClaim(j.claim.Name)
 		if err != nil {
 
-			j.status = store.ErrorStatus(fmt.Sprintf("error reading account JWT: %v", err))
+			j.status = store.ErrorStatus("error reading account JWT: %v", err)
 			return
 		}
 		j.overwrite = aac.Subject == j.claim.Subject
 		if !j.overwrite {
 			j.overwrite, err = cli.Confirm("account %q already exists under the current operator, replace it", false)
 			if err != nil {
-				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+				j.status = store.ErrorStatus("%v", err)
 				return
 			}
 		}
@@ -241,17 +241,17 @@ func (j *MigrateJob) Validate(ctx ActionCtx) {
 		// it is already determined to be a file
 		fp, err := Expand(j.url)
 		if err != nil {
-			j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+			j.status = store.ErrorStatus("%v", err)
 			return
 		}
 		if strings.HasPrefix(fp, parent) {
-			j.status = store.ErrorStatus(fmt.Sprintf("cannot migrate %q onto itself", fp))
+			j.status = store.ErrorStatus("cannot migrate %q onto itself", fp)
 			return
 		}
 	}
 
 	if !j.overwrite && ctx.StoreCtx().Store.HasAccount(j.claim.Name) {
-		j.status = store.ErrorStatus(fmt.Sprintf("account %q already exists, specify --force to overwrite", j.claim.Name))
+		j.status = store.ErrorStatus("account %q already exists, specify --force to overwrite", j.claim.Name)
 		return
 	}
 
@@ -265,7 +265,7 @@ func (j *MigrateJob) Validate(ctx ActionCtx) {
 		}
 	}
 	if !hasOne {
-		j.status = store.ErrorStatus(fmt.Sprintf("unable to find an account key for %q - need one of %s", j.claim.Name, strings.Join(keys, ", ")))
+		j.status = store.ErrorStatus("unable to find an account key for %q - need one of %s", j.claim.Name, strings.Join(keys, ", "))
 		return
 	}
 }
@@ -276,12 +276,12 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 
 	token, err := jwt.ParseDecoratedJWT([]byte(j.accountToken))
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+		j.status = store.ErrorStatus("%v", err)
 		return
 	}
 	ac, err := jwt.DecodeAccountClaims(token)
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+		j.status = store.ErrorStatus("%v", err)
 		return
 	}
 
@@ -299,19 +299,19 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 			}
 		}
 		if kp == nil {
-			j.status = store.ErrorStatus(fmt.Sprintf("unable to find any account keys - need any of %s", strings.Join(keys, ", ")))
+			j.status = store.ErrorStatus("unable to find any account keys - need any of %s", strings.Join(keys, ", "))
 			return
 		}
 		j.accountToken, err = ac.Encode(kp)
 		if err != nil {
-			j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+			j.status = store.ErrorStatus("%v", err)
 			return
 		}
 	}
 
 	remote, err := ctx.StoreCtx().Store.StoreClaim([]byte(j.accountToken))
 	if err != nil {
-		j.status = store.ErrorStatus(fmt.Sprintf("failed to migrate %q: %v", ac.Name, err))
+		j.status = store.ErrorStatus("failed to migrate %q: %v", ac.Name, err)
 		return
 	}
 
@@ -321,7 +321,7 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 		if err == nil && fi.IsDir() {
 			dirEntries, err := os.ReadDir(udir)
 			if err != nil {
-				j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+				j.status = store.ErrorStatus("%v", err)
 				return
 			}
 			for _, v := range dirEntries {
@@ -330,21 +330,21 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 					up := filepath.Join(udir, n)
 					d, err := Read(up)
 					if err != nil {
-						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						j.status = store.ErrorStatus("%v", err)
 						return
 					}
 					s, err := jwt.ParseDecoratedJWT(d)
 					if err != nil {
-						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						j.status = store.ErrorStatus("%v", err)
 						return
 					}
 					uc, err := jwt.DecodeUserClaims(s)
 					if err != nil {
-						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						j.status = store.ErrorStatus("%v", err)
 						return
 					}
 					if err := ctx.StoreCtx().Store.StoreRaw([]byte(s)); err != nil {
-						j.status = store.ErrorStatus(fmt.Sprintf("%v", err))
+						j.status = store.ErrorStatus("%v", err)
 						return
 					}
 					j.migratedUsers = append(j.migratedUsers, uc)
@@ -362,7 +362,7 @@ func (j *MigrateJob) Run(ctx ActionCtx) {
 		um = ""
 	}
 
-	j.status = store.OKStatus(fmt.Sprintf("%s [%s]", m, um))
+	j.status = store.OKStatus("%s [%s]", m, um)
 	if remote != nil {
 		si, ok := j.status.(*store.Report)
 		if ok {

@@ -190,7 +190,7 @@ func (p *DeleteUserParams) Run(ctx ActionCtx) (store.Status, error) {
 			continue
 		}
 
-		ru := store.NewReport(store.OK, fmt.Sprintf("user %s [%s]", n, uc.Subject))
+		ru := store.NewReport(store.OK, "user %s [%s]", n, uc.Subject)
 		r.Add(ru)
 
 		if p.revoke {
