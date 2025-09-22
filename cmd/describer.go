@@ -132,23 +132,38 @@ func (a *AccountDescriber) Describe() string {
 		default:
 			table.AddRow("Max Mem Storage", "Unlimited")
 		}
-		addLimitRow(table, "Max Streams", lim.Streams, false)
-		addLimitRow(table, "Max Consumer", lim.Consumer, false)
-		switch {
-		case lim.MaxAckPending > 0:
+		if lim.Streams > 0 {
+			addLimitRow(table, "Max Streams", lim.Streams, false)
+		} else {
+			table.AddRow("Max Streams", "Unlimited")
+		}
+		if lim.Consumer > 0 {
+			addLimitRow(table, "Max Consumers", lim.Consumer, false)
+		} else {
+			table.AddRow("Max Consumers", "Unlimited")
+		}
+
+		if lim.MaxAckPending > 0 {
 			addLimitRow(table, "Max Ack Pending", lim.MaxAckPending, false)
-		default:
+		} else {
 			table.AddRow("Max Ack Pending", "Consumer Setting")
 		}
-		addLimitRow(table, "Max Ack Pending", lim.MaxAckPending, false)
 		maxBytes := "optional (Stream setting)"
 		if lim.MaxBytesRequired {
 			maxBytes = "required (Stream setting)"
 		}
 		table.AddRow("Max Bytes", maxBytes)
 
-		addLimitRow(table, "Max Memory Stream", lim.MemoryMaxStreamBytes, true)
-		addLimitRow(table, "Max Disk Stream", lim.DiskMaxStreamBytes, true)
+		if lim.MemoryMaxStreamBytes > 0 {
+			addLimitRow(table, "Max Memory Stream", lim.MemoryMaxStreamBytes, true)
+		} else {
+			table.AddRow("Max Memory Stream", "Unlimited")
+		}
+		if lim.DiskMaxStreamBytes > 0 {
+			addLimitRow(table, "Max Disk Stream", lim.DiskMaxStreamBytes, true)
+		} else {
+			table.AddRow("Max Disk Stream", "Unlimited")
+		}
 	}
 
 	table.AddSeparator()
