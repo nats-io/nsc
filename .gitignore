@@ -16,3 +16,4 @@ coverage.out
 
 /nsc
 /vendor/
+cmd/jwt/
