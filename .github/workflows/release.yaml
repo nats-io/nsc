@@ -73,7 +73,7 @@ jobs:
           COSIGN_PASSWORD: ""
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: homebrew-formula-nsc.rb
           path: build/nsc.rb
