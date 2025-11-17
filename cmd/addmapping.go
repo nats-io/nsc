@@ -38,9 +38,11 @@ func createAddMappingCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP((*string)(&params.from), "from", "f", "", "map from subject (required)")
 	cmd.Flags().StringVarP((*string)(&params.to.Subject), "to", "t", "", "to subject (required)")
-	cmd.Flags().Uint8VarP(&params.to.Weight, "weight", "", 0, "weight [1-100] of this mapping entry (default: 100)")
+	cmd.Flags().Uint8VarP(&params.to.Weight, "weight", "", 0, "weight [0-100] of this mapping entry")
 	cmd.Flags().StringVarP(&params.to.Cluster, "cluster", "", "", "in which cluster this mapping should apply")
 	params.AccountContextParams.BindFlags(cmd)
+
+	cmd.MarkFlagRequired("weight")
 
 	return cmd
 }

@@ -91,4 +91,26 @@ func Test_AddMappingCrud(t *testing.T) {
 		Weight:  100,
 		Cluster: "B",
 	}, m[0])
+
+	_, err = ExecuteCmd(createDeleteMappingCmd(), []string{"--from", "qq", "--to", "rr", "--cluster", "B"}...)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	m = ac.Mappings["qq"]
+	require.Nil(t, m)
+
+	_, err = ExecuteCmd(createAddMappingCmd(), []string{"--from", "qq", "--to", "rr", "--weight", "0", "--cluster", "B"}...)
+	require.NoError(t, err)
+
+	ac, err = ts.Store.ReadAccountClaim("B")
+	require.NoError(t, err)
+	m = ac.Mappings["qq"]
+	require.NotNil(t, m)
+	require.Equal(t, jwt.WeightedMapping{
+		Subject: "rr",
+		Weight:  0,
+		Cluster: "B",
+	}, m[0])
+
 }
