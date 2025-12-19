@@ -71,7 +71,7 @@ nsc list keys --account A (changes the account context to the specified account)
 	cmd.Flags().StringVarP(&params.Filter, "filter", "f", "", "filter keys containing string")
 	cmd.Flags().BoolVarP(&params.Unreferenced, "not-referenced", "", false, "shows keys that are not referenced in the current operator context")
 	cmd.Flags().BoolVarP(&params.Seeds, "show-seeds", "S", false, "shows seed keys value")
-	cmd.Flags().BoolVarP(&params.Json, "json", "j", false, "show output as JSON")
+	cmd.Flags().BoolVarP(&params.Json, "json", "J", false, "list keys as JSON")
 
 	return cmd
 }
@@ -206,7 +206,7 @@ func (p *ListKeysParams) ReportJson(ks Keys, showSeeds bool) string {
 		keysForJson = append(keysForJson, kws)
 	}
 
-	data, err := json.MarshalIndent(keysForJson, "", "  ")
+	data, err := json.MarshalIndent(keysForJson, "", " ")
 	if err != nil {
 		return fmt.Sprintf("error marshaling keys: %v", err)
 	}
