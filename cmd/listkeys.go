@@ -189,29 +189,24 @@ type keyForJson struct {
 }
 
 func (p *ListKeysParams) ReportJson(ks Keys, showSeeds bool) string {
-	if showSeeds {
-		keysWithSecret := []keyForJson{}
+	keysForJson := []keyForJson{}
 
-		for _, k := range ks.KeyList {
+	for _, k := range ks.KeyList {
+		var seed string
+		if showSeeds {
 			if !k.Invalid && k.HasKey() {
-				seed, _ := p.KS.GetSeed(k.Pub)
-				kws := keyForJson{
-					Key:          *k,
-					ExpectedKind: k.ExpectedKind.String(),
-					Seed:         seed,
-				}
-				keysWithSecret = append(keysWithSecret, kws)
+				seed, _ = p.KS.GetSeed(k.Pub)
 			}
 		}
-
-		data, err := json.MarshalIndent(keysWithSecret, "", "  ")
-		if err != nil {
-			return fmt.Sprintf("error marshaling keys: %v", err)
+		kws := keyForJson{
+			Key:          *k,
+			ExpectedKind: k.ExpectedKind.String(),
+			Seed:         seed,
 		}
-		return string(data)
+		keysForJson = append(keysForJson, kws)
 	}
 
-	data, err := json.MarshalIndent(ks.KeyList, "", "  ")
+	data, err := json.MarshalIndent(keysForJson, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("error marshaling keys: %v", err)
 	}
