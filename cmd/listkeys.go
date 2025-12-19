@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -70,6 +71,7 @@ nsc list keys --account A (changes the account context to the specified account)
 	cmd.Flags().StringVarP(&params.Filter, "filter", "f", "", "filter keys containing string")
 	cmd.Flags().BoolVarP(&params.Unreferenced, "not-referenced", "", false, "shows keys that are not referenced in the current operator context")
 	cmd.Flags().BoolVarP(&params.Seeds, "show-seeds", "S", false, "shows seed keys value")
+	cmd.Flags().BoolVarP(&params.Json, "json", "j", false, "show output as JSON")
 
 	return cmd
 }
@@ -80,6 +82,7 @@ func init() {
 
 type ListKeysParams struct {
 	Seeds bool
+	Json  bool
 	KeyCollectorParams
 	KS store.KeyStore
 }
@@ -129,6 +132,9 @@ func (p *ListKeysParams) Report(ks Keys) string {
 	if ks.Len() == 0 {
 		return "no keys matched query"
 	}
+	if p.Json {
+		return p.ReportJson(ks, p.Seeds)
+	}
 	if p.Seeds {
 		return p.ReportSeeds(ks)
 	}
@@ -174,6 +180,42 @@ func (p *ListKeysParams) Report(ks Keys) string {
 	}
 	s = fmt.Sprintf("%s[ T ] auth callout encryption target\n", s)
 	return s
+}
+
+type keyForJson struct {
+	Key
+	ExpectedKind string `json:"expected_kind"`
+	Seed         string `json:"seed,omitempty"`
+}
+
+func (p *ListKeysParams) ReportJson(ks Keys, showSeeds bool) string {
+	if showSeeds {
+		keysWithSecret := []keyForJson{}
+
+		for _, k := range ks.KeyList {
+			if !k.Invalid && k.HasKey() {
+				seed, _ := p.KS.GetSeed(k.Pub)
+				kws := keyForJson{
+					Key:          *k,
+					ExpectedKind: k.ExpectedKind.String(),
+					Seed:         seed,
+				}
+				keysWithSecret = append(keysWithSecret, kws)
+			}
+		}
+
+		data, err := json.MarshalIndent(keysWithSecret, "", "  ")
+		if err != nil {
+			return fmt.Sprintf("error marshaling keys: %v", err)
+		}
+		return string(data)
+	}
+
+	data, err := json.MarshalIndent(ks.KeyList, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("error marshaling keys: %v", err)
+	}
+	return string(data)
 }
 
 func (p *ListKeysParams) ReportSeeds(ks Keys) string {
