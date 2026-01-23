@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -168,4 +169,82 @@ func Test_listKeysAuthorizationXKey(t *testing.T) {
 	require.NoError(t, err)
 	stdout = StripTableDecorations(out.Out)
 	require.Contains(t, stdout, xPK)
+}
+
+func Test_ListKeysJson(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--json")
+	require.NoError(t, err)
+
+	opk := ts.GetOperatorPublicKey(t)
+	apk := ts.GetAccountPublicKey(t, "A")
+	upk := ts.GetUserPublicKey(t, "A", "U")
+
+	var keys []keyForJson
+	require.NoError(t, json.Unmarshal([]byte(out.Out), &keys))
+
+	require.Len(t, keys, 3)
+
+	require.Equal(t, "O", keys[0].Key.Name)
+	require.Equal(t, opk, keys[0].Key.Pub)
+	require.Equal(t, "operator", keys[0].ExpectedKind)
+	require.Equal(t, "", keys[0].Seed)
+
+	require.Equal(t, "A", keys[1].Key.Name)
+	require.Equal(t, apk, keys[1].Key.Pub)
+	require.Equal(t, "account", keys[1].ExpectedKind)
+	require.Equal(t, "", keys[1].Seed)
+
+	require.Equal(t, "U", keys[2].Key.Name)
+	require.Equal(t, upk, keys[2].Key.Pub)
+	require.Equal(t, "user", keys[2].ExpectedKind)
+	require.Equal(t, "", keys[2].Seed)
+}
+
+func TestListKeysJsonWithSeeds(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--json", "--show-seeds")
+	require.NoError(t, err)
+
+	opk := ts.GetOperatorPublicKey(t)
+	opSeed, err := ts.KeyStore.GetSeed(opk)
+	require.NoError(t, err)
+
+	apk := ts.GetAccountPublicKey(t, "A")
+	apkSeed, err := ts.KeyStore.GetSeed(apk)
+	require.NoError(t, err)
+
+	upk := ts.GetUserPublicKey(t, "A", "U")
+	upkSeed, err := ts.KeyStore.GetSeed(upk)
+	require.NoError(t, err)
+
+	var keys []keyForJson
+	require.NoError(t, json.Unmarshal([]byte(out.Out), &keys))
+
+	require.Len(t, keys, 3)
+
+	require.Equal(t, "O", keys[0].Key.Name)
+	require.Equal(t, opk, keys[0].Key.Pub)
+	require.Equal(t, "operator", keys[0].ExpectedKind)
+	require.Equal(t, opSeed, keys[0].Seed)
+
+	require.Equal(t, "A", keys[1].Key.Name)
+	require.Equal(t, apk, keys[1].Key.Pub)
+	require.Equal(t, "account", keys[1].ExpectedKind)
+	require.Equal(t, apkSeed, keys[1].Seed)
+
+	require.Equal(t, "U", keys[2].Key.Name)
+	require.Equal(t, upk, keys[2].Key.Pub)
+	require.Equal(t, "user", keys[2].ExpectedKind)
+	require.Equal(t, upkSeed, keys[2].Seed)
 }

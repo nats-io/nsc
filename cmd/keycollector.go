@@ -291,15 +291,15 @@ func (p *KeyCollectorParams) Run(ctx ActionCtx) (KeyList, error) {
 }
 
 type Key struct {
-	Name         string
-	Pub          string
-	Parent       string
-	ExpectedKind nkeys.PrefixByte
-	Signing      bool
-	Curve        bool
-	KeyPath      string
-	Invalid      bool
-	Jwt          []byte
+	Name         string           `json:"name"`
+	Pub          string           `json:"pub"`
+	Parent       string           `json:"parent,omitempty"`
+	ExpectedKind nkeys.PrefixByte `json:"expected_kind"`
+	Signing      bool             `json:"signing"`
+	Curve        bool             `json:"curve"`
+	KeyPath      string           `json:"key_path"`
+	Invalid      bool             `json:"invalid"`
+	Jwt          []byte           `json:"jwt,omitempty"`
 }
 
 func (k *Key) Resolve(ks store.KeyStore) {
