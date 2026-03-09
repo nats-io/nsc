@@ -15,7 +15,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/spf13/cobra"
@@ -32,6 +34,14 @@ func (p *AccountContextParams) BindFlags(cmd *cobra.Command) {
 func (p *AccountContextParams) SetDefaults(ctx ActionCtx) error {
 	config := GetConfig()
 	if p.Name != "" {
+		// if the name is a public account key, resolve it to the account name
+		if nkeys.IsValidPublicAccountKey(p.Name) {
+			resolved, err := p.resolveAccountByKey(ctx, p.Name)
+			if err != nil {
+				return err
+			}
+			p.Name = resolved
+		}
 		// if specified, sync the context
 		err := config.SetAccountTemp(p.Name)
 		if err != nil {
@@ -67,6 +77,24 @@ func (p *AccountContextParams) Validate(ctx ActionCtx) error {
 		return errors.New("an account is required")
 	}
 	return nil
+}
+
+func (p *AccountContextParams) resolveAccountByKey(ctx ActionCtx, key string) (string, error) {
+	s := ctx.StoreCtx().Store
+	accounts, err := s.ListSubContainers(store.Accounts)
+	if err != nil {
+		return "", err
+	}
+	for _, name := range accounts {
+		ac, err := s.ReadAccountClaim(name)
+		if err != nil {
+			continue
+		}
+		if ac.Subject == key {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no account found with public key %s", key)
 }
 
 func (p *AccountContextParams) setAccount(ctx ActionCtx, name string) error {
