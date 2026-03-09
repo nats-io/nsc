@@ -1,6 +1,6 @@
 ## nsc describe operator
 
-Describes the operator
+Describes the operator by name or public nkey
 
 ```
 nsc describe operator [flags]

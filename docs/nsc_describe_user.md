@@ -1,6 +1,6 @@
 ## nsc describe user
 
-Describes an user
+Describes a user by name or public nkey
 
 ```
 nsc describe user [flags]
