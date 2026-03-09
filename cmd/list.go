@@ -60,9 +60,10 @@ func (ei EntryInfo) MarshalJSON() ([]byte, error) {
 
 func createListOperatorsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "operators",
-		Short: "List operators",
-		Args:  MaxArgs(0),
+		Use:     "operators",
+		Aliases: []string{"operator", "o"},
+		Short:   "List operators",
+		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -130,9 +131,10 @@ func createListAccountsCmd() *cobra.Command {
 	var operator string
 
 	cmd := &cobra.Command{
-		Use:   "accounts",
-		Short: "List accounts",
-		Args:  MaxArgs(0),
+		Use:     "accounts",
+		Aliases: []string{"account", "a"},
+		Short:   "List accounts",
+		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
@@ -208,9 +210,10 @@ func createListUsersCmd() *cobra.Command {
 	var operator string
 	var account string
 	cmd := &cobra.Command{
-		Use:   "users",
-		Short: "List users",
-		Args:  MaxArgs(0),
+		Use:     "users",
+		Aliases: []string{"user", "u"},
+		Short:   "List users",
+		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := GetConfig()
 			if config.StoreRoot == "" {
