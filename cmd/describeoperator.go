@@ -16,6 +16,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
+
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/spf13/cobra"
@@ -49,6 +52,13 @@ type DescribeOperatorParams struct {
 
 func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
 	p.name = NameFlagOrArgument(p.name, ctx)
+	if p.name != "" && nkeys.IsValidPublicOperatorKey(p.name) {
+		resolved, err := resolveOperatorByKey(p.name)
+		if err != nil {
+			return err
+		}
+		p.name = resolved
+	}
 	if p.name != "" {
 		actx, ok := ctx.(*Actx)
 		if !ok {
@@ -69,6 +79,25 @@ func (p *DescribeOperatorParams) SetDefaults(ctx ActionCtx) error {
 
 	}
 	return nil
+}
+
+func resolveOperatorByKey(key string) (string, error) {
+	config := GetConfig()
+	operators := config.ListOperators()
+	for _, name := range operators {
+		s, err := store.LoadStore(filepath.Join(config.StoreRoot, name))
+		if err != nil {
+			continue
+		}
+		oc, err := s.ReadOperatorClaim()
+		if err != nil {
+			continue
+		}
+		if oc.Subject == key {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no operator found with public key %s", key)
 }
 
 func (p *DescribeOperatorParams) Load(ctx ActionCtx) error {

@@ -37,6 +37,30 @@ func TestDescribeOperator_Single(t *testing.T) {
 	require.Contains(t, out.Out, " operator ")
 }
 
+func TestDescribeOperator_ByPublicKey(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	pub := ts.GetOperatorPublicKey(t)
+
+	out, err := ExecuteCmd(createDescribeOperatorCmd(), pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " operator ")
+}
+
+func TestDescribeOperator_ByPublicKeyFlag(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddOperator(t, "A")
+	pub := ts.GetOperatorPublicKey(t)
+
+	out, err := ExecuteCmd(createDescribeOperatorCmd(), "--name", pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+}
+
 func TestDescribeOperator_Raw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)
