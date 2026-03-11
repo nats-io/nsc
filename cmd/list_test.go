@@ -26,6 +26,49 @@ type entryJSON struct {
 	PublicKey string `json:"public_key"`
 }
 
+func Test_ListSubcommandAliases(t *testing.T) {
+	assert.Contains(t, createListOperatorsCmd().Aliases, "operator")
+	assert.Contains(t, createListAccountsCmd().Aliases, "account")
+	assert.Contains(t, createListUsersCmd().Aliases, "user")
+	assert.Contains(t, createListKeysCmd().Aliases, "key")
+}
+
+func Test_ListOperators(t *testing.T) {
+	ts := NewTestStore(t, "O1")
+	defer ts.Done(t)
+	ts.AddOperator(t, "O2")
+
+	out, err := ExecuteCmd(createListOperatorsCmd())
+	require.NoError(t, err)
+	assert.Contains(t, out.Out, "O1")
+	assert.Contains(t, out.Out, "O2")
+}
+
+func Test_ListAccounts(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A1")
+	ts.AddAccount(t, "A2")
+
+	out, err := ExecuteCmd(createListAccountsCmd())
+	require.NoError(t, err)
+	assert.Contains(t, out.Out, "A1")
+	assert.Contains(t, out.Out, "A2")
+}
+
+func Test_ListUsers(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U1")
+	ts.AddUser(t, "A", "U2")
+
+	out, err := ExecuteCmd(createListUsersCmd())
+	require.NoError(t, err)
+	assert.Contains(t, out.Out, "U1")
+	assert.Contains(t, out.Out, "U2")
+}
+
 func Test_ListOperatorsJSON(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
@@ -55,7 +98,6 @@ func Test_ListAccountsJSON(t *testing.T) {
 
 	cmd := createListAccountsCmd()
 	cmd.PersistentFlags().BoolVarP(&Json, "json", "J", false, "describe as JSON")
-
 
 	out, err := ExecuteCmd(cmd, "--json")
 	require.NoError(t, err)
