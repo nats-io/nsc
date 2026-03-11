@@ -26,4 +26,4 @@ jobs:
         - API compatibility with existing public interfaces
     secrets:
       claude_oauth_token: ${{ secrets.CLAUDE_OAUTH_TOKEN }}
-      gh_app_private_key: ${{ secrets.CLAUDE_GH_APP_SECRET_KEY }}
+      gh_app_private_key: ${{ secrets.CLAUDE_GH_APP_PRIVATE_KEY }}
