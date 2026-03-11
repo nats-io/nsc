@@ -61,7 +61,7 @@ func (ei EntryInfo) MarshalJSON() ([]byte, error) {
 func createListOperatorsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "operators",
-		Aliases: []string{"operator", "o"},
+		Aliases: []string{"operator"},
 		Short:   "List operators",
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -132,7 +132,7 @@ func createListAccountsCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "accounts",
-		Aliases: []string{"account", "a"},
+		Aliases: []string{"account"},
 		Short:   "List accounts",
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -211,7 +211,7 @@ func createListUsersCmd() *cobra.Command {
 	var account string
 	cmd := &cobra.Command{
 		Use:     "users",
-		Aliases: []string{"user", "u"},
+		Aliases: []string{"user"},
 		Short:   "List users",
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {

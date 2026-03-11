@@ -29,7 +29,7 @@ func createListKeysCmd() *cobra.Command {
 	var params ListKeysParams
 	cmd := &cobra.Command{
 		Use:     "keys",
-		Aliases: []string{"key", "k"},
+		Aliases: []string{"key"},
 		Short:   "List operator, account and user keys in the current operator and account context",
 		Long: `List operator, account and user keys in the current operator and account context.
 Additional flags allow you to specify which types of keys to display. For example
