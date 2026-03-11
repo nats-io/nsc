@@ -325,7 +325,7 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 	}
 	addList := func(name string, list []string) {
 		if len(list) != 0 || detail {
-			addValue(name, strings.Trim(fmt.Sprintf("%q", list), " []"))
+			addValue(name, "%s", strings.Trim(fmt.Sprintf("%q", list), " []"))
 		}
 	}
 	addTime := func(name string, when int64) {
@@ -337,8 +337,8 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 	}
 	addClaims := func(data jwt.ClaimsData, tags jwt.TagList) {
 		if showKeys {
-			addValue("Identity Key", data.Subject)
-			addValue("Identity Key Present", fmt.Sprintf("%t", ctx.KeyStore.HasPrivateKey(data.Subject)))
+			addValue("Identity Key", "%s", data.Subject)
+			addValue("Identity Key Present", "%t", ctx.KeyStore.HasPrivateKey(data.Subject))
 		}
 		addList("Tags", tags)
 		addTime("Issued At", data.IssuedAt)
@@ -356,16 +356,16 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 		} else {
 			bldrPrntf("==**<color:red>Validation</color>**==")
 		}
-		addValue("Errors", strings.Trim(fmt.Sprintf("%q", vr.Errors()), " []"))
+		addValue("Errors", "%s", strings.Trim(fmt.Sprintf("%q", vr.Errors()), " []"))
 		addList("Warnings", vr.Warnings())
 	}
 	addLimit := func(name string, limit int64) {
 		if limit == -1 {
-			addValue(name, "-1 (unlimited)")
+			addValue(name, "%s", "-1 (unlimited)")
 		} else if limit == 0 {
-			addValue(name, "0 (disabled)")
+			addValue(name, "%s", "0 (disabled)")
 		} else {
-			addValue(name, fmt.Sprintf("%d", limit))
+			addValue(name, "%d", limit)
 		}
 	}
 	addAccLimits := func(l jwt.AccountLimits) {
@@ -381,8 +381,8 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 		addLimit("Max Imports", l.Imports)
 		addLimit("Max Client Connections", l.Conn)
 		addLimit("Max Leaf Node Connections", l.LeafNodeConn)
-		addValue("Allow Wildcard Exports", fmt.Sprintf("%t", l.WildcardExports))
-		addValue("Disallow bearer token", fmt.Sprintf("%t", l.DisallowBearer))
+		addValue("Allow Wildcard Exports", "%t", l.WildcardExports)
+		addValue("Disallow bearer token", "%t", l.DisallowBearer)
 	}
 	addNatsLimits := func(l jwt.NatsLimits) {
 		if l.IsUnlimited() {
@@ -428,7 +428,7 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 		for _, t := range l.Times {
 			bldr.WriteString(fmt.Sprintf(" [%s-%s]", t.Start, t.End))
 		}
-		addValue("Permitted Times to Connect", l.Locale+bldr.String())
+		addValue("Permitted Times to Connect", "%s", l.Locale+bldr.String())
 	}
 	addSigningKeys := func(subject string, subjName string, permissionsType string, keys jwt.StringList) {
 		if !showKeys {
@@ -477,7 +477,7 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 			}
 		} else {
 			bldrPrntf("--- Response Permissions ---")
-			addValue("Expiration", p.Resp.Expires.String())
+			addValue("Expiration", "%s", p.Resp.Expires.String())
 			addLimit("Max Messages", int64(p.Resp.MaxMsgs))
 		}
 		bldrPrntf(`}`)
@@ -499,7 +499,7 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 	bldrPrntf(`object "%s" as %s << operator >> {`, op.Name, op.Subject)
 	addClaims(op.ClaimsData, op.Tags)
 	addValue("JWT Version", "%d", op.Version)
-	addValue("account server", op.AccountServerURL)
+	addValue("account server", "%s", op.AccountServerURL)
 	addValue("Strict signing key usage", "%t", op.StrictSigningKeyUsage)
 	addValidationResults(op)
 	bldrPrntf("}")
@@ -545,7 +545,7 @@ func objectDiagram(cmd *cobra.Command, users bool, showKeys bool, detail bool) e
 			}
 			bldrPrntf(`object "%s" as %s << user >> {`, uc.Name, uc.Subject)
 			addClaims(uc.ClaimsData, uc.Tags)
-			addValue("Bearer Token", fmt.Sprintf("%t", uc.BearerToken))
+			addValue("Bearer Token", "%t", uc.BearerToken)
 			addList("Allowed Connection Types", uc.AllowedConnectionTypes)
 			addNatsLimits(uc.NatsLimits)
 			addUserLimits(uc.UserLimits)
