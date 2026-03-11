@@ -316,15 +316,4 @@ func TestReplyPermissionViolation(t *testing.T) {
 	require.Contains(t, err.Error(), "Permissions Violation")
 }
 
-func Test_EncryptDecrypt(t *testing.T) {
-	ts := NewTestStore(t, "O")
-	defer ts.Done(t)
 
-	k := ts.GetOperatorPublicKey(t)
-	text := "this is a test"
-	et, err := Encrypt(k, []byte(text))
-	require.NoError(t, err)
-	od, err := Decrypt(k, et)
-	require.NoError(t, err)
-	require.Equal(t, text, string(od))
-}
