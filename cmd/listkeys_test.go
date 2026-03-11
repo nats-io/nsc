@@ -206,6 +206,204 @@ func Test_ListKeysJson(t *testing.T) {
 	require.Equal(t, "", keys[2].Seed)
 }
 
+func Test_ListKeysShowSeeds(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--show-seeds")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	require.Contains(t, stderr, "Seeds Keys")
+	require.Contains(t, stderr, "Private Key")
+	require.Contains(t, stderr, "Signing Key")
+
+	// Seeds should start with S (seed prefix)
+	opk := ts.GetOperatorPublicKey(t)
+	opSeed, err := ts.KeyStore.GetSeed(opk)
+	require.NoError(t, err)
+	require.Contains(t, stderr, opSeed)
+}
+
+func Test_ListKeysShowSeedsNoKeyPath(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	// Add a user without storing the key locally to get a key with no path
+	_, upk, _ := CreateUserKey(t)
+	_, err := ExecuteCmd(CreateAddUserCmd(), "--name", "U", "--public-key", upk)
+	require.NoError(t, err)
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--show-seeds")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	// The user key without a stored seed should show [!]
+	require.Contains(t, stderr, "[!]")
+	require.Contains(t, stderr, "seed is not stored")
+}
+
+func Test_ListKeysAll(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--all")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "U", ts.GetUserPublicKey(t, "A", "U")))
+}
+
+func Test_ListKeysAccountFlag(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	ts.AddUser(t, "A", "UA")
+	ts.AddUser(t, "B", "UB")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--account", "B")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	// Should show B's keys but not A's user
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "B", ts.GetAccountPublicKey(t, "B")))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "UB", ts.GetUserPublicKey(t, "B", "UB")))
+	require.NotContains(t, stderr, ts.GetUserPublicKey(t, "A", "UA"))
+}
+
+func Test_ListKeysUserFlag(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U1")
+	ts.AddUser(t, "A", "U2")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--user", "U1")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "U1", ts.GetUserPublicKey(t, "A", "U1")))
+	require.NotContains(t, stderr, ts.GetUserPublicKey(t, "A", "U2"))
+}
+
+func Test_ListKeysSeedsAndNotReferencedError(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	_, err := ExecuteCmd(createListKeysCmd(), "--show-seeds", "--not-referenced")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "specify one of --show-seeds or --not-referenced")
+}
+
+func Test_ListKeysMultipleAccounts(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	ts.AddAccount(t, "C")
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--accounts")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "B", ts.GetAccountPublicKey(t, "B")))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "C", ts.GetAccountPublicKey(t, "C")))
+}
+
+func Test_ListKeysWithSigningKey(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	// Add a signing key to the account
+	out, err := ExecuteCmd(createEditAccount(), "--sk", "generate")
+	require.NoError(t, err)
+	_ = out
+
+	out, err = ExecuteCmd(createListKeysCmd(), "--accounts")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	// Account key should be present
+	require.Contains(t, stderr, ts.GetAccountPublicKey(t, "A"))
+	// There should be a signing key marker (*)
+	// The signing key row should have * in the Signing Key column
+	require.Contains(t, stderr, "Signing Key")
+}
+
+func Test_ListKeysJsonNotReferenced(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+
+	_, pk, kp := CreateOperatorKey(t)
+	_, err := ts.KeyStore.Store(kp)
+	require.NoError(t, err)
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--json", "--not-referenced")
+	require.NoError(t, err)
+
+	var keys []keyForJson
+	require.NoError(t, json.Unmarshal([]byte(out.Out), &keys))
+
+	require.Len(t, keys, 1)
+	require.Equal(t, "?", keys[0].Key.Name)
+	require.Equal(t, pk, keys[0].Key.Pub)
+}
+
+func Test_ListKeysJsonFilter(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	opk := ts.GetOperatorPublicKey(t)
+
+	out, err := ExecuteCmd(createListKeysCmd(), "--json", "--all", "--filter", opk[:10])
+	require.NoError(t, err)
+
+	var keys []keyForJson
+	require.NoError(t, json.Unmarshal([]byte(out.Out), &keys))
+
+	require.Len(t, keys, 1)
+	require.Equal(t, opk, keys[0].Key.Pub)
+}
+
+func Test_ListKeysCurveFlag(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "U")
+
+	// --curve is an alias for --users, so it should show user keys
+	out, err := ExecuteCmd(createListKeysCmd(), "--curve")
+	require.NoError(t, err)
+	stderr := StripTableDecorations(out.Out)
+
+	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "O", ts.GetOperatorPublicKey(t)))
+	require.NotContains(t, stderr, fmt.Sprintf("%s %s *", "A", ts.GetAccountPublicKey(t, "A")))
+	require.Contains(t, stderr, fmt.Sprintf("%s %s *", "U", ts.GetUserPublicKey(t, "A", "U")))
+}
+
 func TestListKeysJsonWithSeeds(t *testing.T) {
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
