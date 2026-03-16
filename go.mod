@@ -1,6 +1,6 @@
 module github.com/nats-io/nsc/v2
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -18,7 +18,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/xlab/tablewriter v0.0.0-20160610135559-80b567a11ad5
-	golang.org/x/text v0.33.0
+	golang.org/x/text v0.35.0
 )
 
 require (
