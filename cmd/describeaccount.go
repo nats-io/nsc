@@ -22,7 +22,7 @@ func createDescribeAccountCmd() *cobra.Command {
 	var params DescribeAccountParams
 	cmd := &cobra.Command{
 		Use:          "account",
-		Short:        "Describes an account",
+		Short:        "Describes an account by name or public nkey",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

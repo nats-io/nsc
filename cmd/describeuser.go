@@ -16,6 +16,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 
 	"github.com/nats-io/jwt/v2"
@@ -26,7 +27,7 @@ func createDescribeUserCmd() *cobra.Command {
 	var params DescribeUserParams
 	cmd := &cobra.Command{
 		Use:          "user",
-		Short:        "Describes an user",
+		Short:        "Describes a user by name or public nkey",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -86,11 +87,37 @@ func (p *DescribeUserParams) Load(ctx ActionCtx) error {
 		return fmt.Errorf("user is required")
 	}
 
+	if nkeys.IsValidPublicUserKey(p.user) {
+		resolved, err := resolveUserByKey(ctx, p.AccountContextParams.Name, p.user)
+		if err != nil {
+			return err
+		}
+		p.user = resolved
+	}
+
 	p.raw, err = ctx.StoreCtx().Store.ReadRawUserClaim(p.AccountContextParams.Name, p.user)
 	if err != nil {
 		return err
 	}
 	return p.Init()
+}
+
+func resolveUserByKey(ctx ActionCtx, accountName string, key string) (string, error) {
+	s := ctx.StoreCtx().Store
+	names, err := s.ListEntries(store.Accounts, accountName, store.Users)
+	if err != nil {
+		return "", err
+	}
+	for _, name := range names {
+		uc, err := s.ReadUserClaim(accountName, name)
+		if err != nil {
+			continue
+		}
+		if uc.Subject == key {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no user found with public key %s", key)
 }
 
 func (p *DescribeUserParams) PostInteractive(_ ActionCtx) error {

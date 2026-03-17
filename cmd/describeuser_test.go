@@ -45,6 +45,39 @@ func TestDescribeUser_Single(t *testing.T) {
 	require.Contains(t, out.Out, " a ")
 }
 
+func TestDescribeUser_ByPublicKey(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+
+	pub := ts.GetUserPublicKey(t, "A", "a")
+	apub := ts.GetAccountPublicKey(t, "A")
+
+	out, err := ExecuteCmd(createDescribeUserCmd(), pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, apub)
+	require.Contains(t, out.Out, " a ")
+}
+
+func TestDescribeUser_ByPublicKeyFlag(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddUser(t, "A", "a")
+	ts.AddUser(t, "A", "b")
+
+	pub := ts.GetUserPublicKey(t, "A", "a")
+
+	out, err := ExecuteCmd(createDescribeUserCmd(), "--name", pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " a ")
+}
+
 func TestDescribeUserRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)

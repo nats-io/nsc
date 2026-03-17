@@ -46,6 +46,33 @@ func TestDescribeAccount_Single(t *testing.T) {
 	require.Contains(t, out.Out, " A ")
 }
 
+func TestDescribeAccount_ByPublicKey(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	pub := ts.GetAccountPublicKey(t, "A")
+
+	out, err := ExecuteCmd(createDescribeAccountCmd(), pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " A ")
+}
+
+func TestDescribeAccount_ByPublicKeyFlag(t *testing.T) {
+	ts := NewTestStore(t, "operator")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	ts.AddAccount(t, "B")
+	pub := ts.GetAccountPublicKey(t, "A")
+
+	out, err := ExecuteCmd(createDescribeAccountCmd(), "--name", pub)
+	require.NoError(t, err)
+	require.Contains(t, out.Out, pub)
+	require.Contains(t, out.Out, " A ")
+}
+
 func TestDescribeAccountRaw(t *testing.T) {
 	ts := NewTestStore(t, "operator")
 	defer ts.Done(t)

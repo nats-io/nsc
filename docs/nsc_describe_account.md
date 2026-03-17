@@ -1,6 +1,6 @@
 ## nsc describe account
 
-Describes an account
+Describes an account by name or public nkey
 
 ```
 nsc describe account [flags]
