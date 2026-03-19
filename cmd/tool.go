@@ -49,8 +49,8 @@ func init() {
 	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
 	toolCmd.PersistentFlags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
 	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
-	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "client-cert", "", "", "client certificate file for tls connections")
-	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "client-key", "", "", "client key file for tls connections")
+	toolCmd.PersistentFlags().StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
+	toolCmd.PersistentFlags().StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
 	GetRootCmd().AddCommand(toolCmd)
 }
 
