@@ -44,8 +44,8 @@ func createPullCmd() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
 	cmd.Flags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.ca, "client-cert", "", "", "client certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.ca, "client-key", "", "", "client key file for tls connections")
+	cmd.Flags().StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
+	cmd.Flags().StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
 
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
