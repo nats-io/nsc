@@ -68,7 +68,7 @@ func generateTestPKI(t *testing.T) testPKI {
 		fp := filepath.Join(dir, name)
 		buf := pem.EncodeToMemory(&pem.Block{Type: typ, Bytes: data})
 		require.NoError(t, os.WriteFile(fp, buf, 0600))
-		return fp
+		return filepath.ToSlash(fp)
 	}
 	writeKey := func(name string, key *ecdsa.PrivateKey) string {
 		der, err := x509.MarshalECPrivateKey(key)
@@ -143,14 +143,13 @@ func setupTLSFixture(t *testing.T, tlsFirst bool) *tlsFixture {
 	data, err := os.ReadFile(serverconf)
 	require.NoError(t, err)
 	dir := ts.AddSubDir(t, "resolver")
-	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
-	data = bytes.ReplaceAll(data, []byte(`dir: '.\jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, filepath.ToSlash(dir))))
+	data = bytes.ReplaceAll(data, []byte(`dir: '.\jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, filepath.ToSlash(dir))))
 
 	handshakeFirst := ""
 	if tlsFirst {
 		handshakeFirst = "\n  handshake_first: true"
 	}
-	// use forward slashes so NATS config parser doesn't choke on Windows backslashes
 	tlsConf := fmt.Sprintf(`
 tls: {
   ca_file: "%s"
@@ -158,7 +157,7 @@ tls: {
   key_file: "%s"
   verify: true%s
 }
-`, filepath.ToSlash(pki.caCert), filepath.ToSlash(pki.serverCert), filepath.ToSlash(pki.serverKey), handshakeFirst)
+`, pki.caCert, pki.serverCert, pki.serverKey, handshakeFirst)
 	data = append(data, tlsConf...)
 	err = os.WriteFile(serverconf, data, 0660)
 	require.NoError(t, err)
@@ -214,14 +213,20 @@ tls: {
 func runTLSSubtests(t *testing.T, f *tlsFixture) {
 	t.Helper()
 
+	type cmdResult struct {
+		CmdOutput
+		err error
+	}
+
 	t.Run("push", func(t *testing.T) {
 		args := append([]string{"--all"}, f.tlsFlags...)
 		_, err := ExecuteCmd(createPushCmd(), args...)
 		require.NoError(t, err)
 
-		files, err := filepath.Glob(f.dir + string(os.PathSeparator) + "*.jwt")
+		// SYS + A
+		files, err := filepath.Glob(filepath.Join(f.dir, "*.jwt"))
 		require.NoError(t, err)
-		require.Equal(t, 2, len(files))
+		require.Len(t, files, 2)
 	})
 
 	t.Run("pull", func(t *testing.T) {
@@ -229,11 +234,6 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 		_, err := ExecuteCmd(createPullCmd(), args...)
 		require.NoError(t, err)
 	})
-
-	type cmdResult struct {
-		CmdOutput
-		err error
-	}
 
 	t.Run("pub", func(t *testing.T) {
 		subj := nuid.Next()
@@ -329,5 +329,12 @@ func Test_TLS(t *testing.T) {
 
 func Test_TLS_First(t *testing.T) {
 	f := setupTLSFixture(t, true)
+
+	t.Run("tls_required", func(t *testing.T) {
+		// without client certs the connection must fail
+		_, err := ExecuteCmd(createPushCmd(), "--all", "--ca-cert", f.caCert, "--tls-first")
+		require.Error(t, err)
+	})
+
 	runTLSSubtests(t, f)
 }
