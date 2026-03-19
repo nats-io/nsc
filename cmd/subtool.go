@@ -42,7 +42,7 @@ func createSubCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&params.maxMessages, "max-messages", "", -1, "max messages")
 	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypted payload")
 	cmd.Flags().MarkHidden("max-messages")
-	cmd.Flags().MarkHidden("decrypt")
+	cmd.Flags().MarkHidden("encrypt")
 
 	params.BindFlags(cmd)
 	return cmd
@@ -94,6 +94,10 @@ func (p *SubParams) PostInteractive(ctx ActionCtx) error {
 func (p *SubParams) Validate(ctx ActionCtx) error {
 	if err := p.AccountUserContextParams.Validate(ctx); err != nil {
 		return err
+	}
+
+	if encryptFlag {
+		return fmt.Errorf("the experimental --encrypt option is no longer supported")
 	}
 
 	if p.maxMessages == 0 {
@@ -152,15 +156,6 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	var seed string
-	if encryptFlag {
-		// cannot fail if we are here
-		seed, err = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get the account private key to encrypt/decrypt the payload: %v", err)
-		}
-	}
-
 	i := 0
 	for {
 		msg, err := sub.NextMsg(10 * time.Second)
@@ -178,31 +173,8 @@ func (p *SubParams) Run(ctx ActionCtx) (store.Status, error) {
 		}
 
 		i++
-		if encryptFlag {
-			msg = maybeDecryptMessage(seed, msg)
-		}
 		ctx.CurrentCmd().Printf("[#%d] received on [%s]: '%s'\n", i, msg.Subject, string(msg.Data))
 	}
 
 	return nil, nil
-}
-
-func maybeDecryptMessage(seed string, msg *nats.Msg) *nats.Msg {
-	var dmsg nats.Msg
-	// last part of the subject will be encrypted
-	tokens := strings.Split(msg.Subject, ".")
-	k := tokens[len(tokens)-1]
-	kk, err := Decrypt(seed, []byte(k))
-	if err != nil {
-		dmsg.Subject = msg.Subject
-	} else {
-		tokens[len(tokens)-1] = string(kk)
-		dmsg.Subject = strings.Join(tokens, ".")
-	}
-
-	dmsg.Data, err = Decrypt(seed, msg.Data)
-	if err != nil {
-		dmsg.Data = msg.Data
-	}
-	return &dmsg
 }

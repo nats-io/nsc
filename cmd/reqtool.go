@@ -40,7 +40,6 @@ func createToolReqCmd() *cobra.Command {
 	params.BindFlags(cmd)
 	cmd.Flags().BoolVarP(&encryptFlag, "encrypt", "E", false, "encrypt payload")
 	cmd.Flags().MarkHidden("encrypt")
-	cmd.Flags().MarkHidden("decrypt")
 
 	return cmd
 }
@@ -92,10 +91,7 @@ func (p *ReqParams) Validate(ctx ActionCtx) error {
 	}
 
 	if encryptFlag {
-		_, err := ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
-		if err != nil {
-			return fmt.Errorf("unable to get the account private key to encrypt/decrypt the payload: %v", err)
-		}
+		return fmt.Errorf("the experimental --encrypt option is no longer supported")
 	}
 
 	if p.credsPath == "" {
@@ -125,26 +121,8 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		payload = ctx.Args()[1]
 	}
 
-	var seed string
-	if encryptFlag {
-		// cannot fail if we are here
-		seed, _ = ctx.StoreCtx().KeyStore.GetSeed(ctx.StoreCtx().Account.PublicKey)
-	}
-
-	out := []byte(payload)
-	if encryptFlag {
-		out, err = EncryptKV(seed, out)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if encryptFlag {
-		ctx.CurrentCmd().Printf("published encrypted request: [%s] : '%s'\n", subj, payload)
-	} else {
-		ctx.CurrentCmd().Printf("published request: [%s] : '%s'\n", subj, payload)
-	}
-	msg, err := nc.Request(subj, out, 5*time.Second)
+	ctx.CurrentCmd().Printf("published request: [%s] : '%s'\n", subj, payload)
+	msg, err := nc.Request(subj, []byte(payload), 5*time.Second)
 	if err == nats.ErrTimeout {
 		ctx.CurrentCmd().Println("request timed out")
 		return nil, nil
@@ -153,9 +131,6 @@ func (p *ReqParams) Run(ctx ActionCtx) (store.Status, error) {
 		return nil, err
 	}
 
-	if encryptFlag {
-		msg = maybeDecryptMessage(seed, msg)
-	}
 	_, err = fmt.Fprintf(ctx.CurrentCmd().OutOrStdout(), "received reply: [%v] : '%s'\n", msg.Subject, string(msg.Data))
 	return nil, err
 }
