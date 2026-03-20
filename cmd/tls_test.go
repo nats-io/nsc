@@ -26,6 +26,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -144,13 +145,13 @@ func setupTLSFixture(t *testing.T, tlsFirst bool) *tlsFixture {
 	require.NoError(t, err)
 	dir := ts.AddSubDir(t, "resolver")
 	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, filepath.ToSlash(dir))))
-	data = bytes.ReplaceAll(data, []byte(`dir: '.\jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, filepath.ToSlash(dir))))
 
 	handshakeFirst := ""
 	if tlsFirst {
 		handshakeFirst = "\n  handshake_first: true"
 	}
 	tlsConf := fmt.Sprintf(`
+host: "127.0.0.1"
 tls: {
   ca_file: "%s"
   cert_file: "%s"
@@ -179,8 +180,7 @@ tls: {
 	}
 
 	// push accounts so user creds are recognized by the server
-	args := append([]string{"--all"}, tlsFlags...)
-	_, err = ExecuteCmd(createPushCmd(), args...)
+	_, err = ExecuteCmd(createPushCmd(), slices.Concat([]string{"--all"}, tlsFlags)...)
 	require.NoError(t, err)
 
 	creds := ts.KeyStore.CalcUserCredsPath("A", "a")
@@ -219,8 +219,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 	}
 
 	t.Run("push", func(t *testing.T) {
-		args := append([]string{"--all"}, f.tlsFlags...)
-		_, err := ExecuteCmd(createPushCmd(), args...)
+		_, err := ExecuteCmd(createPushCmd(), slices.Concat([]string{"--all"}, f.tlsFlags)...)
 		require.NoError(t, err)
 
 		// SYS + A
@@ -230,8 +229,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 	})
 
 	t.Run("pull", func(t *testing.T) {
-		args := append([]string{"--all", "--overwrite-newer"}, f.tlsFlags...)
-		_, err := ExecuteCmd(createPullCmd(), args...)
+		_, err := ExecuteCmd(createPullCmd(), slices.Concat([]string{"--all", "--overwrite-newer"}, f.tlsFlags)...)
 		require.NoError(t, err)
 	})
 
@@ -242,8 +240,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 		require.NoError(t, err)
 		require.NoError(t, f.nc.Flush())
 
-		args := append([]string{"tool", "pub", subj, "hello"}, f.tlsFlags...)
-		_, err = ExecuteCmd(GetRootCmd(), args...)
+		_, err = ExecuteCmd(GetRootCmd(), slices.Concat([]string{"tool", "pub", subj, "hello"}, f.tlsFlags)...)
 		require.NoError(t, err)
 
 		select {
@@ -259,8 +256,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 		subCh := make(chan cmdResult, 1)
 		go func() {
 			var r cmdResult
-			args := append([]string{"tool", "sub", "--max-messages", "1", subj}, f.tlsFlags...)
-			r.CmdOutput, r.err = ExecuteCmd(GetRootCmd(), args...)
+			r.CmdOutput, r.err = ExecuteCmd(GetRootCmd(), slices.Concat([]string{"tool", "sub", "--max-messages", "1", subj}, f.tlsFlags)...)
 			subCh <- r
 		}()
 		f.ts.WaitForClient(t, "nsc_sub", 1, 60*time.Second)
@@ -284,8 +280,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 		require.NoError(t, err)
 		require.NoError(t, f.nc.Flush())
 
-		args := append([]string{"tool", "req", subj, "ping"}, f.tlsFlags...)
-		out, err := ExecuteCmd(GetRootCmd(), args...)
+		out, err := ExecuteCmd(GetRootCmd(), slices.Concat([]string{"tool", "req", subj, "ping"}, f.tlsFlags)...)
 		require.NoError(t, err)
 		require.Contains(t, out.Out, "PING")
 		require.NoError(t, reqSub.Unsubscribe())
@@ -296,8 +291,7 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 		replyCh := make(chan cmdResult, 1)
 		go func() {
 			var r cmdResult
-			args := append([]string{"tool", "reply", "--max-messages", "1", subj}, f.tlsFlags...)
-			r.CmdOutput, r.err = ExecuteCmd(GetRootCmd(), args...)
+			r.CmdOutput, r.err = ExecuteCmd(GetRootCmd(), slices.Concat([]string{"tool", "reply", "--max-messages", "1", subj}, f.tlsFlags)...)
 			replyCh <- r
 		}()
 		f.ts.WaitForClient(t, "nsc_reply", 1, 60*time.Second)
@@ -316,25 +310,27 @@ func runTLSSubtests(t *testing.T, f *tlsFixture) {
 }
 
 func Test_TLS(t *testing.T) {
-	f := setupTLSFixture(t, false)
+	for _, tc := range []struct {
+		name     string
+		tlsFirst bool
+	}{
+		{"standard", false},
+		{"handshake_first", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setupTLSFixture(t, tc.tlsFirst)
 
-	t.Run("tls_required", func(t *testing.T) {
-		// without client certs the connection must fail
-		_, err := ExecuteCmd(createPushCmd(), "--all", "--ca-cert", f.caCert)
-		require.Error(t, err)
-	})
+			t.Run("tls_required", func(t *testing.T) {
+				// server has verify: true, so omitting client certs must fail
+				args := []string{"--all", "--ca-cert", f.caCert}
+				if tc.tlsFirst {
+					args = append(args, "--tls-first")
+				}
+				_, err := ExecuteCmd(createPushCmd(), args...)
+				require.Error(t, err)
+			})
 
-	runTLSSubtests(t, f)
-}
-
-func Test_TLS_First(t *testing.T) {
-	f := setupTLSFixture(t, true)
-
-	t.Run("tls_required", func(t *testing.T) {
-		// without client certs the connection must fail
-		_, err := ExecuteCmd(createPushCmd(), "--all", "--ca-cert", f.caCert, "--tls-first")
-		require.Error(t, err)
-	})
-
-	runTLSSubtests(t, f)
+			runTLSSubtests(t, f)
+		})
+	}
 }
