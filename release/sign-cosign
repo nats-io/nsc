@@ -32,6 +32,7 @@ fi
 cosign sign-blob \
 	--key <( printf '%s\n' "$SIGNING_KEY_COSIGN" ) \
 	--output-signature "$signature" \
+	--new-bundle-format=false \
 	--yes \
 	"$artifact" \
 	</dev/null
