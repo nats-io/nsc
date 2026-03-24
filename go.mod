@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0
 	github.com/nats-io/jwt/v2 v2.8.1
-	github.com/nats-io/nats-server/v2 v2.12.5
+	github.com/nats-io/nats-server/v2 v2.12.6
 	github.com/nats-io/nats.go v1.49.0
 	github.com/nats-io/nkeys v0.4.15
 	github.com/nats-io/nuid v1.0.1
@@ -23,21 +23,21 @@ require (
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7 // indirect
-	github.com/antithesishq/antithesis-sdk-go v0.6.0-default-no-op // indirect
+	github.com/antithesishq/antithesis-sdk-go v0.7.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fatih/color v1.18.0 // indirect
+	github.com/fatih/color v1.19.0 // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
-	github.com/minio/highwayhash v1.0.4-0.20251030100505-070ab1a87a76 // indirect
+	github.com/minio/highwayhash v1.0.4 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
