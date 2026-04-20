@@ -9,8 +9,8 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/cliprompts/v2 v2.0.0
 	github.com/nats-io/jwt/v2 v2.8.1
-	github.com/nats-io/nats-server/v2 v2.12.6
-	github.com/nats-io/nats.go v1.49.0
+	github.com/nats-io/nats-server/v2 v2.12.7
+	github.com/nats-io/nats.go v1.50.0
 	github.com/nats-io/nkeys v0.4.15
 	github.com/nats-io/nuid v1.0.1
 	github.com/rhysd/go-github-selfupdate v1.2.3
