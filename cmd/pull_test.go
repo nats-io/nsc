@@ -16,13 +16,14 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"github.com/nats-io/jwt/v2"
-	"github.com/nats-io/nkeys"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nkeys"
+	"github.com/stretchr/testify/require"
 )
 
 func editAccount(t *testing.T, kp nkeys.KeyPair, d []byte, tag string) []byte {
@@ -189,6 +190,7 @@ func Test_SyncNewerFromNatsResolver(t *testing.T) {
 }
 
 func Test_SyncNewerFromNatsResolverWs(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSWebSocket)
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)

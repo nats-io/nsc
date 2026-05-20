@@ -15,12 +15,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/rhysd/go-github-selfupdate/selfupdate"
-	"github.com/stretchr/testify/require"
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/blang/semver"
+	"github.com/nats-io/nsc/v2/internal/fips"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdate_RunDoesntUpdateOrCheck(t *testing.T) {
@@ -98,6 +101,7 @@ func TestUpdate_NeedsUpdate(t *testing.T) {
 }
 
 func TestUpdate_DoUpdateWithV(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSUpdate)
 	d := MakeTempDir(t)
 	require.NoError(t, os.Setenv(NscHomeEnv, d))
 	conf := GetConfig()
@@ -132,6 +136,7 @@ func TestUpdate_DoUpdateWithV(t *testing.T) {
 }
 
 func TestUpdate_DoUpdate(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSUpdate)
 	d := MakeTempDir(t)
 	require.NoError(t, os.Setenv(NscHomeEnv, d))
 	conf := GetConfig()
@@ -166,6 +171,7 @@ func TestUpdate_DoUpdate(t *testing.T) {
 }
 
 func TestUpdate_VerPresent(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSUpdate)
 	d := MakeTempDir(t)
 	require.NoError(t, os.Setenv(NscHomeEnv, d))
 	conf := GetConfig()
@@ -200,6 +206,7 @@ func TestUpdate_VerPresent(t *testing.T) {
 }
 
 func TestUpdate_VerSame(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSUpdate)
 	d := MakeTempDir(t)
 	require.NoError(t, os.Setenv(NscHomeEnv, d))
 	conf := GetConfig()
@@ -233,6 +240,7 @@ func TestUpdate_VerSame(t *testing.T) {
 }
 
 func TestUpdate_VerNotFound(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSUpdate)
 	d := MakeTempDir(t)
 	require.NoError(t, os.Setenv(NscHomeEnv, d))
 	conf := GetConfig()
@@ -264,4 +272,21 @@ func TestUpdate_VerNotFound(t *testing.T) {
 	require.True(t, checkCalled)
 	require.False(t, updateCalled)
 	require.Contains(t, out.Err, "version 2.0.0 not found")
+}
+
+func TestUpdate_FIPSDisabled(t *testing.T) {
+	if !fips.Enforced() {
+		t.Skip("only runs under strict FIPS (fips140=only)")
+	}
+	d := MakeTempDir(t)
+	require.NoError(t, os.Setenv(NscHomeEnv, d))
+	defer func() {
+		require.NoError(t, os.Unsetenv(NscHomeEnv))
+	}()
+	conf := GetConfig()
+	conf.SetVersion("1.0.0")
+
+	_, err := ExecuteCmd(createUpdateCommand())
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "FIPS"))
 }

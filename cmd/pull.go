@@ -24,6 +24,7 @@ import (
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/spf13/cobra"
 )
 
@@ -42,10 +43,7 @@ func createPullCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&params.sysAcc, "system-account", "", "", "System account for use with nats-resolver enabled nats-server. (Default is system account specified by operator)")
 	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
 
-	cmd.Flags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
-	cmd.Flags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
+	bindClientTLSFlags(cmd.Flags())
 
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
@@ -264,6 +262,10 @@ func (p *PullParams) Run(ctx ActionCtx) (store.Status, error) {
 		_, opt, err := getSystemAccountUser(ctx, p.sysAcc, p.sysAccUser, ib, "$SYS.REQ.CLAIMS.PACK")
 		if err != nil {
 			subR.AddError("failed to obtain system user: %v", err)
+			return r, nil
+		}
+		if err := fips.CheckWebSocketURL(url); err != nil {
+			subR.AddError("%v", err)
 			return r, nil
 		}
 		nc, err := nats.Connect(url, createDefaultToolOptions("nsc_pull", ctx, opt)...)

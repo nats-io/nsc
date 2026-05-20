@@ -40,6 +40,29 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
+)
+
+// skipIfFIPS skips the current test under strict FIPS enforcement
+// (GODEBUG=fips140=only) with the given reason. Tests covered by this
+// helper are ones that would panic or error under strict mode; under
+// the looser fips140=on they continue to run.
+func skipIfFIPS(t *testing.T, reason string) {
+	t.Helper()
+	if fips.Enforced() {
+		t.Skip(reason)
+	}
+}
+
+const (
+	skipReasonFIPSCurve  = "curve (X25519) operations are disabled under FIPS"
+	skipReasonFIPSUpdate = "nsc update is disabled under FIPS"
+	// nats.go WebSocket client uses crypto/sha1 unguarded in wsAcceptKey,
+	// which panics under GODEBUG=fips140=only. nats-server has the
+	// fips140.WithoutEnforcement bypass
+	// (https://github.com/nats-io/nats-server/pull/8141, merge 7224db1).
+	// Re-enable when nats.go ships the equivalent fix.
+	skipReasonFIPSWebSocket = "WebSocket URLs not supported under FIPS pending nats.go fix"
 )
 
 type TestStore struct {

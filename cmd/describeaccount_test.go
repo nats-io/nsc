@@ -16,12 +16,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/nkeys"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
@@ -247,6 +248,7 @@ func TestDescribeAccount_JSTiers(t *testing.T) {
 }
 
 func TestDescribeAccount_Callout(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 

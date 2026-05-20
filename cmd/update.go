@@ -23,6 +23,7 @@ import (
 
 	"github.com/briandowns/spinner"
 	cli "github.com/nats-io/cliprompts/v2"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
 )
@@ -59,6 +60,9 @@ func createUpdateCommand() *cobra.Command {
 		Short:   "Update this tool to latest version",
 		Args:    MaxArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if fips.Enforced() {
+				return fips.DisabledError("nsc update", "go-github-selfupdate signature verification")
+			}
 			v, err := semver.ParseTolerant(GetRootCmd().Version)
 			if err != nil {
 				return err

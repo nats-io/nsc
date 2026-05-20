@@ -108,4 +108,30 @@ jobs:
           fi
         if: matrix.canonical
 
+  fips:
+    name: Running FIPS tests (ubuntu-latest/${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [ "1.25", "1.26" ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run tests under FIPS
+        env:
+          GOFIPS140: v1.0.0
+          GODEBUG: fips140=only
+        run: go test -v -failfast ./...
+
 #EOF

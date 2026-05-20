@@ -16,14 +16,15 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"github.com/nats-io/jwt/v2"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nats-io/jwt/v2"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_SyncOK(t *testing.T) {
@@ -353,6 +354,7 @@ func Test_SyncBadUrl(t *testing.T) {
 }
 
 func Test_SyncWs(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSWebSocket)
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "OP", "--sys"}...)

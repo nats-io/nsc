@@ -98,6 +98,7 @@ func Test_ExportOnlyContext(t *testing.T) {
 }
 
 func Test_ExportAllContext(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 	ts.AddAccount(t, "AA")
@@ -197,6 +198,7 @@ func Test_ExportNoKeyStore(t *testing.T) {
 }
 
 func Test_ExportXKeyNotReferenced(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewEmptyStore(t)
 	defer ts.Done(t)
 
@@ -210,6 +212,7 @@ func Test_ExportXKeyNotReferenced(t *testing.T) {
 }
 
 func Test_ExportXKeyInContext(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 

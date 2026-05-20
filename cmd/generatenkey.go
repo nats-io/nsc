@@ -18,6 +18,7 @@ import (
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/spf13/cobra"
 )
 
@@ -78,6 +79,9 @@ func (e *KP) kind() string {
 }
 
 func (e *KP) Generate() error {
+	if e.prefix == nkeys.PrefixByteCurve && fips.Enforced() {
+		return fips.DisabledError("nsc generate nkey --curve", "X25519")
+	}
 	var err error
 	e.kp, err = nkeys.CreatePair(e.prefix)
 	return err

@@ -20,10 +20,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nsc/v2/cmd/store"
-
-	nats "github.com/nats-io/nats.go"
-
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/spf13/cobra"
 )
 
@@ -110,6 +109,9 @@ func (p *RepParams) Validate(ctx ActionCtx) error {
 }
 
 func (p *RepParams) Run(ctx ActionCtx) (store.Status, error) {
+	if err := fips.CheckWebSocketURL(p.natsURLs...); err != nil {
+		return nil, err
+	}
 	nc, err := nats.Connect(strings.Join(p.natsURLs, ","),
 		createDefaultToolOptions("nsc_reply", ctx, nats.UserCredentials(p.credsPath))...)
 	if err != nil {
