@@ -108,4 +108,45 @@ jobs:
           fi
         if: matrix.canonical
 
+  fips:
+    name: Running FIPS tests (ubuntu-latest/${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [ "1.25", "1.26" ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+
+      # Vendor before flipping the FIPS env. Under GODEBUG=fips140=only the
+      # module proxy TLS handshake itself is rejected (it negotiates X25519),
+      # so go test cannot reach proxy.golang.org once the env is set.
+      # `-mod=vendor` keeps subsequent commands fully offline.
+      - name: Vendor modules
+        run: go mod vendor
+
+      - name: Build
+        run: go build -mod=vendor ./...
+
+      - name: Run tests under FIPS (with coverage)
+        env:
+          GOFIPS140: v1.0.0
+          GODEBUG: fips140=only
+        run: go test -mod=vendor -v -failfast -coverpkg=./... -coverprofile=./coverage.out ./...
+
+      - name: Upload coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: fips-${{ matrix.go }}
+          file: ./coverage.out
+
 #EOF

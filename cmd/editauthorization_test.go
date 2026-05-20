@@ -175,6 +175,7 @@ func Test_EditAuthorizationDeleteUser(t *testing.T) {
 }
 
 func Test_EditAuthorizationCurveKey(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewTestStore(t, "test")
 	defer ts.Done(t)
 

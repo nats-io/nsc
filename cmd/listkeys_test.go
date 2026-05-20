@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,6 +137,7 @@ func Test_ListKeysNoKeyStore(t *testing.T) {
 }
 
 func Test_listKeysAuthorizationXKey(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
 	ts := NewTestStore(t, "O")
 	defer ts.Done(t)
 

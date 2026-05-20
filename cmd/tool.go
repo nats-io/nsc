@@ -14,10 +14,14 @@
 package cmd
 
 import (
+	"crypto/tls"
+	"fmt"
+	"strings"
 	"time"
 
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 var toolCmd = &cobra.Command{
@@ -30,18 +34,67 @@ type tlsConfig struct {
 	ca       string
 	cert     string
 	key      string
+	curves   string
+}
+
+// parseTLSCurves parses a comma-separated list of TLS curve names.
+// Accepted names: P256, P384, P521, X25519 (case-insensitive,
+// "Curve" prefix optional).
+func parseTLSCurves(s string) ([]tls.CurveID, error) {
+	if s == "" {
+		return nil, nil
+	}
+	var out []tls.CurveID
+	for _, raw := range strings.Split(s, ",") {
+		name := strings.TrimSpace(raw)
+		name = strings.TrimPrefix(strings.ToLower(name), "curve")
+		switch name {
+		case "p256":
+			out = append(out, tls.CurveP256)
+		case "p384":
+			out = append(out, tls.CurveP384)
+		case "p521":
+			out = append(out, tls.CurveP521)
+		case "x25519":
+			out = append(out, tls.X25519)
+		default:
+			return nil, fmt.Errorf("unknown TLS curve %q (accepted: P256, P384, P521, X25519)", raw)
+		}
+	}
+	return out, nil
+}
+
+// tlsCurvesOption returns a nats.Option that sets CurvePreferences on the
+// connection's TLSConfig, allocating one if needed and preserving any other
+// fields populated by RootCAs/ClientCert callbacks.
+func tlsCurvesOption(curves []tls.CurveID) nats.Option {
+	return func(o *nats.Options) error {
+		if o.TLSConfig == nil {
+			o.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		o.TLSConfig.CurvePreferences = curves
+		return nil
+	}
 }
 
 var natsURLFlag = ""
 var encryptFlag bool
 var clienttls tlsConfig
 
+// bindClientTLSFlags registers the shared --tls-first/--ca-cert/--client-cert/
+// --client-key/--tls-curves flags on the given flag set. Used by tool, push
+// and pull commands so they all expose the same TLS surface.
+func bindClientTLSFlags(flags *flag.FlagSet) {
+	flags.BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
+	flags.StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
+	flags.StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
+	flags.StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
+	flags.StringVarP(&clienttls.curves, "tls-curves", "", "", "comma-separated TLS curve preferences (e.g. P256,P384,P521); defaults to Go's TLS defaults")
+}
+
 func init() {
 	toolCmd.PersistentFlags().StringVarP(&natsURLFlag, "nats", "", "", "nats url, defaults to the operator's service URLs")
-	toolCmd.PersistentFlags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
-	toolCmd.PersistentFlags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
-	toolCmd.PersistentFlags().StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
-	toolCmd.PersistentFlags().StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
+	bindClientTLSFlags(toolCmd.PersistentFlags())
 	GetRootCmd().AddCommand(toolCmd)
 }
 
@@ -83,6 +136,14 @@ func createDefaultToolOptions(name string, ctx ActionCtx, o ...nats.Option) []na
 	}
 	if clienttls.cert != "" || clienttls.key != "" {
 		opts = append(opts, nats.ClientCert(clienttls.cert, clienttls.key))
+	}
+	if clienttls.curves != "" {
+		curves, err := parseTLSCurves(clienttls.curves)
+		if err != nil {
+			opts = append(opts, func(*nats.Options) error { return err })
+		} else {
+			opts = append(opts, tlsCurvesOption(curves))
+		}
 	}
 	opts = append(opts, o...)
 	return opts

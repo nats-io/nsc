@@ -21,6 +21,7 @@ import (
 	cli "github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/spf13/cobra"
 )
 
@@ -65,6 +66,9 @@ func (e *SigningKeysParams) resolve(s string) (nkeys.KeyPair, error) {
 		return nil, fmt.Errorf("signing key cannot be empty")
 	}
 	if s == "generate" {
+		if e.kind == nkeys.PrefixByteCurve && fips.Enforced() {
+			return nil, fips.DisabledError("curve signing key generation", "X25519")
+		}
 		if kp, err := nkeys.CreatePair(e.kind); err != nil {
 			return nil, err
 		} else if s, err = kp.PublicKey(); err != nil {

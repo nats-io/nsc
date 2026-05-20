@@ -18,6 +18,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -31,7 +32,8 @@ import (
 	"testing"
 	"time"
 
-	nats "github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/nats-io/nuid"
 	"github.com/stretchr/testify/require"
 )
@@ -157,6 +159,13 @@ tls: {
   cert_file: "%s"
   key_file: "%s"
   verify: true%s
+  curve_preferences: [ "CurveP256", "CurveP384", "CurveP521" ]
+  cipher_suites: [
+    "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+    "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+  ]
 }
 `, pki.caCert, pki.serverCert, pki.serverKey, handshakeFirst)
 	data = append(data, tlsConf...)
@@ -178,6 +187,11 @@ tls: {
 	if tlsFirst {
 		tlsFlags = append(tlsFlags, "--tls-first")
 	}
+	if fips.Enforced() {
+		// FIPS 140-only blocks X25519, the Go default. Pin to NIST curves so the
+		// handshake completes against nats-server under fips140=only.
+		tlsFlags = append(tlsFlags, "--tls-curves", "P256,P384,P521")
+	}
 
 	// push accounts so user creds are recognized by the server
 	_, err = ExecuteCmd(createPushCmd(), slices.Concat([]string{"--all"}, tlsFlags)...)
@@ -191,6 +205,15 @@ tls: {
 	}
 	if tlsFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+	if fips.Enforced() {
+		opts = append(opts, func(o *nats.Options) error {
+			if o.TLSConfig == nil {
+				o.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+			}
+			o.TLSConfig.CurvePreferences = []tls.CurveID{tls.CurveP256, tls.CurveP384, tls.CurveP521}
+			return nil
+		})
 	}
 	nc, err := nats.Connect(natsURL, opts...)
 	require.NoError(t, err)

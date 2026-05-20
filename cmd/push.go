@@ -27,6 +27,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/spf13/cobra"
 )
 
@@ -56,10 +57,7 @@ push -P -A (all accounts)`,
 	cmd.Flags().StringVarP(&params.sysAccUser, "system-user", "", "", "System account user for use with nats-resolver enabled nats-server. (Default to temporarily generated user)")
 	cmd.Flags().IntVarP(&params.timeout, "timeout", "", 1, "timeout in seconds [1-60] to wait for responses from the server (only applicable to nats-resolver configurations, and applies per operation)")
 
-	cmd.Flags().BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
-	cmd.Flags().StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
-	cmd.Flags().StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
+	bindClientTLSFlags(cmd.Flags())
 
 	params.AccountContextParams.BindFlags(cmd)
 	return cmd
@@ -583,6 +581,10 @@ func (p *PushCmdParams) Run(ctx ActionCtx) (store.Status, error) {
 			"$SYS.REQ.CLAIMS.LIST", "$SYS.REQ.CLAIMS.UPDATE", "$SYS.REQ.CLAIMS.DELETE")
 		if err != nil {
 			r.AddError("error obtaining system account user: %v", err)
+			return r, nil
+		}
+		if err := fips.CheckWebSocketURL(p.ASU); err != nil {
+			r.AddError("%v", err)
 			return r, nil
 		}
 		nc, err := nats.Connect(p.ASU, createDefaultToolOptions("nsc_push", ctx, opt)...)
