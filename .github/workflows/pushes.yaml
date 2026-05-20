@@ -135,10 +135,18 @@ jobs:
       - name: Build
         run: go build -mod=vendor ./...
 
-      - name: Run tests under FIPS
+      - name: Run tests under FIPS (with coverage)
         env:
           GOFIPS140: v1.0.0
           GODEBUG: fips140=only
-        run: go test -mod=vendor -v -failfast ./...
+        run: go test -mod=vendor -v -failfast -coverpkg=./... -coverprofile=./coverage.out ./...
+
+      - name: Upload coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: fips-${{ matrix.go }}
+          file: ./coverage.out
 
 #EOF
