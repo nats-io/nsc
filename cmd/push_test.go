@@ -420,7 +420,10 @@ func Test_PushPullSigningKeysRequired(t *testing.T) {
 	data, err := os.ReadFile(serverConf)
 	require.NoError(t, err)
 	dir := ts.AddSubDir(t, "resolver")
-	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	oldResolverDir := []byte(`dir: './jwt'`)
+	require.Contains(t, string(data), string(oldResolverDir))
+	data = bytes.ReplaceAll(data, oldResolverDir, []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	require.NotContains(t, string(data), string(oldResolverDir))
 	require.NoError(t, os.WriteFile(serverConf, data, 0660))
 
 	ports := ts.RunServerWithConfig(t, serverConf)
