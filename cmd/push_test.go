@@ -417,6 +417,11 @@ func Test_PushPullSigningKeysRequired(t *testing.T) {
 	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
 		"--config-file", serverConf)
 	require.NoError(t, err)
+	data, err := os.ReadFile(serverConf)
+	require.NoError(t, err)
+	dir := ts.AddSubDir(t, "resolver")
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	require.NoError(t, os.WriteFile(serverConf, data, 0660))
 
 	ports := ts.RunServerWithConfig(t, serverConf)
 	defer ts.Server.Shutdown()
@@ -471,6 +476,11 @@ func Test_PushPullScopedOnly(t *testing.T) {
 	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
 		"--config-file", serverConf)
 	require.NoError(t, err)
+	data, err := os.ReadFile(serverConf)
+	require.NoError(t, err)
+	dir := ts.AddSubDir(t, "resolver")
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	require.NoError(t, os.WriteFile(serverConf, data, 0660))
 
 	ports := ts.RunServerWithConfig(t, serverConf)
 	defer ts.Server.Shutdown()
@@ -527,6 +537,11 @@ func Test_PushPullScopedAndNormalOnly(t *testing.T) {
 	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
 		"--config-file", serverConf)
 	require.NoError(t, err)
+	data, err := os.ReadFile(serverConf)
+	require.NoError(t, err)
+	dir := ts.AddSubDir(t, "resolver")
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	require.NoError(t, os.WriteFile(serverConf, data, 0660))
 
 	ports := ts.RunServerWithConfig(t, serverConf)
 	defer ts.Server.Shutdown()
@@ -556,6 +571,11 @@ func Test_PushPullNormalOnly(t *testing.T) {
 	_, err = ExecuteCmd(createServerConfigCmd(), "--nats-resolver",
 		"--config-file", serverConf)
 	require.NoError(t, err)
+	data, err := os.ReadFile(serverConf)
+	require.NoError(t, err)
+	dir := ts.AddSubDir(t, "resolver")
+	data = bytes.ReplaceAll(data, []byte(`dir: './jwt'`), []byte(fmt.Sprintf(`dir: '%s'`, dir)))
+	require.NoError(t, os.WriteFile(serverConf, data, 0660))
 
 	ports := ts.RunServerWithConfig(t, serverConf)
 	defer ts.Server.Shutdown()
