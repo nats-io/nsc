@@ -86,6 +86,11 @@ var clienttls tlsConfig
 // and pull commands so they all expose the same TLS surface.
 func bindClientTLSFlags(flags *flag.FlagSet) {
 	flags.BoolVarP(&clienttls.tlsFirst, "tls-first", "", false, "use tls-first when connecting to the nats server")
+	// Alias to match the nats CLI's spelling (--tlsfirst). Hidden so --help
+	// keeps showing only the canonical --tls-first; both names bind to the
+	// same variable so either spelling works in scripts.
+	flags.BoolVar(&clienttls.tlsFirst, "tlsfirst", false, "alias for --tls-first")
+	_ = flags.MarkHidden("tlsfirst")
 	flags.StringVarP(&clienttls.ca, "ca-cert", "", "", "ca certificate file for tls connections")
 	flags.StringVarP(&clienttls.cert, "client-cert", "", "", "client certificate file for tls connections")
 	flags.StringVarP(&clienttls.key, "client-key", "", "", "client key file for tls connections")
