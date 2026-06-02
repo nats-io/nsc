@@ -14,13 +14,14 @@
 package cmd
 
 import (
-	"github.com/nats-io/cliprompts/v2"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/nats-io/cliprompts/v2"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -367,6 +368,49 @@ func Test_AddUser_BearerToken(t *testing.T) {
 	u, err = ts.Store.ReadUserClaim("A", "UB")
 	require.NoError(t, err)
 	require.True(t, u.BearerToken)
+}
+
+func Test_AddUser_NameWithSlash(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "a/b"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+
+	_, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "a\\b"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+}
+
+func Test_AddUser_BearerOnDisallowBearerAccount(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	// flip the account to forbid bearer
+	_, err := ExecuteCmd(createEditAccount(), []string{"A", "--disallow-bearer"}...)
+	require.NoError(t, err)
+
+	_, err = ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "UA", "--bearer"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "forbids the use of bearer token")
+}
+
+func Test_AddUser_RandomName(t *testing.T) {
+	ts := NewTestStore(t, "O")
+	defer ts.Done(t)
+
+	ts.AddAccount(t, "A")
+	_, err := ExecuteCmd(HoistRootFlags(CreateAddUserCmd()), []string{"--name", "*"}...)
+	require.NoError(t, err)
+
+	// some user got created with a generated name (not literally "*")
+	names, err := ts.Store.ListEntries(store.Accounts, "A", store.Users)
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	require.NotEqual(t, "*", names[0])
 }
 
 func Test_AddUserWithSigningKeyOnly(t *testing.T) {

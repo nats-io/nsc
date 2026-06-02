@@ -437,3 +437,84 @@ func TestStore_NilStore(t *testing.T) {
 	d, err = s.ReadRawUserClaim("A", "U")
 	assertError(t, d, err, NoStoreSetError)
 }
+
+func TestIsNatsUrl(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"nats://localhost:4222", true},
+		{"NATS://localhost:4222", true},
+		{"  nats://x  ", true},
+		{",nats://x", true}, // leading comma accepted (list of URLs prefix)
+		{"http://x", false},
+		{"tls://x", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		require.Equal(t, c.want, IsNatsUrl(c.in), "input %q", c.in)
+	}
+}
+
+func TestIsAccountServerURL(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"http://x", true},
+		{"https://x", true},
+		{"HTTP://x", true},
+		{"HTTPS://x", true},
+		{"nats://x", false},
+		{"ws://x", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		require.Equal(t, c.want, IsAccountServerURL(c.in), "input %q", c.in)
+	}
+}
+
+func TestIsResolverURL(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"nats://x", true},
+		{"tls://x", true},
+		{"ws://x", true},
+		{"wss://x", true},
+		{"NATS://x", true},
+		{"http://x", false},
+		{"https://x", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		require.Equal(t, c.want, IsResolverURL(c.in), "input %q", c.in)
+	}
+}
+
+func TestResourceErr_Error(t *testing.T) {
+	err := NewAccountNotExistErr("A")
+	require.Equal(t, "account A does not exist in the current operator", err.Error())
+
+	err = NewUserNotExistErr("U")
+	require.Equal(t, "user U does not exist in the current account", err.Error())
+
+	err = NewOperatorNotExistErr("O")
+	require.Equal(t, "operator O does not exist", err.Error())
+
+	// IsNotExist unwraps to ErrNotExist
+	require.True(t, IsNotExist(NewAccountNotExistErr("A")))
+	require.True(t, IsNotExist(NewUserNotExistErr("U")))
+	require.True(t, IsNotExist(NewOperatorNotExistErr("O")))
+	require.False(t, IsNotExist(fmt.Errorf("other")))
+}
+
+func TestInfo_String(t *testing.T) {
+	i := &Info{Managed: true, Name: "n", Kind: "Operator", Version: "1"}
+	s := i.String()
+	require.Contains(t, s, `"managed":true`)
+	require.Contains(t, s, `"name":"n"`)
+	require.Contains(t, s, `"kind":"Operator"`)
+	require.Contains(t, s, `"version":"1"`)
+}

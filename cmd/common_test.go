@@ -464,6 +464,108 @@ func TestPushAccount(t *testing.T) {
 	require.Equal(t, opk, ac.Issuer)
 }
 
+func TestCommon_IsAccountAvailable(t *testing.T) {
+	require.True(t, IsAccountAvailable(http.StatusOK))
+	require.False(t, IsAccountAvailable(http.StatusCreated))
+	require.False(t, IsAccountAvailable(http.StatusAccepted))
+	require.False(t, IsAccountAvailable(http.StatusNotFound))
+}
+
+func TestCommon_IsAccountPending(t *testing.T) {
+	require.False(t, IsAccountPending(http.StatusOK))
+	require.True(t, IsAccountPending(http.StatusCreated))
+	require.True(t, IsAccountPending(http.StatusAccepted))
+	require.False(t, IsAccountPending(http.StatusMultipleChoices))
+	require.False(t, IsAccountPending(http.StatusBadRequest))
+}
+
+func TestCommon_LimitToString(t *testing.T) {
+	require.Equal(t, "unlimited", limitToString(-1))
+	require.Equal(t, "0", limitToString(0))
+	require.Equal(t, "42", limitToString(42))
+}
+
+func TestCommon_IsURL(t *testing.T) {
+	require.True(t, IsURL("http://example.com"))
+	require.True(t, IsURL("https://example.com"))
+	require.True(t, IsURL("HTTP://example.com"))
+	require.False(t, IsURL("nats://example.com"))
+	require.False(t, IsURL("file:///tmp/x"))
+	require.False(t, IsURL("/just/a/path"))
+	require.False(t, IsURL(""))
+}
+
+func TestCommon_AccountJwtURLFromString(t *testing.T) {
+	u, err := AccountJwtURLFromString("https://server.example/jwt/v1", "ACCTPUB")
+	require.NoError(t, err)
+	require.Equal(t, "https://server.example/jwt/v1/accounts/ACCTPUB", u)
+
+	u, err = AccountJwtURLFromString("https://server.example/", "ACCTPUB")
+	require.NoError(t, err)
+	require.Equal(t, "https://server.example/accounts/ACCTPUB", u)
+}
+
+func TestCommon_OperatorJwtURLFromString(t *testing.T) {
+	u, err := OperatorJwtURLFromString("https://server.example/jwt/v1")
+	require.NoError(t, err)
+	require.Equal(t, "https://server.example/jwt/v1/operator", u)
+}
+
+func TestCommon_AccountJwtURL_NoServer(t *testing.T) {
+	oc := &jwt.OperatorClaims{}
+	oc.Name = "MyOp"
+	_, err := AccountJwtURL(oc, &jwt.AccountClaims{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "MyOp")
+	require.Contains(t, err.Error(), "account server url")
+}
+
+func TestCommon_OperatorJwtURL_NoServer(t *testing.T) {
+	oc := &jwt.OperatorClaims{}
+	oc.Name = "MyOp"
+	_, err := OperatorJwtURL(oc)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "MyOp")
+}
+
+func TestCommon_ParseMaxResponse(t *testing.T) {
+	p := &PermissionsParams{}
+	v, err := p.parseMaxResponse("")
+	require.NoError(t, err)
+	require.Equal(t, 0, v)
+
+	v, err = p.parseMaxResponse("42")
+	require.NoError(t, err)
+	require.Equal(t, 42, v)
+
+	_, err = p.parseMaxResponse("not-a-number")
+	require.Error(t, err)
+
+	require.NoError(t, p.maxResponseValidator(""))
+	require.NoError(t, p.maxResponseValidator("7"))
+	require.Error(t, p.maxResponseValidator("garbage"))
+}
+
+func TestCommon_ValidateAccountNKey(t *testing.T) {
+	p := &AddAccountParams{}
+	_, _, akp := CreateAccountKey(t)
+	aSeed, err := akp.Seed()
+	require.NoError(t, err)
+	apk, err := akp.PublicKey()
+	require.NoError(t, err)
+
+	require.NoError(t, p.validateAccountNKey(string(aSeed)))
+	require.NoError(t, p.validateAccountNKey(apk))
+
+	oSeed, _, _ := CreateOperatorKey(t)
+	err = p.validateAccountNKey(string(oSeed))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a valid account nkey")
+
+	err = p.validateAccountNKey("")
+	require.Error(t, err)
+}
+
 func Test_NameFlagArgOnlyOnEmpty(t *testing.T) {
 	var tests = []struct {
 		n   string

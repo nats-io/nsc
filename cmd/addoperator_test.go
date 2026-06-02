@@ -331,4 +331,69 @@ func Test_AddOperatorBadName(t *testing.T) {
 	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"A/B"}...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+
+	_, err = ExecuteCmd(createAddOperatorCmd(), []string{"foo\\bar"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name cannot contain '/' or '\\'")
+}
+
+func Test_AddOperator_MissingName(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	_, err := ExecuteCmd(createAddOperatorCmd())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "operator name is required")
+}
+
+func Test_AddOperator_ForceWithoutURL(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	// --force only valid alongside --url import
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "O", "--force"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "force only works with -u")
+}
+
+func Test_AddOperator_TokenWithSysAccount(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	// build a token to import
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "O.jwt")
+	require.NoError(t, WriteFile(tf, []byte(token)))
+
+	_, err = ExecuteCmd(createAddOperatorCmd(), []string{"--url", tf, "--sys"}...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "importing an operator is not compatible with system account generation")
+}
+
+func Test_AddOperator_DuplicateWithoutForce(t *testing.T) {
+	ts := NewEmptyStore(t)
+	defer ts.Done(t)
+
+	// create operator O
+	_, err := ExecuteCmd(createAddOperatorCmd(), []string{"--name", "O"}...)
+	require.NoError(t, err)
+
+	// import a token to replace it without --force fails
+	_, pub, kp := CreateOperatorKey(t)
+	oc := jwt.NewOperatorClaims(pub)
+	oc.Name = "O"
+	token, err := oc.Encode(kp)
+	require.NoError(t, err)
+	tf := filepath.Join(ts.Dir, "Oimport.jwt")
+	require.NoError(t, WriteFile(tf, []byte(token)))
+
+	out, err := ExecuteCmd(createAddOperatorCmd(), []string{"--url", tf}...)
+	require.Error(t, err)
+	// "exists already" surfaces in the report details on stderr;
+	// top-level err is the summary "all jobs failed"
+	require.Contains(t, out.Err, "exists already")
 }
