@@ -16,14 +16,14 @@ permissions:
 on:
   push:
     branches-ignore:
-      - 'exp'
-      - 'exp/*'
-      - 'exp-*'
-      - 'exp_*'
-      - 'wip'
-      - 'wip/*'
-      - 'wip-*'
-      - 'wip_*'
+      - "exp"
+      - "exp/*"
+      - "exp-*"
+      - "exp_*"
+      - "wip"
+      - "wip/*"
+      - "wip-*"
+      - "wip_*"
   pull_request:
 
 jobs:
@@ -38,13 +38,13 @@ jobs:
         # The canonical entry is the only one where we run vet/lint/style checks.
         # `experimental: true` entries do not cause the tests to fail.
         include:
-          - go: 'stable'
+          - go: "stable"
             os: ubuntu-latest
             canonical: true
-          - go: 'stable'
+          - go: "stable"
             os: windows-latest
             canonical: false
-          - go: 'stable'
+          - go: "stable"
             os: macos-latest
             canonical: false
 
