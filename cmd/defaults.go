@@ -34,6 +34,7 @@ const NscNoGitIgnoreEnv = "NSC_NO_GIT_IGNORE"
 const NscRootCasNatsEnv = "NATS_CA"
 const NscTlsKeyNatsEnv = "NATS_KEY"
 const NscTlsCertNatsEnv = "NATS_CERT"
+const NscUTF8TableEnv = "NSC_UTF8_TABLE"
 
 type ToolConfig struct {
 	ContextConfig
