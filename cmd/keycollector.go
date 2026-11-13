@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 )
@@ -116,12 +117,15 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 	aki.Resolve(ks)
 	keys = append(keys, &aki)
 
-	for k := range ac.SigningKeys {
+	for k, scope := range ac.SigningKeys {
 		var ask Key
 		ask.Name = ac.Name
 		ask.Pub = k
 		ask.Signing = true
 		ask.Resolve(ks)
+		if scope != nil {
+			ask.Role = scope.(*jwt.UserScope).Role
+		}
 		keys = append(keys, &ask)
 	}
 	if ac.Authorization.XKey != "" {
@@ -135,7 +139,7 @@ func (p *KeyCollectorParams) handleAccount(ctx ActionCtx, parent string, name st
 	return keys, nil
 }
 
-func (p *KeyCollectorParams) handleUsers(ctx ActionCtx, account string) (KeyList, error) {
+func (p *KeyCollectorParams) handleUsers(ctx ActionCtx, account string, akeys KeyList) (KeyList, error) {
 	var keys KeyList
 
 	s := ctx.StoreCtx().Store
@@ -150,7 +154,7 @@ func (p *KeyCollectorParams) handleUsers(ctx ActionCtx, account string) (KeyList
 	}
 	sort.Strings(users)
 	for _, u := range users {
-		uk, err := p.handleUser(ctx, account, u)
+		uk, err := p.handleUser(ctx, account, u, akeys)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +164,7 @@ func (p *KeyCollectorParams) handleUsers(ctx ActionCtx, account string) (KeyList
 	return keys, nil
 }
 
-func (p *KeyCollectorParams) handleUser(ctx ActionCtx, account string, name string) (*Key, error) {
+func (p *KeyCollectorParams) handleUser(ctx ActionCtx, account string, name string, akeys KeyList) (*Key, error) {
 	s := ctx.StoreCtx().Store
 	ks := ctx.StoreCtx().KeyStore
 
@@ -169,6 +173,15 @@ func (p *KeyCollectorParams) handleUser(ctx ActionCtx, account string, name stri
 		return nil, err
 	}
 	var uki Key
+	if len(uc.IssuerAccount) > 0 {
+		// Get the signing key's role name if set
+		for _, sk := range akeys {
+			if uc.Issuer == sk.Pub {
+				uki.Role = sk.Role
+				break
+			}
+		}
+	}
 	uki.Name = uc.Name
 	uki.Pub = uc.Subject
 	uki.ExpectedKind = nkeys.PrefixByteUser
@@ -206,13 +219,13 @@ func (p *KeyCollectorParams) Run(ctx ActionCtx) (KeyList, error) {
 			keys = append(keys, akeys...)
 
 			if p.User != "" {
-				uk, err := p.handleUser(ctx, a, p.User)
+				uk, err := p.handleUser(ctx, a, p.User, akeys)
 				if err != nil {
 					return nil, err
 				}
 				keys = append(keys, uk)
 			} else {
-				ukeys, err := p.handleUsers(ctx, a)
+				ukeys, err := p.handleUsers(ctx, a, akeys)
 				if err != nil {
 					return nil, err
 				}
@@ -300,6 +313,7 @@ type Key struct {
 	KeyPath      string           `json:"key_path"`
 	Invalid      bool             `json:"invalid"`
 	Jwt          []byte           `json:"jwt,omitempty"`
+	Role         string           `json:"role,omitempty"`
 }
 
 func (k *Key) Resolve(ks store.KeyStore) {
