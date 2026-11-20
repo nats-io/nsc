@@ -693,6 +693,17 @@ func (p *FixCmd) ReadGenericJwt(fp string) (*jwt.GenericClaims, error) {
 	return jwt.DecodeGeneric(tok)
 }
 
+// parseCurveNKey finds the first line holding a curve (xkey) seed and returns its key pair.
+func parseCurveNKey(contents []byte) (nkeys.KeyPair, error) {
+	for _, line := range strings.Split(string(contents), "\n") {
+		seed := strings.TrimSpace(line)
+		if strings.HasPrefix(seed, "SX") {
+			return nkeys.FromSeed([]byte(seed))
+		}
+	}
+	return nil, fmt.Errorf("no curve nkey seed found")
+}
+
 func (p *FixCmd) LoadNKey(fp string) error {
 	d, err := p.loadFile(fp)
 	if err != nil {
@@ -700,7 +711,12 @@ func (p *FixCmd) LoadNKey(fp string) error {
 	}
 	kp, err := jwt.ParseDecoratedNKey(d)
 	if err != nil {
-		return fmt.Errorf("error parsing nkey %#q: %v", fp, err)
+		// jwt only recognizes operator/account/user seeds; curve (xkey) seeds start with SX
+		xkp, xerr := parseCurveNKey(d)
+		if xerr != nil {
+			return fmt.Errorf("error parsing nkey %#q: %v", fp, err)
+		}
+		kp = xkp
 	}
 
 	pk, err := kp.PublicKey()
