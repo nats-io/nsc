@@ -26,6 +26,7 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/spf13/cobra"
+	"github.com/xlab/tablewriter"
 )
 
 var (
@@ -248,6 +249,9 @@ func SetEnvOptions() {
 }
 
 func init() {
+	if os.Getenv(NscUTF8TableEnv) != "" {
+		tablewriter.EnableUTF8()
+	}
 	SetEnvOptions()
 	root := GetRootCmd()
 	root.Flags().BoolP("version", "v", false, "version for nsc")
