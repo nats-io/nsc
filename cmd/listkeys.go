@@ -142,7 +142,7 @@ func (p *ListKeysParams) Report(ks Keys) string {
 	var hasUnreferenced bool
 	table := tablewriter.CreateTable()
 	table.AddTitle("Keys")
-	table.AddHeaders("Entity", "Key", "Signing Key", "Stored")
+	table.AddHeaders("Entity", "Key", "Signing Key", "Stored", "Role")
 	for _, k := range ks.KeyList {
 		unreferenced := false
 		if k.Name == "?" {
@@ -152,6 +152,14 @@ func (p *ListKeysParams) Report(ks Keys) string {
 		sk := ""
 		if k.Signing {
 			sk = "*"
+			if k.Role != "" {
+				sk = k.Role
+				if k.Curve {
+					sk = fmt.Sprintf("(T)%s", k.Role)
+				}
+			}
+			// So in the table, only users in the role have the role column populated, for better readability
+			k.Role = ""
 		}
 		if k.Curve {
 			sk = "T"
@@ -173,7 +181,7 @@ func (p *ListKeysParams) Report(ks Keys) string {
 			}
 		}
 		n := fmt.Sprintf("%s%s", pad, k.Name)
-		table.AddRow(n, k.Pub, sk, stored)
+		table.AddRow(n, k.Pub, sk, stored, role)
 	}
 	s := table.Render()
 	if hasUnreferenced {
