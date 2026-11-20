@@ -16,6 +16,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/cmd/store"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
@@ -141,4 +142,19 @@ func Test_FixBasics(t *testing.T) {
 
 	ukf := filepath.Join(ofp, "keys", "keys", upk[:1], upk[1:3], fmt.Sprintf("%s.nk", upk))
 	require.FileExists(t, ukf)
+}
+
+func Test_FixLoadsXKeys(t *testing.T) {
+	ts := NewTestStore(t, "T")
+	defer ts.Done(t)
+
+	in := filepath.Join(ts.Dir, "in")
+	require.NoError(t, MaybeMakeDir(in))
+
+	xseed, xpub, _ := CreateNkey(t, nkeys.PrefixByteCurve)
+	require.NoError(t, WriteFile(filepath.Join(in, "xk.nk"), xseed))
+
+	p := &FixCmd{Keys: map[string]string{}}
+	require.NoError(t, p.LoadNKey(filepath.Join(in, "xk.nk")))
+	require.Equal(t, string(xseed), p.Keys[xpub])
 }
