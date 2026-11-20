@@ -39,7 +39,7 @@ func Test_AddExport(t *testing.T) {
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubstream", "--private"}, []string{"added private stream export \"pubstream\""}, nil, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "pubservice", "--private", "--service"}, []string{"added private service export \"pubservice\""}, nil, false},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "th.1", "--service", "--response-threshold", "1s"}, []string{"added public service export \"th.1\""}, nil, false},
-		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`time: unknown unit`}, true},
+		{createAddExportCmd(), []string{"add", "export", "--subject", "th.2", "--response-threshold", "1whatever"}, nil, []string{`must be a duration like`}, true},
 		{createAddExportCmd(), []string{"add", "export", "--subject", "re", "--response-type", "stream"}, nil, []string{"response type can only be specified in conjunction with service"}, true},
 	}
 
