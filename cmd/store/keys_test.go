@@ -16,11 +16,13 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nsc/v2/home"
+	"github.com/nats-io/nsc/v2/internal/fips"
 	"github.com/stretchr/testify/require"
 )
 
@@ -595,4 +597,249 @@ func TestAllKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, keys, opk)
 	require.Contains(t, keys, apk)
+}
+
+func CreateCurveKey(t *testing.T) (seed []byte, pub string, kp nkeys.KeyPair) {
+	return CreateTestNKey(t, nkeys.CreateCurveKeys)
+}
+
+func TestXKey_StoreAndRead(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	dir := MakeTempDir(t)
+	old := KeyStorePath
+	KeyStorePath = dir
+	defer func() { KeyStorePath = old }()
+
+	ks := NewKeyStore(t.Name())
+	seed, xpk, xkp := CreateCurveKey(t)
+	require.Equal(t, "SX", string(seed[:2]))
+
+	fp, err := ks.Store(xkp)
+	require.NoError(t, err)
+	// curve keys are sharded under X like any other key kind
+	require.Equal(t, filepath.Join(dir, KeysDir, "X", xpk[1:3], xpk+NKeyExtension), fp)
+	require.Equal(t, fp, ks.GetKeyPath(xpk))
+	d, err := os.ReadFile(fp)
+	require.NoError(t, err)
+	require.Equal(t, string(seed), string(d))
+
+	kp, err := ks.GetKeyPair(xpk)
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+	require.True(t, Match(xpk, kp))
+
+	gotPk, err := ks.GetPublicKey(xpk)
+	require.NoError(t, err)
+	require.Equal(t, xpk, gotPk)
+
+	gotSeed, err := ks.GetSeed(xpk)
+	require.NoError(t, err)
+	require.Equal(t, string(seed), gotSeed)
+
+	require.True(t, ks.HasPrivateKey(xpk))
+	_, otherPk, _ := CreateCurveKey(t)
+	require.False(t, ks.HasPrivateKey(otherPk))
+
+	// storing the same key again is a noop
+	fp2, err := ks.Store(xkp)
+	require.NoError(t, err)
+	require.Equal(t, fp, fp2)
+}
+
+func TestXKey_Remove(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	dir := MakeTempDir(t)
+	old := KeyStorePath
+	KeyStorePath = dir
+	defer func() { KeyStorePath = old }()
+
+	ks := NewKeyStore(t.Name())
+	_, xpk, xkp := CreateCurveKey(t)
+	fp, err := ks.Store(xkp)
+	require.NoError(t, err)
+	require.FileExists(t, fp)
+
+	require.NoError(t, ks.Remove(xpk))
+	_, err = os.Stat(fp)
+	require.True(t, os.IsNotExist(err))
+	require.False(t, ks.HasPrivateKey(xpk))
+
+	kp, err := ks.GetKeyPair(xpk)
+	require.NoError(t, err)
+	require.Nil(t, kp)
+
+	// removing a missing key is not an error
+	require.NoError(t, ks.Remove(xpk))
+}
+
+func TestXKey_AllKeys(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	dir := MakeTempDir(t)
+	old := KeyStorePath
+	KeyStorePath = dir
+	defer func() { KeyStorePath = old }()
+
+	ks := NewKeyStore(t.Name())
+	_, apk, akp := CreateAccountKey(t)
+	_, err := ks.Store(akp)
+	require.NoError(t, err)
+	_, xpk, xkp := CreateCurveKey(t)
+	_, err = ks.Store(xkp)
+	require.NoError(t, err)
+
+	keys, err := ks.AllKeys()
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	require.Contains(t, keys, apk)
+	require.Contains(t, keys, xpk)
+}
+
+func TestXKey_MatchAndType(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	_, xpk, xkp := CreateCurveKey(t)
+	_, xpk2, _ := CreateCurveKey(t)
+	_, apk, akp := CreateAccountKey(t)
+
+	require.True(t, Match(xpk, xkp))
+	require.False(t, Match(xpk2, xkp))
+	require.False(t, Match(apk, xkp))
+	require.False(t, Match(xpk, akp))
+
+	require.True(t, KeyPairTypeOk(nkeys.PrefixByteCurve, xkp))
+	require.False(t, KeyPairTypeOk(nkeys.PrefixByteAccount, xkp))
+	require.False(t, KeyPairTypeOk(nkeys.PrefixByteCurve, akp))
+
+	kind, err := KeyType(xkp)
+	require.NoError(t, err)
+	require.Equal(t, nkeys.PrefixByteCurve, kind)
+}
+
+func TestXKey_ExtractSeed(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	seed, xpk, _ := CreateCurveKey(t)
+
+	kp, err := ExtractSeed(string(seed))
+	require.NoError(t, err)
+	got, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, xpk, got)
+
+	block := "-----BEGIN CURVE NKEY SEED-----\n" +
+		string(seed) + "\n" +
+		"------END CURVE NKEY SEED------\n"
+	kp, err = ExtractSeed(block)
+	require.NoError(t, err)
+	got, err = kp.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, xpk, got)
+}
+
+func TestXKey_ResolveKey(t *testing.T) {
+	skipIfFIPS(t, skipReasonFIPSCurve)
+	seed, xpk, _ := CreateCurveKey(t)
+
+	// raw seed
+	kp, err := ResolveKey(string(seed))
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+	got, err := kp.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, xpk, got)
+	gotSeed, err := kp.Seed()
+	require.NoError(t, err)
+	require.Equal(t, string(seed), string(gotSeed))
+
+	// seed in a file
+	dir := MakeTempDir(t)
+	fp := filepath.Join(dir, "x.nk")
+	require.NoError(t, os.WriteFile(fp, seed, 0600))
+	kp, err = ResolveKey(fp)
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+	got, err = kp.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, xpk, got)
+
+	// raw public key
+	kp, err = ResolveKey(xpk)
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+	got, err = kp.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, xpk, got)
+}
+
+// a different seed already stored at a key's path must not be overwritten
+func TestStore_ConflictingKey(t *testing.T) {
+	dir := MakeTempDir(t)
+	old := KeyStorePath
+	KeyStorePath = dir
+	defer func() { KeyStorePath = old }()
+
+	ks := NewKeyStore(t.Name())
+	_, apk, akp := CreateAccountKey(t)
+	other, _, _ := CreateAccountKey(t)
+
+	fp := ks.GetKeyPath(apk)
+	require.NoError(t, os.MkdirAll(filepath.Dir(fp), 0700))
+	require.NoError(t, os.WriteFile(fp, other, 0600))
+
+	_, err := ks.Store(akp)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already exists and is different")
+
+	d, err := os.ReadFile(fp)
+	require.NoError(t, err)
+	require.Equal(t, string(other), string(d))
+}
+
+// seeds reach the store from files written by hand or by other tooling, so
+// line endings, padding and armor must not matter - for any key kind
+func TestExtractSeed_Shapes(t *testing.T) {
+	useed, upk, _ := CreateUserKey(t)
+	kinds := map[string]struct {
+		seed  string
+		pk    string
+		label string
+	}{
+		"user": {string(useed), upk, "USER"},
+	}
+	if !fips.Enforced() {
+		xseed, xpk, _ := CreateCurveKey(t)
+		kinds["curve"] = struct {
+			seed  string
+			pk    string
+			label string
+		}{string(xseed), xpk, "CURVE"}
+	}
+
+	for kind, k := range kinds {
+		armor := "-----BEGIN " + k.label + " NKEY SEED-----\n" + k.seed + "\n------END " + k.label + " NKEY SEED------\n"
+		banner := "************************* IMPORTANT *************************\n" +
+			"NKEY Seed printed below can be used to sign and prove identity.\n" +
+			"NKEYs are sensitive and should be treated as secrets.\n\n"
+		shapes := map[string]string{
+			"raw":            k.seed,
+			"newline":        k.seed + "\n",
+			"crlf":           k.seed + "\r\n",
+			"padded":         "\n  " + k.seed + "  \n\n",
+			"armored":        armor,
+			"armored_banner": banner + armor + "\n*************************************************************\n",
+			"armored_crlf":   strings.ReplaceAll(armor, "\n", "\r\n"),
+			"armored_no_eol": strings.TrimSpace(armor),
+			"armored_indent": "  -----BEGIN " + k.label + " NKEY SEED-----\n  " + k.seed + "\n  ------END " + k.label + " NKEY SEED------\n",
+		}
+		for name, content := range shapes {
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				kp, err := ExtractSeed(content)
+				require.NoError(t, err)
+				got, err := kp.PublicKey()
+				require.NoError(t, err)
+				require.Equal(t, k.pk, got)
+				seed, err := kp.Seed()
+				require.NoError(t, err)
+				require.Equal(t, k.seed, string(seed))
+			})
+		}
+	}
 }
