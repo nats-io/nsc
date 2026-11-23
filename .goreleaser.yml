@@ -26,25 +26,25 @@ builds:
       - amd64
       - arm64
       - arm
-      - 386
+      - "386"
     goarm:
-      - 6
-      - 7
+      - "6"
+      - "7"
     ignore:
       - goos: windows
         goarch: arm64
       - goos: windows
         goarch: arm
       - goos: windows
-        goarch: 386
+        goarch: "386"
       - goos: darwin
-        goarch: 386
+        goarch: "386"
       - goos: freebsd
         goarch: arm
       - goos: freebsd
         goarch: arm64
       - goos: freebsd
-        goarch: 386
+        goarch: "386"
     binary: nsc
     main: .
     env:
@@ -103,22 +103,34 @@ signs:
 #   artifacts: checksum
 
 
-brews:
+homebrew_casks:
   - name: nsc
-    directory: Formula
+    description: "A tool for creating NATS account and user access configurations"
+    homepage: "https://github.com/nats-io/nsc"
+    license: "Apache-2.0"
+
+    url:
+      template: 'https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}.zip'
+
     repository:
       owner: nats-io
       name: homebrew-nats-tools
       token: "{{ .Env.GITHUB_APP_TOKEN }}"
-    url_template: 'https://github.com/nats-io/nsc/releases/download/{{ .Tag }}/nsc-{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}.zip'
-    homepage: "https://github.com/nats-io/nsc"
-    description: "A tool for creating NATS account and user access configurations"
-    license: "Apache-2.0"
-    # Cross-repo upload currently requires that $GITHUB_ACTION be a PAT which has some undesirable security characteristics.
-    # We are instead registering this as a build artifact, so that the file is available for a manual PR of nsc.rb in the tap.
-    skip_upload: false
-    test: |
-      system "#{bin}/nsc --version"
-    install: |
-      bin.install "nsc"
-      generate_completions_from_executable(bin/"nsc", "completion")
+
+    generate_completions_from_executable:
+      executable: "bin/nsc"
+      args: ["completion"]
+      shell_parameter_format: "cobra"
+      shells:
+        - bash
+        - fish
+        - powershell
+        - zsh
+
+    # Until we support Apple Codesign, we need this:
+    hooks:
+      post:
+        install_steps: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/nsc"]
+          end
