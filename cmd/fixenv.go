@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nats-io/nsc/v2/cmd/store"
+	"github.com/nats-io/nsc/v2/internal/fips"
 )
 
 func init() {
@@ -283,10 +285,24 @@ func (p *FixCmd) Regenerate(rr *store.Report) error {
 				if kp != nil {
 					_, err := ks.Store(*kp)
 					if err != nil {
-						ar.AddError("error storing key %s: %v", ak, err)
+						ar.AddError("error storing key %s: %v", k, err)
+						continue
 					}
 					or.AddOK("stored key %s", k)
 					p.nkeys++
+				}
+			}
+
+			// the curve (xkey) used by the authorization callout is not a
+			// signing key, but it belongs to the account
+			if xk := ac.Authorization.XKey; xk != "" {
+				if xkp := p.kp(xk); xkp != nil {
+					if _, err := ks.Store(*xkp); err != nil {
+						ar.AddError("error storing curve key %s: %v", xk, err)
+					} else {
+						ar.AddOK("stored curve key %s", xk)
+						p.nkeys++
+					}
 				}
 			}
 
@@ -361,7 +377,7 @@ func (p *FixCmd) LoadNKeys(ctx ActionCtx) (*store.Report, error) {
 			ext := filepath.Ext(src)
 			if ext == store.NKeyExtension {
 				if err := p.LoadNKey(src); err != nil {
-					r.AddFromError(err)
+					addNKeyErr(r, err)
 				}
 			}
 
@@ -602,7 +618,7 @@ func (p *FixCmd) LoadCreds(ctx ActionCtx) (*store.Report, error) {
 				sr.Add(r)
 
 				if err := p.LoadNKey(src); err != nil {
-					sr.AddFromError(err)
+					addNKeyErr(sr, err)
 				}
 			}
 			return nil
@@ -693,6 +709,40 @@ func (p *FixCmd) ReadGenericJwt(fp string) (*jwt.GenericClaims, error) {
 	return jwt.DecodeGeneric(tok)
 }
 
+// errCurveKeySkipped is returned when a curve (xkey) seed is found under
+// strict fips - deriving its public key requires X25519, which panics there
+var errCurveKeySkipped = errors.New("curve keys (X25519) are not supported in FIPS mode")
+
+// addNKeyErr reports a key load failure - skipped curve keys are only a
+// warning, so the rest of the fix can proceed
+func addNKeyErr(r *store.Report, err error) {
+	if errors.Is(err, errCurveKeySkipped) {
+		r.AddWarning("%v", err)
+		return
+	}
+	r.AddFromError(err)
+}
+
+// curveNKey returns the key pair if the contents hold a curve (xkey) seed.
+// jwt.ParseDecoratedNKey only knows operator/account/user seeds, the store
+// parses any seed. the kind is read from the seed itself, as deriving the
+// public key requires X25519
+func curveNKey(contents []byte) (nkeys.KeyPair, bool) {
+	kp, err := store.ExtractSeed(string(contents))
+	if err != nil {
+		return nil, false
+	}
+	seed, err := kp.Seed()
+	if err != nil {
+		return nil, false
+	}
+	kind, _, err := nkeys.DecodeSeed(seed)
+	if err != nil || kind != nkeys.PrefixByteCurve {
+		return nil, false
+	}
+	return kp, true
+}
+
 func (p *FixCmd) LoadNKey(fp string) error {
 	d, err := p.loadFile(fp)
 	if err != nil {
@@ -700,7 +750,14 @@ func (p *FixCmd) LoadNKey(fp string) error {
 	}
 	kp, err := jwt.ParseDecoratedNKey(d)
 	if err != nil {
-		return fmt.Errorf("error parsing nkey %#q: %v", fp, err)
+		xkp, ok := curveNKey(d)
+		if !ok {
+			return fmt.Errorf("error parsing nkey %#q: %v", fp, err)
+		}
+		if fips.Enforced() {
+			return fmt.Errorf("skipping nkey %#q: %w", fp, errCurveKeySkipped)
+		}
+		kp = xkp
 	}
 
 	pk, err := kp.PublicKey()

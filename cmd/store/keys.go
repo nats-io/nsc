@@ -662,6 +662,10 @@ func Write(name string, data []byte) error {
 
 func ExtractSeed(s string) (nkeys.KeyPair, error) {
 	lines := strings.Split(s, "\n")
+	// tolerate crlf line endings and indentation
+	for i, v := range lines {
+		lines[i] = strings.TrimSpace(v)
+	}
 	start := -1
 	end := -1
 	for i, v := range lines {
@@ -679,7 +683,7 @@ func ExtractSeed(s string) (nkeys.KeyPair, error) {
 		lines := lines[start:end]
 		s = strings.Join(lines, "")
 	}
-	return nkeys.FromSeed([]byte(s))
+	return nkeys.FromSeed([]byte(strings.TrimSpace(s)))
 }
 
 func AbbrevHomePaths(fp string) string {
